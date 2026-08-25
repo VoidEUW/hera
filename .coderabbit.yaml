@@ -1,0 +1,63 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+language: en-GB
+early_access: false
+
+reviews:
+  profile: assertive
+  request_changes_workflow: false
+  high_level_summary: true
+  poem: false
+  review_status: true
+  collapse_walkthrough: true
+
+  path_filters:
+    - "!uv.lock"
+    - "!apps/web/package-lock.json"
+    - "!apps/web/src/lib/api/generated/**"
+    - "!**/*.min.js"
+    - "!docs/prototype.md"
+
+  path_instructions:
+    - path: "packages/**"
+      instructions: >-
+        Enforce the layering in ARCHITECTURE.md: imports point downwards only.
+        hera_providers, hera_permissions, hera_storage and hera_prompts are the foundation and
+        must not import any other hera_* package. hera_tools may use hera_permissions;
+        hera_profiles may use hera_prompts; hera_chats may use providers, tools, profiles and
+        skillsets; nothing may import from apps/. Flag any upward or sideways import.
+        Every table sets an explicit prefixed __tablename__ and cross-package references are
+        bare UUID columns, never ForeignKey. Public functions are fully annotated and modules
+        start with `from __future__ import annotations`.
+    - path: "packages/hera_providers/**"
+      instructions: >-
+        This is the only package allowed to know what an LLM is. Flag any leak of
+        provider-specific shapes (raw OpenAI dicts, <think> tags, tool_call JSON) past its
+        public API — everything above consumes the normalised event union.
+        embed() must never raise; it returns None on failure.
+    - path: "packages/hera_skillsets/**"
+      instructions: >-
+        Skill selection must stay deterministic and server-side. Flag any design that relies on
+        the model choosing to load a skill; the target model is unreliable at that.
+    - path: "apps/api/**"
+      instructions: >-
+        Every route depends on the authenticated user; flag any route without it except the
+        documented public allow-list (/healthz, /api/v1/auth/*, static assets).
+        Responses are typed Pydantic models, never bare dicts. No raw SQL — go through a
+        repository.
+    - path: "apps/web/**"
+      instructions: >-
+        No hand-written API types: they are generated from the OpenAPI schema. All user-visible
+        strings go through the i18n layer — flag hard-coded English or German text in
+        components. The message view must be able to render every event variant.
+    - path: "**/*.md"
+      instructions: >-
+        Documentation is English. Flag stale statements that contradict the code in the same
+        pull request.
+
+  auto_review:
+    enabled: true
+    drafts: false
+    base_branches: ["main"]
+
+chat:
+  auto_reply: true

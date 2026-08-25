@@ -1,0 +1,48 @@
+name: Bug report
+description: Something behaves differently than it should
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, what you got instead.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. …
+        2. …
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Where
+      options:
+        - apps/web (the interface)
+        - apps/api (routes, streaming, auth)
+        - chats / the turn loop
+        - tools / MCP
+        - skills
+        - the mind (profiles, regions, git)
+        - memories
+        - dreaming / experience training
+        - tooling, CI, packaging
+        - not sure
+    validations:
+      required: true
+  - type: input
+    id: model
+    attributes:
+      label: Model and endpoint
+      placeholder: Qwen3.6-35B via LM Studio 0.3.x
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Server output or browser console. Redact anything private.
+      render: shell

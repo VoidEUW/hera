@@ -1,0 +1,45 @@
+# The fast half of CI, so a failure surfaces before the push rather than after it.
+#   uv run pre-commit install
+default_install_hook_types: [pre-commit, commit-msg]
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: check-yaml
+      - id: check-toml
+      - id: check-json
+        exclude: ^apps/web/(tsconfig|jsconfig)\.json$
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: [--maxkb=512]
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+        args: [--markdown-linebreak-ext=md]
+      - id: mixed-line-ending
+        args: [--fix=lf]
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.16.4
+    hooks:
+      - id: ruff-check
+        args: [--fix]
+      - id: ruff-format
+
+  # mypy runs against the synced workspace rather than pre-commit's isolated environment;
+  # the foundation packages are path sources and would not resolve otherwise.
+  - repo: local
+    hooks:
+      - id: mypy
+        name: mypy --strict
+        entry: uv run mypy
+        language: system
+        types: [python]
+        pass_filenames: false
+
+  - repo: https://github.com/compilerla/conventional-pre-commit
+    rev: v4.2.0
+    hooks:
+      - id: conventional-pre-commit
+        stages: [commit-msg]
+        args: [feat, fix, chore, docs, refactor, test, perf, ci, build, revert]

@@ -1,0 +1,119 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-python-workspace
+      - run: uv run ruff check --output-format=github .
+      - run: uv run ruff format --check .
+
+  types:
+    name: types
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-python-workspace
+      - run: uv run mypy
+
+  test:
+    name: test
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-python-workspace
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Unit tests
+        run: uv run coverage run -m pytest -m "not e2e and not live"
+      - name: Coverage gate
+        run: |
+          if compgen -G "packages/*/pyproject.toml" > /dev/null; then
+            uv run coverage report
+          else
+            echo "No packages in the workspace yet — coverage gate not applicable."
+          fi
+
+  web:
+    name: web
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - id: guard
+        run: |
+          if [ -f apps/web/package.json ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "apps/web does not exist yet — nothing to check."
+          fi
+      - uses: actions/setup-node@v7
+        if: steps.guard.outputs.present == 'true'
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - if: steps.guard.outputs.present == 'true'
+        working-directory: apps/web
+        run: |
+          npm ci
+          npm run lint
+          npm run check
+          npm run test:unit
+          npm run build
+
+  e2e:
+    name: e2e
+    runs-on: ubuntu-latest
+    needs: [test, web]
+    steps:
+      - uses: actions/checkout@v7
+      - id: guard
+        run: |
+          if [ -d tests/e2e ] && [ -f apps/web/package.json ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "End-to-end suite not present yet — nothing to run."
+          fi
+      - uses: ./.github/actions/setup-python-workspace
+        if: steps.guard.outputs.present == 'true'
+      - uses: actions/setup-node@v7
+        if: steps.guard.outputs.present == 'true'
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - name: Build the web app
+        if: steps.guard.outputs.present == 'true'
+        working-directory: apps/web
+        run: npm ci && npm run build
+      - name: Install browsers
+        if: steps.guard.outputs.present == 'true'
+        run: uv run playwright install --with-deps chromium
+      - name: End-to-end tests
+        if: steps.guard.outputs.present == 'true'
+        # The suite drives the real application against FakeProvider, so it needs no model.
+        run: uv run pytest -m e2e
+      - uses: actions/upload-artifact@v7
+        if: failure() && steps.guard.outputs.present == 'true'
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7

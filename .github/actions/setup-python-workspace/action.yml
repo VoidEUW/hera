@@ -1,0 +1,19 @@
+name: Set up the Python workspace
+description: Install uv with a warm cache and sync every workspace member.
+
+inputs:
+  python-version:
+    description: Python version to install
+    required: false
+    default: "3.12"
+
+runs:
+  using: composite
+  steps:
+    - uses: astral-sh/setup-uv@v10
+      with:
+        enable-cache: true
+        cache-dependency-glob: uv.lock
+    - name: Sync the workspace
+      shell: bash
+      run: uv sync --all-packages --python ${{ inputs.python-version }}

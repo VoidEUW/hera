@@ -1,0 +1,85 @@
+[project]
+name = "hera"
+version = "0.1.0.dev0"
+description = "Hera — a self-hosted agentic chat space: MCP tools, SKILL.md skills, a git-versioned mind."
+readme = "README.md"
+requires-python = ">=3.12"
+authors = [{ name = "Lukas Kreuz" }]
+license = { text = "MIT" }
+dependencies = []
+
+# The workspace root is a container, not a distribution: nothing installs `hera` itself.
+[tool.uv]
+package = false
+
+[tool.uv.workspace]
+members = ["packages/*", "apps/api"]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "coverage>=7.6",
+    "mypy>=1.11",
+    "ruff>=0.6",
+    "httpx>=0.27",
+    # Needed at the workspace root for the pydantic mypy plugin to load.
+    "pydantic>=2.9",
+]
+
+# ---------------------------------------------------------------------------
+# Shared tool configuration. Every package inherits this; a package only adds a
+# `[tool.ruff.lint.per-file-ignores]` entry when it has a documented reason to.
+# ---------------------------------------------------------------------------
+
+[tool.ruff]
+line-length = 100
+src = ["packages", "apps/api/src", "tests"]
+extend-exclude = ["*.md", "apps/web"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "ANN", "RUF"]
+
+[tool.ruff.lint.per-file-ignores]
+"**/tests/*" = ["ANN401"]
+"tests/*" = ["ANN401"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+plugins = ["pydantic.mypy"]
+# Listed explicitly, one entry per workspace member: mypy treats a glob that matches nothing as
+# a literal path, so `packages/*` cannot be used while a member is still missing.
+# tests/test_docs.py::test_mypy_checks_every_package fails if an entry is forgotten.
+files = ["tests"]
+
+[[tool.mypy.overrides]]
+module = ["tests.*", "*.tests.*"]
+disallow_untyped_decorators = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests", "packages", "apps/api/tests"]
+asyncio_mode = "auto"
+addopts = "--strict-markers --strict-config"
+markers = [
+    "e2e: end-to-end tests driving a real server (deselect with '-m \"not e2e\"')",
+    "live: needs a reachable model endpoint; never runs in CI",
+]
+
+# Coverage runs as `coverage run -m pytest`, not through --cov: hera_storage ships a pytest11
+# plugin, so pytest imports it while loading entry points -- before pytest-cov could start
+# tracing. Everything at module level would count as unmeasured.
+[tool.coverage.run]
+source = ["packages", "apps/api/src"]
+branch = true
+
+[tool.coverage.report]
+fail_under = 90
+show_missing = true
+skip_covered = true
+exclude_also = [
+    "if TYPE_CHECKING:",
+    "@overload",
+    "raise NotImplementedError",
+    "class .*\\(Protocol\\):",
+]

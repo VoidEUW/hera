@@ -1,0 +1,35 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Collect the changes since the previous tag
+        id: notes
+        run: |
+          previous=$(git describe --tags --abbrev=0 "${GITHUB_REF_NAME}^" 2>/dev/null || true)
+          if [ -n "$previous" ]; then
+            range="$previous..${GITHUB_REF_NAME}"
+          else
+            range="${GITHUB_REF_NAME}"
+          fi
+          {
+            echo "body<<EOF"
+            git log --no-merges --pretty='- %s (%h)' "$range"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+      - uses: softprops/action-gh-release@v3
+        with:
+          name: ${{ github.ref_name }}
+          body: ${{ steps.notes.outputs.body }}
+          generate_release_notes: false

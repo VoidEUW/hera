@@ -1,0 +1,36 @@
+name: Feature request
+description: Something Hera should be able to do
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: need
+    attributes:
+      label: The need
+      description: The situation you are in and what is missing. Not the solution yet.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: How you imagine it
+    validations:
+      required: true
+  - type: dropdown
+    id: layer
+    attributes:
+      label: Which package would own this
+      description: See ARCHITECTURE.md. "Not sure" is a fine answer.
+      options:
+        - hera_providers
+        - hera_permissions
+        - hera_tools
+        - hera_skillsets
+        - hera_profiles
+        - hera_chats
+        - hera_memories
+        - hera_promptevo
+        - apps/api
+        - apps/web
+        - not sure
+    validations:
+      required: true

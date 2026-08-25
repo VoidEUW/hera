@@ -1,0 +1,32 @@
+version: 2
+updates:
+  - package-ecosystem: uv
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      dev-tooling:
+        patterns: ["ruff", "mypy", "pytest*", "coverage"]
+
+  - package-ecosystem: npm
+    directory: /apps/web
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      svelte:
+        patterns: ["svelte*", "@sveltejs/*", "vite*"]
+      dev-tooling:
+        patterns: ["eslint*", "prettier*", "typescript", "vitest", "@playwright/*"]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: "chore(ci)"

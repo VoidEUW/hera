@@ -1,0 +1,39 @@
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+
+# Tooling caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# Databases / local state
+*.db
+*.db-wal
+*.db-shm
+*.sqlite3
+*.sqlite3-wal
+*.sqlite3-shm
+
+# Web
+node_modules/
+apps/web/.svelte-kit/
+apps/web/build/
+apps/api/src/hera_api/static/
+test-results/
+playwright-report/
+blob-report/
+
+# Generated API client
+apps/web/src/lib/api/generated/
+
+# OS / editors
+.DS_Store
+*.swp
