@@ -1,8 +1,14 @@
 name: Release
 
+# Two tag shapes:
+#   v1.2.3                  the application
+#   hera-prompts-v0.1.3     a single package, so a consumer can pin one library without
+#                           pinning Hera (see CONTRIBUTING.md, "Using one package somewhere else")
 on:
   push:
-    tags: ["v*"]
+    tags:
+      - "v*"
+      - "hera-*-v*"
 
 permissions:
   contents: write
@@ -14,22 +20,59 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
+
+      - name: Work out what is being released
+        id: target
+        run: |
+          if [[ "$GITHUB_REF_NAME" =~ ^(hera-[a-z0-9-]+)-v[0-9] ]]; then
+            package="${BASH_REMATCH[1]}"
+            echo "package=$package" >> "$GITHUB_OUTPUT"
+            echo "directory=packages/${package//-/_}" >> "$GITHUB_OUTPUT"
+          else
+            echo "package=" >> "$GITHUB_OUTPUT"
+            echo "directory=." >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check the tag matches the declared version
+        if: steps.target.outputs.package != ''
+        run: |
+          directory='${{ steps.target.outputs.directory }}'
+          declared=$(grep -m1 '^version = ' "$directory/pyproject.toml" | cut -d'"' -f2)
+          tagged="${GITHUB_REF_NAME##*-v}"
+          if [ "$declared" != "$tagged" ]; then
+            echo "::error::$directory/pyproject.toml declares $declared but the tag says $tagged"
+            exit 1
+          fi
+
+      - uses: ./.github/actions/setup-python-workspace
+        if: steps.target.outputs.package != ''
+
+      - name: Build the package
+        if: steps.target.outputs.package != ''
+        run: uv build --package '${{ steps.target.outputs.package }}' --out-dir dist
+
       - name: Collect the changes since the previous tag
         id: notes
         run: |
-          previous=$(git describe --tags --abbrev=0 "${GITHUB_REF_NAME}^" 2>/dev/null || true)
+          pattern='v[0-9]*'
+          if [ -n '${{ steps.target.outputs.package }}' ]; then
+            pattern='${{ steps.target.outputs.package }}-v[0-9]*'
+          fi
+          previous=$(git describe --tags --abbrev=0 --match "$pattern" "${GITHUB_REF_NAME}^" 2>/dev/null || true)
           if [ -n "$previous" ]; then
             range="$previous..${GITHUB_REF_NAME}"
           else
             range="${GITHUB_REF_NAME}"
           fi
           {
-            echo "body<<EOF"
-            git log --no-merges --pretty='- %s (%h)' "$range"
-            echo "EOF"
+            echo "body<<HERA_EOF"
+            git log --no-merges --pretty='- %s (%h)' "$range" -- '${{ steps.target.outputs.directory }}'
+            echo "HERA_EOF"
           } >> "$GITHUB_OUTPUT"
+
       - uses: softprops/action-gh-release@v3
         with:
           name: ${{ github.ref_name }}
           body: ${{ steps.notes.outputs.body }}
+          files: ${{ steps.target.outputs.package != '' && 'dist/*' || '' }}
           generate_release_notes: false

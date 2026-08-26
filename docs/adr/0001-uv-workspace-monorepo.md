@@ -38,14 +38,37 @@ packages have an empty allow-list, and `hera_storage` is named explicitly by eac
 persists something instead of being treated as universally available — so the one package that
 must *not* reach for it stays visible.
 
+## Reuse is not lost
+
+A monorepo usually trades away the ability to consume one library on its own. Here it does not,
+because every member stays a real distribution with its own name, version and build backend. A
+separate project depends on exactly one package by pointing at its subdirectory:
+
+```toml
+[project]
+dependencies = ["hera-prompts"]
+
+[tool.uv.sources]
+hera-prompts = { git = "https://github.com/VoidEUW/hera", subdirectory = "packages/hera_prompts", tag = "hera-prompts-v0.1.2" }
+```
+
+Only that package and its own dependencies are installed; the rest of the workspace is not
+fetched, built or imported. `uv build --package hera-prompts` produces the same wheel a
+standalone repository would, so publishing to an index later needs no restructuring.
+
+Verified end to end: installing `hera-storage` this way into an unrelated project resolves
+`sqlmodel` and `pydantic-settings`, and nothing else from the workspace comes with it.
+
 ## Consequences
 
-- Their standalone repositories become upstream history rather than a live dependency. A change
-  now lands here; syncing it back out is a manual export, which is the trade for not maintaining
-  two release paths.
+- Their standalone repositories become upstream history rather than a live dependency. Changes
+  land here from now on.
+- Package versions move independently of the application's. Releases are therefore tagged
+  `<package>-v<version>` (`hera-prompts-v0.1.2`) next to the application's plain `v<version>`,
+  so a consumer can pin one library without pinning Hera.
 - Nothing physically stops `hera_chats` from importing `hera_profiles`' internals. The layering
   test and CodeRabbit's path instructions are the enforcement; the rule is written down in
   `ARCHITECTURE.md`.
 - Contributors need one checkout and one `uv sync`.
-- If a package ever needs its own release cadence, it can be extracted with its history intact.
+- If a package ever needs its own repository again, it can be extracted with its history intact.
   The import path does not change, because it never depended on the repository boundary.

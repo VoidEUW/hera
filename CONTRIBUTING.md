@@ -71,6 +71,44 @@ Both must stay liftable into a project that has nothing to do with Hera.
 `tests/test_layering.py` gives them an empty allow-list, so a stray import fails the build. See
 [ADR 1](docs/adr/0001-uv-workspace-monorepo.md).
 
+## Using one package somewhere else
+
+Every member of `packages/` is a real distribution with its own name, version and build
+backend, so another project can depend on exactly one of them without cloning the workspace or
+pulling in anything else:
+
+```toml
+# in the other project's pyproject.toml
+[project]
+dependencies = ["hera-prompts"]
+
+[tool.uv.sources]
+hera-prompts = { git = "https://github.com/VoidEUW/hera", subdirectory = "packages/hera_prompts", tag = "hera-prompts-v0.1.2" }
+```
+
+Pin a **tag**, not a branch — a branch means the consumer silently moves whenever this
+repository does. Package releases are tagged `<package>-v<version>`; the application's own
+releases are plain `v<version>`.
+
+While developing both sides at once, point at the checkout instead:
+
+```toml
+hera-prompts = { path = "../hera/packages/hera_prompts", editable = true }
+```
+
+To cut a package release, bump `version` in its `pyproject.toml` and tag:
+
+```bash
+git tag hera-prompts-v0.1.3 && git push origin hera-prompts-v0.1.3
+```
+
+`uv build --package hera-prompts` produces the wheel, identical to what a standalone repository
+would have built — publishing to an index later needs no restructuring.
+
+**Skills are not Python packages.** A `SKILL.md` directory is content: consume it with a git
+clone or a sparse checkout, or let `hera_skillsets` sync it into `~/.hera/skills/`. The same
+directory can be pointed at by Claude Code.
+
 ## Architecture decisions
 
 Anything that changes the shape of the system gets a file in [docs/adr/](docs/adr/): the context,

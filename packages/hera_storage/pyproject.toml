@@ -1,0 +1,33 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "hera-storage"
+version = "0.1.0"
+description = "Domain-free persistence foundation: engine, sessions, model mixins, generic repository and snapshot versioning."
+readme = "README.md"
+requires-python = ">=3.12"
+authors = [{ name = "Void" }]
+keywords = ["sqlmodel", "sqlalchemy", "repository", "persistence"]
+classifiers = [
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Database",
+    "Typing :: Typed",
+]
+dependencies = [
+    "sqlmodel>=0.0.22",
+    "pydantic-settings>=2.4.0",
+]
+
+# Ships the `db` and `session` fixtures to every package that installs this one, without any
+# conftest.py duplication.
+[project.entry-points.pytest11]
+hera_storage = "hera_storage.testing"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/hera_storage"]
+
+# Linting, typing, testing and coverage are configured once in the workspace root. This package
+# deliberately declares none of it, so there is only ever one answer to "which config applies".

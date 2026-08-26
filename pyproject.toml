@@ -41,8 +41,14 @@ extend-exclude = ["*.md", "apps/web"]
 select = ["E", "F", "I", "UP", "B", "SIM", "ANN", "RUF"]
 
 [tool.ruff.lint.per-file-ignores]
+# Test models and fixtures legitimately use untyped and dynamic constructs.
 "**/tests/*" = ["ANN401"]
 "tests/*" = ["ANN401"]
+# These two implement signatures that are a fixed contract for everything built on top: an
+# explicit TypeVar instead of PEP 695 type parameters (UP046/UP047), and `Any` for SQLAlchemy
+# filter expressions and **changes (ANN401).
+"packages/hera_storage/src/hera_storage/repository.py" = ["UP046", "ANN401"]
+"packages/hera_storage/src/hera_storage/versioning.py" = ["UP047", "ANN401"]
 
 [tool.mypy]
 python_version = "3.12"
@@ -51,7 +57,7 @@ plugins = ["pydantic.mypy"]
 # Listed explicitly, one entry per workspace member: mypy treats a glob that matches nothing as
 # a literal path, so `packages/*` cannot be used while a member is still missing.
 # tests/test_docs.py::test_mypy_checks_every_package fails if an entry is forgotten.
-files = ["tests"]
+files = ["tests", "packages/hera_storage/src", "packages/hera_storage/tests"]
 
 [[tool.mypy.overrides]]
 module = ["tests.*", "*.tests.*"]
@@ -70,8 +76,12 @@ markers = [
 # plugin, so pytest imports it while loading entry points -- before pytest-cov could start
 # tracing. Everything at module level would count as unmeasured.
 [tool.coverage.run]
-source = ["packages", "apps/api/src"]
+# `apps/api/src` joins this list when the application exists; coverage warns on every run about
+# a source that is not importable yet. tests/test_workspace.py fails if a member is forgotten.
+source = ["packages"]
+omit = ["*/tests/*"]
 branch = true
+relative_files = true
 
 [tool.coverage.report]
 fail_under = 90
