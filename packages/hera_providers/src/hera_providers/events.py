@@ -1,7 +1,7 @@
 """The one event union: everything a model can emit, normalised.
 
 This module is the contract the whole system is built around. ``hera_chats`` persists these,
-``apps/api`` serialises them to Server-Sent Events, and the browser reduces them into a
+``apps/core`` serialises them to Server-Sent Events, and the browser reduces them into a
 message -- so a new kind of thing the model can do is **one new variant here**, not a new
 parser somewhere above. The previous version of Hera had a parser on the server and a second
 one in the browser that had to stay byte-compatible with it; that is the cost this union

@@ -13,7 +13,7 @@ dependencies = []
 package = false
 
 [tool.uv.workspace]
-members = ["packages/*", "apps/api"]
+members = ["packages/*", "apps/core"]
 
 # Every member another member depends on needs an entry here, or `uv sync` fails with
 # "included as a workspace member, but is missing an entry in tool.uv.sources".
@@ -46,8 +46,8 @@ dev = [
 
 [tool.ruff]
 line-length = 100
-src = ["packages", "apps/api/src", "tests"]
-extend-exclude = ["*.md", "apps/web"]
+src = ["packages", "apps/core/src", "tests"]
+extend-exclude = ["*.md", "apps/core/web"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "ANN", "RUF"]
@@ -100,7 +100,7 @@ module = ["tests.*", "*.tests.*"]
 disallow_untyped_decorators = false
 
 [tool.pytest.ini_options]
-testpaths = ["tests", "packages", "apps/api/tests"]
+testpaths = ["tests", "packages", "apps/core/tests"]
 asyncio_mode = "auto"
 addopts = "--strict-markers --strict-config"
 markers = [
@@ -112,7 +112,7 @@ markers = [
 # plugin, so pytest imports it while loading entry points -- before pytest-cov could start
 # tracing. Everything at module level would count as unmeasured.
 [tool.coverage.run]
-# `apps/api/src` joins this list when the application exists; coverage warns on every run about
+# `apps/core/src` joins this list when the application exists; coverage warns on every run about
 # a source that is not importable yet. tests/test_workspace.py fails if a member is forgotten.
 source = ["packages"]
 omit = ["*/tests/*"]

@@ -12,8 +12,8 @@ reviews:
 
   path_filters:
     - "!uv.lock"
-    - "!apps/web/package-lock.json"
-    - "!apps/web/src/lib/api/generated/**"
+    - "!apps/core/web/package-lock.json"
+    - "!apps/core/web/src/lib/api/generated/**"
     - "!**/*.min.js"
     - "!docs/prototype.md"
 
@@ -38,13 +38,13 @@ reviews:
       instructions: >-
         Skill selection must stay deterministic and server-side. Flag any design that relies on
         the model choosing to load a skill; the target model is unreliable at that.
-    - path: "apps/api/**"
+    - path: "apps/core/src/**"
       instructions: >-
         Every route depends on the authenticated user; flag any route without it except the
         documented public allow-list (/healthz, /api/v1/auth/*, static assets).
         Responses are typed Pydantic models, never bare dicts. No raw SQL — go through a
         repository.
-    - path: "apps/web/**"
+    - path: "apps/core/web/**"
       instructions: >-
         No hand-written API types: they are generated from the OpenAPI schema. All user-visible
         strings go through the i18n layer — flag hard-coded English or German text in

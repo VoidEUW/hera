@@ -209,17 +209,17 @@ would silently collide.
 
 A reference to an entity owned by another library is a bare `UUID` field with no
 `ForeignKey` constraint. Integrity across library boundaries is the application's job, not
-the database's. Linking tables belong in `apps/api`.
+the database's. Linking tables belong in `apps/core`.
 
-### Migrations run in `apps/api`
+### Migrations run in `apps/core`
 
 This package deliberately does not depend on Alembic. It provides the `MetaData` and the
-naming convention; the migration environment lives in `apps/api`, which imports every
+naming convention; the migration environment lives in `apps/core`, which imports every
 library — that import is what registers the models, and only then does
 `alembic autogenerate` see the complete schema.
 
 ```python
-# apps/api/alembic/env.py
+# apps/core/src/hera_core/alembic/env.py
 import hera_chats, hera_memories, hera_profiles, hera_promptevo   # noqa: F401
 from hera_storage import Database
 
@@ -249,7 +249,7 @@ This package is the bottom of the dependency graph. Anything that knows what the
   wrong.
 - **No imports of other `hera_*` libraries.** Not now, not later. Dependencies point one
   way only.
-- **No linking tables** between libraries — those live in `apps/api`.
+- **No linking tables** between libraries — those live in `apps/core`.
 - **No migrations.** Alembic is not a dependency here.
 - **Not built on purpose:** caching, connection retry, event/outbox systems, full-text
   search, embeddings, multi-tenancy, an async variant, a CLI.

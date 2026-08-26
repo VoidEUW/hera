@@ -95,10 +95,10 @@ def test_imports_point_downwards(package: str) -> None:
 
 @pytest.mark.parametrize("package", _packages())
 def test_no_package_imports_the_application(package: str) -> None:
-    """apps/api wires the packages together; a package that knows about it is inverted."""
+    """apps/core wires the packages together; a package that knows about it is inverted."""
     offences = [
         str(source.relative_to(ROOT))
         for source in sorted((PACKAGES / package / "src").rglob("*.py"))
-        if "hera_api" in _hera_imports(source)
+        if "hera_core" in _hera_imports(source)
     ]
     assert not offences, f"{package} imports the application layer: {offences}"

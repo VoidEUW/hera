@@ -4,7 +4,7 @@ The model boundary. Everything that knows how to talk to a language model lives 
 nothing that knows what a chat, a prompt or a tool *is*.
 
 What leaves this package is **one normalised event union**. `hera_chats` persists it,
-`apps/api` serialises it to Server-Sent Events, and the browser reduces it into a message — so
+`apps/core` serialises it to Server-Sent Events, and the browser reduces it into a message — so
 a new kind of thing the model can do is one new variant in `events.py`, not a new parser
 somewhere above. The previous version of Hera had a parser on the server and a second one in
 the browser that had to stay byte-compatible with it; this union is what that cost bought.

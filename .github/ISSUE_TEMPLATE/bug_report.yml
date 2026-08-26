@@ -23,8 +23,8 @@ body:
     attributes:
       label: Where
       options:
-        - apps/web (the interface)
-        - apps/api (routes, streaming, auth)
+        - apps/core/web (the interface)
+        - apps/core (routes, streaming, auth)
         - chats / the turn loop
         - tools / MCP
         - skills

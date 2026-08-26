@@ -15,7 +15,7 @@ repos:
       - id: check-yaml
       - id: check-toml
       - id: check-json
-        exclude: ^apps/web/(tsconfig|jsconfig)\.json$
+        exclude: ^apps/core/web/(tsconfig|jsconfig)\.json$
       - id: check-merge-conflict
       - id: check-added-large-files
         args: [--maxkb=512]

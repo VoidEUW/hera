@@ -3,7 +3,7 @@
 Where the rebuild stands and what is settled, so a new session can pick up without re-reading
 the history. Updated as milestones land — this file is a snapshot, not a changelog.
 
-**Last updated:** 2026-08-26 · **Version:** v0.1 in progress
+**Last updated:** 2026-08-27 · **Version:** v0.1 in progress
 
 ---
 
@@ -14,9 +14,10 @@ with Jinja and HTMX, a German interface, a hand-written tool registry and a text
 around GPT-OSS-20B — is retired to [prototype.md](prototype.md) and is wrong about everything
 structural.
 
-The replacement is a **uv-workspace monorepo**: small libraries under `packages/`, a FastAPI
-JSON/SSE API at `apps/api`, a SvelteKit interface at `apps/web`. Tools come from **MCP servers**,
-know-how from **`SKILL.md` skills**, and the target model is **Qwen3.6-35B** exclusively.
+The replacement is a **uv-workspace monorepo**: small libraries under `packages/`, and one
+application, `hera-core` at `apps/core/` — a FastAPI JSON/SSE API with the SvelteKit interface
+under `web/`, built into the directory the API serves. Tools come from **MCP servers**, know-how
+from **`SKILL.md` skills**, and the target model is **Qwen3.6-35B** exclusively.
 
 ## Settled decisions
 
@@ -32,6 +33,7 @@ Each has a record in [adr/](adr/); read those before reopening one.
 | [6](adr/0006-spa-over-json-sse-api.md) | SvelteKit over a JSON/SSE API | API renders no HTML; client types are generated from OpenAPI; server render stays authoritative at `done` |
 | [7](adr/0007-fresh-start-no-legacy-import.md) | Empty `~/.hera/` | No importer. Boot refuses to run against a pre-v0.1 directory and tells you to move it aside; nothing is deleted |
 | [8](adr/0008-github-flow-and-required-checks.md) | GitHub Flow, protected `main` | PR for everything, squash merge, linear history, required checks, zero required approvals (single maintainer) |
+| [9](adr/0009-one-application-package.md) | One application package, `hera-core` | `apps/core/` holds the API and the web app; `packages/` stays libraries only, so the layering guard keeps meaning what it means |
 
 Other constraints that are decided but did not need a record: English everywhere with an i18n
 seam; single-user login in v0.1 behind a multi-user-ready seam (`Depends(current_user)` on every
@@ -46,19 +48,20 @@ packages/hera_prompts/    vendored, unchanged in behaviour
 packages/hera_providers/  the model boundary: event union, Qwen adapter, transport, FakeProvider
 packages/hera_permissions/ allow · deny · ask, resolved by pattern and profile
 tests/                    repository-level guards (see below)
-.github/                  CI, release, templates, CODEOWNERS, dependabot
-docs/adr/                 eight decision records
+.github/                  CI, CodeQL, release, templates, CODEOWNERS, dependabot
+docs/adr/                 nine decision records
 ```
 
-**The foundation layer is complete** — all four packages that import no other `hera_*` package
-exist, and `FakeProvider` means every layer built on top of them is testable without a model
-running. 330 tests, 99 % coverage.
+**The foundation layer is complete and merged.** All four packages that import no other `hera_*`
+package are on `main`; there are no open pull requests and no live feature branches.
+`FakeProvider` means every layer built on top of them is testable without a model running.
+331 tests, 99 % coverage.
 
 Two things worth knowing before building on them:
 
 - **The event union is the contract.** `hera_providers.events` defines what a model can emit.
   A new kind of thing the model can do is one new variant there, persisted by `hera_chats`,
-  serialised by `apps/api`, rendered by `apps/web` — never a new parser. `EVENT_ADAPTER`
+  serialised by `apps/core`, rendered by its web app — never a new parser. `EVENT_ADAPTER`
   round-trips a single event, so persistence goes through the union rather than through each
   variant.
 - **A malformed tool call is not an error.** Unparseable arguments arrive as
@@ -83,8 +86,44 @@ Rules that would otherwise rot are tests, not prose:
 ### CI
 
 `lint` (ruff + every pre-commit hook) · `types` (mypy --strict) · `test` (3.12 and 3.13, 90 %
-coverage gate) · `web` · `e2e`. The `web` and `e2e` jobs guard on their directories existing and
-stay green until `apps/web` lands. Required on `main`.
+coverage gate) · `web` · `e2e` · `analyze` (CodeQL, `python` and `actions`). The `web` and `e2e`
+jobs guard on `apps/core/web` existing and stay green until it lands.
+
+**Known open:** CodeQL's `actions` queries report `actions/missing-workflow-permissions` five
+times against `ci.yml`, which declares no `permissions:` block and so runs every job with the
+default `GITHUB_TOKEN` scope. `release.yml` and `codeql.yml` both declare one. Medium severity,
+below the ruleset threshold, so it blocks nothing — the fix is `permissions: contents: read` at
+the top of `ci.yml`.
+
+### Merging into `main`
+
+`main` is guarded by the **`protect-main` ruleset**, not classic branch protection — the classic
+API answers *"Branch not protected"*, which is misleading. Read it with
+`gh api repos/VoidEUW/hera/rulesets`. It requires linear history, squash merge only, resolved
+review threads, and a **CodeQL result**. `require_code_owner_review` is off, because the sole
+`CODEOWNERS` entry is the only maintainer and nobody can approve their own pull request — ADR 8
+already describes the intent as zero required approvals.
+
+Three consequences, each of which has already cost a blocked merge:
+
+- **`.github/workflows/codeql.yml` has to keep existing.** The ruleset waits for a CodeQL
+  result; with no workflow nothing produces one, and every pull request blocks indefinitely on
+  *"Waiting for Code Scanning results"*. Advanced setup rather than GitHub's default setup, so
+  the configuration is reviewable in a pull request instead of living only in settings.
+- **Leave the CodeQL query suite at the default.** `security-and-quality` was tried; every
+  finding it added was a false positive — `assert` after `raise` inside `with pytest.raises(...)`
+  read as unreachable, SQLAlchemy's `@declared_attr.directive def __table_args__(cls)` read as
+  needing `self`, an import kept for its side effect read as unused. ruff and mypy already hold
+  that bar and understand the idioms. Because unresolved review threads block the merge, a noisy
+  query is not merely noise here — it is a stop.
+- **`mergeStateStatus: CLEAN` means no conflicts, not a correct diff.** After a squash merge, a
+  branch built on the pre-squash tip still reports clean while proposing to *undo* whatever
+  exists only in the squash. Check `git diff --name-status origin/main HEAD` for deletions
+  before merging, and rebase with `git rebase --onto origin/main <old-base>` so only your own
+  commits replay.
+
+GitHub refuses `gh pr merge` for anything it considers part of a stack. Use
+`PUT /repos/{owner}/{repo}/pulls/{n}/merge-async` with `sha=` pinning the head you verified.
 
 ## Releases and deployment
 
@@ -125,8 +164,7 @@ or pointed at directly by Claude Code. They live in the separate `hera-skills` r
 **v0.1 — the spine that runs.** In order: `hera_tools` (MCP client — server lifecycle from
 `~/.hera/mcp.json`, namespaced catalogue, dispatch, plus Hera's own in-process server) →
 `hera_profiles` (git-backed mind regions, `PromptBuilder`) → `hera_skillsets` →
-`hera_chats` (turn orchestrator, persisted event stream) → `apps/api` → `apps/web` → the
-end-to-end suite.
+`hera_chats` (turn orchestrator, persisted event stream) → `apps/core` → the end-to-end suite.
 
 `hera_tools` is the next one and the largest remaining library: it brings in the MCP SDK and
 subprocess lifecycle management. `hera_permissions` is already there to decide before dispatch,

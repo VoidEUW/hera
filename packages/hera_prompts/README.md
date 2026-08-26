@@ -203,7 +203,7 @@ droppable is left, `BudgetExceeded` is raised.
 The default counter estimates roughly three characters per token. That is a compromise, not
 a measurement: underestimating lets the budget bite too late and the call runs into the
 context limit, while overestimating drops one section too early, which is visible and
-harmless. Pass a real tokenizer as `TokenBudget(counter=...)` — `apps/api` should do exactly
+harmless. Pass a real tokenizer as `TokenBudget(counter=...)` — `apps/core` should do exactly
 that — whenever the number has to be right.
 
 **Why content is missing** is answered by three separate fields, because three separate

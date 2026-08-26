@@ -29,8 +29,8 @@ body:
         - hera_chats
         - hera_memories
         - hera_promptevo
-        - apps/api
-        - apps/web
+        - apps/core (API)
+        - apps/core/web (interface)
         - not sure
     validations:
       required: true

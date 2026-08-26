@@ -55,7 +55,7 @@ relevant; the target model does not. See ADR 5.
 goes through i18n so a German locale can be added later.
 
 **Tables** carry a package-prefixed `__tablename__`; cross-package references are bare `UUID`
-columns, never `ForeignKey`; migrations live in `apps/api`.
+columns, never `ForeignKey`; migrations live in `apps/core`.
 
 ## State of the build
 

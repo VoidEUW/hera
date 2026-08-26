@@ -5,7 +5,7 @@ downwards. The rule is mechanical: if a package needs something from a package a
 dependency is wrong, not the design.
 
 ```
-                        apps/api  (FastAPI — wires everything, owns migrations)
+                  apps/core  (hera-core: FastAPI + the SvelteKit app, owns migrations)
                               │
         ┌─────────────────────┼──────────────────────┐
    hera_profiles         hera_promptevo              │
@@ -43,13 +43,13 @@ silently collide.
 
 **No cross-package foreign keys.** A reference to another package's entity is a bare `UUID`
 column. Integrity is the application's job, not the database's. Linking tables live in
-`apps/api`.
+`apps/core`.
 
-**Migrations live in `apps/api`.** Only there is every package imported, so only there does
+**Migrations live in `apps/core`.** Only there is every package imported, so only there does
 `alembic autogenerate` see the whole schema. SQLite needs `render_as_batch=True`.
 
 **One event union.** `hera_providers` defines the stream event types; `hera_chats` persists
-them; `apps/api` serialises them to SSE; the web app reduces them into a message. A new kind of
+them; `apps/core` serialises them to SSE; the web app reduces them into a message. A new kind of
 thing the model can do is one new event variant, not a new parser.
 
 **The server render is authoritative.** The client renders optimistically while streaming, then

@@ -12,7 +12,7 @@ updates:
         patterns: ["ruff", "mypy", "pytest*", "coverage"]
 
   - package-ecosystem: npm
-    directory: /apps/web
+    directory: /apps/core/web
     schedule:
       interval: weekly
     open-pull-requests-limit: 5

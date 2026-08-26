@@ -6,7 +6,7 @@
 git clone https://github.com/VoidEUW/hera.git
 cd hera
 uv sync --all-packages
-cd apps/web && npm ci
+cd apps/core/web && npm ci
 ```
 
 One checkout, one sync. Every library is a workspace member under `packages/`, so an edit in one
@@ -18,7 +18,7 @@ is visible to the others immediately with no reinstall.
 uv run ruff check . && uv run ruff format --check .
 uv run mypy
 uv run coverage run -m pytest && uv run coverage report   # gate: 90 %
-cd apps/web && npm run check && npm run test:unit
+cd apps/core/web && npm run check && npm run test:unit
 uv run pytest -m e2e                                      # Playwright, no model needed
 ```
 
@@ -52,7 +52,7 @@ Commit messages follow [Conventional Commits](https://www.conventionalcommits.or
   and stored content. User-visible text goes through the i18n layer so a German locale can be
   added without touching components.
 - **New table?** Prefix `__tablename__` with your package's prefix and add an Alembic revision in
-  `apps/api`. Cross-package references are bare `UUID` columns, never `ForeignKey`.
+  `apps/core`. Cross-package references are bare `UUID` columns, never `ForeignKey`.
 - **New model capability?** One new variant in the `hera_providers` event union, one branch where
   it is persisted, one branch where it renders. If you are writing a parser, stop and check
   whether it should be a tool call instead.

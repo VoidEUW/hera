@@ -14,6 +14,6 @@
 - [ ] Imports still point downwards (see ARCHITECTURE.md); no package reaches upwards
 - [ ] `ruff`, `mypy --strict` and the coverage gate pass locally
 - [ ] New behaviour has a test; model behaviour is tested against `FakeProvider`, not a live model
-- [ ] New tables carry a package-prefixed `__tablename__` and an Alembic revision in `apps/api`
+- [ ] New tables carry a package-prefixed `__tablename__` and an Alembic revision in `apps/core`
 - [ ] User-visible strings go through i18n; everything written is English
 - [ ] Docs updated if the shape of the system changed; an ADR added if a decision was made

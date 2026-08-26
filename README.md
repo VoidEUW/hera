@@ -58,8 +58,8 @@ Everything is one workspace: a single `uv sync` and every library is editable in
 
 ```
 packages/     the libraries, each with one job and no upward imports
-apps/api      FastAPI: /api/v1 JSON + SSE, serves the built web app
-apps/web      SvelteKit desktop-shaped UI, installable as a PWA on the phone
+apps/core     hera-core — FastAPI (/api/v1 JSON + SSE) and, under web/, the
+              SvelteKit interface it serves: desktop-shaped, installable as a PWA
 docs/adr      why the structure looks like this
 ```
 
