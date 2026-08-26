@@ -1,6 +1,12 @@
 # The fast half of CI, so a failure surfaces before the push rather than after it.
 #   uv run pre-commit install
+#
+# CI runs `pre-commit run --all-files` in the lint job: a hook configuration nobody exercises
+# rots, and this one had already drifted before it was ever run.
 default_install_hook_types: [pre-commit, commit-msg]
+# Without this every hook is eligible for every stage, so ruff and mypy would run a second time
+# while checking the commit message.
+default_stages: [pre-commit]
 
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
@@ -38,7 +44,7 @@ repos:
         pass_filenames: false
 
   - repo: https://github.com/compilerla/conventional-pre-commit
-    rev: v4.2.0
+    rev: v4.4.0
     hooks:
       - id: conventional-pre-commit
         stages: [commit-msg]

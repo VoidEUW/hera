@@ -19,6 +19,13 @@ jobs:
       - uses: ./.github/actions/setup-python-workspace
       - run: uv run ruff check --output-format=github .
       - run: uv run ruff format --check .
+      - name: Cache pre-commit environments
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/pre-commit
+          key: pre-commit-${{ hashFiles('.pre-commit-config.yaml') }}
+      - name: Hooks
+        run: uv run pre-commit run --all-files --show-diff-on-failure
 
   types:
     name: types

@@ -98,8 +98,21 @@ with *"included as a workspace member, but is missing an entry"*.
 honest.
 
 Pin a **tag**, not a branch — a branch means the consumer silently moves whenever this
-repository does. Package releases are tagged `<package>-v<version>`; the application's own
-releases are plain `v<version>`.
+repository does.
+
+## Tags are the moving point
+
+Nothing ships off a branch. A tag is the only thing that causes a release, and a release is the
+only thing that gets deployed:
+
+| Tag | Releases | Consumed by |
+|---|---|---|
+| `v1.2.3` | the application | the deployment |
+| `hera-skillsets-v0.1.0` | one package, wheel attached | other projects, e.g. `hera-code` |
+
+`release.yml` refuses a package tag whose version disagrees with that package's
+`pyproject.toml`, so a consumer can never be pinned to a lie. `main` being green means it is
+*releasable*, not released.
 
 While developing both sides at once, point at the checkout instead:
 
