@@ -2,7 +2,8 @@
 
 | File | What it is |
 |---|---|
-| [adr/](adr/) | Architecture decision records — why the system has the shape it has. Start here. |
+| [status.md](status.md) | Where the rebuild stands, what is settled, what comes next. **Start here** after a break. |
+| [adr/](adr/) | Architecture decision records — why the system has the shape it has. |
 | [hera-storage.md](hera-storage.md) | The specification `hera_storage` was built against. A contract, in German, kept as written. |
 | [hera-prompts.md](hera-prompts.md) | The specification the `hera_prompts` compiler was built against. A contract, in German, kept as written. |
 | [prototype.md](prototype.md) | The guidance file of the previous version of Hera. **Historical.** |

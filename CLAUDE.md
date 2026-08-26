@@ -10,6 +10,7 @@ OpenAI-compatible endpoint.
 
 ## Read first
 
+- `docs/status.md` — where the rebuild stands, what is settled, what is next. Start here
 - `ARCHITECTURE.md` — the packages, the layering rule, the shape of a turn
 - `docs/adr/` — why the structure looks like this; read 2 (Qwen only), 3 (emotions as tool
   calls) and 5 (deterministic skill routing) before changing model-facing behaviour
@@ -58,9 +59,7 @@ columns, never `ForeignKey`; migrations live in `apps/api`.
 
 ## State of the build
 
-v0.1 is in progress. Order: workspace skeleton → `hera_providers` → `hera_permissions` +
-`hera_tools` → `hera_profiles` → `hera_skillsets` → `hera_chats` → `apps/api` → `apps/web` →
-end-to-end suite. `hera_memories` and `hera_promptevo` (dreaming, experience training) are v0.2;
-Hera as an MCP server and agent branching are v0.3.
+See `docs/status.md` — kept there so this file stays a map rather than turning back into a
+changelog.
 
 Commit and push only when asked. Branch first — `main` is protected.
