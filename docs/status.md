@@ -47,17 +47,20 @@ packages/hera_storage/    vendored, unchanged in behaviour
 packages/hera_prompts/    vendored, unchanged in behaviour
 packages/hera_providers/  the model boundary: event union, Qwen adapter, transport, FakeProvider
 packages/hera_permissions/ allow · deny · ask, resolved by pattern and profile
+packages/hera_tools/      the MCP client, the namespaced catalogue, and her own server
 tests/                    repository-level guards (see below)
 .github/                  CI, CodeQL, release, templates, CODEOWNERS, dependabot
 docs/adr/                 nine decision records
 ```
 
 **The foundation layer is complete and merged.** All four packages that import no other `hera_*`
-package are on `main`; there are no open pull requests and no live feature branches.
-`FakeProvider` means every layer built on top of them is testable without a model running.
-331 tests, 99 % coverage.
+package are on `main`. `FakeProvider` means every layer built on top of them is testable without
+a model running.
 
-Two things worth knowing before building on them:
+**`hera_tools` is built** and sits on the branch `feat/hera-tools`, not yet merged. 450 tests,
+99 % coverage.
+
+Two things worth knowing before building on the foundation:
 
 - **The event union is the contract.** `hera_providers.events` defines what a model can emit.
   A new kind of thing the model can do is one new variant there, persisted by `hera_chats`,
@@ -72,6 +75,33 @@ Two things worth knowing before building on them:
   layer owning the turn catches them, because it is the only one that knows how much of the
   answer already arrived. `StreamInterrupted` is the one to special-case: persist the partial
   events and close the list with a `cancelled` turn.
+
+### What `hera_tools` settled
+
+- **Above `ToolRegistry`, nothing raises.** Denied, misnamed, unreachable, timed out, or a tool
+  that failed on purpose — all of them are a `ToolResult` with `ok=False` and a `text` written
+  for the model to read and correct itself with. `ManagedServer` below it still raises, so it
+  is honest used on its own. A turn therefore needs no `try` around a tool call.
+- **Her own tools are a real MCP server**, reached in-process by the same client every other
+  server is reached by. `emotion`, `remember`, `note`, `skill` under `hera__*`. The three that
+  touch the rest of the system take **ports** (`hera_tools.ports`), because this package may
+  not import memories, skills or chats — the application wires them, and what is unwired
+  answers "not available in this deployment" rather than vanishing from the catalogue.
+- **The SDK is `mcp` 2.x**, whose `Client` accepts a URL, `StdioServerParameters`, a transport,
+  or a `Server` object for the in-process case. Note `httpx2`, not `httpx`: the MCP SDK ships
+  its own HTTP client library, and that is how request headers reach a remote server.
+- **A client is owned by one worker task.** anyio task groups are task-affine, so a client
+  opened in a request and closed at shutdown unwinds into "cancel scope in a different task".
+  Every server therefore has a worker task that holds its client for the connection's whole
+  life; calls are queued to it and run as its children, which keeps parallel calls parallel.
+- **A dead stdio server does not look dead.** When the subprocess exits, the SDK's client keeps
+  reporting healthy and every later call fails with `MCPError("Connection closed")` forever.
+  That is detected explicitly and the connection retired, so the next call starts a fresh
+  process. Without it, one crash is a dead tool until Hera restarts.
+- `~/.hera/mcp.json` is read in the Claude-Desktop shape with `${VAR}` expansion; an unset
+  variable is an error, because a blank credential fails later and somewhere else. `HERA_HOME`
+  is resolved by `hera_tools.settings.hera_home()` — the first package that needed it. Lift it
+  when a second one does.
 
 ### The guards
 
@@ -161,14 +191,23 @@ or pointed at directly by Claude Code. They live in the separate `hera-skills` r
 
 ## What comes next
 
-**v0.1 — the spine that runs.** In order: `hera_tools` (MCP client — server lifecycle from
-`~/.hera/mcp.json`, namespaced catalogue, dispatch, plus Hera's own in-process server) →
-`hera_profiles` (git-backed mind regions, `PromptBuilder`) → `hera_skillsets` →
-`hera_chats` (turn orchestrator, persisted event stream) → `apps/core` → the end-to-end suite.
+**v0.1 — the spine that runs.** In order: ~~`hera_tools`~~ → `hera_profiles` (git-backed mind
+regions, `PromptBuilder`) → `hera_skillsets` → `hera_chats` (turn orchestrator, persisted event
+stream) → `apps/core` → the end-to-end suite.
 
-`hera_tools` is the next one and the largest remaining library: it brings in the MCP SDK and
-subprocess lifecycle management. `hera_permissions` is already there to decide before dispatch,
-and an unreachable server must degrade to a missing tool rather than take a turn down.
+`hera_profiles` is the next one. `hera_chats` is the one to think about before starting it: it
+is where a tool *result* has to become something persisted and rendered, and the event union in
+`hera_providers` deliberately has no variant for one — it defines what a **model** emits, and a
+tool result is not that. Whether `hera_chats` persists a superset of the union or the union
+grows a variant is the first decision that turn orchestrator makes.
+
+**The application is one package now.** `hera-core` at `apps/core/` holds the API and, under
+`web/`, the SvelteKit interface — not two directories under `apps/`. See
+[ADR 9](adr/0009-one-application-package.md), which supersedes the layout clause of ADR 1 and
+ADR 6 and leaves everything else in both standing. It stays out of `packages/` on purpose: that
+directory means *a library another project can consume*, and `tests/test_layering.py` scans it
+and demands an allow-list per member. The application is the one thing that legitimately imports
+everything.
 
 **v0.2 — what makes her Hera.** `hera_memories` (embeddings, retrieval, caps, dedup, hits),
 trace compaction and the context meter, `hera_promptevo` (dreaming and experience training).
