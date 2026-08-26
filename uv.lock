@@ -9,6 +9,7 @@ resolution-markers = [
 [manifest]
 members = [
     "hera",
+    "hera-permissions",
     "hera-prompts",
     "hera-providers",
     "hera-storage",
@@ -338,6 +339,17 @@ dev = [
     { name = "pytest-asyncio", specifier = ">=0.24" },
     { name = "ruff", specifier = ">=0.6" },
 ]
+
+[[package]]
+name = "hera-permissions"
+version = "0.1.0"
+source = { editable = "packages/hera_permissions" }
+dependencies = [
+    { name = "pydantic" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "pydantic", specifier = ">=2.7" }]
 
 [[package]]
 name = "hera-prompts"

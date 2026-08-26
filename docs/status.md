@@ -40,14 +40,35 @@ route, `owner_id` on every row); desktop-shaped interface, installable as a PWA 
 ## What exists
 
 ```
-pyproject.toml          uv workspace root — ruff, mypy --strict, pytest, coverage, all shared
-packages/hera_storage/  vendored, unchanged in behaviour
-tests/                  repository-level guards (see below)
-.github/                CI, release, templates, CODEOWNERS, dependabot
-docs/adr/               eight decision records
+pyproject.toml            uv workspace root — ruff, mypy --strict, pytest, coverage, all shared
+packages/hera_storage/    vendored, unchanged in behaviour
+packages/hera_prompts/    vendored, unchanged in behaviour
+packages/hera_providers/  the model boundary: event union, Qwen adapter, transport, FakeProvider
+packages/hera_permissions/ allow · deny · ask, resolved by pattern and profile
+tests/                    repository-level guards (see below)
+.github/                  CI, release, templates, CODEOWNERS, dependabot
+docs/adr/                 eight decision records
 ```
 
-Nothing else yet. `hera_providers` is next.
+**The foundation layer is complete** — all four packages that import no other `hera_*` package
+exist, and `FakeProvider` means every layer built on top of them is testable without a model
+running. 330 tests, 99 % coverage.
+
+Two things worth knowing before building on them:
+
+- **The event union is the contract.** `hera_providers.events` defines what a model can emit.
+  A new kind of thing the model can do is one new variant there, persisted by `hera_chats`,
+  serialised by `apps/api`, rendered by `apps/web` — never a new parser. `EVENT_ADAPTER`
+  round-trips a single event, so persistence goes through the union rather than through each
+  variant.
+- **A malformed tool call is not an error.** Unparseable arguments arrive as
+  `ToolCallReady.parse_error` rather than as an exception, so one bad call does not discard the
+  calls that arrived beside it and the turn stays alive. Feed it back as a tool result and let
+  the model correct itself. Actual failures — unreachable endpoint, timeout, bad status, a
+  connection that breaks mid-answer — raise a `ProviderError`; nothing from httpx escapes. The
+  layer owning the turn catches them, because it is the only one that knows how much of the
+  answer already arrived. `StreamInterrupted` is the one to special-case: persist the partial
+  events and close the list with a `cancelled` turn.
 
 ### The guards
 
@@ -56,7 +77,7 @@ Rules that would otherwise rot are tests, not prose:
 | Test | Fails when |
 |---|---|
 | `test_layering.py` | a package imports sideways or upwards, or reaches into `apps/`. Each package has an explicit allow-list; `hera_storage` and `hera_prompts` have an empty one |
-| `test_workspace.py` | a member is missing from mypy's `files`, from coverage's `source`, or from the root `[tool.uv.sources]`; or two test modules would shadow each other |
+| `test_workspace.py` | a member is missing from mypy's `files`, from coverage's `source`, or from the root `[tool.uv.sources]`; or two test modules would shadow each other. `conftest.py` is exempt because pytest loads it by path — mypy does not, which is why `[tool.mypy] exclude` drops it |
 | `test_docs.py` | a decision record is unindexed, misnumbered, or has no status |
 
 ### CI
@@ -101,15 +122,15 @@ or pointed at directly by Claude Code. They live in the separate `hera-skills` r
 
 ## What comes next
 
-**v0.1 — the spine that runs.** In order: `hera_providers` (httpx streaming, Qwen adapter for
-`reasoning_content`/`<think>` and parallel `tool_calls`, and `FakeProvider` — the thing that
-makes every layer above testable without a model) → `hera_permissions` + `hera_tools` →
+**v0.1 — the spine that runs.** In order: `hera_tools` (MCP client — server lifecycle from
+`~/.hera/mcp.json`, namespaced catalogue, dispatch, plus Hera's own in-process server) →
 `hera_profiles` (git-backed mind regions, `PromptBuilder`) → `hera_skillsets` →
 `hera_chats` (turn orchestrator, persisted event stream) → `apps/api` → `apps/web` → the
 end-to-end suite.
 
-`hera_prompts` still needs vendoring alongside `hera_storage`. Its ruff `select` is narrower
-than the root's, so unifying it may surface annotation findings.
+`hera_tools` is the next one and the largest remaining library: it brings in the MCP SDK and
+subprocess lifecycle management. `hera_permissions` is already there to decide before dispatch,
+and an unreachable server must degrade to a missing tool rather than take a turn down.
 
 **v0.2 — what makes her Hera.** `hera_memories` (embeddings, retrieval, caps, dedup, hits),
 trace compaction and the context meter, `hera_promptevo` (dreaming and experience training).
