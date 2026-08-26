@@ -10,7 +10,8 @@ inputs:
 runs:
   using: composite
   steps:
-    - uses: astral-sh/setup-uv@v10
+    # Pinned to an exact version: setup-uv stopped publishing floating major tags after v7.
+    - uses: astral-sh/setup-uv@v10.0.1
       with:
         enable-cache: true
         cache-dependency-glob: uv.lock
