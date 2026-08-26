@@ -46,18 +46,24 @@ separate project depends on exactly one package by pointing at its subdirectory:
 
 ```toml
 [project]
-dependencies = ["hera-prompts"]
+dependencies = ["hera-skillsets"]
 
 [tool.uv.sources]
-hera-prompts = { git = "https://github.com/VoidEUW/hera", subdirectory = "packages/hera_prompts", tag = "hera-prompts-v0.1.2" }
+hera-skillsets = { git = "https://github.com/VoidEUW/hera", subdirectory = "packages/hera_skillsets", tag = "hera-skillsets-v0.1.0" }
 ```
 
-Only that package and its own dependencies are installed; the rest of the workspace is not
-fetched, built or imported. `uv build --package hera-prompts` produces the same wheel a
-standalone repository would, so publishing to an index later needs no restructuring.
+Only that package and its dependencies are installed; the rest of the workspace is not fetched,
+built or imported. Where a package depends on another member, uv resolves that member from the
+**same commit and subdirectory** without the consumer declaring anything further — which is
+what makes the root's `[tool.uv.sources]` entries load-bearing beyond this repository.
 
-Verified end to end: installing `hera-storage` this way into an unrelated project resolves
-`sqlmodel` and `pydantic-settings`, and nothing else from the workspace comes with it.
+`uv build --package hera-prompts` produces the same wheel a standalone repository would, so
+publishing to an index later needs no restructuring. All the package names are unclaimed on
+PyPI today; only bare `hera` is taken, and the workspace root is never built.
+
+Verified end to end before this was written down: a package installed into an unrelated project
+this way pulled its transitive workspace dependency from the same commit and imported cleanly,
+with nothing else from the workspace coming along.
 
 ## Consequences
 

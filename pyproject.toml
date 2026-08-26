@@ -15,6 +15,14 @@ package = false
 [tool.uv.workspace]
 members = ["packages/*", "apps/api"]
 
+# Every member another member depends on needs an entry here, or `uv sync` fails with
+# "included as a workspace member, but is missing an entry in tool.uv.sources".
+# It is also what lets an outside project depend on one package through a git subdirectory:
+# uv then resolves that package's internal dependencies from the same commit, with no extra
+# declarations on the consumer's side. tests/test_workspace.py checks the list stays complete.
+[tool.uv.sources]
+hera-storage = { workspace = true }
+
 [dependency-groups]
 dev = [
     "pytest>=8.3",

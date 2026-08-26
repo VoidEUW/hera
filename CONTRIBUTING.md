@@ -74,17 +74,28 @@ Both must stay liftable into a project that has nothing to do with Hera.
 ## Using one package somewhere else
 
 Every member of `packages/` is a real distribution with its own name, version and build
-backend, so another project can depend on exactly one of them without cloning the workspace or
-pulling in anything else:
+backend, so another project — `hera-code`, say — can depend on exactly one of them without
+cloning the workspace or pulling in anything else:
 
 ```toml
 # in the other project's pyproject.toml
 [project]
-dependencies = ["hera-prompts"]
+dependencies = ["hera-skillsets"]
 
 [tool.uv.sources]
-hera-prompts = { git = "https://github.com/VoidEUW/hera", subdirectory = "packages/hera_prompts", tag = "hera-prompts-v0.1.2" }
+hera-skillsets = { git = "https://github.com/VoidEUW/hera", subdirectory = "packages/hera_skillsets", tag = "hera-skillsets-v0.1.0" }
 ```
+
+That is the whole declaration. If the package depends on other members — `hera_skillsets`
+needs `hera_storage` — uv resolves those from the **same commit and subdirectory** on its own,
+because the root declares them as workspace sources. The consumer names one package and gets a
+consistent set; nothing else in the workspace is fetched, built or imported.
+
+The prerequisite lives here, not there: every member that another member depends on needs an
+entry in the root `[tool.uv.sources]` as `{ workspace = true }`. Miss one and `uv sync` fails
+with *"included as a workspace member, but is missing an entry"*.
+`tests/test_workspace.py::test_internal_dependencies_have_a_workspace_source` keeps that list
+honest.
 
 Pin a **tag**, not a branch — a branch means the consumer silently moves whenever this
 repository does. Package releases are tagged `<package>-v<version>`; the application's own

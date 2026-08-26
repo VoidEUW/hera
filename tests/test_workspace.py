@@ -6,6 +6,7 @@ not wired into the type checker, or two test modules that shadow each other.
 
 from __future__ import annotations
 
+import re
 import tomllib
 from collections import defaultdict
 from pathlib import Path
@@ -21,8 +22,20 @@ def _table(config: Any, *keys: str) -> Any:
     return config
 
 
+def _config(package: Path) -> Any:
+    return tomllib.loads((package / "pyproject.toml").read_text(encoding="utf-8"))
+
+
 def _root_config() -> Any:
-    return tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    return _config(ROOT)
+
+
+def _requirement_names(package: Path) -> list[str]:
+    """Distribution names a package depends on, stripped of version and marker syntax."""
+    requirements: list[str] = _config(package).get("project", {}).get("dependencies", [])
+    return [
+        re.split(r"[<>=!~\[; ]", requirement, maxsplit=1)[0].strip() for requirement in requirements
+    ]
 
 
 def _members() -> list[Path]:
@@ -68,6 +81,28 @@ def test_coverage_measures_every_package() -> None:
     """A member missing from `[tool.coverage.run] source` passes the gate without being read."""
     missing = _uncovered_by(_table(_root_config(), "tool", "coverage", "run", "source"))
     assert not missing, f"add to [tool.coverage.run] source in pyproject.toml: {missing}"
+
+
+def test_internal_dependencies_have_a_workspace_source() -> None:
+    """Every member another member depends on needs `{ workspace = true }` in the root.
+
+    Without it `uv sync` fails outright, and — less obviously — an outside project depending on
+    one package through a git subdirectory cannot resolve that package's internal dependencies
+    from the same commit. See CONTRIBUTING.md, "Using one package somewhere else".
+    """
+    member_names = {_table(_config(m), "project", "name") for m in _members()}
+    declared = set(_root_config().get("tool", {}).get("uv", {}).get("sources", {}))
+
+    missing: dict[str, list[str]] = {}
+    for member in _members():
+        required = member_names & set(_requirement_names(member))
+        if gaps := sorted(required - declared):
+            missing[_table(_config(member), "project", "name")] = gaps
+
+    assert not missing, (
+        "add to [tool.uv.sources] in the root pyproject.toml as `{ workspace = true }`: "
+        f"{missing}"
+    )
 
 
 def test_test_modules_do_not_shadow_each_other() -> None:
