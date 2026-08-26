@@ -25,6 +25,7 @@ hera-permissions = { workspace = true }
 hera-prompts = { workspace = true }
 hera-providers = { workspace = true }
 hera-storage = { workspace = true }
+hera-tools = { workspace = true }
 
 [dependency-groups]
 dev = [
@@ -37,6 +38,9 @@ dev = [
     # Needed at the workspace root for the pydantic mypy plugin to load.
     "pydantic>=2.9",
     "pre-commit>=4.6.2",
+    # Serves a real MCP server over HTTP in the hera_tools transport tests. It arrives with
+    # the MCP SDK anyway; declared here so the suite does not depend on that staying true.
+    "uvicorn>=0.30",
 ]
 
 # ---------------------------------------------------------------------------
@@ -68,6 +72,10 @@ select = ["E", "F", "I", "UP", "B", "SIM", "ANN", "RUF"]
 # `**updates` is forwarded straight into `model_dump()` and back through validation, so the
 # field types live on the models rather than on these two helpers (ANN401).
 "packages/hera_prompts/src/hera_prompts/prompt.py" = ["ANN401"]
+# This one reads a JSON document someone else wrote. `json.loads` produces `Any` by
+# definition, and the whole job of the module is narrowing that into typed models -- the
+# helpers doing the narrowing have to accept it (ANN401).
+"packages/hera_tools/src/hera_tools/config.py" = ["ANN401"]
 
 [tool.mypy]
 python_version = "3.12"
@@ -86,6 +94,8 @@ files = [
     "packages/hera_providers/tests",
     "packages/hera_storage/src",
     "packages/hera_storage/tests",
+    "packages/hera_tools/src",
+    "packages/hera_tools/tests",
 ]
 
 # Two packages with a conftest.py resolve to one module name -- mypy derives it from the file
