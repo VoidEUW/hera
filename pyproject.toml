@@ -21,6 +21,7 @@ members = ["packages/*", "apps/api"]
 # uv then resolves that package's internal dependencies from the same commit, with no extra
 # declarations on the consumer's side. tests/test_workspace.py checks the list stays complete.
 [tool.uv.sources]
+hera-prompts = { workspace = true }
 hera-storage = { workspace = true }
 
 [dependency-groups]
@@ -58,6 +59,13 @@ select = ["E", "F", "I", "UP", "B", "SIM", "ANN", "RUF"]
 # filter expressions and **changes (ANN401).
 "packages/hera_storage/src/hera_storage/repository.py" = ["UP046", "ANN401"]
 "packages/hera_storage/src/hera_storage/versioning.py" = ["UP047", "ANN401"]
+# Canonical JSON encoding accepts whatever pydantic dumped. Spelling that as a recursive
+# JSON alias buys no safety -- the input is already `model_dump(mode="json")` output -- and
+# costs a cast at every call site (ANN401).
+"packages/hera_prompts/src/hera_prompts/canonical.py" = ["ANN401"]
+# `**updates` is forwarded straight into `model_dump()` and back through validation, so the
+# field types live on the models rather than on these two helpers (ANN401).
+"packages/hera_prompts/src/hera_prompts/prompt.py" = ["ANN401"]
 
 [tool.mypy]
 python_version = "3.12"
@@ -66,7 +74,20 @@ plugins = ["pydantic.mypy"]
 # Listed explicitly, one entry per workspace member: mypy treats a glob that matches nothing as
 # a literal path, so `packages/*` cannot be used while a member is still missing.
 # tests/test_docs.py::test_mypy_checks_every_package fails if an entry is forgotten.
-files = ["tests", "packages/hera_storage/src", "packages/hera_storage/tests"]
+files = [
+    "tests",
+    "packages/hera_prompts/src",
+    "packages/hera_prompts/tests",
+    "packages/hera_storage/src",
+    "packages/hera_storage/tests",
+]
+
+# Two packages with a conftest.py resolve to one module name -- mypy derives it from the file
+# name, and pytest requires that name. pytest itself is fine because it loads conftest by path;
+# mypy has no equivalent, and refuses to check either file rather than pick one. Excluding them
+# is the narrowest fix available: ruff still lints them under the full rule set including ANN,
+# and a fixture that does not type-check shows up as a failure in every test that uses it.
+exclude = ["/tests/conftest\\.py$"]
 
 [[tool.mypy.overrides]]
 module = ["tests.*", "*.tests.*"]

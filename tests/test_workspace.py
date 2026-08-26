@@ -112,6 +112,10 @@ def test_test_modules_do_not_shadow_each_other() -> None:
     its modules by bare name. Two `test_router.py` files in different packages would resolve to
     one module and pytest would abort collection with an import-file-mismatch. `conftest.py` is
     exempt: pytest handles those by path.
+
+    mypy has no such exemption -- it derives the module name from the file name and refuses to
+    check either of two files that collide. That is why `[tool.mypy] exclude` drops
+    `tests/conftest.py`; the two facts belong next to each other.
     """
     by_name: defaultdict[str, list[str]] = defaultdict(list)
 
