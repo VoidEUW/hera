@@ -15,6 +15,14 @@ runs:
       with:
         enable-cache: true
         cache-dependency-glob: uv.lock
+    # Every later `uv run` has to agree with the interpreter we just synced against. Without
+    # this the checked-in .python-version wins, uv silently rebuilds the environment for that
+    # version instead, and re-syncs it *without* --all-packages -- so the workspace members
+    # vanish and the tests fail on an import of a dependency that was installed a step earlier.
+    - name: Pin the interpreter for the rest of the job
+      shell: bash
+      run: echo "UV_PYTHON=${{ inputs.python-version }}" >> "$GITHUB_ENV"
+
     - name: Sync the workspace
       shell: bash
       run: uv sync --all-packages --python ${{ inputs.python-version }}
