@@ -31,7 +31,13 @@ In the maintainer's words, condensed:
   possible.
 - All of it *imitated but with our own design principles, so it gives a special feeling.*
 
-That last line is the brief. Everything below is an attempt to take it literally.
+And the principle underneath all of it, in the maintainer's words: *"my own version of my ideal
+wish of Claude — something that reminds me of it but feels like my own."*
+
+That is the tie-breaker for every decision in this document and the ones that follow it. Where a
+choice is between **familiar** and **clever**, familiar wins: the muscle memory is the feature.
+Where it is between **borrowed** and **ours**, ours wins: a copy would remind him of Claude
+instead of being his. Most decisions here are one of those two sentences.
 
 ## What we take, and what has to be ours
 
@@ -289,6 +295,40 @@ per server, so this screen is a direct rendering of that.
 rules over `server__tool` patterns, editable, with the rules that came from answering a
 confirmation card marked as such.
 
+## Projects
+
+There are no folders. `hera_chats` owns **projects**, and a project is a container with
+behaviour, the way the reference's are: a name, its own **instructions**, its own **files**, its
+own **pinned skills**, and the chats that live inside it. A chat outside every project is
+normal — that is what the start screen opens.
+
+### Project or profile?
+
+Projects and `hera_profiles` both put words into a prompt, so the line between them has to be
+stated once and then held, or every future feature will be arguable in two places:
+
+| | Answers | Lives in | Scope |
+|---|---|---|---|
+| **Profile** | *Who she is* — voice, stance, behavioural traits, the emotion vocabulary | Mind regions, in a git repository | Global. One of her. Changes rarely, and `hera_promptevo` may propose changes to it |
+| **Project** | *What we are working on* — the domain, the conventions, the files that are context | Rows and files under `~/.hera` | This body of work. Many. Changes whenever the work does |
+
+*The coding profile* and *the Hera project* compose: she is the same person in every project, and
+she knows different things in each. If a piece of text would still be true in a project about
+something else, it is a mind region; if it would not, it is project instructions. A project may
+name a **default profile**, which is what the composer's dropdown is pre-set to when you open a
+chat inside it.
+
+### What lands when
+
+Projects are the concept from the start, because renaming folders into them later would be a
+migration for nothing. The *behaviour* arrives in two steps:
+
+- **v0.1** — name, instructions, pinned skills, default profile. Instructions bind into the
+  prompt as a slot. This is enough for a project to feel like one.
+- **v0.2** — project files, with retrieval over them. Files need embeddings, which is
+  `hera_memories`, which is v0.2. Until then the sidebar shows no files section rather than an
+  empty one.
+
 ## A turn, rendered
 
 This is the part that matters, because it is where the design meets the data. A turn is **a list
@@ -432,9 +472,10 @@ Waiting on the maintainer, who has said more of the story is coming:
    more delicate)?
 3. **The mark** — does the ocellus land, and should the wordmark be set in the display face or
    drawn?
-4. **Projects vs. folders** — `hera_chats` owns *folders*; the reference calls them *projects*
-   and gives them their own instructions and files. Are they the same thing here?
-5. **Where thinking lives** — a gutter row that expands in place, as drawn, or its own column?
+4. **Where thinking lives** — a gutter row that expands in place, as drawn, or its own column?
+5. **Project instructions vs. a project's own profile** — a project can name a default profile
+   *and* carry instructions. If that turns out to be one control too many, instructions win and
+   the profile becomes a per-chat choice only.
 
 Everything in this document is provisional until there is a build to argue with, which is the
 point at which it gets rewritten rather than amended.
