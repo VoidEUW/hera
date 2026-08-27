@@ -1,0 +1,49 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "hera-core"
+version = "0.1.0"
+description = "Hera's application: a FastAPI JSON and SSE API, and the SvelteKit interface it serves."
+readme = "README.md"
+requires-python = ">=3.12"
+authors = [{ name = "Void" }]
+license = { text = "MIT" }
+keywords = ["fastapi", "sse", "agent", "chat"]
+classifiers = [
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Typing :: Typed",
+]
+dependencies = [
+    "alembic>=1.13",
+    "fastapi>=0.115",
+    "hera-chats",
+    "hera-home",
+    "hera-permissions",
+    "hera-profiles",
+    "hera-prompts",
+    "hera-providers",
+    "hera-skillsets",
+    "hera-storage",
+    "hera-tools",
+    "pydantic>=2.7",
+    "pydantic-settings>=2.4.0",
+    "uvicorn[standard]>=0.30",
+]
+
+[project.scripts]
+hera = "hera_core.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/hera_core"]
+
+# The wheel ships the built interface from src/hera_core/static/, never web/ itself, so the
+# build order is explicit: `npm run build` before `uv build`. See ADR 9.
+[tool.hatch.build.targets.wheel.force-include]
+"src/hera_core/static" = "hera_core/static"
+
+# Linting, typing, testing and coverage are configured once in the workspace root. This package
+# deliberately declares none of it, so there is only ever one answer to "which config applies".

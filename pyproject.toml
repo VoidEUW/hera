@@ -22,6 +22,7 @@ members = ["packages/*", "apps/core"]
 # declarations on the consumer's side. tests/test_workspace.py checks the list stays complete.
 [tool.uv.sources]
 hera-chats = { workspace = true }
+hera-core = { workspace = true }
 hera-home = { workspace = true }
 hera-permissions = { workspace = true }
 hera-profiles = { workspace = true }
@@ -82,6 +83,10 @@ select = ["E", "F", "I", "UP", "B", "SIM", "ANN", "RUF"]
 # definition, and the whole job of the module is narrowing that into typed models -- the
 # helpers doing the narrowing have to accept it (ANN401).
 "packages/hera_tools/src/hera_tools/config.py" = ["ANN401"]
+# One function takes "whatever json.dumps can handle" on its way to the browser. Narrowing it
+# to a recursive JSON alias would buy no safety -- the input is already `model_dump(mode="json")`
+# output -- and cost a cast at every call site (ANN401).
+"apps/core/src/hera_core/sse.py" = ["ANN401"]
 
 [tool.mypy]
 python_version = "3.12"
@@ -92,6 +97,8 @@ plugins = ["pydantic.mypy"]
 # tests/test_docs.py::test_mypy_checks_every_package fails if an entry is forgotten.
 files = [
     "tests",
+    "apps/core/src",
+    "apps/core/tests",
     "packages/hera_chats/src",
     "packages/hera_chats/tests",
     "packages/hera_home/src",
@@ -136,9 +143,7 @@ markers = [
 # plugin, so pytest imports it while loading entry points -- before pytest-cov could start
 # tracing. Everything at module level would count as unmeasured.
 [tool.coverage.run]
-# `apps/core/src` joins this list when the application exists; coverage warns on every run about
-# a source that is not importable yet. tests/test_workspace.py fails if a member is forgotten.
-source = ["packages"]
+source = ["packages", "apps/core/src"]
 omit = ["*/tests/*"]
 branch = true
 relative_files = true
