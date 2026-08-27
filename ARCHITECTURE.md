@@ -40,7 +40,7 @@ as an empty mind directory rather than as an error.
 | `hera_tools` | The MCP client: server lifecycle, tool catalogue, namespacing, dispatch — plus Hera's own built-in server (`emotion`, `remember`, `note`, `skill`), which takes what it needs from above as injected **ports**. Above `ToolRegistry`, a failed call is a `ToolResult`, never an exception. | Does not decide policy, does not build prompts, does not import memories, skills or chats |
 | `hera_skillsets` | `SKILL.md` packages on disk, the **router** that picks them server-side — pinned, `/slash`, retrieved — and per-owner usage counts. Bad content is a reported problem, never an exception. | Does not ask the model which skill it wants; does not write to the skills directory; does not know what a profile or a project is |
 | `hera_profiles` | The mind: twelve named regions as files in a git repository, behaviour traits, profiles that select and override them, and the builder that turns the lot into a `hera_prompts.Prompt` with slots left open. Answers *who she is*; a project answers *what we are working on*. | Does not render, does not stream, does not know what fills a slot |
-| `hera_chats` | **Projects**, chats, messages, the persisted event stream, and the turn orchestrator. A project is a container with behaviour — instructions, pinned skills, a default profile, and later its own files — not a folder. | Does not know which provider or which tools exist — both arrive injected; does not answer *who she is*, which is `hera_profiles` |
+| `hera_chats` | **Projects**, chats, messages, the persisted `ChatEvent` stream (ADR 10), and the turn orchestrator. A project is a container with behaviour — instructions, pinned skills, a default profile, and later its own files — not a folder. | Does not know which provider or which tools exist — both arrive injected; does not answer *who she is*, which is `hera_profiles`; raises nothing — a turn closes with a reason |
 | `hera_memories` (v0.2) | What Hera remembers across chats: retrieval, caps, dedup, hit counts. | |
 | `hera_promptevo` (v0.2) | Dreaming and experience training — the only place the words *generation*, *fitness* and *dream* are allowed. | Never writes to the mind without an accepted proposal |
 
@@ -57,9 +57,14 @@ column. Integrity is the application's job, not the database's. Linking tables l
 **Migrations live in `apps/core`.** Only there is every package imported, so only there does
 `alembic autogenerate` see the whole schema. SQLite needs `render_as_batch=True`.
 
-**One event union.** `hera_providers` defines the stream event types; `hera_chats` persists
-them; `apps/core` serialises them to SSE; the web app reduces them into a message. A new kind of
-thing the model can do is one new event variant, not a new parser.
+**One event union per boundary, with a total mapping between them.** `hera_providers` defines
+what a *model* can emit. `hera_chats.ChatEvent` wraps it and adds what a *turn* contains — a
+skill selection, a tool result, a permission request — because none of those is model output and
+the model boundary must not learn what a skill is. See
+[ADR 10](docs/adr/0010-chat-events-wrap-the-provider-union.md). `apps/core` serialises
+`ChatEvent` to SSE and the web app reduces it into a message. A new kind of thing the model can
+do is one variant in `hera_providers` plus one line of mapping; a new kind of thing a turn
+contains is one variant in `hera_chats` and no change below. Neither is ever a parser.
 
 **The server render is authoritative.** The client renders optimistically while streaming, then
 replaces its view with the persisted event list at `done`. Live view and reload can therefore
@@ -73,9 +78,11 @@ user input
   └─ hera_profiles.PromptBuilder.build()        mind regions → Prompt, slots bound
   └─ hera_prompts.Prompt.render()               messages + snapshot (fingerprint, dropped keys)
   └─ hera_providers.Provider.stream()           TextDelta · ThinkingDelta · ToolCallReady …
-        ├─ ToolCallReady → hera_permissions.check() → hera_tools.dispatch() → results
+        ├─ ToolCallReady → hera_permissions.check() → hera_tools.dispatch() → ToolResultEvent
+        │                    └─ ask → PermissionRequired, turn closes, resumable
         │                                        ↑ loops, bounded by max_iterations
-        └─ TurnEnd → hera_chats persists the event list
+        └─ TurnEnd consumed per round trip → one TurnClosed ends the turn
+             └─ hera_chats persists the coalesced ChatEvent list
 ```
 
 ## The model

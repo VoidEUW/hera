@@ -129,3 +129,23 @@ def test_test_modules_do_not_shadow_each_other() -> None:
 
     clashes = {name: paths for name, paths in by_name.items() if len(paths) > 1}
     assert not clashes, f"test module names must be unique across the workspace: {clashes}"
+
+
+def test_a_package_claiming_to_be_typed_ships_the_marker() -> None:
+    """`Typing :: Typed` without a `py.typed` file is a lie a consumer pays for.
+
+    The classifier is advisory; `py.typed` is what actually makes a type checker read the
+    package's annotations (PEP 561). Without it, another project that depends on one of these
+    -- which CONTRIBUTING.md explicitly invites -- gets `module is installed, but missing
+    library stubs`, and every call into it silently becomes `Any`.
+    """
+    missing = []
+    for member in _members():
+        config = _config(member)
+        if "Typing :: Typed" not in _table(config, "project").get("classifiers", []):
+            continue
+        for package in _table(config, "tool", "hatch", "build", "targets", "wheel")["packages"]:
+            if not (member / package / "py.typed").is_file():
+                missing.append(f"{member.name}: {package}/py.typed")
+
+    assert not missing, f"declared as typed but ship no marker: {missing}"

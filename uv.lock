@@ -10,6 +10,7 @@ resolution-markers = [
 [manifest]
 members = [
     "hera",
+    "hera-chats",
     "hera-home",
     "hera-permissions",
     "hera-profiles",
@@ -500,6 +501,39 @@ dev = [
     { name = "ruff", specifier = ">=0.6" },
     { name = "types-pyyaml", specifier = ">=6.0" },
     { name = "uvicorn", specifier = ">=0.30" },
+]
+
+[[package]]
+name = "hera-chats"
+version = "0.1.0"
+source = { editable = "packages/hera_chats" }
+dependencies = [
+    { name = "hera-home" },
+    { name = "hera-permissions" },
+    { name = "hera-profiles" },
+    { name = "hera-prompts" },
+    { name = "hera-providers" },
+    { name = "hera-skillsets" },
+    { name = "hera-storage" },
+    { name = "hera-tools" },
+    { name = "pydantic" },
+    { name = "pydantic-settings" },
+    { name = "sqlmodel" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "hera-home", editable = "packages/hera_home" },
+    { name = "hera-permissions", editable = "packages/hera_permissions" },
+    { name = "hera-profiles", editable = "packages/hera_profiles" },
+    { name = "hera-prompts", editable = "packages/hera_prompts" },
+    { name = "hera-providers", editable = "packages/hera_providers" },
+    { name = "hera-skillsets", editable = "packages/hera_skillsets" },
+    { name = "hera-storage", editable = "packages/hera_storage" },
+    { name = "hera-tools", editable = "packages/hera_tools" },
+    { name = "pydantic", specifier = ">=2.7" },
+    { name = "pydantic-settings", specifier = ">=2.4.0" },
+    { name = "sqlmodel", specifier = ">=0.0.22" },
 ]
 
 [[package]]

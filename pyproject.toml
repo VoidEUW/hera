@@ -21,6 +21,7 @@ members = ["packages/*", "apps/core"]
 # uv then resolves that package's internal dependencies from the same commit, with no extra
 # declarations on the consumer's side. tests/test_workspace.py checks the list stays complete.
 [tool.uv.sources]
+hera-chats = { workspace = true }
 hera-home = { workspace = true }
 hera-permissions = { workspace = true }
 hera-profiles = { workspace = true }
@@ -91,6 +92,8 @@ plugins = ["pydantic.mypy"]
 # tests/test_docs.py::test_mypy_checks_every_package fails if an entry is forgotten.
 files = [
     "tests",
+    "packages/hera_chats/src",
+    "packages/hera_chats/tests",
     "packages/hera_home/src",
     "packages/hera_home/tests",
     "packages/hera_permissions/src",

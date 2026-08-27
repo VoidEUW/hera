@@ -1,0 +1,38 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "hera-chats"
+version = "0.1.0"
+description = "Projects, chats, the persisted event stream, and the turn orchestrator."
+readme = "README.md"
+requires-python = ">=3.12"
+authors = [{ name = "Void" }]
+license = { text = "MIT" }
+keywords = ["chat", "agent", "streaming", "orchestration"]
+classifiers = [
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Typing :: Typed",
+]
+dependencies = [
+    "hera-home",
+    "hera-permissions",
+    "hera-profiles",
+    "hera-prompts",
+    "hera-providers",
+    "hera-skillsets",
+    "hera-storage",
+    "hera-tools",
+    "pydantic>=2.7",
+    "pydantic-settings>=2.4.0",
+    "sqlmodel>=0.0.22",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/hera_chats"]
+
+# Linting, typing, testing and coverage are configured once in the workspace root. This package
+# deliberately declares none of it, so there is only ever one answer to "which config applies".

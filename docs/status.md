@@ -34,6 +34,7 @@ Each has a record in [adr/](adr/); read those before reopening one.
 | [7](adr/0007-fresh-start-no-legacy-import.md) | Empty `~/.hera/` | No importer. Boot refuses to run against a pre-v0.1 directory and tells you to move it aside; nothing is deleted |
 | [8](adr/0008-github-flow-and-required-checks.md) | GitHub Flow, protected `main` | PR for everything, squash merge, linear history, required checks, zero required approvals (single maintainer) |
 | [9](adr/0009-one-application-package.md) | One application package, `hera-core` | `apps/core/` holds the API and the web app; `packages/` stays libraries only, so the layering guard keeps meaning what it means |
+| [10](adr/0010-chat-events-wrap-the-provider-union.md) | `ChatEvent` wraps `hera_providers.Event` | A skill selection, a tool result and a permission request are not model output. Two unions, one total mapping, still no parser — and `hera_providers` keeps its empty allow-list |
 
 Other constraints that are decided but did not need a record: English everywhere with an i18n
 seam; single-user login in v0.1 behind a multi-user-ready seam (`Depends(current_user)` on every
@@ -51,6 +52,7 @@ packages/hera_permissions/ allow · deny · ask, resolved by pattern and profile
 packages/hera_tools/      the MCP client, the namespaced catalogue, and her own server
 packages/hera_profiles/   the git-backed mind, behaviour traits, profiles, the PromptBuilder
 packages/hera_skillsets/  SKILL.md packages, the router, usage counts
+packages/hera_chats/      projects, chats, the persisted event stream, the turn orchestrator
 tests/                    repository-level guards (see below)
 .github/                  CI, CodeQL, release, templates, CODEOWNERS, dependabot
 docs/adr/                 nine decision records
@@ -60,8 +62,9 @@ docs/adr/                 nine decision records
 tests, 99 % coverage. `FakeProvider` means every layer built on top is testable without a model
 running. The whole suite is 571 tests at 99 % coverage.
 
-**`hera_profiles` and `hera_skillsets` are built**, on the stacked branches
-`feat/hera-profiles` and `feat/hera-skillsets`. Profiles brought `hera_home` with it:
+**`hera_profiles`, `hera_skillsets` and `hera_chats` are built**, on the stacked branches
+`feat/hera-profiles`, `feat/hera-skillsets` and `feat/hera-chats`. Every package of v0.1 now
+exists; `apps/core` is the only thing left. Profiles brought `hera_home` with it:
 `HERA_HOME` had been resolved by `hera_tools.settings.hera_home()` with a note saying to lift
 it when a second package needed it, and the mind directory was that second package.
 
@@ -166,6 +169,32 @@ model was reading a corrupted sample of the very thing the section existed to te
 exposure is a slot that could appear to close its own element early, which matters far less
 here than in a browser: nothing parses this output, and the content came from a file its owner
 wrote.
+
+### What `hera_chats` settled
+
+- **`ChatEvent` wraps the provider union** rather than extending it — [ADR 10](adr/0010-chat-events-wrap-the-provider-union.md).
+  Growing `hera_providers.Event` with `tool_result` would have made the model boundary carry a
+  concept from `hera_tools`, and that package's empty allow-list is what lets it stand alone.
+- **`TurnEnd` never reaches the browser.** It is the model's full stop for one round trip and a
+  turn with tools has several; the orchestrator consumes them and closes the turn once with
+  `turn_closed`, whose reason set is wider — a turn can also be waiting for a person.
+- **An `ask` closes the turn instead of blocking it.** `awaiting_permission`, events persisted,
+  and answering the card starts a new turn that *resumes the same message* through
+  `TurnContext.resume`. A turn holding an SSE response open waiting for a person dies with the
+  tab. A resumed turn does not re-route skills and does not re-stream what the client already
+  has.
+- **Nothing raises into the caller's loop**, and there is no error module at all. A dead
+  provider, a broken stream, a runaway tool loop: each closes the turn with a reason.
+  `Turn.recorded` is correct at every moment, so a cancelled turn keeps the text that arrived.
+- **History is rebuilt from the event list, not from a column.** One assistant turn becomes
+  several wire messages — assistant-with-calls, one `tool` message per result, assistant again.
+  Flattening loses the `tool_call_id` pairing and the model ignores the result *silently*. A
+  call with no result still gets a message saying it never ran.
+- **Text is coalesced before storage.** Hundreds of `text_delta` events become one; the variant
+  is unchanged, so live view and reload still render the same thing.
+- **`Tools` is a narrowing port, not an inverting one.** `hera_chats` may import `hera_tools`
+  and does; the protocol says which three methods a turn actually uses, and lets a test drive
+  the loop without MCP servers.
 
 ### The guards
 

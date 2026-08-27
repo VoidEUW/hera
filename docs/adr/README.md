@@ -16,3 +16,4 @@ later.
 | [7](0007-fresh-start-no-legacy-import.md) | Start from an empty `~/.hera/` | accepted |
 | [8](0008-github-flow-and-required-checks.md) | GitHub Flow, protected `main`, required checks | accepted |
 | [9](0009-one-application-package.md) | One application package, `hera-core` at `apps/core/` | accepted |
+| [10](0010-chat-events-wrap-the-provider-union.md) | The persisted stream wraps the provider union rather than extending it | accepted |
