@@ -418,6 +418,35 @@ def test_xml_escapes_bound_slot_content() -> None:
     assert "&lt;call/&gt;" in content
 
 
+def test_xml_leaves_a_section_alone_when_escaping_is_switched_off() -> None:
+    """For a slot holding somebody else's prose. Escaping turns a code sample into a
+    corrupted code sample, and the model is reading the very thing it was given the section
+    to learn from."""
+    prompt = Prompt(
+        sections=[Section(key="skills", slot="skills", escape=False)],
+        renderer=RendererConfig(format="xml"),
+    )
+    content = prompt.render(bindings={"skills": "if count < limit && ready"}).messages[0].content
+    assert "if count < limit && ready" in content
+
+
+def test_switching_escaping_off_changes_the_fingerprint() -> None:
+    """It changes the rendered output, so two prompts differing only in it are not the same
+    prompt -- otherwise a cache keyed on the fingerprint would serve the wrong one."""
+    escaped = Prompt(sections=[Section(key="skills", content="a < b")])
+    raw = Prompt(sections=[Section(key="skills", content="a < b", escape=False)])
+    assert escaped.fingerprint() != raw.fingerprint()
+
+
+@pytest.mark.parametrize("fmt", ["keyvalue", "markdown"])
+def test_the_other_renderers_never_escaped_anything_anyway(fmt: str) -> None:
+    prompt = Prompt(
+        sections=[Section(key="skills", content="a < b & c")],
+        renderer=RendererConfig.model_validate({"format": fmt}),
+    )
+    assert "a < b & c" in prompt.render().messages[0].content
+
+
 def test_xml_renders_an_empty_binding_as_an_empty_element() -> None:
     prompt = Prompt(
         sections=[Section(key="tools", slot="tools")],

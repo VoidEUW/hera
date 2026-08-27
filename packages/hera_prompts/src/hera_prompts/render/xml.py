@@ -35,7 +35,13 @@ class XmlRenderer:
         traits = self._constraints(block, config, depth + 1)
         body: list[str] = []
         if block.text is not None:
-            body.extend(f"{INDENT * (depth + 1)}{escape(line)}" for line in block.text.splitlines())
+            # A block built from the general trait bin has no section behind it and is always
+            # this library's own text, so escaping is the safe default there.
+            protect = block.section.escape if block.section is not None else True
+            body.extend(
+                f"{INDENT * (depth + 1)}{escape(line) if protect else line}"
+                for line in block.text.splitlines()
+            )
         for child in block.children:
             body.append(self.block(child, config, depth + 1))
         if traits is not None:

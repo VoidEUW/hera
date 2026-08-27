@@ -76,6 +76,23 @@ class Section(BaseModel):
     locked: bool = False
     enabled: bool = True
 
+    escape: bool = True
+    """Whether the XML renderer escapes ``&``, ``<`` and ``>`` in this section's text.
+
+    On by default, which is right for authored content: a section that accidentally contains
+    ``</identity>`` must not appear to close its own element.
+
+    Turn it off for a section whose text is somebody else's prose — a slot filled with a skill
+    body, a project's instructions, a tool catalogue. Those routinely contain code, and
+    escaping turns ``if count < limit && ready`` into ``if count &lt; limit &amp;&amp;
+    ready``: the model is then reading a corrupted sample of the very thing it was given the
+    section to learn from. The exposure that buys is a section that could close early, which
+    matters far less here than in a browser — nothing parses this output, and the content came
+    from a file its owner wrote.
+
+    The other two renderers never escape anything, so this flag is XML's alone.
+    """
+
     @model_validator(mode="after")
     def _validate_subtree(self) -> Section:
         if not KEY_PATTERN.match(self.key):

@@ -50,6 +50,7 @@ packages/hera_providers/  the model boundary: event union, Qwen adapter, transpo
 packages/hera_permissions/ allow · deny · ask, resolved by pattern and profile
 packages/hera_tools/      the MCP client, the namespaced catalogue, and her own server
 packages/hera_profiles/   the git-backed mind, behaviour traits, profiles, the PromptBuilder
+packages/hera_skillsets/  SKILL.md packages, the router, usage counts
 tests/                    repository-level guards (see below)
 .github/                  CI, CodeQL, release, templates, CODEOWNERS, dependabot
 docs/adr/                 nine decision records
@@ -59,10 +60,10 @@ docs/adr/                 nine decision records
 tests, 99 % coverage. `FakeProvider` means every layer built on top is testable without a model
 running. The whole suite is 571 tests at 99 % coverage.
 
-**`hera_profiles` is built** and sits on the branch `feat/hera-profiles`. It brought
-`hera_home` with it: `HERA_HOME` had been resolved by `hera_tools.settings.hera_home()` with a
-note saying to lift it when a second package needed it, and the mind directory was that second
-package.
+**`hera_profiles` and `hera_skillsets` are built**, on the stacked branches
+`feat/hera-profiles` and `feat/hera-skillsets`. Profiles brought `hera_home` with it:
+`HERA_HOME` had been resolved by `hera_tools.settings.hera_home()` with a note saying to lift
+it when a second package needed it, and the mind directory was that second package.
 
 Two things worth knowing before building on the foundation:
 
@@ -132,6 +133,39 @@ Two things worth knowing before building on the foundation:
   says so, so the trap is documented rather than hidden.
 - **Everything is synchronous**, like `hera_storage`. The turn orchestrator runs it in a
   worker thread. An async facade over `subprocess` would be a thread pool wearing a costume.
+
+### What `hera_skillsets` settled
+
+- **Retrieval works with no model endpoint.** ADR 5 names keyword overlap as the fallback, and
+  it is what runs by default rather than something waiting for v0.2 — a skill that silently
+  stops arriving because embeddings are down looks exactly like a skill that was not relevant.
+  Terms are weighted by how few skills contain them, and a skill is scored on how much of *its
+  own* description the turn covered; scoring the turn's coverage would reward whichever
+  description was longest. An `Embedder` port improves it; an embedder that raises is treated
+  as one that is absent.
+- **The directory name is the skill's identifier**, not the frontmatter `name`. A disagreement
+  is a reported problem, not an override — two sources of truth for an identifier is how a
+  skill becomes unreachable under the name it appears with.
+- **`description: Use when: …` is invalid YAML** and PyYAML rejects the whole block over it,
+  which would silently cost the skill its description and make it unretrievable. Frontmatter
+  that fails to parse is re-read line by line and the rescue is reported, so the author is told
+  to quote the value instead of wondering why retrieval never fires.
+- **Nothing raises for bad content.** Unparseable YAML, no description, an empty body — the
+  skill still loads carrying `problems` written for a person. A directory with no `SKILL.md`
+  becomes a `BrokenSkill` in `Catalogue.broken` rather than being skipped.
+- **`missing` and `dropped` are different fields.** One is a pin whose folder is gone, the
+  other is a skill that exists and did not fit the budget. Same-looking absence, opposite fixes.
+
+### `hera_prompts` grew one field
+
+`Section.escape`, defaulting to `True`, which is the behaviour it always had. The XML renderer
+escapes `&`, `<` and `>` in section text — correct for content this project authors, and wrong
+for a slot. A skill body reached the model as `if count &lt; limit &amp;&amp; ready`, so the
+model was reading a corrupted sample of the very thing the section existed to teach it.
+`hera_profiles` sets `escape=False` on every slot section and `True` on every region. The
+exposure is a slot that could appear to close its own element early, which matters far less
+here than in a browser: nothing parses this output, and the content came from a file its owner
+wrote.
 
 ### The guards
 
@@ -229,9 +263,7 @@ message actually streams into the SvelteKit interface against `FakeProvider`, an
 deepened. `docs/frontend.md` says in as many words that the design language gets adjusted once
 there is a running build to react to, and it cannot be until there is one.
 
-`hera_skillsets` is the next one. It needs `SKILL.md` loading from `~/.hera/skills/` and the
-router — pinned and `/slash` only for the thin pass; retrieval needs embeddings, which is
-`hera_memories`, which is v0.2.
+`hera_chats` is the next one, and it is the last package before the application.
 
 `hera_chats` is the one to think about before starting it: it is where a tool *result* has to
 become something persisted and rendered, and the event union in `hera_providers` deliberately

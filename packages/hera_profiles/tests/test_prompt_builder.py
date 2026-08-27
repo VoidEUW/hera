@@ -211,3 +211,17 @@ class TestTraits:
         for spec in BEHAVIOUR_TRAITS.specs:
             prefix = spec.key.rsplit(".", 1)[0]
             assert prefix in keys, f"{spec.key} would render in the general block"
+
+
+class TestForeignContent:
+    def test_a_slot_is_not_escaped(self, builder: PromptBuilder) -> None:
+        """A skill body or a project's instructions routinely contain code. Escaping would
+        hand the model `if count &lt; limit` and expect it to learn from the sample."""
+        text = rendered(builder, **{SLOT_SKILLS: "if count < limit && ready"})
+        assert "if count < limit && ready" in text
+
+    def test_a_region_is_escaped(self, builder: PromptBuilder, mind: MindRepository) -> None:
+        """Text this package authors keeps the default: a region that accidentally contains
+        `</identity>` must not appear to close its own element."""
+        mind.write("tone", "Never write </identity> in an answer.")
+        assert "&lt;/identity&gt;" in rendered(builder)

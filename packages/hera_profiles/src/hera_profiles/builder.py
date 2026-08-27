@@ -298,6 +298,11 @@ def _build(
         role=node.role,
         priority=node.priority,
         required=node.required,
+        # A slot holds somebody else's prose -- a skill body, a project's instructions, a tool
+        # catalogue -- and those routinely contain code. Escaping would hand the model
+        # `if count &lt; limit` and then expect it to learn from the sample. A region is text
+        # from the mind repository and is escaped like everything else this package authors.
+        escape=slot is None,
     )
 
 

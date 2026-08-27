@@ -26,6 +26,7 @@ hera-permissions = { workspace = true }
 hera-profiles = { workspace = true }
 hera-prompts = { workspace = true }
 hera-providers = { workspace = true }
+hera-skillsets = { workspace = true }
 hera-storage = { workspace = true }
 hera-tools = { workspace = true }
 
@@ -40,6 +41,8 @@ dev = [
     # Needed at the workspace root for the pydantic mypy plugin to load.
     "pydantic>=2.9",
     "pre-commit>=4.6.2",
+    # hera_skillsets parses SKILL.md frontmatter; mypy --strict needs the stubs.
+    "types-PyYAML>=6.0",
     # Serves a real MCP server over HTTP in the hera_tools transport tests. It arrives with
     # the MCP SDK anyway; declared here so the suite does not depend on that staying true.
     "uvicorn>=0.30",
@@ -98,6 +101,8 @@ files = [
     "packages/hera_prompts/tests",
     "packages/hera_providers/src",
     "packages/hera_providers/tests",
+    "packages/hera_skillsets/src",
+    "packages/hera_skillsets/tests",
     "packages/hera_storage/src",
     "packages/hera_storage/tests",
     "packages/hera_tools/src",
