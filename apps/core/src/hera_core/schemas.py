@@ -22,10 +22,12 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
+from hera_skillsets.models import ID_PATTERN
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from hera_chats import Chat, Message, Project
 from hera_core.config import validate_provider_name
+from hera_mcp import Emotion
 from hera_profiles import MindRegion, Profile
 from hera_skillsets import BrokenSkill, Skill, SkillUsage
 
@@ -110,6 +112,7 @@ class ChatOut(BaseModel):
     project_id: UUID | None
     profile_id: UUID | None
     pinned: bool
+    pinned_skills: list[str]
     created_at: datetime
     last_message_at: datetime | None
 
@@ -121,6 +124,7 @@ class ChatOut(BaseModel):
             project_id=chat.project_id,
             profile_id=chat.profile_id,
             pinned=chat.pinned,
+            pinned_skills=list(chat.pinned_skills or []),
             created_at=chat.created_at,
             last_message_at=chat.last_message_at,
         )
@@ -130,6 +134,22 @@ class ChatIn(BaseModel):
     title: str = ""
     project_id: UUID | None = None
     profile_id: UUID | None = None
+
+
+class ChatPatch(BaseModel):
+    """Renaming. ``None`` means "leave it", as everywhere else here.
+
+    A title typed by hand sticks: :meth:`hera_chats.ChatRepository.touch` only ever names a
+    chat that has no name, so the next turn will not quietly rename it back. Clearing it to
+    ``""`` therefore hands naming back to her.
+    """
+
+    title: str | None = Field(default=None, max_length=200)
+
+    pinned_skills: list[str] | None = Field(default=None, max_length=32)
+    """Skills switched on for this conversation. The whole list, because it is a set of
+    toggles and three endpoints for add, remove and reorder would each have an opinion about
+    an order the person can see."""
 
 
 class MessageOut(BaseModel):
@@ -167,7 +187,9 @@ class MessageOut(BaseModel):
             events=list(message.events),
             attachments=[
                 AttachmentSummary(
-                    name=str(item.get("name", "")), bytes=int(item.get("bytes", 0) or 0)
+                    name=str(item.get("name", "")),
+                    bytes=int(item.get("bytes", 0) or 0),
+                    media_type=str(item.get("media_type", "") or ""),
                 )
                 for item in message.attachments
             ],
@@ -175,12 +197,16 @@ class MessageOut(BaseModel):
 
 
 class AttachmentSummary(BaseModel):
-    """A file's name and size. Never its contents — see :class:`MessageOut`."""
+    """A file's name, size and kind. Never its contents — see :class:`MessageOut`."""
 
     model_config = ConfigDict(frozen=True)
 
     name: str
     bytes: int
+
+    media_type: str = ""
+    """``image/png`` for a picture, empty for text. Enough for the chip to say which it was
+    without the browser guessing from the extension, and far short of sending the bytes back."""
 
 
 class ChatDetail(BaseModel):
@@ -190,17 +216,55 @@ class ChatDetail(BaseModel):
     messages: list[MessageOut]
 
 
+MAX_TEXT_CHARS = 4 * 1024 * 1024
+"""A text attachment's ceiling. The browser stops far below this; the number here exists so a
+request built by hand cannot put an arbitrary amount of memory into a JSON column."""
+
+MAX_DATA_URL_CHARS = 32 * 1024 * 1024
+"""A picture's ceiling, in base64 characters — roughly 24 MB of image. Same reasoning."""
+
+IMAGE_TYPES = frozenset({"image/png", "image/jpeg", "image/webp", "image/gif"})
+"""What an OpenAI-compatible endpoint is agreed to accept. Refusing anything else here is the
+difference between a clear error and a model being handed a file it will describe as noise."""
+
+
 class AttachmentIn(BaseModel):
     """A file sent with a message, read in the browser.
 
     There is no upload endpoint, and that is deliberate rather than unfinished: a *project's*
     files need embeddings and retrieval and are v0.2, while a file attached to one question is
     context for that turn and nothing else.
+
+    Two shapes, and exactly one of them per file: ``text`` for something that decoded as text,
+    ``data_url`` for a picture. Sending both, or neither, is rejected rather than resolved by
+    precedence — a rule about which one wins is a rule somebody has to remember.
     """
 
     name: str = Field(min_length=1, max_length=255)
-    text: str
+    text: str = Field(default="", max_length=MAX_TEXT_CHARS)
     bytes: int = 0
+
+    data_url: str = Field(default="", max_length=MAX_DATA_URL_CHARS)
+    """A picture as ``data:<media type>;base64,…``. The bytes travel rather than a link: the
+    endpoint is usually a local server with no route back to the browser that read the file."""
+
+    media_type: str = Field(default="", max_length=100)
+
+    @model_validator(mode="after")
+    def _one_kind_of_file(self) -> AttachmentIn:
+        if self.data_url:
+            if self.text:
+                raise ValueError(f"{self.name}: an attachment is either text or a picture")
+            if self.media_type not in IMAGE_TYPES:
+                raise ValueError(
+                    f"{self.name}: {self.media_type or 'that'} is not an image Hera "
+                    f"can send — {', '.join(sorted(IMAGE_TYPES))}"
+                )
+            if not self.data_url.startswith(f"data:{self.media_type};base64,"):
+                raise ValueError(f"{self.name}: a picture must be a base64 data URL")
+        elif not self.text:
+            raise ValueError(f"{self.name}: an attachment with nothing in it is not a question")
+        return self
 
 
 class MessageIn(BaseModel):
@@ -208,7 +272,7 @@ class MessageIn(BaseModel):
     """What the person typed, ``/commands`` included — the router strips them server-side, so
     the browser must not."""
 
-    attachments: list[AttachmentIn] = Field(default_factory=list)
+    attachments: list[AttachmentIn] = Field(default_factory=list, max_length=16)
 
     @model_validator(mode="after")
     def _says_something(self) -> MessageIn:
@@ -216,6 +280,17 @@ class MessageIn(BaseModel):
         if not self.text.strip() and not self.attachments:
             raise ValueError("a message needs text, a file, or both")
         return self
+
+
+class RedoIn(BaseModel):
+    """Ask again from a message.
+
+    ``text`` left out means "the same question" — *try again* on an answer, or on a question
+    whose wording was fine. Sent, it replaces the question, which is what *edit* is. There is
+    no third field: everything else about the turn is read from the message being replayed.
+    """
+
+    text: str | None = None
 
 
 class PermissionAnswer(BaseModel):
@@ -226,6 +301,43 @@ class PermissionAnswer(BaseModel):
     remember: bool = False
     """Whether to write a rule. **Always allow** has to be visibly different from **Allow
     once** afterwards, or nobody can tell whether the decision stuck."""
+
+
+class EmotionOut(BaseModel):
+    """One stance, as the Emotions screen and the emotion card see it."""
+
+    model_config = ConfigDict(frozen=True)
+
+    kind: str
+    description: str
+    tone: str
+
+    @classmethod
+    def of(cls, emotion: Emotion) -> EmotionOut:
+        return cls(kind=emotion.kind, description=emotion.description, tone=emotion.tone)
+
+
+class EmotionsOut(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    emotions: list[EmotionOut]
+    customised: bool
+    """Whether this is the person's list or the one she ships with. What decides whether
+    *Reset* is worth offering."""
+
+    problem: str = ""
+    """Why the stored list could not be read, when it could not — the defaults are on screen
+    and this says so, rather than a screen that fails to load."""
+
+
+class EmotionsIn(BaseModel):
+    """The whole list, in the order it should be read.
+
+    Whole rather than one at a time: the order is something a person arranges, and three
+    endpoints for add, edit and remove would each need to agree about it.
+    """
+
+    emotions: list[Emotion] = Field(min_length=1, max_length=64)
 
 
 class RegionOut(BaseModel):
@@ -258,7 +370,15 @@ class RegionIn(BaseModel):
 
 
 class SkillOut(BaseModel):
-    """A skill row on the settings screen."""
+    """A skill row on the settings screen.
+
+    ``author``, ``license``, ``icon`` and ``version`` are frontmatter keys ``hera_skillsets``
+    deliberately does not interpret — it keeps them in ``metadata`` and stays out of the way.
+    They are lifted into named fields *here*, where the audience is a screen: a row that has to
+    reach into a dictionary for the field it always draws is a row that renders nothing when
+    somebody spells the key differently, with no way to tell that from a skill that never had
+    a licence.
+    """
 
     model_config = ConfigDict(frozen=True)
 
@@ -271,8 +391,25 @@ class SkillOut(BaseModel):
     hits: int = 0
     last_used_at: datetime | None = None
 
+    author: str = ""
+    license: str = ""
+    icon: str = ""
+    """One character or emoji from the frontmatter. Empty is the normal case, and the interface
+    draws a monogram instead — every row gets a mark, none of them has to."""
+    version: str = ""
+    homepage: str = ""
+
+    digest: str = ""
+    """SHA-256 of the ``SKILL.md``, so a person can compare it with a published list by eye."""
+
+    trust: str = "unknown"
+    """``verified``, ``modified`` or ``unknown`` — see :mod:`hera_core.trust`."""
+
     @classmethod
-    def of(cls, skill: Skill, usage: SkillUsage | None = None) -> SkillOut:
+    def of(
+        cls, skill: Skill, usage: SkillUsage | None = None, *, trust: str = "unknown"
+    ) -> SkillOut:
+        meta = skill.metadata
         return cls(
             id=skill.id,
             name=skill.name,
@@ -282,7 +419,38 @@ class SkillOut(BaseModel):
             problems=list(skill.problems),
             hits=usage.hits if usage is not None else 0,
             last_used_at=usage.last_used_at if usage is not None else None,
+            author=meta.get("author", ""),
+            license=meta.get("license", ""),
+            icon=meta.get("icon", ""),
+            version=meta.get("version", ""),
+            homepage=meta.get("homepage", ""),
+            digest=skill.digest,
+            trust=trust,
         )
+
+
+class SkillIn(BaseModel):
+    """A skill written from the interface.
+
+    Enough to be a real ``SKILL.md`` and nothing more: an id, the description retrieval matches
+    on, and the body that reaches the model. Everything else — author, licence, an icon — is
+    frontmatter a person adds in the file, which is the point of skills being folders.
+    """
+
+    id: str = Field(min_length=1, max_length=64)
+    description: str = Field(default="", max_length=1024)
+    body: str = ""
+
+    @field_validator("id")
+    @classmethod
+    def _usable_id(cls, value: str) -> str:
+        """The same rule `hera_skillsets` enforces, applied where a person can be told about
+        it: the id ends up in a `/slash` command and in a directory name, and Claude Code
+        accepts exactly this much."""
+        cleaned = value.strip().lower()
+        if not ID_PATTERN.match(cleaned):
+            raise ValueError("lowercase letters, digits and hyphens, starting with one of them")
+        return cleaned
 
 
 class BrokenSkillOut(BaseModel):
@@ -302,6 +470,10 @@ class SkillsOut(BaseModel):
 
     skills: list[SkillOut]
     broken: list[BrokenSkillOut]
+
+    trust_problem: str = ""
+    """Why the trust list could not be read, when it could not. A broken ``trusted.json`` costs
+    the verified marks and nothing else — it must not be able to hide the skills themselves."""
 
 
 class ServerOut(BaseModel):

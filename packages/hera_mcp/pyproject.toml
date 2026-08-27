@@ -1,0 +1,26 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "hera-mcp"
+version = "0.1.0"
+description = "Hera's own capabilities as an MCP server: emotion, remember, note, skill."
+readme = "README.md"
+requires-python = ">=3.12"
+authors = [{ name = "Void" }]
+license = { text = "MIT" }
+keywords = ["mcp", "server", "agent", "tools"]
+classifiers = [
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Typing :: Typed",
+]
+dependencies = ["mcp>=2.1"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/hera_mcp"]
+
+# Linting, typing, testing and coverage are configured once in the workspace root. This package
+# deliberately declares none of it, so there is only ever one answer to "which config applies".

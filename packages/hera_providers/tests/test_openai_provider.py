@@ -17,6 +17,7 @@ from hera_providers import (
     ChatMessage,
     ChatRequest,
     EmbeddingProvider,
+    ImagePart,
     MalformedResponse,
     OpenAICompatibleProvider,
     Provider,
@@ -28,6 +29,7 @@ from hera_providers import (
     Role,
     StreamInterrupted,
     TextDelta,
+    TextPart,
     ToolCall,
     ToolCallReady,
     ToolSpec,
@@ -205,6 +207,60 @@ def test_a_tool_result_names_the_call_it_answers() -> None:
     assert assistant["tool_calls"][0]["id"] == "c1"
     assert json.loads(assistant["tool_calls"][0]["function"]["arguments"]) == {"text": "hi"}
     assert tool["tool_call_id"] == "c1"
+
+
+def test_prose_stays_a_bare_string_on_the_wire() -> None:
+    """Wrapping every message in a one-element list is equally valid by the specification and
+    is not what local servers have been tested against. Being unremarkable is worth more."""
+    payload = chat_payload(
+        request(messages=[ChatMessage(role=Role.USER, content="hello")]), stream=False
+    )
+
+    assert payload["messages"][0]["content"] == "hello"
+
+
+def test_a_picture_is_sent_as_typed_blocks() -> None:
+    payload = chat_payload(
+        request(
+            messages=[
+                ChatMessage(
+                    role=Role.USER,
+                    content=[
+                        TextPart(text="what is this?"),
+                        ImagePart(url="data:image/png;base64,iVBOR"),
+                    ],
+                )
+            ]
+        ),
+        stream=False,
+    )
+
+    assert payload["messages"][0]["content"] == [
+        {"type": "text", "text": "what is this?"},
+        {"type": "image_url", "image_url": {"url": "data:image/png;base64,iVBOR"}},
+    ]
+
+
+def test_detail_is_omitted_unless_it_was_asked_for() -> None:
+    """Same reason as every other optional field: a null where a server expected a word."""
+    payload = chat_payload(
+        request(messages=[ChatMessage(role=Role.USER, content=[ImagePart(url="http://x/a.png")])]),
+        stream=False,
+    )
+
+    assert payload["messages"][0]["content"][0]["image_url"] == {"url": "http://x/a.png"}
+
+
+def test_the_words_of_a_message_are_readable_whichever_shape_it_is() -> None:
+    """Anything wanting a message for its words — a title, a budget, a log line — asks for
+    `.text` and does not have to know a picture came with it."""
+    parts = ChatMessage(
+        role=Role.USER,
+        content=[TextPart(text="look at "), ImagePart(url="data:image/png;base64,x")],
+    )
+
+    assert parts.text == "look at "
+    assert ChatMessage(role=Role.USER, content="plain").text == "plain"
 
 
 def test_extra_is_merged_last_so_a_server_specific_field_can_be_passed_through() -> None:

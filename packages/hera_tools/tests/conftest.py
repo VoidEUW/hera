@@ -9,72 +9,17 @@ asserting that our own assumptions agree with themselves.
 from __future__ import annotations
 
 import sys
-from collections.abc import AsyncIterator, Sequence
+from collections.abc import AsyncIterator
 
 import pytest
 from hera_tools.config import StdioServer
 from hera_tools.registry import ToolRegistry
 from hera_tools.server import ManagedServer
 from mcp.server.mcpserver import MCPServer
+from tools_support import STDIO_SERVER_SOURCE, TOY_SERVER_NAME, build_toy_server
 
 from hera_permissions import PermissionSet, Policy
-from hera_tools import ToolsSettings, build_builtin_server
-
-STDIO_SERVER_SOURCE = """
-import os
-from mcp.server.mcpserver import MCPServer
-
-server = MCPServer("spike", version="0.1.0")
-
-
-@server.tool(description="Repeat the text back.")
-def echo(text: str) -> str:
-    return "echo:" + text
-
-
-@server.tool(description="Leave without saying goodbye.")
-def die() -> str:
-    os._exit(9)
-
-
-server.run(transport="stdio")
-"""
-"""A whole MCP server as a string, launched with the interpreter running the tests.
-
-Written inline rather than as a file in the test directory so that pytest collection never
-tries to import it, and so the thing being launched is visibly a separate process.
-"""
-
-
-class FakeMemories:
-    """A :class:`~hera_tools.ports.MemoryWriter` that keeps what it was told."""
-
-    def __init__(self) -> None:
-        self.written: list[tuple[str, str]] = []
-
-    async def remember(self, text: str, *, scope: str) -> str:
-        self.written.append((text, scope))
-        return f"remembered ({scope})"
-
-
-class FakeNotes:
-    def __init__(self) -> None:
-        self.written: list[tuple[str, str]] = []
-
-    async def write_note(self, text: str, *, title: str = "") -> str:
-        self.written.append((title, text))
-        return "note written"
-
-
-class FakeSkills:
-    def __init__(self, bodies: dict[str, str] | None = None) -> None:
-        self.bodies = bodies or {"writing": "# Writing\nBe brief."}
-
-    async def load(self, name: str) -> str | None:
-        return self.bodies.get(name)
-
-    async def names(self) -> Sequence[str]:
-        return sorted(self.bodies)
+from hera_tools import ToolsSettings
 
 
 @pytest.fixture
@@ -84,23 +29,8 @@ def settings() -> ToolsSettings:
 
 
 @pytest.fixture
-def memories() -> FakeMemories:
-    return FakeMemories()
-
-
-@pytest.fixture
-def notes() -> FakeNotes:
-    return FakeNotes()
-
-
-@pytest.fixture
-def skills() -> FakeSkills:
-    return FakeSkills()
-
-
-@pytest.fixture
-def builtin(memories: FakeMemories, notes: FakeNotes, skills: FakeSkills) -> MCPServer:
-    return build_builtin_server(memories=memories, notes=notes, skills=skills)
+def toy() -> MCPServer:
+    return build_toy_server()
 
 
 @pytest.fixture
@@ -110,11 +40,11 @@ def allow_everything() -> Policy:
 
 @pytest.fixture
 async def registry(
-    builtin: MCPServer, allow_everything: Policy, settings: ToolsSettings
+    toy: MCPServer, allow_everything: Policy, settings: ToolsSettings
 ) -> AsyncIterator[ToolRegistry]:
-    """Hera's own server, everything allowed, nothing external."""
+    """One in-process server, everything allowed, nothing external."""
     registry = ToolRegistry(
-        [ManagedServer.in_process("hera", builtin, settings)], policy=allow_everything
+        [ManagedServer.in_process(TOY_SERVER_NAME, toy, settings)], policy=allow_everything
     )
     try:
         yield registry

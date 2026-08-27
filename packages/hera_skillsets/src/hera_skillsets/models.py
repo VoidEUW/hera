@@ -74,6 +74,19 @@ class Skill(BaseModel):
     metadata: dict[str, str] = Field(default_factory=dict)
     """Frontmatter keys this package does not interpret — ``author``, ``license`` and so on."""
 
+    digest: str = ""
+    """SHA-256 of the ``SKILL.md`` that produced this, hex.
+
+    Content, not provenance: this package says *what the file is*, and whoever holds a list of
+    digests they trust says whether that is one of them. Two reasons it is computed here rather
+    than by the thing doing the trusting — the bytes are already in hand, and a second reader
+    would be a second opinion about which bytes count.
+
+    Taken over the decoded text, so a file checked out with CRLF endings hashes the same as the
+    one it was signed from. The body alone would be the wrong thing to hash: a skill's
+    frontmatter is what decides when it fires.
+    """
+
     problems: tuple[str, ...] = ()
     """What is wrong with this skill, in sentences for a person to read.
 

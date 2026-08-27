@@ -595,4 +595,4 @@ async def test_an_empty_message_sends_no_user_turn(make_orchestrator: Make, text
     provider = FakeProvider([text_turn("ok")])
     await drain(make_orchestrator(provider).begin(TurnContext(text=text)).stream())
 
-    assert all(m.content.strip() for m in provider.requests[0].messages)
+    assert all(m.text.strip() for m in provider.requests[0].messages)

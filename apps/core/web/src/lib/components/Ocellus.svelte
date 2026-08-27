@@ -36,7 +36,7 @@
 		<circle cx="12" cy="12" r="11.5" class="ground" />
 		<!-- brass: her authority -->
 		<circle cx="12" cy="12" r="9.5" class="ring" />
-		<!-- peacock: her attention -->
+		<!-- laurel: her attention -->
 		<circle cx="12" cy="12" r="6.5" class="iris" />
 		<!-- the pupil is the ground colour, punched through -->
 		<circle cx="12" cy="12" r="2.6" class="pupil" />
@@ -64,7 +64,7 @@
 	}
 
 	.iris {
-		fill: var(--peacock);
+		fill: var(--laurel);
 		transform-origin: 50% 50%;
 	}
 

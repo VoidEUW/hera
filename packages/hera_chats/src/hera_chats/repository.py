@@ -142,6 +142,17 @@ class ChatRepository(Repository[Chat]):
     def create(self, owner_id: UUID, **fields: object) -> Chat:
         return self.add(Chat(owner_id=owner_id, **fields))
 
+    def save(self, obj: Chat) -> Chat:
+        # A chat carries a JSON column now (`pinned_skills`), and an in-place edit followed by
+        # a bare flush is silently lost. See `_flag_json`.
+        _flag_json(self.session, obj)
+        return super().save(obj)
+
+    def set_pinned_skills(self, chat: Chat, names: Sequence[str]) -> Chat:
+        """Switch skills on for this conversation, by name and in order."""
+        chat.pinned_skills = list(dict.fromkeys(names))
+        return self.save(chat)
+
     def touch(self, chat: Chat, *, title: str = "") -> Chat:
         """Record that something was said, and name the chat if it has no name yet."""
         chat.last_message_at = utcnow()
@@ -232,6 +243,23 @@ class MessageRepository(Repository[Message]):
             limit=1,
         )
         return found[0] if found else None
+
+    def truncate_from(self, chat_id: UUID, sequence: int) -> int:
+        """Remove this message and everything after it, and say how many went.
+
+        What "ask that again" is made of, whether the question was reworded or not: the answer
+        that followed the old wording is not an answer to the new one, and leaving it in place
+        would have the model reading a conversation that never happened.
+
+        Deleted rather than flagged. A chat *is* its message list, and a ``superseded`` column
+        would mean every reader — history, the sidebar preview, the interface — has to remember
+        to filter, with the one that forgets showing a version of the conversation nobody had.
+        """
+        rows = [row for row in self.for_chat(chat_id) if row.sequence >= sequence]
+        for row in rows:
+            self.session.delete(row)
+        self.session.flush()
+        return len(rows)
 
     def delete_for_chat(self, chat_id: UUID) -> int:
         """Remove every message of a chat. Used when the chat itself is deleted."""

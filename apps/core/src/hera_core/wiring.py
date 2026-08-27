@@ -27,14 +27,16 @@ from dataclasses import dataclass
 
 from hera_chats import ChatsSettings, TurnOrchestrator
 from hera_core.config import load as load_config
+from hera_core.search import DuckDuckGo
 from hera_core.settings import CoreSettings
 from hera_home import mind_dir, skills_dir
+from hera_mcp import build_builtin_server
 from hera_permissions import Decision, PermissionSet, Policy, Rule
 from hera_profiles import MindRepository, PromptBuilder
 from hera_providers import OpenAICompatibleProvider, Provider, ProviderSettings
 from hera_skillsets import SkillLibrary, SkillLibraryPort, SkillRouter
 from hera_storage import Database, StorageSettings
-from hera_tools import ToolRegistry, ToolsSettings, build_builtin_server
+from hera_tools import ToolRegistry, ToolsSettings
 
 DEFAULT_POLICY = Policy(
     base=PermissionSet(
@@ -42,7 +44,7 @@ DEFAULT_POLICY = Policy(
             Rule(
                 pattern="hera__*",
                 decision=Decision.ALLOW,
-                reason="one of her own tools, which touch nothing outside Hera",
+                reason="one of her own tools, none of which changes anything outside Hera",
             )
         ]
     ),
@@ -54,8 +56,17 @@ DEFAULT_POLICY = Policy(
 about is exactly the case a person should see once. It is the wrong default for hers.
 ``hera__emotion`` is called several times in an ordinary turn (ADR 3), and a confirmation card
 for each one would make the feature unusable and teach a person to click through cards without
-reading them, which is the failure that matters. Her four built-ins reach only her own mind,
-memories and skills, so they are allowed and everything else still asks.
+reading them, which is the failure that matters.
+
+**``hera__search`` leaves the machine, and is still allowed.** It is the first of her tools that
+does, so the old sentence here — *they reach only her own mind, memories and skills* — is no
+longer the reason. The reason is that a search **reads** something public and changes nothing:
+a card before every lookup would cost a click for each of the three or four searches a real
+question takes, which is the same unusability ``emotion`` would have had. What travels is a
+query the model wrote, to whichever engine ``hera_core.search`` is pointed at, and a person who
+does not want that writes one rule to deny it. The tool that would deserve a card is a *fetch* —
+an arbitrary URL is a request to a machine somebody chose, and `http://192.168.1.1/` is not the
+same act as a search (``docs/tooling.md`` § 1).
 """
 
 
@@ -159,11 +170,16 @@ def build_services(
         registry = ToolRegistry.open(
             policy=policy if policy is not None else DEFAULT_POLICY,
             settings=ToolsSettings(),
-            # hera_tools may not import hera_skillsets, so the library arrives as a port.
+            # hera_mcp imports no hera_* package at all, so the library arrives as a port, and
+            # so does the search engine -- which one a person's questions are sent to is a
+            # decision about this deployment and not about the server she is.
             # Memories and notes stay unwired until v0.2; the tools still appear in the
             # catalogue and answer "not available in this deployment", because a model that
             # cannot see `remember` concludes it cannot remember and says so to the person.
-            builtin=build_builtin_server(skills=SkillLibraryPort(library)),
+            builtin=build_builtin_server(
+                skills=SkillLibraryPort(library),
+                searcher=DuckDuckGo(),
+            ),
         )
 
     mind = MindRepository(mind_dir())

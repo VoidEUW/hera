@@ -92,6 +92,15 @@ class Chat(Entity, SoftDeletable, table=True):
 
     pinned: bool = Field(default=False, index=True)
 
+    pinned_skills: list[str] = Field(default_factory=list, sa_column=Column(_JSON))
+    """Skills switched on **for this conversation**, by name.
+
+    The third place a pin can come from, after the profile and the project, and the only one a
+    person reaches for mid-conversation: *use this, here, now*, without hoping retrieval agrees
+    or that the model notices (ADR 5). Bare strings, like everywhere else a skill is referred
+    to — this package sits below `hera_skillsets` and a folder can be deleted from under a pin.
+    """
+
 
 class Message(Entity, table=True):
     """One turn, stored as the events it was made of.

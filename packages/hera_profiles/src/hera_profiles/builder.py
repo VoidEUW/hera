@@ -47,7 +47,17 @@ SLOT_MEMORIES = "memories"
 SLOT_PROJECT = "project"
 """The instructions of the project this chat lives in, if it lives in one."""
 
-SLOTS: frozenset[str] = frozenset({SLOT_TOOLS, SLOT_SKILLS, SLOT_MEMORIES, SLOT_PROJECT})
+SLOT_EMOTIONS = "emotions"
+"""Her stance vocabulary, rendered by whoever owns it.
+
+A slot rather than a region because the list is *data* the person edits on a screen — a word,
+a sentence, a tone — and the interface colours a card from the same list the model reads. As a
+region it was a paragraph that the browser would have needed a second copy of.
+"""
+
+SLOTS: frozenset[str] = frozenset(
+    {SLOT_TOOLS, SLOT_SKILLS, SLOT_MEMORIES, SLOT_PROJECT, SLOT_EMOTIONS}
+)
 """Every slot the skeleton offers.
 
 Named constants rather than string literals at the call site: a typo in a binding key is
@@ -109,6 +119,7 @@ LAYOUT: tuple[Node, ...] = (
             Node(key="identity.role", title="Role", priority=20, region="role"),
             Node(key="identity.character", title="Character", priority=20, region="character"),
             Node(key="identity.tone", title="Tone", priority=30, region="tone"),
+            Node(key="identity.language", title="Language", priority=31, region="language"),
         ),
     ),
     Node(key="approach", title="Approach", priority=40, region="approach"),
@@ -121,7 +132,7 @@ LAYOUT: tuple[Node, ...] = (
                 key="emotions.vocabulary",
                 title="Available kinds",
                 priority=45,
-                region="emotion_vocab",
+                slot=SLOT_EMOTIONS,
             ),
             Node(
                 key="emotions.usage", title="When to use one", priority=46, region="emotion_usage"

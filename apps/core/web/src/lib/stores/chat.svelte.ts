@@ -8,7 +8,14 @@
  * the server already decided, and the two would drift.
  */
 
-import { api, answerPermission, sendMessage, type Chat, type Message } from '$lib/api/client';
+import {
+	api,
+	answerPermission,
+	redoMessage,
+	sendMessage,
+	type Chat,
+	type Message
+} from '$lib/api/client';
 import type { Attachment } from '$lib/attachments';
 import type { AnyEvent } from '$lib/api/events';
 import { frames } from '$lib/api/sse';
@@ -78,6 +85,47 @@ export class ChatSession {
 		this.pending = text;
 		this.pendingFiles = attachments;
 		await this.#consume(() => sendMessage(this.chat!.id, text, attachments, this.#begin()));
+	}
+
+	/** Switch skills on for this conversation. Optimistic: the picker is a set of toggles and
+	 * a tick that waits for a round trip reads as a click that did not land. */
+	async pinSkills(names: string[]) {
+		if (!this.chat) return;
+		const previous = this.chat.pinned_skills;
+		this.chat = { ...this.chat, pinned_skills: names };
+		try {
+			this.chat = await api.pinSkills(this.chat.id, names);
+		} catch (cause) {
+			if (this.chat) this.chat = { ...this.chat, pinned_skills: previous };
+			this.error = cause instanceof Error ? cause.message : String(cause);
+		}
+	}
+
+	/** Ask again from this message. `text` given rewords the question — the interface calls
+	 * that **edit**; left out it repeats it, which is **try again**. Pointed at an answer, the
+	 * server replays the question above it.
+	 *
+	 * The messages from that question onwards are dropped here as well as on the server, so
+	 * the screen is not still showing an answer to a question that no longer exists while the
+	 * new one streams in. `#settle` refreshes from the server at `done` either way. */
+	async redo(messageId: string, text?: string) {
+		if (!this.chat || this.busy) return;
+		const target = this.messages.find((message) => message.id === messageId);
+		if (!target) return;
+		const asked =
+			target.role === 'user'
+				? target
+				: [...this.messages]
+						.reverse()
+						.find((message) => message.role === 'user' && message.sequence < target.sequence);
+		if (!asked) return;
+
+		this.messages = this.messages.filter((message) => message.sequence < asked.sequence);
+		this.pending = text ?? asked.content;
+		// The files travel with the question server-side; the chips come back with the refresh
+		// at `done`. Redrawing them here would mean holding contents the browser threw away.
+		this.pendingFiles = [];
+		await this.#consume(() => redoMessage(this.chat!.id, messageId, text, this.#begin()));
 	}
 
 	async answer(callIds: string[], allow: boolean, remember = false) {

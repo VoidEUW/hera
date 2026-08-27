@@ -16,7 +16,6 @@
 	import '../app.css';
 
 	let { children } = $props();
-	let settingsOpen = $state(false);
 	let profileOpen = $state(false);
 
 	// Called directly rather than from an $effect. `ssr = false`, so this only ever runs in the
@@ -28,16 +27,45 @@
 
 	const activeId = $derived(page.params.id ?? null);
 
+	/** **New chat** goes to the start screen rather than making a chat.
+	 *
+	 * It used to create one and navigate into it, which meant every new conversation opened as
+	 * an empty transcript with a "say something to start" line under it — the one screen in the
+	 * application with nothing on it. The start screen is where beginning a conversation is
+	 * already designed to happen: the mark, the greeting, the composer. It also means an
+	 * abandoned "new chat" leaves no empty row in the rail, because nothing was created.
+	 *
+	 * A project's own **＋** carries the project through the store the same way the first
+	 * message does — the start screen has no route parameter to put it in, and a query string
+	 * would survive a refresh into a chat somebody has stopped meaning to create.
+	 */
 	async function newChat(projectId?: string) {
-		const chat = await workspace.createChat(projectId);
-		if (chat) await goto(`/chat/${chat.id}`);
+		workspace.pendingProject = projectId ?? null;
+		await goto('/');
+	}
+
+	async function removeChat(id: string) {
+		const removed = await workspace.deleteChat(id);
+		// Only when the conversation on screen is the one that just went. Deleting another
+		// chat from the rail must not take you away from what you were reading.
+		if (removed && page.params.id === id) await goto('/');
+	}
+
+	/** The composer shows what she can reach, and settings is where that changes. */
+	async function closeSettings() {
+		workspace.settingsOpen = false;
+		await Promise.all([
+			workspace.loadProviders(),
+			workspace.loadServers(),
+			workspace.loadEmotions()
+		]);
 	}
 
 	function onkeydown(event: KeyboardEvent) {
 		// ⌘K opens settings for now; search lands with the command palette.
 		if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
 			event.preventDefault();
-			settingsOpen = true;
+			workspace.openSettings();
 		}
 	}
 </script>
@@ -51,8 +79,10 @@
 		profile={workspace.activeProfile}
 		{activeId}
 		onnew={newChat}
-		onsettings={() => (settingsOpen = true)}
+		onsettings={() => workspace.openSettings()}
 		onprofile={() => (profileOpen = true)}
+		onrename={(id, title) => workspace.renameChat(id, title)}
+		ondelete={removeChat}
 	/>
 
 	<main>
@@ -60,8 +90,8 @@
 	</main>
 </div>
 
-{#if settingsOpen}
-	<Settings onclose={() => (settingsOpen = false)} />
+{#if workspace.settingsOpen}
+	<Settings onclose={closeSettings} />
 {/if}
 
 {#if profileOpen}

@@ -103,14 +103,19 @@
 		<p class="note">{t.profileMenu.languageOnly}</p>
 	</section>
 
-	{#if health}
-		<section class="about">
-			<p class="heading">{t.profileMenu.about}</p>
+	<!-- The heading is here before the answer is. `health` is one round trip away, and hiding
+	     the whole section until it lands made the menu grow under the pointer — and made a test
+	     that reads it fail whenever the request was slower than the click. -->
+	<section class="about">
+		<p class="heading">{t.profileMenu.about}</p>
+		{#if health}
 			<p class="note">{t.profileMenu.version(health.version)}</p>
 			<p class="note mono path">{t.profileMenu.dataIn} {health.home}</p>
 			<p class="note">{health.model}</p>
-		</section>
-	{/if}
+		{:else}
+			<p class="note">{t.profileMenu.checking}</p>
+		{/if}
+	</section>
 </div>
 
 <style>

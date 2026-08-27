@@ -120,6 +120,20 @@ MIND_REGIONS: tuple[MindRegion, ...] = (
             "something, not to decorate."
         ),
     ),
+    MindRegion(
+        id="language",
+        title="Language",
+        section="identity.language",
+        tier=Tier.EVOLVABLE,
+        purpose=(
+            "Which language she answers in. Replace this with 'Answer in the language the "
+            "person wrote to you in' to have her follow whoever is typing."
+        ),
+        default=(
+            "Answer in English unless you are asked for another language. Keep names, "
+            "identifiers and quoted text in the language they came in."
+        ),
+    ),
     # -- conduct --------------------------------------------------------------------------
     MindRegion(
         id="safety",
@@ -163,18 +177,6 @@ MIND_REGIONS: tuple[MindRegion, ...] = (
         ),
     ),
     # -- emotions -------------------------------------------------------------------------
-    MindRegion(
-        id="emotion_vocab",
-        title="Emotion vocabulary",
-        section="emotions.vocabulary",
-        tier=Tier.OWNER_FIXED,
-        purpose="The starter set of emotion kinds. A vocabulary, not a cage.",
-        default=(
-            "Kinds you can reach for: agree, doubt, curious, surprised, hope, excited, "
-            "funny, warn, disagree, judge, annoyed, sorry, ask. This is a starting "
-            "vocabulary and not a closed list — invent a kind when none of these is honest."
-        ),
-    ),
     MindRegion(
         id="emotion_usage",
         title="Emotion usage",
@@ -224,6 +226,19 @@ MIND_REGIONS: tuple[MindRegion, ...] = (
 Twelve. The prototype had fifteen; ``grammar`` is gone because ADR 2 deleted the text call
 grammar it described — shipping it would invite a call syntax nothing parses — and the two
 memory regions collapsed into one until ``hera_memories`` gives the split a reason to exist.
+
+``language`` arrived as ``emotion_vocab`` left. Answering in English is a *behaviour*, and a
+behaviour with no line in the mind is one nobody can find and nobody can change — "why does she
+always answer in English" was a question with no screen to ask it on. Its own region rather than
+a sentence inside ``tone``, because that is what makes it visible in a list.
+
+``emotion_vocab`` left in the other direction. It was a paragraph listing the stances she can show,
+which meant the interface needed its own copy to know which colour ``doubt`` is drawn in. The
+list is data now, edited on the Emotions screen and bound into ``SLOT_EMOTIONS`` per turn; the
+*guidance* — when showing a reaction is worth interrupting an answer for — stays prose, in
+``emotion_usage``, because that is a judgement rather than a table. A ``mind/emotion_vocab.md``
+left over from an older install is ignored rather than deleted; nothing here removes a file
+somebody may have written in.
 """
 
 REGIONS_BY_ID: dict[str, MindRegion] = {region.id: region for region in MIND_REGIONS}

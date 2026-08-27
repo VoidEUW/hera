@@ -43,24 +43,58 @@
 			<span>{greeting}</span>
 		</p>
 
-		<Composer autofocus {busy} profiles={workspace.profiles} onsend={start} />
+		<Composer
+			autofocus
+			{busy}
+			profiles={workspace.profiles}
+			profileId={workspace.activeProfile?.id ?? null}
+			providers={workspace.providers}
+			activeProvider={workspace.activeProvider}
+			servers={workspace.servers}
+			chatSkills={workspace.pendingSkills}
+			onsend={start}
+			onmodel={(name) => workspace.useProvider(name)}
+			onsettings={() => workspace.openSettings()}
+			onskills={(names) => (workspace.pendingSkills = names)}
+		/>
 
 		{#if error}
 			<p class="error">{error}</p>
 		{/if}
 	</div>
+
+	<!-- Under the composer, centred, and quiet enough to be furniture. The start screen is the
+	     one page with room for it and the one people look at while wondering whether the thing
+	     they just pulled is the thing they are running. -->
+	{#if workspace.version}
+		<p class="version caption">{t.settings.version(workspace.version)}</p>
+	{/if}
 </div>
 
 <style>
 	.start {
+		position: relative;
 		display: grid;
 		place-items: center;
 		height: 100%;
 		padding: 24px;
 	}
 
+	/* Pinned to the foot of the screen rather than trailing the composer, so it does not move
+	   when the greeting or an error changes the height of the column above it. */
+	.version {
+		position: absolute;
+		bottom: 18px;
+		left: 50%;
+		transform: translateX(-50%);
+		margin: 0;
+		color: var(--text-faint);
+	}
+
+	/* The same column the conversation uses, so the composer does not change width when the
+	   first message turns this screen into that one. */
 	.middle {
-		width: min(720px, 100%);
+		width: min(var(--column), 100%);
 		margin-bottom: 8vh;
 	}
 

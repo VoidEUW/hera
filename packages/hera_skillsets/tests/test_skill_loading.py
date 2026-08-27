@@ -6,6 +6,7 @@ refuses to boot over a stray colon in someone's YAML is worse than one skill mar
 
 from __future__ import annotations
 
+from hashlib import sha256
 from pathlib import Path
 
 from hera_skillsets.loader import MAX_DESCRIPTION
@@ -34,6 +35,23 @@ class TestAWellFormedSkill:
         """The format is Claude Code's and it is not ours to narrow."""
         skill = loaded(write_skill("tdd", frontmatter="author: Lukas Kreuz\nlicense: MIT"))
         assert skill.metadata == {"author": "Lukas Kreuz", "license": "MIT"}
+
+    def test_it_digests_the_whole_file(self, write_skill: WriteSkill) -> None:
+        """Frontmatter included: what decides when a skill fires is as much a part of it as
+        the body, so a signature over the body alone would sign the wrong thing."""
+        path = write_skill("tdd", description="Test first.", body="Red, green.")
+        digest = loaded(path).digest
+
+        assert len(digest) == 64
+        assert (
+            digest
+            == sha256((path / "SKILL.md").read_text(encoding="utf-8").encode("utf-8")).hexdigest()
+        )
+
+    def test_the_digest_follows_the_content(self, write_skill: WriteSkill) -> None:
+        before = loaded(write_skill("tdd", body="Red, green.")).digest
+        after = loaded(write_skill("tdd", body="Red, green, refactor.")).digest
+        assert before != after
 
     def test_a_description_with_a_colon_survives(self, write_skill: WriteSkill) -> None:
         """`description: Use when: you need X` is a natural sentence and invalid YAML -- a

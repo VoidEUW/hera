@@ -86,9 +86,14 @@ class TestEmptyRegions:
     def test_a_group_whose_children_all_vanished_vanishes_too(
         self, builder: PromptBuilder, mind: MindRepository
     ) -> None:
-        mind.write("emotion_vocab", "")
+        """Emptying the one region leaves the group holding nothing but an unbound slot.
+
+        The *build* keeps the slot node — whether a binding exists is a render-time question —
+        so this is asserted where it matters: nothing reaches the model announcing an empty
+        block of emotions.
+        """
         mind.write("emotion_usage", "")
-        assert builder.build().get("emotions") is None
+        assert "emotions" not in rendered(builder)
 
     def test_user_prefs_starts_empty_and_is_therefore_absent(self, builder: PromptBuilder) -> None:
         assert builder.build().get("context.user") is None

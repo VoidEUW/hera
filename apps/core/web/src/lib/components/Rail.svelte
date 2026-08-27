@@ -5,6 +5,10 @@
 	 *
 	 * Projects disclose inline rather than navigating, because finding a chat under the thing it
 	 * belongs to is genuinely easier than finding it in one flat list sorted by time.
+	 *
+	 * Every chat carries a **⋯** menu: rename in place, delete behind a confirmation. Renaming
+	 * is an input where the title was rather than a prompt box, because the thing being renamed
+	 * is a line in a list and you should be able to see the list while you retype it.
 	 */
 	import type { Chat, Profile, Project } from '$lib/api/client';
 	import { t } from '$lib/i18n';
@@ -18,16 +22,66 @@
 		onnew?: (projectId?: string) => void;
 		onsettings?: () => void;
 		onprofile?: () => void;
+		onrename?: (id: string, title: string) => void;
+		ondelete?: (id: string) => void;
 	}
 
-	let { chats, projects, profile, activeId = null, onnew, onsettings, onprofile }: Props = $props();
+	let {
+		chats,
+		projects,
+		profile,
+		activeId = null,
+		onnew,
+		onsettings,
+		onprofile,
+		onrename,
+		ondelete
+	}: Props = $props();
 
 	let expanded = $state<Record<string, boolean>>({});
+
+	/** The chat whose ⋯ menu is open, the one being renamed, and the one being confirmed for
+	 * deletion. Three separate ids rather than one mode, because only one of each can be true
+	 * at a time and a single field would let "renaming" survive the menu closing. */
+	let menuFor = $state<string | null>(null);
+	let renaming = $state<string | null>(null);
+	let confirming = $state<string | null>(null);
+	let draft = $state('');
 
 	const loose = $derived(chats.filter((chat) => !chat.project_id));
 
 	function inside(projectId: string): Chat[] {
 		return chats.filter((chat) => chat.project_id === projectId);
+	}
+
+	function closeMenu() {
+		menuFor = null;
+		confirming = null;
+	}
+
+	function startRename(chat: Chat) {
+		closeMenu();
+		renaming = chat.id;
+		draft = chat.title;
+	}
+
+	function commitRename(chat: Chat) {
+		const title = draft.trim();
+		renaming = null;
+		if (title && title !== chat.title) onrename?.(chat.id, title);
+	}
+
+	function onkeydown(event: KeyboardEvent) {
+		if (event.key !== 'Escape') return;
+		closeMenu();
+		renaming = null;
+	}
+
+	/** The field takes the cursor and the whole title with it. The menu item that opened it is
+	 * gone by then, so leaving focus behind would leave it nowhere. */
+	function takeover(node: HTMLInputElement) {
+		node.focus();
+		node.select();
 	}
 
 	function initials(name: string): string {
@@ -39,6 +93,90 @@
 			.join('');
 	}
 </script>
+
+<svelte:window {onkeydown} />
+
+{#snippet row(chat: Chat)}
+	<li class="item">
+		{#if renaming === chat.id}
+			<input
+				class="rename"
+				use:takeover
+				bind:value={draft}
+				aria-label={t.rail.rename}
+				onblur={() => commitRename(chat)}
+				onkeydown={(event) => {
+					if (event.key === 'Enter') commitRename(chat);
+					if (event.key === 'Escape') renaming = null;
+				}}
+			/>
+		{:else}
+			<a class="entry" class:active={chat.id === activeId} href="/chat/{chat.id}">
+				<span class="label">{chat.title || t.empty.title}</span>
+			</a>
+			<button
+				class="more"
+				class:shown={menuFor === chat.id}
+				type="button"
+				aria-label={t.rail.chatOptions}
+				aria-haspopup="menu"
+				aria-expanded={menuFor === chat.id}
+				onclick={() => {
+					confirming = null;
+					menuFor = menuFor === chat.id ? null : chat.id;
+				}}
+			>
+				<span aria-hidden="true">⋯</span>
+			</button>
+		{/if}
+
+		{#if menuFor === chat.id}
+			<div class="menu" role="menu">
+				{#if confirming === chat.id}
+					<p class="ask caption">{t.rail.deleteAsk}</p>
+					<button
+						class="option danger"
+						type="button"
+						role="menuitem"
+						onclick={() => {
+							closeMenu();
+							ondelete?.(chat.id);
+						}}
+					>
+						{t.rail.delete}
+					</button>
+					<button class="option" type="button" role="menuitem" onclick={closeMenu}>
+						{t.rail.cancel}
+					</button>
+				{:else}
+					<button class="option" type="button" role="menuitem" onclick={() => startRename(chat)}>
+						{t.rail.rename}
+					</button>
+					<button
+						class="option danger"
+						type="button"
+						role="menuitem"
+						onclick={() => (confirming = chat.id)}
+					>
+						{t.rail.delete}
+					</button>
+				{/if}
+			</div>
+		{/if}
+	</li>
+{/snippet}
+
+{#if menuFor}
+	<!-- Catches the click that closes the menu. Transparent rather than dimmed: this is a
+	     three-line popup, not a modal, and darkening the application behind it would say
+	     otherwise. -->
+	<div
+		class="away"
+		role="presentation"
+		onclick={closeMenu}
+		onkeydown={(event) => event.key === 'Enter' && closeMenu()}
+	></div>
+{/if}
 
 <nav class="rail" aria-label={t.appName}>
 	<a class="brand" href="/">
@@ -69,11 +207,7 @@
 					{#if open}
 						<ul class="list nested">
 							{#each inside(project.id) as chat (chat.id)}
-								<li>
-									<a class="entry" class:active={chat.id === activeId} href="/chat/{chat.id}">
-										<span class="label">{chat.title || t.empty.title}</span>
-									</a>
-								</li>
+								{@render row(chat)}
 							{:else}
 								<li class="hint caption">{t.rail.noChats}</li>
 							{/each}
@@ -93,11 +227,7 @@
 	<p class="heading">{t.rail.chats}</p>
 	<ul class="list scroll">
 		{#each loose as chat (chat.id)}
-			<li>
-				<a class="entry" class:active={chat.id === activeId} href="/chat/{chat.id}">
-					<span class="label">{chat.title || t.empty.title}</span>
-				</a>
-			</li>
+			{@render row(chat)}
 		{:else}
 			<li class="hint caption">{t.rail.noChats}</li>
 		{/each}
@@ -195,8 +325,12 @@
 		color: var(--text);
 	}
 
+	/* Brass, not pomegranate. Gold leads the interface now, and "which chat am I in" is a
+	   statement about where you are rather than about her — the same kind of thing a skill row
+	   and a permission card are saying. Pomegranate is kept for the two places that are her:
+	   the send action and her name. */
 	.entry.active {
-		color: var(--pomegranate);
+		color: var(--brass);
 		background: var(--surface-raised);
 	}
 
@@ -204,6 +338,104 @@
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
+	}
+
+	/* One chat: the link, the ⋯, and the popup either of them can open. */
+	.item {
+		position: relative;
+	}
+
+	/* Room for the ⋯ so a long title is cut by the button rather than sliding under it. */
+	.item .entry {
+		padding-right: 30px;
+	}
+
+	.more {
+		position: absolute;
+		top: 50%;
+		right: 4px;
+		transform: translateY(-50%);
+		display: grid;
+		place-items: center;
+		width: 22px;
+		height: 22px;
+		border-radius: 6px;
+		color: var(--text-faint);
+		font-size: 14px;
+		line-height: 1;
+		opacity: 0;
+		transition:
+			opacity var(--fade) var(--ease),
+			color var(--fade) var(--ease);
+	}
+
+	/* Shown on hover, on keyboard focus anywhere in the row, and while its own menu is open —
+	   a control that only appears under a pointer is a control a keyboard cannot reach. */
+	.item:hover .more,
+	.item:focus-within .more,
+	.more.shown {
+		opacity: 1;
+	}
+
+	.more:hover {
+		background: var(--surface);
+		color: var(--text);
+	}
+
+	.rename {
+		width: 100%;
+		padding: 6px 8px;
+		background: var(--ground);
+		border: 1px solid var(--brass);
+		border-radius: var(--radius);
+		font-size: 13.5px;
+	}
+
+	.rename:focus {
+		outline: none;
+	}
+
+	.away {
+		position: fixed;
+		inset: 0;
+		z-index: 20;
+	}
+
+	.menu {
+		position: absolute;
+		top: calc(100% - 2px);
+		right: 4px;
+		z-index: 21;
+		display: flex;
+		flex-direction: column;
+		min-width: 148px;
+		padding: 4px;
+		background: var(--surface-raised);
+		border: 1px solid var(--line);
+		border-radius: var(--radius);
+		box-shadow: var(--shadow);
+	}
+
+	.option {
+		padding: 6px 8px;
+		border-radius: 6px;
+		text-align: left;
+		font-size: 13px;
+		color: var(--text-muted);
+	}
+
+	.option:hover {
+		background: var(--surface);
+		color: var(--text);
+	}
+
+	.option.danger:hover {
+		color: var(--danger);
+	}
+
+	.ask {
+		margin: 4px 8px 6px;
+		color: var(--text-muted);
 	}
 
 	.chevron {

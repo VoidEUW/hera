@@ -1,18 +1,30 @@
 /**
  * The design language of docs/frontend.md, as tokens.
  *
- * Warm on both ends: the dark ground is a warm charcoal and never blue-grey, the light ground
- * is warm paper and never white. The three accents are not interchangeable — each one means
- * something, and using the wrong one is a bug:
+ * **Parchment and laurel — gold leads.** She is a goddess and the interface should be able to
+ * say so, so the ground itself is gold: aged vellum by day, a gold-brown black by night. The
+ * green beside it keeps that from being gaudy — laurel is the thing that grows, and warm gold
+ * against a living green is the oldest familiar pairing there is.
  *
- *   pomegranate  her            the mark, the send action, the active chat, her name
- *   peacock      her attention  thinking, a tool running, the ocellus iris, live state
- *   brass        her authority  skills, permission cards, the ring of the mark, emphasis
+ * The neutrals are the part of an interface people recognise from across a room, which is why
+ * they are specified this precisely, and why the parchment is *saturated*. A pale gold at four
+ * percent is not parchment, it is cream, and a cream ground under white cards is somebody
+ * else's room however unfamiliar the accents on top of it are. Nothing here is pure white or
+ * pure black — see docs/frontend.md, "What we take, and what has to be ours".
+ *
+ * The three accents are not interchangeable — each one means something, and using the wrong
+ * one is a bug:
+ *
+ *   brass        her authority  the leading colour: the mark's ring, skills, permission
+ *                               cards, the active chat, emphasis
+ *   laurel       her attention  thinking, a tool running, the ocellus iris, live state
+ *   pomegranate  her            the send action, her name — the two places that are her
  *
  * If a colour appears somewhere and you cannot say which of those three sentences it is
  * saying, it does not belong there.
  */
 
+@import 'katex/dist/katex.min.css';
 @import '@fontsource-variable/fraunces';
 @import '@fontsource-variable/source-serif-4';
 @import '@fontsource-variable/figtree';
@@ -26,6 +38,14 @@
 	--font-mono: 'IBM Plex Mono', ui-monospace, monospace;
 
 	--measure: 68ch;
+	/* The reading column, and the axis everything in a conversation sits on: her prose, a user
+	   bubble, an activity row, a card, the composer. It is `--measure` resolved against the body
+	   face at 17px — measured, not guessed — because a column wider than the measure leaves the
+	   prose ending short of the right edge while everything around it does not, and the whole
+	   message reads as nudged off-centre. Measured in the browser, not guessed: 68ch of Source
+	   Serif 4 at 17px is 611.5px — Georgia, the fallback, is a sixth wider, so a number taken
+	   before the webfont loads is wrong by 100px. */
+	--column: 612px;
 	--rail: 264px;
 	--radius: 10px;
 	--radius-lg: 16px;
@@ -41,17 +61,28 @@
    afford. */
 :root,
 [data-theme='dark'] {
-	--ground: #15100e;
-	--surface: #1e1815;
-	--surface-raised: #272019;
-	--line: #362c26;
-	--text: #f2e9e1;
-	--text-muted: #a79a90;
-	--text-faint: #7a6e66;
+	--ground: #17130a;
+	--surface: #211b10;
+	--surface-raised: #2c2416;
+	--line: #3d3421;
+	--text: #f4eedf;
+	--text-muted: #b0a68d;
+	--text-faint: #7f7660;
 
-	--pomegranate: #d9636b;
-	--peacock: #35a093;
-	--brass: #c9a24c;
+	/* Brass leads. It is the most used of the three and the one the interface is remembered by:
+	   the ring of the mark, the active chat, every emphasis, a permission card. */
+	--brass: #d9ae52;
+	/* Live state. Laurel rather than the teal it replaces — the wreath is hers by association,
+	   and a green that reads as *growing* is the right picture for a tool that is running. It
+	   has to look like motion, which is why it is a leaf green and not a sage one. */
+	--laurel: #7fb069;
+	/* Reserved for her: the send action and her name, and nothing else. Crimson, not coral — a
+	   pomegranate is a deep red, and the salmon it replaced sat in the same family as every
+	   other warm mid-red an assistant interface might be wearing. */
+	--pomegranate: #de4e64;
+	/* Kept apart from pomegranate by hue: hers is a rose-crimson, this is a salmon-orange, and
+	   the two never appear next to each other — one is the send button and the active chat, the
+	   other is inline text on a turn that went wrong. */
 	--danger: #e0685e;
 
 	--shadow: 0 12px 32px rgb(0 0 0 / 0.4);
@@ -59,20 +90,25 @@
 }
 
 [data-theme='light'] {
-	--ground: #fbf7f2;
-	--surface: #ffffff;
-	--surface-raised: #f4ede4;
-	--line: #e4d9cd;
-	--text: #1e1613;
-	--text-muted: #6e625a;
-	--text-faint: #968a81;
+	--ground: #f6eedb;
+	/* Off-white, deliberately. A pure-white card on a tinted ground is the single most copied
+	   arrangement in this category; a card that carries a little of the ground's own hue is
+	   invisible as a colour and unmistakable as a room. */
+	--surface: #fdfaf1;
+	--surface-raised: #efe4cc;
+	--line: #e0d2b4;
+	--text: #201b10;
+	--text-muted: #6b6250;
+	--text-faint: #9a8f79;
 
-	--pomegranate: #a93744;
-	--peacock: #1d6157;
-	--brass: #8e6e27;
+	--brass: #8a6a1c;
+	--laurel: #3f6b32;
+	--pomegranate: #a82a45;
 	--danger: #b03a2e;
 
-	--shadow: 0 12px 32px rgb(30 22 19 / 0.12);
+	/* The shadow is the text colour at low opacity, so a card sits in the same light the type
+	   is drawn in rather than casting a neutral grey nobody else on the page is wearing. */
+	--shadow: 0 12px 32px rgb(32 27 16 / 0.14);
 	color-scheme: light;
 }
 
@@ -114,7 +150,7 @@ button {
 
 /* Keyboard first: a visible focus ring everywhere, never removed. */
 :focus-visible {
-	outline: 2px solid var(--peacock);
+	outline: 2px solid var(--laurel);
 	outline-offset: 2px;
 	border-radius: 4px;
 }
@@ -135,14 +171,241 @@ a {
 	margin: 0 0 1em;
 }
 
+.prose > :first-child {
+	margin-top: 0;
+}
+
 .prose > :last-child {
 	margin-bottom: 0;
 }
 
+/* Markdown, which is the notation her answers are written in. Rules live here rather than in
+   Prose.svelte because the rendered HTML arrives through `{@html}`, which Svelte's scoped
+   styles do not reach. Everything below is the type scale in docs/frontend.md; nothing here
+   introduces a colour that is not already saying one of the three sentences at the top. */
+
+.prose h1,
+.prose h2,
+.prose h3,
+.prose h4,
+.prose h5,
+.prose h6 {
+	margin: 1.4em 0 0.5em;
+	line-height: 1.3;
+	font-weight: 600;
+}
+
+.prose h1 {
+	font-family: var(--font-display);
+	font-variation-settings:
+		'SOFT' 60,
+		'WONK' 0;
+	font-size: 22px;
+	font-weight: 500;
+}
+
+.prose h2 {
+	font-size: 19px;
+}
+
+.prose h3 {
+	font-size: 17px;
+}
+
+.prose h4,
+.prose h5,
+.prose h6 {
+	font-size: 15px;
+	color: var(--text-muted);
+}
+
+.prose ul,
+.prose ol {
+	margin: 0 0 1em;
+	padding-left: 1.4em;
+}
+
+.prose li {
+	margin: 0.25em 0;
+}
+
+.prose li > ul,
+.prose li > ol {
+	margin: 0.25em 0;
+}
+
+.prose li::marker {
+	color: var(--text-faint);
+}
+
+/* A task list is a list of states, not of bullets. */
+.prose li:has(> input[type='checkbox']) {
+	list-style: none;
+	margin-left: -1.2em;
+}
+
+.prose input[type='checkbox'] {
+	margin-right: 0.5em;
+	accent-color: var(--laurel);
+}
+
+.prose blockquote {
+	margin: 0 0 1em;
+	padding: 0.1em 0 0.1em 1em;
+	border-left: 2px solid var(--line);
+	color: var(--text-muted);
+}
+
+/* Three dashes. A separator when she meant a break in the argument, a breath when she meant a
+   gap between two parts — one hairline with air on both sides reads as either. */
+.prose hr {
+	margin: 1.8em 0;
+	border: 0;
+	border-top: 1px solid var(--line);
+}
+
+.prose a {
+	color: inherit;
+	text-decoration: underline;
+	text-decoration-color: var(--text-faint);
+	text-underline-offset: 2px;
+	transition: color var(--fade) var(--ease);
+}
+
+.prose a:hover {
+	color: var(--brass);
+	text-decoration-color: var(--brass);
+}
+
+.prose strong {
+	font-weight: 650;
+}
+
+.prose img {
+	max-width: 100%;
+	border-radius: var(--radius);
+}
+
+/* A fenced block is a figure: a caption bar carrying the language and the copy button, then
+   the code. The bar is part of the frame rather than floating over the code, so it cannot end
+   up on top of the first line of a program. */
+.prose figure.code {
+	margin: 0 0 1em;
+	background: var(--surface);
+	border: 1px solid var(--line);
+	border-radius: var(--radius);
+	overflow: hidden;
+}
+
+.prose figure.code figcaption {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 10px;
+	padding: 4px 8px 4px 12px;
+	border-bottom: 1px solid var(--line);
+	font-family: var(--font-ui);
+	font-size: 11.5px;
+	color: var(--text-faint);
+}
+
+.prose figure.code .lang {
+	letter-spacing: 0.03em;
+}
+
+.prose figure.code .copy {
+	padding: 3px 8px;
+	border-radius: 6px;
+	font-family: var(--font-ui);
+	font-size: 11.5px;
+	color: var(--text-faint);
+	cursor: pointer;
+	transition:
+		background var(--fade) var(--ease),
+		color var(--fade) var(--ease);
+}
+
+.prose figure.code .copy:hover {
+	background: var(--surface-raised);
+	color: var(--text);
+}
+
+.prose pre {
+	margin: 0 0 1em;
+	padding: 10px 12px;
+	background: var(--surface);
+	border: 1px solid var(--line);
+	border-radius: var(--radius);
+	overflow-x: auto;
+	line-height: 1.55;
+}
+
+/* Inside a figure the frame is the figure's, so the pre keeps only the scroll. */
+.prose figure.code pre {
+	margin: 0;
+	background: none;
+	border: 0;
+	border-radius: 0;
+}
+
+.prose pre code {
+	background: none;
+	border: 0;
+	padding: 0;
+	font-size: inherit;
+	/* A line of code means what it says; wrapping it silently is how a shell command becomes
+	   two commands to the eye. */
+	overflow-wrap: normal;
+	white-space: pre;
+}
+
+.prose :not(pre) > code {
+	padding: 0.1em 0.35em;
+	background: var(--surface);
+	border: 1px solid var(--line);
+	border-radius: 4px;
+}
+
+.prose table {
+	margin: 0 0 1em;
+	border-collapse: collapse;
+	font-size: 15px;
+	/* Wider than the measure is normal for a table and wrong for prose, so the table scrolls
+	   inside the column rather than widening it. */
+	display: block;
+	max-width: 100%;
+	overflow-x: auto;
+}
+
+.prose th,
+.prose td {
+	padding: 6px 12px 6px 0;
+	border-bottom: 1px solid var(--line);
+	text-align: left;
+	vertical-align: top;
+}
+
+.prose th {
+	font-family: var(--font-ui);
+	font-size: 12.5px;
+	font-weight: 600;
+	letter-spacing: 0.02em;
+	color: var(--text-muted);
+}
+
+.prose pre,
 .prose code,
 .mono {
 	font-family: var(--font-mono);
 	font-size: 13.5px;
+}
+
+/* A displayed formula is often wider than the measure and must never widen the column. */
+.prose .katex-display {
+	margin: 1em 0;
+	padding: 2px 0;
+	overflow-x: auto;
+	overflow-y: hidden;
 }
 
 .display {

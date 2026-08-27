@@ -12,6 +12,7 @@ than a Hera with one skill marked broken.
 
 from __future__ import annotations
 
+from hashlib import sha256
 from pathlib import Path
 
 import yaml
@@ -77,6 +78,7 @@ def load_skill(directory: Path) -> Skill | BrokenSkill:
         path=directory,
         resources=_resources(directory),
         metadata={key: _string(value) for key, value in frontmatter.items()},
+        digest=sha256(text.encode("utf-8")).hexdigest(),
         problems=tuple(problems),
     )
 

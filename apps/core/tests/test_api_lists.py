@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -13,6 +14,7 @@ from httpx import ASGITransport, AsyncClient
 
 from hera_core.app import create_app
 from hera_core.wiring import Services
+from hera_providers import FakeProvider
 
 
 class TestProfiles:
@@ -146,6 +148,54 @@ class TestChats:
         assert (await client.delete(f"{API}/chats/{chat['id']}")).status_code == 204
         assert (await client.get(f"{API}/chats")).json() == []
 
+    async def test_a_chat_can_be_renamed(self, client: AsyncClient) -> None:
+        chat = (await client.post(f"{API}/chats", json={})).json()
+
+        response = await client.patch(f"{API}/chats/{chat['id']}", json={"title": "  Kerberos  "})
+
+        assert response.status_code == 200
+        assert response.json()["title"] == "Kerberos"
+        assert (await client.get(f"{API}/chats")).json()[0]["title"] == "Kerberos"
+
+    async def test_skills_can_be_pinned_to_one_chat(
+        self, client: AsyncClient, write_skill: WriteSkill
+    ) -> None:
+        """ADR 5 in the person's hands: retrieval decides what might apply, a pin says use
+        this. The whole list is sent, because it is a set of toggles."""
+        write_skill("tdd")
+        chat = (await client.post(f"{API}/chats", json={})).json()
+        assert chat["pinned_skills"] == []
+
+        patched = await client.patch(
+            f"{API}/chats/{chat['id']}", json={"pinned_skills": ["tdd", "tdd"]}
+        )
+
+        assert patched.json()["pinned_skills"] == ["tdd"]
+        detail = (await client.get(f"{API}/chats/{chat['id']}")).json()
+        assert detail["chat"]["pinned_skills"] == ["tdd"]
+
+    async def test_a_chat_pin_reaches_the_turn_ahead_of_the_others(
+        self, client: AsyncClient, write_skill: WriteSkill, services: Services
+    ) -> None:
+        """And it arrives as *pinned* rather than as something retrieval happened to like."""
+        write_skill("tdd", body="Red, green, refactor.")
+        chat = (await client.post(f"{API}/chats", json={})).json()
+        await client.patch(f"{API}/chats/{chat['id']}", json={"pinned_skills": ["tdd"]})
+
+        streamed = await client.post(
+            f"{API}/chats/{chat['id']}/messages", json={"text": "anything at all"}
+        )
+        streamed.read()
+
+        provider = services.provider
+        assert isinstance(provider, FakeProvider)
+        prompt = "\n".join(message.text for message in provider.requests[0].messages)
+        assert "Red, green, refactor." in prompt
+
+    async def test_renaming_an_unknown_chat_is_a_404(self, client: AsyncClient) -> None:
+        response = await client.patch(f"{API}/chats/{uuid4()}", json={"title": "x"})
+        assert response.status_code == 404
+
 
 class TestTheSettingsLists:
     async def test_skills_are_listed_with_their_problems(
@@ -160,6 +210,61 @@ class TestTheSettingsLists:
         assert by_id["tdd"]["problems"] == []
         assert any("retrieval" in p for p in by_id["nameless"]["problems"])
 
+    async def test_a_skill_carries_the_provenance_a_person_asks_about(
+        self, client: AsyncClient, skills_path: Any
+    ) -> None:
+        """Who wrote it, under what licence, and what it hashes to. Lifted out of the
+        uninterpreted frontmatter into named fields, because a row that reaches into a
+        dictionary draws nothing when the key is spelled differently."""
+        directory = skills_path / "tdd"
+        directory.mkdir()
+        directory.joinpath("SKILL.md").write_text(
+            "---\nname: tdd\ndescription: Test first.\nauthor: Void\nlicense: MIT\n"
+            "icon: 🧪\nversion: 1.2.0\n---\nRed, green.\n",
+            encoding="utf-8",
+        )
+
+        skill = (await client.get(f"{API}/skills")).json()["skills"][0]
+
+        assert skill["author"] == "Void"
+        assert skill["license"] == "MIT"
+        assert skill["icon"] == "🧪"
+        assert skill["version"] == "1.2.0"
+        assert len(skill["digest"]) == 64
+        assert skill["trust"] == "unknown"
+
+    async def test_a_listed_digest_is_what_makes_a_skill_verified(
+        self, client: AsyncClient, write_skill: WriteSkill, tmp_path: Path
+    ) -> None:
+        """And editing it afterwards says *modified* rather than falling back to unknown —
+        somebody changing a skill after you accepted it is the case worth being loud about."""
+        write_skill("tdd", description="Test first.")
+        digest = (await client.get(f"{API}/skills")).json()["skills"][0]["digest"]
+
+        home = tmp_path / "home"
+        home.mkdir(exist_ok=True)
+        home.joinpath("trusted.json").write_text(
+            json.dumps({"skills": {"tdd": digest}}), encoding="utf-8"
+        )
+        assert (await client.get(f"{API}/skills")).json()["skills"][0]["trust"] == "verified"
+
+        write_skill("tdd", description="Test first, always.")
+        assert (await client.get(f"{API}/skills")).json()["skills"][0]["trust"] == "modified"
+
+    async def test_an_unreadable_trust_list_costs_the_marks_and_nothing_else(
+        self, client: AsyncClient, write_skill: WriteSkill, tmp_path: Path
+    ) -> None:
+        write_skill("tdd")
+        home = tmp_path / "home"
+        home.mkdir(exist_ok=True)
+        home.joinpath("trusted.json").write_text("{not json", encoding="utf-8")
+
+        listed = (await client.get(f"{API}/skills")).json()
+
+        assert [skill["id"] for skill in listed["skills"]] == ["tdd"]
+        assert listed["skills"][0]["trust"] == "unknown"
+        assert "trusted.json" in listed["trust_problem"]
+
     async def test_a_broken_skill_is_surfaced_rather_than_skipped(
         self, client: AsyncClient, skills_path: Any
     ) -> None:
@@ -169,6 +274,92 @@ class TestTheSettingsLists:
         listed = (await client.get(f"{API}/skills")).json()
 
         assert [broken["id"] for broken in listed["broken"]] == ["notaskill"]
+
+    async def test_a_skill_can_be_written_from_the_interface(
+        self, client: AsyncClient, skills_path: Path
+    ) -> None:
+        """A folder on disk like any other, discovered by the loader on the next listing —
+        the route writes the file, the library still owns what a skill is."""
+        response = await client.post(
+            f"{API}/skills",
+            json={"id": "Note-Taking", "description": "Use when taking notes."},
+        )
+
+        assert response.status_code == 201
+        assert response.json()["id"] == "note-taking"
+        assert (skills_path / "note-taking" / "SKILL.md").is_file()
+
+        listed = (await client.get(f"{API}/skills")).json()["skills"]
+        assert [skill["id"] for skill in listed] == ["note-taking"]
+        assert listed[0]["problems"] == []
+
+    async def test_a_skill_id_that_would_not_work_is_refused(self, client: AsyncClient) -> None:
+        """It becomes a directory name and a `/slash` command, so this is the same rule
+        `hera_skillsets` reports a problem for — enforced where a person can be told."""
+        response = await client.post(f"{API}/skills", json={"id": "note taking"})
+        assert response.status_code == 422
+
+    async def test_writing_over_an_existing_skill_is_refused(
+        self, client: AsyncClient, write_skill: WriteSkill
+    ) -> None:
+        write_skill("tdd")
+        response = await client.post(f"{API}/skills", json={"id": "tdd"})
+        assert response.status_code == 409
+
+    async def test_emotions_start_as_the_ones_she_ships_with(self, client: AsyncClient) -> None:
+        listed = (await client.get(f"{API}/emotions")).json()
+
+        kinds = [emotion["kind"] for emotion in listed["emotions"]]
+        assert "agree" in kinds and "doubt" in kinds
+        assert not listed["customised"]
+        assert listed["problem"] == ""
+
+    async def test_a_custom_vocabulary_is_stored_and_reset(self, client: AsyncClient) -> None:
+        """Reset deletes the file rather than rewriting it, so "reset" and "never touched" are
+        the same state and a later change to the defaults still reaches this person."""
+        mine = {"emotions": [{"kind": "smug", "description": "Called it.", "tone": "warm"}]}
+
+        saved = (await client.put(f"{API}/emotions", json=mine)).json()
+        assert [emotion["kind"] for emotion in saved["emotions"]] == ["smug"]
+        assert saved["customised"]
+
+        back = (await client.post(f"{API}/emotions/reset")).json()
+        assert len(back["emotions"]) > 1
+        assert not back["customised"]
+
+    async def test_the_vocabulary_reaches_the_next_turn(
+        self, client: AsyncClient, services: Services
+    ) -> None:
+        """The reason it is a slot rather than a tool description: edited on screen, applied on
+        the next turn, with nothing restarted in between."""
+        await client.put(
+            f"{API}/emotions",
+            json={"emotions": [{"kind": "smug", "description": "Called it.", "tone": "warm"}]},
+        )
+
+        chat = (await client.post(f"{API}/chats", json={})).json()
+        streamed = await client.post(f"{API}/chats/{chat['id']}/messages", json={"text": "hi"})
+        assert streamed.status_code == 200
+        streamed.read()
+
+        provider = services.provider
+        assert isinstance(provider, FakeProvider)
+        prompt = "\n".join(message.text for message in provider.requests[0].messages)
+        assert "smug: Called it." in prompt
+        assert "agree" not in prompt
+
+    async def test_an_unreadable_vocabulary_falls_back_and_says_so(
+        self, client: AsyncClient, tmp_path: Path
+    ) -> None:
+        home = tmp_path / "home"
+        home.mkdir(exist_ok=True)
+        home.joinpath("emotions.json").write_text("{not json", encoding="utf-8")
+
+        listed = (await client.get(f"{API}/emotions")).json()
+
+        assert len(listed["emotions"]) > 1
+        assert "emotions.json" in listed["problem"]
+        assert not listed["customised"]
 
     async def test_servers_report_their_connection(self, client: AsyncClient) -> None:
         """A direct rendering of ToolRegistry.status(). Nothing here computes whether a server

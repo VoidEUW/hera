@@ -37,13 +37,14 @@ from hera_chats.events import (
     TurnClosed,
     coalesce,
 )
-from hera_chats.history import Attachment, compose, turn_to_messages
+from hera_chats.history import Attachment, content_of, says_something, turn_to_messages
 from hera_chats.models import Chat, Project
 from hera_chats.ports import Tools
 from hera_chats.settings import ChatsSettings
 from hera_permissions import Decision
 from hera_profiles import (
     BEHAVIOUR_TRAITS,
+    SLOT_EMOTIONS,
     SLOT_MEMORIES,
     SLOT_PROJECT,
     SLOT_SKILLS,
@@ -113,11 +114,20 @@ class TurnContext:
     told it was not allowed, which is what lets it try something else instead of hanging."""
 
     attachments: Sequence[Attachment] = ()
-    """Files sent with this message. Composed into the user turn by :func:`compose`, which is
-    the one place a file becomes text."""
+    """Files sent with this message. Composed into the user turn by :func:`content_of`, which
+    is the one place a file becomes something the model can read — fenced text, or a picture as
+    a content part beside it."""
 
     memories: str = ""
     """Pre-rendered recall for the ``memories`` slot. Empty until v0.2."""
+
+    emotions: str = ""
+    """Pre-rendered stance vocabulary for the ``emotions`` slot.
+
+    Pre-rendered, like everything else that arrives through a slot: this package does not know
+    what an emotion is and should not learn. The application reads the person's list and calls
+    ``hera_mcp.render_emotions``; empty leaves the section out, which is a deployment where she
+    shows no stances rather than a broken one."""
 
 
 @dataclass
@@ -291,6 +301,7 @@ class Turn:
             SLOT_MEMORIES: context.memories,
             SLOT_PROJECT: context.project.instructions if context.project is not None else "",
             SLOT_TOOLS: catalogue_text,
+            SLOT_EMOTIONS: context.emotions,
         }
         frame = prompt.render(
             bindings={key: value for key, value in bindings.items() if value},
@@ -302,19 +313,26 @@ class Turn:
         messages = [*head, *context.history]
         # The router strips the /command; the attachments are added after that, so a file is
         # never scored as part of the turn's own words.
-        spoken = compose(self.cleaned_text, context.attachments)
-        if spoken.strip():
+        spoken = content_of(self.cleaned_text, context.attachments)
+        if says_something(spoken):
             messages.append(ChatMessage(role=Role.USER, content=spoken))
         messages.extend(tail)
         return messages
 
     def _pins(self) -> list[str]:
-        """The profile's pinned skills and the project's, in that order, deduplicated.
+        """Pinned skills from the chat, the profile and the project, in that order.
+
+        The chat comes first because it is the most specific and the most deliberate: somebody
+        opened a picker during this conversation and said *use this one*. Order decides which
+        skills survive the budget, so the one chosen by hand a minute ago outranks the one a
+        profile has always carried.
 
         Merged here rather than in ``hera_skillsets``, which knows what a skill is and
-        deliberately not what a profile or a project is.
+        deliberately not what a chat, a profile or a project is.
         """
         names: list[str] = []
+        if self.context.chat is not None:
+            names.extend(self.context.chat.pinned_skills)
         if self.context.profile is not None:
             names.extend(self.context.profile.pinned_skills)
         if self.context.project is not None:

@@ -1,0 +1,220 @@
+"""Her own tools, exercised the way the model reaches them.
+
+Through a real client over the protocol, so the schema, the description and the ``is_error``
+convention are all part of what is asserted. That her tools are namespaced and permission
+checked like anybody else's (ADR 4) is `hera_tools`' claim to prove, and it does.
+"""
+
+from __future__ import annotations
+
+import pytest
+from mcp.server.mcpserver import MCPServer
+from mcp_support import FakeMemories, FakeNotes, FakeSearch, FakeSkills, said, talking_to
+
+from hera_mcp import BUILTIN_SERVER_NAME, SEARCH_LIMIT, TOOL_NAMES, build_builtin_server
+
+
+async def test_it_offers_her_whole_catalogue_under_her_name(wired: MCPServer) -> None:
+    """What a settings screen counts for the ``hera`` server."""
+    async with talking_to(wired) as client:
+        listing = await client.list_tools()
+
+    assert sorted(tool.name for tool in listing.tools) == sorted(TOOL_NAMES)
+    assert build_builtin_server().name == BUILTIN_SERVER_NAME
+
+
+class TestEmotion:
+    async def test_it_acknowledges_and_nothing_more(self, wired: MCPServer) -> None:
+        """The call itself is the record; the answer only has to let generation continue."""
+        async with talking_to(wired) as client:
+            result = await client.call_tool("emotion", {"kind": "doubt", "text": "hm"})
+
+        assert not result.is_error
+        assert said(result) == "shown"
+
+    async def test_an_invented_kind_is_accepted(self, wired: MCPServer) -> None:
+        """ADR 3: ``kind`` is free text and unknown kinds render generically."""
+        async with talking_to(wired) as client:
+            result = await client.call_tool("emotion", {"kind": "wistful"})
+
+        assert not result.is_error
+
+    async def test_the_description_says_a_kind_may_be_invented(self, wired: MCPServer) -> None:
+        """A model that hard-obeys its schema needs the freedom written where it can see it."""
+        async with talking_to(wired) as client:
+            listing = await client.list_tools()
+
+        emotion = next(tool for tool in listing.tools if tool.name == "emotion")
+        assert emotion.description is not None
+        assert "invent" in emotion.description
+
+    async def test_a_missing_kind_comes_back_as_a_tool_error(self, wired: MCPServer) -> None:
+        """Schema validation happens in the server, and arrives as a result, not a crash."""
+        async with talking_to(wired) as client:
+            result = await client.call_tool("emotion", {"text": "no kind"})
+
+        assert result.is_error
+
+
+class TestRemember:
+    async def test_it_writes_through_the_port(
+        self, wired: MCPServer, memories: FakeMemories
+    ) -> None:
+        async with talking_to(wired) as client:
+            result = await client.call_tool(
+                "remember", {"text": "prefers dark roast", "scope": "global"}
+            )
+
+        assert not result.is_error
+        assert memories.written == [("prefers dark roast", "global")]
+
+    async def test_the_scope_defaults_to_global(
+        self, wired: MCPServer, memories: FakeMemories
+    ) -> None:
+        async with talking_to(wired) as client:
+            await client.call_tool("remember", {"text": "x"})
+
+        assert memories.written == [("x", "global")]
+
+    async def test_a_scope_the_schema_does_not_allow_is_refused(
+        self, wired: MCPServer, memories: FakeMemories
+    ) -> None:
+        async with talking_to(wired) as client:
+            result = await client.call_tool("remember", {"text": "x", "scope": "planet"})
+
+        assert result.is_error
+        assert memories.written == []
+
+
+class TestNote:
+    async def test_it_writes_through_the_port(self, wired: MCPServer, notes: FakeNotes) -> None:
+        async with talking_to(wired) as client:
+            result = await client.call_tool("note", {"text": "the plan", "title": "Plan"})
+
+        assert not result.is_error
+        assert notes.written == [("Plan", "the plan")]
+
+
+class TestSkill:
+    async def test_it_returns_the_body(self, wired: MCPServer, skills: FakeSkills) -> None:
+        async with talking_to(wired) as client:
+            result = await client.call_tool("skill", {"name": "writing"})
+
+        assert not result.is_error
+        assert said(result) == skills.bodies["writing"]
+
+    async def test_an_unknown_skill_says_what_there_is(self, wired: MCPServer) -> None:
+        """Told what exists, a model asks again correctly instead of giving up."""
+        async with talking_to(wired) as client:
+            result = await client.call_tool("skill", {"name": "cooking"})
+
+        assert result.is_error
+        assert "writing" in said(result)
+
+
+class TestSearch:
+    """The one tool of hers that leaves the machine."""
+
+    async def test_it_asks_the_engine_and_reads_back_what_came(
+        self, wired: MCPServer, searcher: FakeSearch
+    ) -> None:
+        async with talking_to(wired) as client:
+            result = await client.call_tool("search", {"query": "kerberos tgt", "limit": 2})
+
+        assert not result.is_error
+        assert searcher.asked == [("kerberos tgt", 2)]
+        text = said(result)
+        # Numbered, because she refers back to them, and every link on its own line so it
+        # survives being copied out of an answer.
+        assert "1. Kerberos" in text
+        assert "https://example.test/kerberos" in text
+        assert "2. TGT" in text
+
+    async def test_finding_nothing_is_an_answer_and_not_a_failure(self) -> None:
+        """A model told the search is broken stops searching. Told nothing was found, it tries
+        other words -- which is the behaviour worth having, so the two must not look alike."""
+        server = build_builtin_server(searcher=FakeSearch())
+        async with talking_to(server) as client:
+            result = await client.call_tool("search", {"query": "asdkjhqwlekjh"})
+
+        assert not result.is_error
+        assert "no results" in said(result)
+
+    async def test_an_engine_that_failed_says_why(self) -> None:
+        """Not the SDK's "Error executing tool search": rate-limited and unreachable want
+        different next moves, and she can only pick one if the reason survives."""
+        server = build_builtin_server(searcher=FakeSearch(fails=RuntimeError("429 slow down")))
+        async with talking_to(server) as client:
+            result = await client.call_tool("search", {"query": "kerberos"})
+
+        assert result.is_error
+        assert "429 slow down" in said(result)
+
+    async def test_an_empty_query_is_refused_before_anything_leaves(
+        self, wired: MCPServer, searcher: FakeSearch
+    ) -> None:
+        async with talking_to(wired) as client:
+            result = await client.call_tool("search", {"query": "   "})
+
+        assert result.is_error
+        assert searcher.asked == [], "nothing was sent anywhere"
+
+    async def test_the_limit_is_capped(self, wired: MCPServer, searcher: FakeSearch) -> None:
+        """A hundred snippets is a page of noise where the answer used to be, and it is paid
+        for twice -- in the window, and in how hard her own answer is to find afterwards."""
+        async with talking_to(wired) as client:
+            await client.call_tool("search", {"query": "x", "limit": 500})
+            await client.call_tool("search", {"query": "x", "limit": 0})
+
+        assert [limit for _, limit in searcher.asked] == [SEARCH_LIMIT, 1]
+
+    async def test_the_description_tells_her_to_prefer_it_to_guessing(
+        self, wired: MCPServer
+    ) -> None:
+        """The whole reason this tool exists: a model with no way to look something up does not
+        say it cannot check, it guesses fluently. That has to be written where it can see it."""
+        async with talking_to(wired) as client:
+            listing = await client.list_tools()
+
+        search = next(tool for tool in listing.tools if tool.name == "search")
+        assert search.description is not None
+        assert "guessing" in search.description
+
+
+class TestUnwiredPorts:
+    """A deployment with no memories still has to be usable, and honest about why.
+
+    This is v0.1 exactly: ``remember`` waits for `hera_memories` and ``note`` for somewhere to
+    put a document, and both are listed anyway.
+    """
+
+    async def test_the_tools_are_still_listed(self, bare: MCPServer) -> None:
+        """A model that cannot see ``remember`` concludes it cannot remember, and says so."""
+        async with talking_to(bare) as client:
+            listing = await client.list_tools()
+
+        assert sorted(tool.name for tool in listing.tools) == sorted(TOOL_NAMES)
+
+    @pytest.mark.parametrize(
+        ("tool", "arguments"),
+        [
+            ("remember", {"text": "x"}),
+            ("note", {"text": "x"}),
+            ("skill", {"name": "writing"}),
+            ("search", {"query": "kerberos"}),
+        ],
+    )
+    async def test_they_answer_that_they_are_unavailable(
+        self, bare: MCPServer, tool: str, arguments: dict[str, str]
+    ) -> None:
+        async with talking_to(bare) as client:
+            result = await client.call_tool(tool, arguments)
+
+        assert result.is_error
+        assert "not available" in said(result)
+
+    async def test_emotion_needs_nothing_wired(self, bare: MCPServer) -> None:
+        async with talking_to(bare) as client:
+            result = await client.call_tool("emotion", {"kind": "hope"})
+
+        assert not result.is_error

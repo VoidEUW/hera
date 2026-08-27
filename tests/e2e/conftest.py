@@ -41,11 +41,21 @@ SCRIPT = [
     [
         ThinkingDelta(text="They want the short version, not the RFC."),
         TextDelta(text="Kerberos issues a ticket-granting ticket, "),
-        TextDelta(text="then service tickets against it."),
+        TextDelta(text="then service tickets against it.\n\n"),
+        # Markdown and TeX, because that is the notation a model answers in and the interface
+        # typesets it (ADR 11). The `---` sits directly under a line on purpose: that is the
+        # setext trap, and it must come out as a rule rather than promoting "Cost" to a heading.
+        TextDelta(text="- the TGT is cached\n- every service ticket derives from it\n\n"),
+        TextDelta(text="**Cost**\n---\nThe lifetime is \\(t_0 + \\Delta\\).\n\n"),
         tool_call("hera__emotion", {"kind": "curious", "text": "Which part matters to you?"}),
         TurnEnd(reason="tool_calls"),
     ],
     text_turn("Ask me for the detail on whichever step you need."),
+    # Enough turns for a test that edits a question and tries an answer again. The script
+    # raises rather than repeating when it runs out, so a loop asking for more than this is a
+    # bug in the loop and says so.
+    text_turn("Shorter: one ticket buys the rest."),
+    text_turn("Once more, then."),
 ]
 
 
@@ -78,6 +88,15 @@ def server(
 
     home = tmp_path_factory.mktemp("hera-home")
     monkeypatch.setenv("HERA_HOME", str(home))
+
+    # One skill on disk, so the composer's picker has something to switch on. Written rather
+    # than mocked: the picker reads the same catalogue every other screen does.
+    skill = home / "skills" / "tdd"
+    skill.mkdir(parents=True)
+    skill.joinpath("SKILL.md").write_text(
+        "---\nname: tdd\ndescription: 'Use when you want tests first.'\n---\nRed, green.\n",
+        encoding="utf-8",
+    )
     monkeypatch.setenv("HERA_STORAGE_URL", f"sqlite:///{home / 'hera.sqlite3'}")
 
     settings = CoreSettings()

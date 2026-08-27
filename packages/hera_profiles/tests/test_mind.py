@@ -165,7 +165,7 @@ class TestPropose:
         assert mind.propose("character", "Warmer.", origin="dream:7") is not None
         assert mind.read("character").strip() == "Warmer."
 
-    @pytest.mark.parametrize("region_id", ["safety", "about_you", "developer", "emotion_vocab"])
+    @pytest.mark.parametrize("region_id", ["safety", "about_you", "developer", "tool_usage"])
     def test_an_owner_fixed_region_refuses_one(self, mind: MindRepository, region_id: str) -> None:
         """Enforced at the write rather than by filtering what gets offered, so a bug in a
         proposer cannot become a bug in her conduct."""

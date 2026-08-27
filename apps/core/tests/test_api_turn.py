@@ -9,14 +9,19 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Any
+from uuid import uuid4
 
+import pytest
 from core_support import API, StubTools, WriteSkill, names, payload, sse
 from httpx import ASGITransport, AsyncClient
 
 from hera_core.app import create_app
 from hera_core.wiring import Services
-from hera_permissions import Policy
+from hera_mcp import TOOL_NAMES, build_builtin_server
+from hera_permissions import PermissionSet, Policy
 from hera_providers import FakeProvider, text_turn, thinking_turn, tool_call, tool_turn
+from hera_skillsets import SkillLibrary, SkillLibraryPort
+from hera_tools import ToolRegistry, ToolsSettings
 
 
 async def open_chat(client: AsyncClient) -> str:
@@ -158,6 +163,243 @@ class TestSkillsAndTools:
             "done",
         ]
         assert payload(frames, "tool_result")["text"] == "ran fs__read_file"
+
+
+class TestARealMcpServer:
+    """The same path, with no stub anywhere between the model and the tool.
+
+    Everything above uses `StubTools`, which is right for testing the *turn* — but it means
+    nothing in the suite would notice if the MCP round trip stopped working. Here the registry
+    is a real `ToolRegistry`, the server is a real `MCPServer` from `hera_mcp` reached over the
+    SDK's in-memory transport, and the skill body that comes back was read off disk by
+    `hera_skillsets` through a port. What is faked is the model, and only the model.
+    """
+
+    async def test_her_own_tools_are_reachable_through_the_protocol(
+        self, make_services: Any, write_skill: WriteSkill, mcp_registry: ToolRegistry
+    ) -> None:
+        write_skill("tdd", body="Red, green, refactor.")
+        provider = FakeProvider(
+            [
+                tool_turn(
+                    tool_call("hera__emotion", {"kind": "curious"}),
+                    tool_call("hera__skill", {"name": "tdd"}),
+                ),
+                text_turn("Tests first, then."),
+            ]
+        )
+        services = make_services(provider, mcp_registry)
+        async with _client(services) as client:
+            frames = await talk(client, await open_chat(client), "how do I start?")
+
+        results = {body["tool"]: body for name, body in frames if name == "tool_result"}
+        assert results["hera__emotion"]["ok"]
+        assert results["hera__emotion"]["text"] == "shown"
+        # Read off disk, handed over a port, returned through the protocol.
+        assert results["hera__skill"]["text"] == "Red, green, refactor."
+        assert names(frames)[-2:] == ["turn_closed", "done"]
+
+    async def test_a_tool_that_fails_comes_back_as_a_result(
+        self, make_services: Any, mcp_registry: ToolRegistry
+    ) -> None:
+        """`ToolError` from the server, not an exception in the turn: the model is told the
+        skill does not exist and what does, and gets to correct itself."""
+        provider = FakeProvider(
+            [tool_turn(tool_call("hera__skill", {"name": "nope"})), text_turn("My mistake.")]
+        )
+        services = make_services(provider, mcp_registry)
+        async with _client(services) as client:
+            frames = await talk(client, await open_chat(client), "load nope")
+
+        result = payload(frames, "tool_result")
+        assert not result["ok"]
+        assert "no skill named" in result["text"]
+
+    async def test_the_catalogue_reaches_the_model_as_function_specs(
+        self, make_services: Any, mcp_registry: ToolRegistry
+    ) -> None:
+        """Her whole catalogue, named for the server it came from. Without this the model has
+        the prompt and no way to act on it."""
+        provider = FakeProvider([text_turn("nothing to do")])
+        services = make_services(provider, mcp_registry)
+        async with _client(services) as client:
+            await talk(client, await open_chat(client), "hello")
+
+        offered = {spec.name for spec in provider.requests[0].tools}
+        assert offered == {
+            "hera__emotion",
+            "hera__remember",
+            "hera__note",
+            "hera__skill",
+            "hera__search",
+        }
+
+    async def test_the_settings_screen_sees_the_server_it_is_talking_to(
+        self, make_services: Any, mcp_registry: ToolRegistry
+    ) -> None:
+        services = make_services(FakeProvider([text_turn("ok")]), mcp_registry)
+        async with _client(services) as client:
+            servers = (await client.get(f"{API}/servers")).json()
+
+        assert servers == [
+            {"name": "hera", "connected": True, "tools": len(TOOL_NAMES), "failure": None}
+        ]
+
+
+@pytest.fixture
+async def mcp_registry(skills_path: Any) -> AsyncIterator[ToolRegistry]:
+    """Her own server, mounted the way the application mounts it, everything allowed.
+
+    ``HERA_HOME`` points at a temporary directory with no ``mcp.json`` in it, so nothing
+    external is mounted: a test that started somebody's Docker gateway would be a test nobody
+    can run offline.
+    """
+    registry = ToolRegistry.open(
+        policy=Policy(base=PermissionSet.of(allow=["*"])),
+        settings=ToolsSettings(),
+        builtin=build_builtin_server(skills=SkillLibraryPort(SkillLibrary(skills_path))),
+    )
+    try:
+        yield registry
+    finally:
+        await registry.aclose()
+
+
+class TestAskingAgain:
+    """Edit and try-again, which are one route because they are one idea."""
+
+    async def test_editing_a_question_replaces_the_answer_that_followed_it(
+        self, make_services: Any
+    ) -> None:
+        provider = FakeProvider([text_turn("About Kerberos."), text_turn("About Kerberos v5.")])
+        services = make_services(provider)
+        async with _client(services) as client:
+            chat_id = await open_chat(client)
+            first = payload(await talk(client, chat_id, "tell me about kerberos"), "done")
+            asked = _first_user(await _detail(client, chat_id))
+
+            frames = await _redo(client, chat_id, asked["id"], "tell me about kerberos v5")
+            detail = await _detail(client, chat_id)
+
+        assert payload(frames, "done")["content"] == "About Kerberos v5."
+        # Two messages, not four: the old question and its answer are gone rather than hidden.
+        assert [m["content"] for m in detail["messages"]] == [
+            "tell me about kerberos v5",
+            "About Kerberos v5.",
+        ]
+        assert first["id"] not in {m["id"] for m in detail["messages"]}
+
+    async def test_the_model_never_sees_the_wording_that_was_replaced(
+        self, make_services: Any
+    ) -> None:
+        """The point of deleting rather than flagging: history is the message list."""
+        provider = FakeProvider([text_turn("One."), text_turn("Two.")])
+        services = make_services(provider)
+        async with _client(services) as client:
+            chat_id = await open_chat(client)
+            await talk(client, chat_id, "first wording")
+            asked = _first_user(await _detail(client, chat_id))
+            await _redo(client, chat_id, asked["id"], "second wording")
+
+        contents = [m.content for m in provider.requests[1].messages]
+        assert any("second wording" in content for content in contents)
+        assert not any("first wording" in content for content in contents)
+
+    async def test_trying_an_answer_again_replays_the_question_above_it(
+        self, make_services: Any
+    ) -> None:
+        provider = FakeProvider([text_turn("Terse."), text_turn("Longer, with detail.")])
+        services = make_services(provider)
+        async with _client(services) as client:
+            chat_id = await open_chat(client)
+            answer = payload(await talk(client, chat_id, "explain it"), "done")
+
+            frames = await _redo(client, chat_id, answer["id"])
+            detail = await _detail(client, chat_id)
+
+        assert payload(frames, "done")["content"] == "Longer, with detail."
+        assert [m["content"] for m in detail["messages"]] == ["explain it", "Longer, with detail."]
+
+    async def test_the_files_of_the_question_come_with_it(self, make_services: Any) -> None:
+        """Rewording a question about a file must not quietly drop the file."""
+        provider = FakeProvider([text_turn("It contradicts slide 9."), text_turn("Still does.")])
+        services = make_services(provider)
+        async with _client(services) as client:
+            chat_id = await open_chat(client)
+            response = await client.post(
+                f"{API}/chats/{chat_id}/messages",
+                json={
+                    "text": "what is wrong here?",
+                    "attachments": [{"name": "notes.md", "text": "Slide 14.", "bytes": 9}],
+                },
+            )
+            sse(response)
+            asked = _first_user(await _detail(client, chat_id))
+
+            await _redo(client, chat_id, asked["id"], "what is wrong with this?")
+            detail = await _detail(client, chat_id)
+
+        assert [f["name"] for f in detail["messages"][0]["attachments"]] == ["notes.md"]
+        assert any("Slide 14." in m.content for m in provider.requests[1].messages)
+
+    async def test_only_the_turns_after_it_go(self, make_services: Any) -> None:
+        """Asking the second question again leaves the first exchange alone."""
+        provider = FakeProvider([text_turn("One."), text_turn("Two."), text_turn("Two again.")])
+        services = make_services(provider)
+        async with _client(services) as client:
+            chat_id = await open_chat(client)
+            await talk(client, chat_id, "first")
+            await talk(client, chat_id, "second")
+            second = (await _detail(client, chat_id))["messages"][2]
+
+            await _redo(client, chat_id, second["id"])
+            detail = await _detail(client, chat_id)
+
+        assert [m["content"] for m in detail["messages"]] == [
+            "first",
+            "One.",
+            "second",
+            "Two again.",
+        ]
+
+    async def test_an_unknown_message_is_a_404(self, make_services: Any) -> None:
+        services = make_services(FakeProvider([text_turn("ok")]))
+        async with _client(services) as client:
+            chat_id = await open_chat(client)
+            response = await client.post(
+                f"{API}/chats/{chat_id}/messages/{uuid4()}/redo", json={"text": "x"}
+            )
+
+        assert response.status_code == 404
+
+    async def test_an_edit_to_nothing_is_refused(self, make_services: Any) -> None:
+        services = make_services(FakeProvider([text_turn("ok"), text_turn("ok")]))
+        async with _client(services) as client:
+            chat_id = await open_chat(client)
+            await talk(client, chat_id, "something")
+            asked = _first_user(await _detail(client, chat_id))
+            response = await client.post(
+                f"{API}/chats/{chat_id}/messages/{asked['id']}/redo", json={"text": "   "}
+            )
+
+        assert response.status_code == 422
+
+
+async def _detail(client: AsyncClient, chat_id: str) -> Any:
+    return (await client.get(f"{API}/chats/{chat_id}")).json()
+
+
+def _first_user(detail: Any) -> Any:
+    return next(message for message in detail["messages"] if message["role"] == "user")
+
+
+async def _redo(
+    client: AsyncClient, chat_id: str, message_id: str, text: str | None = None
+) -> list[tuple[str, Any]]:
+    body = {} if text is None else {"text": text}
+    response = await client.post(f"{API}/chats/{chat_id}/messages/{message_id}/redo", json=body)
+    assert response.status_code == 200, response.text
+    return sse(response)
 
 
 class TestThePermissionCard:
@@ -352,9 +594,103 @@ class TestAttachments:
 
         user = detail["messages"][0]
         assert user["content"] == "read this", "the stored message is what was typed"
-        assert user["attachments"] == [{"name": "notes.md", "bytes": 28}]
+        assert user["attachments"] == [{"name": "notes.md", "bytes": 28, "media_type": ""}]
         assert "slide 14" not in str(user["attachments"]), "contents do not come back"
         assert names(frames)[-1] == "done"
+
+    async def test_a_picture_reaches_the_model_as_a_content_part(self, make_services: Any) -> None:
+        """The bytes go on the wire, not a link: the endpoint is usually a local server with no
+        route back to the browser that read the file."""
+        from hera_providers import ImagePart, TextPart
+
+        url = "data:image/png;base64,iVBORw0KGgo="
+        provider = FakeProvider([text_turn("A white square.")])
+        services = make_services(provider)
+
+        async with _client(services) as client:
+            chat_id = await open_chat(client)
+            response = await client.post(
+                f"{API}/chats/{chat_id}/messages",
+                json={
+                    "text": "what is this?",
+                    "attachments": [
+                        {
+                            "name": "shot.png",
+                            "data_url": url,
+                            "media_type": "image/png",
+                            "bytes": 9,
+                        }
+                    ],
+                },
+            )
+            frames = sse(response)
+            detail = (await client.get(f"{API}/chats/{chat_id}")).json()
+
+        content = provider.requests[0].messages[-1].content
+        assert isinstance(content, list), "a message with a picture is a list of parts"
+        words, picture = content
+        assert isinstance(words, TextPart)
+        assert isinstance(picture, ImagePart)
+        assert picture.url == url
+        # Named in the text too, so "the second screenshot" has something to refer to.
+        assert "Attached image: shot.png" in words.text
+
+        chip = detail["messages"][0]["attachments"][0]
+        assert chip == {"name": "shot.png", "bytes": 9, "media_type": "image/png"}
+        assert url not in str(detail), "the bytes do not come back with the conversation"
+        assert names(frames)[-1] == "done"
+
+    async def test_a_message_with_no_picture_stays_a_plain_string(self, make_services: Any) -> None:
+        """An installation that never attaches one never sends a differently shaped request."""
+        provider = FakeProvider([text_turn("ok")])
+        services = make_services(provider)
+
+        async with _client(services) as client:
+            chat_id = await open_chat(client)
+            await client.post(f"{API}/chats/{chat_id}/messages", json={"text": "hello"})
+
+        assert all(isinstance(m.content, str) for m in provider.requests[0].messages)
+
+    @pytest.mark.parametrize(
+        ("attachment", "why"),
+        [
+            (
+                {
+                    "name": "a.png",
+                    "data_url": "data:image/heic;base64,x",
+                    "media_type": "image/heic",
+                },
+                "an image format no endpoint will accept",
+            ),
+            (
+                {"name": "a.png", "data_url": "not-a-data-url", "media_type": "image/png"},
+                "a picture that is not a data URL",
+            ),
+            (
+                {
+                    "name": "a.png",
+                    "text": "x",
+                    "data_url": "data:image/png;base64,x",
+                    "media_type": "image/png",
+                },
+                "both a text body and a picture, with no rule for which wins",
+            ),
+            ({"name": "a.py"}, "an attachment with nothing in it"),
+        ],
+    )
+    async def test_an_attachment_that_is_neither_one_thing_nor_the_other_is_refused(
+        self, make_services: Any, attachment: dict[str, Any], why: str
+    ) -> None:
+        services = make_services(FakeProvider())
+
+        async with _client(services) as client:
+            chat_id = await open_chat(client)
+            response = await client.post(
+                f"{API}/chats/{chat_id}/messages",
+                json={"text": "look", "attachments": [attachment]},
+            )
+
+        assert response.status_code == 422, why
 
     async def test_a_file_on_its_own_is_a_fair_question(self, make_services: Any) -> None:
         services = make_services(FakeProvider([text_turn("It looks fine.")]))

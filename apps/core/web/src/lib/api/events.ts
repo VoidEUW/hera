@@ -116,8 +116,27 @@ export function isKnown(event: AnyEvent): event is ChatEvent {
 /** The emotion tool, which renders as a card rather than as a gutter row (ADR 3). */
 export const EMOTION_TOOL = 'hera__emotion';
 
+/** The skill tool. Reaching for a skill mid-task and being handed one before the turn are the
+ * same thing to a reader, so they are drawn the same way — see `Scroll.svelte`. */
+export const SKILL_TOOL = 'hera__skill';
+
+/** Her own namespace, which is the only one this interface is allowed to recognise. */
+export const HERA = 'hera__';
+
 export function isEmotion(event: AnyEvent): boolean {
 	// A plain predicate rather than a type guard: the caller already knows it holds a
 	// ToolCallReady, and a guard would narrow the *negative* branch to `never`.
 	return event.type === 'tool_call_ready' && (event as ToolCallReady).name === EMOTION_TOOL;
+}
+
+/** Whether this tool row is about a skill, by call or by result.
+ *
+ * Knowing these two names is not the same as recognising tools in general: `hera__*` is *her*
+ * namespace, the four tools on it are shipped in this repository, and the interface already
+ * draws one of them as a card. What it must not do is learn somebody else's server — that is
+ * what makes an unfamiliar tool look broken next to a familiar one. */
+export function isSkillTool(event: AnyEvent): boolean {
+	if (event.type === 'tool_call_ready') return (event as ToolCallReady).name === SKILL_TOOL;
+	if (event.type === 'tool_result') return (event as { tool?: string }).tool === SKILL_TOOL;
+	return false;
 }

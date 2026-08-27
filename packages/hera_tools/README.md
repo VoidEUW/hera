@@ -1,7 +1,8 @@
 # hera-tools
 
-The tool layer: an **MCP client** over the servers declared in `~/.hera/mcp.json`, plus Hera's
-own capabilities as an in-process server inside it.
+The tool layer: an **MCP client** over the servers declared in `~/.hera/mcp.json`, plus any
+in-process server the application hands it — `hera-mcp` carries Hera's own capabilities and is
+mounted exactly that way, with no special case here.
 
 Every tool is namespaced `server__tool`, every call is checked by `hera_permissions` before it
 runs, and every call comes back as a `ToolResult` — including the ones that were refused,
@@ -19,8 +20,9 @@ dependencies = ["hera-tools"]
 ## Quick start
 
 ```python
+from hera_mcp import build_builtin_server
 from hera_permissions import PermissionSet, Policy
-from hera_tools import ToolInvocation, ToolRegistry, build_builtin_server
+from hera_tools import ToolInvocation, ToolRegistry
 
 registry = ToolRegistry.open(
     policy=Policy(base=PermissionSet.of(allow=["hera__*"], ask=["*"])),
@@ -69,23 +71,16 @@ else is the protocol's.
 A missing file is not an error. Hera with no external servers is a working installation — her
 own tools are in-process and do not come from here.
 
-## Her own server
+## An in-process server
 
-`emotion`, `remember`, `note` and `skill` are registered on a real `MCPServer`, reached over an
-in-memory transport by the same client the filesystem server is reached by, listed in the same
-catalogue, and checked by the same policy. Nothing about them is a special case, which is what
-makes exposing them to other agents in v0.3 a transport change rather than a rewrite.
+`from_config(builtin=...)` mounts a server object running inside this process, under its own
+`name`, over the SDK's in-memory transport. It is reached by the same client a subprocess is
+reached by, listed in the same catalogue, and checked by the same policy — nothing about it is
+a special case, which is what makes exposing such a server to other agents in v0.3 a transport
+change rather than a rewrite.
 
-The three that touch the rest of the system take **ports** — `MemoryWriter`, `NoteWriter`,
-`SkillLibrary` in `hera_tools.ports`. This package sits below memories, skills and chats and
-may not import them, so it declares what it needs and the application wires it. All three are
-optional: what is not wired still appears in the catalogue and answers "not available in this
-deployment", because a model that cannot see `remember` concludes it cannot remember and says
-so to the person.
-
-`emotion` needs nothing wired. It returns a one-word acknowledgement; the call itself is the
-record, persisted as an event and rendered by the interface
-([ADR 3](../../docs/adr/0003-emotions-as-tool-calls.md)).
+Hera's own four tools are one of these, in [`hera-mcp`](../hera_mcp/). This package does not
+import it and does not know what is on it; the application puts the two together.
 
 ## Failure never reaches the turn
 

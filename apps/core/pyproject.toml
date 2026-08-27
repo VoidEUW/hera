@@ -19,9 +19,11 @@ classifiers = [
 ]
 dependencies = [
     "alembic>=1.13",
+    "ddgs>=9.16.0",
     "fastapi>=0.115",
     "hera-chats",
     "hera-home",
+    "hera-mcp",
     "hera-permissions",
     "hera-profiles",
     "hera-prompts",

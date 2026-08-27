@@ -22,7 +22,6 @@ from mcp.server.mcpserver import MCPServer
 from pydantic import BaseModel, ConfigDict
 
 from hera_permissions import Decision, Outcome, Policy
-from hera_tools.builtin import BUILTIN_SERVER_NAME, build_builtin_server
 from hera_tools.catalogue import Catalogue, Tool
 from hera_tools.config import McpConfig
 from hera_tools.errors import ServerUnavailable, ToolTimeout
@@ -64,12 +63,14 @@ class ToolRegistry:
         builtin: MCPServer | None = None,
         settings: ToolsSettings | None = None,
     ) -> ToolRegistry:
-        """Build from a parsed ``mcp.json``, with Hera's own server alongside the rest.
+        """Build from a parsed ``mcp.json``, with an in-process server alongside the rest.
 
-        ``builtin`` is passed in rather than constructed here because it needs the memory,
-        note and skill ports, and those are wired by the application -- see
-        :mod:`hera_tools.ports`. Passing ``None`` leaves her with no tools of her own, which is
-        a legitimate configuration for a test.
+        ``builtin`` is a server object, not a flag, and this package does not know what is on
+        it: Hera's own four tools live in ``hera_mcp``, which sits below this one and is wired
+        by the application because it needs the memory, note and skill ports. It is mounted
+        under **its own** ``name``, so the word "hera" is written in one place rather than
+        agreed on by two packages. ``None`` mounts nothing, which is a legitimate configuration
+        for a test and for a deployment that only wants somebody else's servers.
         """
         settings = settings or ToolsSettings()
         servers = [
@@ -77,7 +78,7 @@ class ToolRegistry:
             for name, server in config.enabled().items()
         ]
         if builtin is not None:
-            servers.insert(0, ManagedServer.in_process(BUILTIN_SERVER_NAME, builtin, settings))
+            servers.insert(0, ManagedServer.in_process(builtin.name, builtin, settings))
         return cls(servers, policy=policy)
 
     @classmethod
@@ -88,10 +89,13 @@ class ToolRegistry:
         settings: ToolsSettings | None = None,
         builtin: MCPServer | None = None,
     ) -> ToolRegistry:
-        """Read ``mcp.json`` from disk and build. The application's one-liner at startup."""
+        """Read ``mcp.json`` from disk and build. The application's one-liner at startup.
+
+        ``builtin`` left out means the configured servers and nothing else. It used to default
+        to an unwired copy of her own server; a default that quietly mounts four tools is the
+        kind of thing you discover from a catalogue listing rather than from the call site.
+        """
         settings = settings or ToolsSettings()
-        if builtin is None:
-            builtin = build_builtin_server()
         return cls.from_config(
             McpConfig.load(settings.resolved_config_path()),
             policy=policy,

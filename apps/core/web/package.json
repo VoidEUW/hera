@@ -22,6 +22,7 @@
 		"eslint-config-prettier": "^10.0.1",
 		"eslint-plugin-svelte": "^2.46.1",
 		"globals": "^15.14.0",
+		"jsdom": "^30.0.1",
 		"openapi-typescript": "^7.6.1",
 		"prettier": "^3.4.2",
 		"prettier-plugin-svelte": "^3.3.3",
@@ -36,6 +37,10 @@
 		"@fontsource-variable/figtree": "^5.1.1",
 		"@fontsource-variable/fraunces": "^5.1.1",
 		"@fontsource-variable/source-serif-4": "^5.1.1",
-		"@fontsource/ibm-plex-mono": "^5.1.1"
+		"@fontsource/ibm-plex-mono": "^5.1.1",
+		"dompurify": "^3.4.14",
+		"katex": "^0.18.4",
+		"marked": "^18.0.11",
+		"marked-katex-extension": "^5.1.12"
 	}
 }

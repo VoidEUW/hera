@@ -37,18 +37,29 @@ from hera_providers.fake import (
 )
 from hera_providers.openai import OpenAICompatibleProvider, build_client, chat_payload
 from hera_providers.qwen import QwenAdapter
-from hera_providers.request import ChatMessage, ChatRequest, Role, ToolCall, ToolSpec
+from hera_providers.request import (
+    ChatMessage,
+    ChatRequest,
+    ContentPart,
+    ImagePart,
+    Role,
+    TextPart,
+    ToolCall,
+    ToolSpec,
+)
 from hera_providers.settings import ProviderSettings
 
 __all__ = [
     "EVENT_ADAPTER",
     "ChatMessage",
     "ChatRequest",
+    "ContentPart",
     "EmbeddingProvider",
     "Event",
     "FakeProvider",
     "FakeProviderExhausted",
     "FinishReason",
+    "ImagePart",
     "MalformedResponse",
     "OpenAICompatibleProvider",
     "Provider",
@@ -62,6 +73,7 @@ __all__ = [
     "StreamAdapter",
     "StreamInterrupted",
     "TextDelta",
+    "TextPart",
     "ThinkingDelta",
     "ToolCall",
     "ToolCallReady",

@@ -271,7 +271,7 @@
 	}
 
 	.entry.current header h3 {
-		color: var(--pomegranate);
+		color: var(--brass);
 	}
 
 	header {
@@ -292,7 +292,7 @@
 		font-size: 11px;
 		letter-spacing: 0.06em;
 		text-transform: uppercase;
-		color: var(--pomegranate);
+		color: var(--brass);
 	}
 
 	label {
@@ -398,7 +398,7 @@
 
 	.ok {
 		font-size: 12.5px;
-		color: var(--peacock);
+		color: var(--laurel);
 	}
 
 	.error {

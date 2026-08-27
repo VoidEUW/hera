@@ -32,7 +32,12 @@ ALLOWED: dict[str, frozenset[str]] = {
     # The model boundary and pure policy. Neither touches persistence.
     "hera_providers": frozenset(),
     "hera_permissions": frozenset(),
-    # Capability layer.
+    # Her own MCP server. Not domain-free -- it is entirely about what Hera can do -- but it
+    # imports nothing of ours: what it needs from the rest of the system arrives as a port, the
+    # way it did when it lived inside hera_tools.
+    "hera_mcp": frozenset(),
+    # Capability layer. hera_tools mounts whatever in-process server it is handed and does not
+    # know that hera_mcp exists; the application is what puts the two together.
     "hera_tools": frozenset({"hera_home", "hera_permissions"}),
     "hera_skillsets": frozenset({"hera_home", "hera_storage"}),
     "hera_memories": frozenset({"hera_storage"}),

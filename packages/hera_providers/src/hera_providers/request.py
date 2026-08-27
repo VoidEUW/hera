@@ -10,7 +10,7 @@ the turn maps one onto the other -- that mapping is where the history goes.
 from __future__ import annotations
 
 from enum import StrEnum
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -44,8 +44,44 @@ class ToolCall(BaseModel):
     arguments: dict[str, Any] = Field(default_factory=dict)
 
 
+class TextPart(BaseModel):
+    """Prose, in a message that is carrying more than prose."""
+
+    model_config = ConfigDict(frozen=True)
+
+    type: Literal["text"] = "text"
+    text: str = ""
+
+
+class ImagePart(BaseModel):
+    """A picture in a user message.
+
+    ``url`` is a ``data:`` URL for something read off a person's disk, or an ``http(s)`` one for
+    something already on the network. This package does not care which — it moves whichever it
+    is onto the wire — but a local endpoint that cannot fetch is the reason the interface sends
+    the bytes rather than a link.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    type: Literal["image_url"] = "image_url"
+    url: str
+    detail: Literal["auto", "low", "high"] | None = None
+
+
+ContentPart = Annotated[TextPart | ImagePart, Field(discriminator="type")]
+"""One block of a multi-part message. Deliberately small: text and images are what an
+OpenAI-compatible endpoint agrees on, and a part this package invented would be a part no
+server understands."""
+
+
 class ChatMessage(BaseModel):
     """One message in the conversation being sent.
+
+    ``content`` is a plain string in the ordinary case and a list of parts when the message
+    carries something that is not prose — today, a picture. Both are what the protocol accepts,
+    and the string is kept rather than always sending a one-element list because a good number
+    of local servers only ever grew the string form.
 
     A ``TOOL`` message carries the result of a call and must set ``tool_call_id`` to the id of
     the call it answers; a model that cannot match the two ignores the result.
@@ -54,9 +90,21 @@ class ChatMessage(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     role: Role
-    content: str = ""
+    content: str | list[ContentPart] = ""
     tool_calls: list[ToolCall] = Field(default_factory=list)
     tool_call_id: str | None = None
+
+    @property
+    def text(self) -> str:
+        """The prose of this message, whichever form the content is in.
+
+        Anything reading a message for its *words* — a title, a budget, a log line — wants this
+        rather than ``content``, so that a message growing a picture does not turn every such
+        reader into a type check.
+        """
+        if isinstance(self.content, str):
+            return self.content
+        return "".join(part.text for part in self.content if isinstance(part, TextPart))
 
 
 class ToolSpec(BaseModel):

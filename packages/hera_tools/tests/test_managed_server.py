@@ -48,48 +48,48 @@ def _slow_server() -> MCPServer:
 
 
 class TestInProcess:
-    async def test_it_connects_on_first_use(self, builtin: MCPServer) -> None:
-        server = ManagedServer.in_process("hera", builtin)
+    async def test_it_connects_on_first_use(self, toy: MCPServer) -> None:
+        server = ManagedServer.in_process("toy", toy)
         assert not server.connected
 
         tools = await server.tools()
 
         assert server.connected
-        assert "hera__emotion" in {tool.name for tool in tools}
+        assert "toy__emotion" in {tool.name for tool in tools}
         await server.aclose()
 
-    async def test_the_listing_is_cached(self, builtin: MCPServer) -> None:
-        server = ManagedServer.in_process("hera", builtin)
+    async def test_the_listing_is_cached(self, toy: MCPServer) -> None:
+        server = ManagedServer.in_process("toy", toy)
         first = await server.tools()
         assert await server.tools() is first
         assert await server.tools(refresh=True) == first
         await server.aclose()
 
-    async def test_parallel_calls_to_one_server(self, builtin: MCPServer) -> None:
+    async def test_parallel_calls_to_one_server(self, toy: MCPServer) -> None:
         """A turn's worth of emotions is one round trip only if these overlap (ADR 3)."""
-        server = ManagedServer.in_process("hera", builtin)
+        server = ManagedServer.in_process("toy", toy)
         results = await asyncio.gather(
             *(server.call("emotion", {"kind": "curious", "text": str(n)}) for n in range(5))
         )
         assert [result.is_error for result in results] == [False] * 5
         await server.aclose()
 
-    async def test_one_connection_for_concurrent_first_calls(self, builtin: MCPServer) -> None:
+    async def test_one_connection_for_concurrent_first_calls(self, toy: MCPServer) -> None:
         """Three cold calls must not race into three connections."""
-        server = ManagedServer.in_process("hera", builtin)
+        server = ManagedServer.in_process("toy", toy)
         await asyncio.gather(*(server.tools() for _ in range(3)))
         assert server.connected
         await server.aclose()
 
-    async def test_closing_twice_is_harmless(self, builtin: MCPServer) -> None:
-        server = ManagedServer.in_process("hera", builtin)
+    async def test_closing_twice_is_harmless(self, toy: MCPServer) -> None:
+        server = ManagedServer.in_process("toy", toy)
         await server.tools()
         await server.aclose()
         await server.aclose()
         assert not server.connected
 
-    async def test_a_closed_server_refuses_rather_than_reconnects(self, builtin: MCPServer) -> None:
-        server = ManagedServer.in_process("hera", builtin)
+    async def test_a_closed_server_refuses_rather_than_reconnects(self, toy: MCPServer) -> None:
+        server = ManagedServer.in_process("toy", toy)
         await server.aclose()
         with pytest.raises(ServerUnavailable, match="closed"):
             await server.tools()

@@ -1,12 +1,13 @@
 """What Hera's own tools need from the rest of the system, expressed as protocols.
 
-``hera_tools`` sits below memories, skills and chats and may not import them, so the built-in
-server does not reach for them -- it declares the three things it needs and takes them
+``hera_mcp`` sits below memories, skills and chats and imports no ``hera_*`` package at all, so
+the built-in server does not reach for them -- it declares the things it needs and takes them
 injected. The port belongs to the consumer, so it says exactly what ``remember`` requires and
-nothing about how a memory is stored.
+nothing about how a memory is stored. The same holds for search: this package knows that she can
+look something up, and knows nothing about DuckDuckGo, an API key or an HTTP client.
 
-All three are async because the implementations will touch a database or a git repository, and
-a synchronous port would force every one of them through a thread later.
+All of them are async because the implementations touch a database, a git repository or the
+network, and a synchronous port would force every one of them through a thread later.
 
 Every port is optional. A deployment that wires none of them still has ``emotion``, and the
 other tools answer "not available here" as a tool error the model can read and work around --
@@ -16,7 +17,43 @@ which is the whole degradation story of ADR 4 applied to her own capabilities.
 from __future__ import annotations
 
 from collections.abc import Sequence
+from dataclasses import dataclass
 from typing import Protocol, runtime_checkable
+
+
+@dataclass(frozen=True, slots=True)
+class Hit:
+    """One search result.
+
+    A dataclass rather than a dict because it crosses a seam: the adapter builds it and the
+    tool renders it, and the two are in different packages. ``snippet`` is whatever the engine
+    returned and is not fetched, cleaned or summarised here -- that would be this package
+    deciding what a search result *is*, and it does not know.
+    """
+
+    title: str
+    url: str
+    snippet: str = ""
+
+
+@runtime_checkable
+class Searcher(Protocol):
+    """Somewhere to look things up. Implemented by the application, over whichever engine the
+    deployment has -- there is no default, because every one of them is a choice about where a
+    person's questions go.
+
+    The only port here that leaves the machine, which is why it is worth saying plainly: what
+    is passed to :meth:`search` is a query the *model* wrote, and it goes to a third party.
+    """
+
+    async def search(self, query: str, *, limit: int) -> Sequence[Hit]:
+        """Results for one query, best first, at most ``limit`` of them.
+
+        Returning nothing is a normal answer and not an error -- the tool says so and the model
+        tries different words. Raise only when the *engine* failed, so that "no results" and
+        "the search is broken" cannot look the same to her.
+        """
+        ...
 
 
 @runtime_checkable

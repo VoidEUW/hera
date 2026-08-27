@@ -14,6 +14,7 @@
 	 */
 	import type { PermissionRequired } from '$lib/api/events';
 	import { t } from '$lib/i18n';
+	import { toolName } from '$lib/tools';
 
 	interface Props {
 		card: PermissionRequired;
@@ -25,6 +26,12 @@
 	}
 
 	let { card, decided = null, busy = false, onanswer }: Props = $props();
+
+	// "Run docker__mcp-find?" is a question about machinery. The decision being asked for is
+	// about an action and where it will happen, so that is what the sentence says -- with the
+	// qualified name kept underneath, because that is the thing a rule gets written against
+	// and a person answering "always allow" deserves to see it.
+	const named = $derived(toolName(card.tool));
 
 	const args = $derived(
 		Object.entries(card.arguments)
@@ -42,8 +49,12 @@
 <aside class="card" class:settled={!!decided}>
 	<p class="title">
 		<span class="mark" aria-hidden="true">⬡</span>
-		{t.permission.title(card.tool)}
+		{named.server
+			? t.permission.titleFrom(named.action, named.server)
+			: t.permission.title(named.action)}
 	</p>
+
+	<p class="qualified mono">{named.qualified}</p>
 
 	{#if args}
 		<p class="args mono">{args}</p>
@@ -96,6 +107,12 @@
 
 	.mark {
 		color: var(--brass);
+	}
+
+	.qualified {
+		margin: 4px 0 0;
+		font-size: 12px;
+		color: var(--text-faint);
 	}
 
 	.args {

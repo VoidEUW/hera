@@ -20,7 +20,7 @@ from collections.abc import AsyncIterator, Sequence
 from typing import Any
 from uuid import UUID
 
-from fastapi import APIRouter, status
+from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import StreamingResponse
 from hera_chats.events import ChatEvent, PermissionDecided, PermissionRequired
 from sqlmodel import Session
@@ -39,8 +39,20 @@ from hera_chats import (
     title_from,
 )
 from hera_core.deps import Container, Db, Owner, not_found
-from hera_core.schemas import ChatDetail, ChatIn, ChatOut, MessageIn, MessageOut, PermissionAnswer
+from hera_core.emotions import EmotionsError
+from hera_core.emotions import load as load_emotions
+from hera_core.schemas import (
+    ChatDetail,
+    ChatIn,
+    ChatOut,
+    ChatPatch,
+    MessageIn,
+    MessageOut,
+    PermissionAnswer,
+    RedoIn,
+)
 from hera_core.sse import HEADERS, MEDIA_TYPE, event_frame, frame
+from hera_mcp import DEFAULT_EMOTIONS, render_emotions
 from hera_permissions import Decision, Rule
 from hera_profiles import Profile, ProfileRepository
 from hera_providers import ToolCallReady
@@ -92,6 +104,29 @@ def read_chat(chat_id: UUID, owner: Owner, db: Db) -> ChatDetail:
     )
 
 
+@router.patch("/chats/{chat_id}", response_model=ChatOut)
+def update_chat(chat_id: UUID, payload: ChatPatch, owner: Owner, db: Db) -> ChatOut:
+    """Rename a chat, or change which skills are switched on inside it.
+
+    Whitespace is stripped from a title, and a title of nothing is allowed: it hands the name
+    back to her, since a chat with no title is the one case a finished turn will name.
+
+    Pinning here is ADR 5 in the person's hands. Retrieval decides what *might* apply; a pin
+    says *use this*, and the turn puts the chat's pins ahead of the profile's and the
+    project's — the most specific and the most deliberate of the three.
+    """
+    chat = _require_chat(db, chat_id, owner)
+    chats = ChatRepository(db)
+    if payload.title is not None:
+        chat.title = payload.title.strip()
+    if payload.pinned_skills is not None:
+        # Not validated against what is installed: a pin whose folder is gone is reported by
+        # the router as `missing`, which is the useful outcome — refusing it here would mean a
+        # skill temporarily moved aside silently loses every pin that named it.
+        chats.set_pinned_skills(chat, payload.pinned_skills)
+    return ChatOut.of(chats.save(chat))
+
+
 @router.delete("/chats/{chat_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_chat(chat_id: UUID, owner: Owner, db: Db) -> None:
     chat = _require_chat(db, chat_id, owner)
@@ -118,6 +153,69 @@ def send_message(
     assistant = messages.start_assistant_message(chat)
 
     return _stream(container, db, chat, assistant, text=payload.text, attachments=attachments)
+
+
+@router.post("/chats/{chat_id}/messages/{message_id}/redo")
+def redo_message(
+    chat_id: UUID,
+    message_id: UUID,
+    payload: RedoIn,
+    owner: Owner,
+    db: Db,
+    container: Container,
+) -> StreamingResponse:
+    """Ask again from here — the same question, or a reworded one.
+
+    One route for what the interface calls two things, because they are one thing: **edit**
+    sends new text for a question, **try again** sends none for an answer. Both mean "the
+    conversation goes forward from this point differently", and both need the same rewind.
+
+    Point it at an *assistant* message and the question above it is the one replayed. That is
+    the only sensible reading — a turn is an answer to something, and re-running it without its
+    question would be re-running nothing.
+
+    Everything from that question onwards is deleted first, deliberately: an answer to the old
+    wording is not an answer to the new one, and the model reads history from the message list.
+    Which is also why this streams like any other turn — from here on it *is* one.
+    """
+    chat = _require_chat(db, chat_id, owner)
+    messages = MessageRepository(db)
+    history = messages.for_chat(chat.id)
+
+    target = next((message for message in history if message.id == message_id), None)
+    if target is None:
+        raise not_found("message")
+
+    asked = _question_behind(history, target)
+    if asked is None:
+        raise not_found("question to ask again")
+
+    text = asked.content if payload.text is None else payload.text
+    attachments = [Attachment(**item) for item in asked.attachments]
+    if not text.strip() and not attachments:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="a message needs text, a file, or both",
+        )
+
+    messages.truncate_from(chat.id, asked.sequence)
+    messages.add_user_message(chat, text, attachments)
+    ChatRepository(db).touch(chat)
+    assistant = messages.start_assistant_message(chat)
+
+    return _stream(container, db, chat, assistant, text=text, attachments=attachments)
+
+
+def _question_behind(history: Sequence[Message], target: Message) -> Message | None:
+    """The user message a redo replays: this one, or the one this answer was answering."""
+    if target.role == "user":
+        return target
+    earlier = [
+        message
+        for message in history
+        if message.role == "user" and message.sequence < target.sequence
+    ]
+    return earlier[-1] if earlier else None
 
 
 @router.post("/chats/{chat_id}/permissions")
@@ -246,7 +344,7 @@ def _record(
 
 
 def _context(session: Session, chat: Chat, *, text: str, **extra: object) -> TurnContext:
-    """Gather the profile, the project and the history for one turn."""
+    """Gather the profile, the project, the history and the vocabulary for one turn."""
     profile = _profile_of(session, chat)
     project = None
     if chat.project_id is not None:
@@ -258,8 +356,23 @@ def _context(session: Session, chat: Chat, *, text: str, **extra: object) -> Tur
         project=project,
         profile=profile,
         history=history,
+        emotions=_emotion_vocabulary(),
         **extra,  # type: ignore[arg-type]  # resume/confirmed/denied, forwarded to the dataclass
     )
+
+
+def _emotion_vocabulary() -> str:
+    """Her stances, rendered for the prompt.
+
+    Read per turn rather than at startup: the Emotions screen writes a file, and a vocabulary
+    you can edit on screen that only applies after a restart is the trap `config.toml` already
+    taught this project once. A file that will not parse falls back to the shipped list — the
+    Emotions screen is where that gets explained, and a turn is not the place to find out.
+    """
+    try:
+        return render_emotions(load_emotions())
+    except EmotionsError:
+        return render_emotions(list(DEFAULT_EMOTIONS))
 
 
 def _profile_of(session: Session, chat: Chat) -> Profile | None:

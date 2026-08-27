@@ -9,8 +9,15 @@
 	 *
 	 * The left edge is coloured by tone, not by kind, which is what lets an invented kind land
 	 * somewhere sensible instead of nowhere.
+	 *
+	 * **Warm is not red.** Pomegranate is *her* — the mark, send, the active chat — and next to
+	 * `--danger` in a dark interface it reads as an alarm, so a card saying *agree* looked like
+	 * something had gone wrong. Warmth is brass here: her authority, the same colour her skills
+	 * and permission cards already use. Nothing in this component is allowed to be the danger
+	 * colour, because no stance she can hold is an error.
 	 */
 	import type { ToolCallReady } from '$lib/api/events';
+	import { workspace } from '$lib/stores/workspace.svelte';
 
 	interface Props {
 		call: ToolCallReady;
@@ -19,23 +26,6 @@
 	let { call }: Props = $props();
 
 	type Tone = 'warm' | 'cool' | 'sharp' | 'soft';
-
-	const TONES: Record<string, Tone> = {
-		agree: 'warm',
-		hope: 'warm',
-		excited: 'warm',
-		funny: 'warm',
-		joke: 'warm',
-		curious: 'cool',
-		surprised: 'cool',
-		doubt: 'cool',
-		ask: 'cool',
-		warn: 'sharp',
-		disagree: 'sharp',
-		judge: 'sharp',
-		annoyed: 'sharp',
-		sorry: 'soft'
-	};
 
 	const GLYPHS: Record<Tone, string> = {
 		warm: '◕',
@@ -46,15 +36,22 @@
 
 	const kind = $derived(String(call.arguments.kind ?? 'note'));
 	const text = $derived(String(call.arguments.text ?? ''));
+
+	// The vocabulary is the person's, edited in Settings -> Emotions and read by the prompt
+	// from the same list. There is no table of tones in this file any more: one that disagreed
+	// with what she was told would draw her stance in the wrong colour and nobody could say why.
+	const known = $derived(workspace.emotions.find((entry) => entry.kind === kind) ?? null);
+
 	// Every unknown kind is `soft`, which reads as a stance she is holding lightly -- a
-	// reasonable thing for a word nobody anticipated.
-	const tone = $derived<Tone>(TONES[kind] ?? 'soft');
+	// reasonable thing for a word nobody anticipated, and the case ADR 3 requires to look
+	// deliberate rather than broken.
+	const tone = $derived<Tone>(known?.tone ?? 'soft');
 </script>
 
 <aside class="card" data-tone={tone}>
 	<span class="glyph" aria-hidden="true">{GLYPHS[tone]}</span>
 	<div class="content">
-		<p class="kind">{kind}</p>
+		<p class="kind" title={known?.description ?? ''}>{kind}</p>
 		{#if text}
 			<!-- `text` may be absent: a card that is only a stance is valid. -->
 			<p class="text">{text}</p>
@@ -76,17 +73,20 @@
 		border-radius: var(--radius);
 	}
 
+	/* Warm and sharp are both brass, distinguished by the glyph rather than by hue: two
+	   neighbouring colours saying "positive" and "careful" is a distinction nobody reads
+	   correctly anyway, and one of them would have to be red. */
 	.card[data-tone='warm'] {
-		--edge: var(--pomegranate);
+		--edge: var(--brass);
 	}
 	.card[data-tone='cool'] {
-		--edge: var(--peacock);
+		--edge: var(--laurel);
 	}
 	.card[data-tone='sharp'] {
 		--edge: var(--brass);
 	}
 	.card[data-tone='soft'] {
-		--edge: var(--line);
+		--edge: var(--text-faint);
 	}
 
 	.glyph {

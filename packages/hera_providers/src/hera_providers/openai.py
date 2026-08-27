@@ -26,7 +26,7 @@ from hera_providers.errors import (
 )
 from hera_providers.events import Event
 from hera_providers.qwen import QwenAdapter
-from hera_providers.request import ChatMessage, ChatRequest, Role
+from hera_providers.request import ChatMessage, ChatRequest, Role, TextPart
 from hera_providers.settings import ProviderSettings
 
 DONE_SENTINEL = "[DONE]"
@@ -171,7 +171,7 @@ def chat_payload(request: ChatRequest, *, stream: bool) -> dict[str, Any]:
 
 
 def _message_payload(message: ChatMessage) -> dict[str, Any]:
-    payload: dict[str, Any] = {"role": message.role.value, "content": message.content}
+    payload: dict[str, Any] = {"role": message.role.value, "content": _content_payload(message)}
     if message.role is Role.TOOL and message.tool_call_id is not None:
         payload["tool_call_id"] = message.tool_call_id
     if message.tool_calls:
@@ -184,6 +184,27 @@ def _message_payload(message: ChatMessage) -> dict[str, Any]:
             for call in message.tool_calls
         ]
     return payload
+
+
+def _content_payload(message: ChatMessage) -> str | list[dict[str, Any]]:
+    """Content as the protocol wants it: a string, or a list of typed blocks.
+
+    A string stays a string. Wrapping every message in a one-element list would be equally
+    valid by the specification and is not what local servers are tested against, and this is a
+    place where being unremarkable is worth more than being uniform.
+    """
+    if isinstance(message.content, str):
+        return message.content
+    blocks: list[dict[str, Any]] = []
+    for part in message.content:
+        if isinstance(part, TextPart):
+            blocks.append({"type": "text", "text": part.text})
+            continue
+        image: dict[str, Any] = {"url": part.url}
+        if part.detail is not None:
+            image["detail"] = part.detail
+        blocks.append({"type": "image_url", "image_url": image})
+    return blocks
 
 
 def _frame_payload(line: str) -> str | None:

@@ -28,7 +28,15 @@ from hera_chats.events import (
     coalesce,
     visible_text,
 )
-from hera_chats.history import Attachment, build_history, compose, events_of, turn_to_messages
+from hera_chats.history import (
+    Attachment,
+    build_history,
+    compose,
+    content_of,
+    events_of,
+    says_something,
+    turn_to_messages,
+)
 from hera_chats.models import Chat, Message, Project
 from hera_chats.ports import Tools
 from hera_chats.repository import (
@@ -66,7 +74,9 @@ __all__ = [
     "build_history",
     "coalesce",
     "compose",
+    "content_of",
     "events_of",
+    "says_something",
     "slugify",
     "title_from",
     "turn_to_messages",

@@ -198,6 +198,63 @@ class TestAttachments:
 
         assert compose("Explain Kerberos", []) == "Explain Kerberos"
 
+    def test_a_message_without_a_picture_is_still_a_plain_string(self) -> None:
+        """The shape every OpenAI-compatible server has served since before parts existed. An
+        installation that never attaches an image never sends a differently shaped request."""
+        from hera_chats import Attachment, content_of
+
+        assert content_of("Explain Kerberos", []) == "Explain Kerberos"
+        assert isinstance(content_of("look", [Attachment(name="a.py", text="x = 1")]), str)
+
+    def test_a_picture_becomes_a_content_part_beside_the_words(self) -> None:
+        from hera_chats import Attachment, content_of
+        from hera_providers import ImagePart, TextPart
+
+        url = "data:image/png;base64,iVBORw0KGgo="
+        content = content_of(
+            "what is this?",
+            [Attachment(name="shot.png", data_url=url, media_type="image/png", bytes=9)],
+        )
+
+        assert isinstance(content, list)
+        words, picture = content
+        assert isinstance(words, TextPart)
+        assert isinstance(picture, ImagePart)
+        assert picture.url == url
+        # Named in the text as well, because "the second screenshot" has to refer to something.
+        assert "Attached image: shot.png" in words.text
+        assert url not in words.text, "the bytes go in the block, not into the prose"
+
+    def test_a_picture_on_its_own_sends_no_empty_text_part(self) -> None:
+        from hera_chats import Attachment, content_of
+
+        picture = Attachment(
+            name="a.png", data_url="data:image/png;base64,x", media_type="image/png"
+        )
+        content = content_of("", [picture])
+
+        assert isinstance(content, list)
+        # The name is words, so there is still a text part -- what there is never is an empty one.
+        assert all(getattr(part, "text", "x") for part in content)
+
+    def test_text_and_pictures_travel_in_the_same_message(self) -> None:
+        from hera_chats import Attachment, content_of
+        from hera_providers import ImagePart
+
+        content = content_of(
+            "compare these",
+            [
+                Attachment(name="a.py", text="x = 1"),
+                Attachment(
+                    name="b.png", data_url="data:image/png;base64,y", media_type="image/png"
+                ),
+            ],
+        )
+
+        assert isinstance(content, list)
+        assert [type(part) for part in content][-1] is ImagePart
+        assert "x = 1" in content[0].text  # type: ignore[union-attr]
+
     def test_a_fence_inside_a_file_cannot_close_the_block_early(self) -> None:
         from hera_chats import Attachment, compose
 

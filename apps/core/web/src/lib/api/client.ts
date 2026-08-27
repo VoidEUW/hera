@@ -7,6 +7,7 @@
  * body as if it were data is the bug this file exists to prevent.
  */
 
+import type { Attachment } from '$lib/attachments';
 import type { AnyEvent } from './events';
 
 export const API = '/api/v1';
@@ -39,6 +40,8 @@ export interface Chat {
 	project_id: string | null;
 	profile_id: string | null;
 	pinned: boolean;
+	/** Skills switched on for this conversation, ahead of the profile's and the project's. */
+	pinned_skills: string[];
 	created_at: string;
 	last_message_at: string | null;
 }
@@ -46,6 +49,9 @@ export interface Chat {
 export interface AttachmentSummary {
 	name: string;
 	bytes: number;
+	/** `image/png` for a picture, empty for text. The contents never come back, so this is how
+	 * a chip knows which kind of thing it is drawing without guessing from the extension. */
+	media_type: string;
 }
 
 export interface Message {
@@ -74,6 +80,9 @@ export interface Region {
 	generation: number;
 }
 
+/** Whether this is one you have vouched for. `modified` means listed and changed since. */
+export type Trust = 'verified' | 'modified' | 'unknown';
+
 export interface Skill {
 	id: string;
 	name: string;
@@ -83,6 +92,29 @@ export interface Skill {
 	problems: string[];
 	hits: number;
 	last_used_at: string | null;
+	author: string;
+	license: string;
+	/** An emoji from the frontmatter. Empty is normal — the row draws a monogram instead. */
+	icon: string;
+	version: string;
+	homepage: string;
+	digest: string;
+	trust: Trust;
+}
+
+/** One stance she can show. The list is the person's, and it is what both the prompt and the
+ * card are drawn from — see `hera_mcp.emotions`. */
+export interface Emotion {
+	kind: string;
+	description: string;
+	tone: 'warm' | 'cool' | 'sharp' | 'soft';
+}
+
+export interface Emotions {
+	emotions: Emotion[];
+	/** Whether this is the person's list or the one she ships with. */
+	customised: boolean;
+	problem: string;
 }
 
 export interface BrokenSkill {
@@ -191,6 +223,10 @@ export const api = {
 	createChat: (body: { project_id?: string | null; profile_id?: string | null } = {}) =>
 		request<Chat>('/chats', { method: 'POST', body: JSON.stringify(body) }),
 	chat: (id: string) => request<ChatDetail>(`/chats/${id}`),
+	renameChat: (id: string, title: string) =>
+		request<Chat>(`/chats/${id}`, { method: 'PATCH', body: JSON.stringify({ title }) }),
+	pinSkills: (id: string, pinned_skills: string[]) =>
+		request<Chat>(`/chats/${id}`, { method: 'PATCH', body: JSON.stringify({ pinned_skills }) }),
 	deleteChat: (id: string) => request<void>(`/chats/${id}`, { method: 'DELETE' }),
 
 	providers: () => request<Providers>('/providers'),
@@ -203,7 +239,15 @@ export const api = {
 	deleteProvider: (name: string) => request<Providers>(`/providers/${name}`, { method: 'DELETE' }),
 	probeProvider: (name: string) => request<Probe>(`/providers/${name}/models`),
 
-	skills: () => request<{ skills: Skill[]; broken: BrokenSkill[] }>('/skills'),
+	skills: () =>
+		request<{ skills: Skill[]; broken: BrokenSkill[]; trust_problem: string }>('/skills'),
+	createSkill: (body: { id: string; description?: string; body?: string }) =>
+		request<Skill>('/skills', { method: 'POST', body: JSON.stringify(body) }),
+
+	emotions: () => request<Emotions>('/emotions'),
+	writeEmotions: (emotions: Emotion[]) =>
+		request<Emotions>('/emotions', { method: 'PUT', body: JSON.stringify({ emotions }) }),
+	resetEmotions: () => request<Emotions>('/emotions/reset', { method: 'POST' }),
 	servers: () => request<Server[]>('/servers'),
 	permissions: () => request<{ fallback: string; rules: Rule[] }>('/permissions')
 };
@@ -212,13 +256,29 @@ export const api = {
 export function sendMessage(
 	chatId: string,
 	text: string,
-	attachments: Array<{ name: string; text: string; bytes: number }> = [],
+	attachments: Attachment[] = [],
 	signal?: AbortSignal
 ): Promise<Response> {
 	return fetch(`${API}/chats/${chatId}/messages`, {
 		method: 'POST',
 		headers: { 'content-type': 'application/json' },
 		body: JSON.stringify({ text, attachments }),
+		signal
+	});
+}
+
+/** Ask again from a message: new text edits the question, none repeats it. Streams like a
+ * send, because from here on it is one. */
+export function redoMessage(
+	chatId: string,
+	messageId: string,
+	text?: string,
+	signal?: AbortSignal
+): Promise<Response> {
+	return fetch(`${API}/chats/${chatId}/messages/${messageId}/redo`, {
+		method: 'POST',
+		headers: { 'content-type': 'application/json' },
+		body: JSON.stringify(text === undefined ? {} : { text }),
 		signal
 	});
 }

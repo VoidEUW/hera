@@ -81,6 +81,7 @@
 				events={message.events}
 				busy={session.busy}
 				onanswer={answer}
+				onredo={(text) => session.redo(message.id, text)}
 			/>
 		{/each}
 
@@ -112,8 +113,15 @@
 			busy={session.busy}
 			profiles={workspace.profiles}
 			profileId={session.chat?.profile_id ?? null}
+			providers={workspace.providers}
+			activeProvider={workspace.activeProvider}
+			servers={workspace.servers}
+			chatSkills={session.chat?.pinned_skills ?? []}
 			onsend={(text, files) => session.send(text, files)}
 			onstop={() => session.stop()}
+			onmodel={(name) => workspace.useProvider(name)}
+			onsettings={() => workspace.openSettings()}
+			onskills={(names) => session.pinSkills(names)}
 		/>
 	</div>
 </div>
@@ -143,8 +151,10 @@
 		padding: 8px 24px 24px;
 	}
 
+	/* The reading column is the measure itself, so her prose fills it instead of stopping short
+	   of the edge every other thing in the conversation reaches. */
 	.column {
-		width: min(760px, 100%);
+		width: min(var(--column), 100%);
 		margin: 0 auto;
 	}
 

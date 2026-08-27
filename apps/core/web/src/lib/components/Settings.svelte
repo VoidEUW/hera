@@ -15,16 +15,11 @@
 	 * A modal, because settings is somewhere you go and come back from, and a modal keeps the
 	 * conversation visible behind it.
 	 */
-	import {
-		api,
-		type BrokenSkill,
-		type Region,
-		type Rule,
-		type Server,
-		type Skill
-	} from '$lib/api/client';
+	import { api, type Region, type Rule, type Server } from '$lib/api/client';
 	import { t } from '$lib/i18n';
+	import Emotions from './settings/Emotions.svelte';
 	import Models from './settings/Models.svelte';
+	import Skills from './settings/Skills.svelte';
 
 	interface Props {
 		onclose?: () => void;
@@ -32,13 +27,14 @@
 
 	let { onclose }: Props = $props();
 
-	type Tab = 'models' | 'skills' | 'servers' | 'permissions' | 'mind' | 'dreaming';
+	type Tab = 'models' | 'skills' | 'servers' | 'permissions' | 'emotions' | 'mind' | 'dreaming';
 
 	const TABS: Array<{ id: Tab; label: string; soon?: boolean }> = [
 		{ id: 'models', label: t.settings.models },
 		{ id: 'skills', label: t.settings.skills },
 		{ id: 'servers', label: t.settings.servers },
 		{ id: 'permissions', label: t.settings.permissions },
+		{ id: 'emotions', label: t.settings.emotions },
 		{ id: 'mind', label: t.settings.mind },
 		{ id: 'dreaming', label: t.settings.dreaming, soon: true }
 	];
@@ -47,8 +43,6 @@
 	let query = $state('');
 
 	let regions = $state<Region[]>([]);
-	let skills = $state<Skill[]>([]);
-	let broken = $state<BrokenSkill[]>([]);
 	let servers = $state<Server[]>([]);
 	let rules = $state<Rule[]>([]);
 	let fallback = $state('ask');
@@ -58,9 +52,6 @@
 
 	const filter = $derived(query.trim().toLowerCase());
 
-	const visibleSkills = $derived(
-		skills.filter((s) => !filter || `${s.id} ${s.description}`.toLowerCase().includes(filter))
-	);
 	const visibleServers = $derived(
 		servers.filter((s) => !filter || s.name.toLowerCase().includes(filter))
 	);
@@ -83,10 +74,6 @@
 			if (which === 'mind') {
 				regions = await api.regions();
 				drafts = Object.fromEntries(regions.map((region) => [region.id, region.text]));
-			} else if (which === 'skills') {
-				const found = await api.skills();
-				skills = found.skills;
-				broken = found.broken;
 			} else if (which === 'servers') {
 				servers = await api.servers();
 			} else if (which === 'permissions') {
@@ -197,31 +184,9 @@
 					<p class="empty">{t.settings.noMatch}</p>
 				{/each}
 			{:else if tab === 'skills'}
-				{#each visibleSkills as skill (skill.id)}
-					<section class="row">
-						<div class="row-head">
-							<h3>{skill.id}</h3>
-							<span class="caption">
-								{skill.hits ? t.settings.usedTimes(skill.hits) : t.settings.never}
-							</span>
-						</div>
-						<p class="caption">{skill.description}</p>
-						{#each skill.problems as problem (problem)}
-							<p class="caption problem">{problem}</p>
-						{/each}
-					</section>
-				{:else}
-					<p class="empty">{filter ? t.settings.noMatch : t.settings.noSkills}</p>
-				{/each}
-				{#each broken as item (item.id)}
-					<section class="row">
-						<div class="row-head">
-							<h3>{item.id}</h3>
-							<span class="caption problem">{t.settings.broken}</span>
-						</div>
-						<p class="caption problem">{item.reason}</p>
-					</section>
-				{/each}
+				<Skills {filter} />
+			{:else if tab === 'emotions'}
+				<Emotions {filter} />
 			{:else if tab === 'servers'}
 				{#each visibleServers as server (server.name)}
 					<section class="row">
@@ -445,7 +410,7 @@
 	}
 
 	.saved {
-		color: var(--peacock);
+		color: var(--laurel);
 	}
 
 	.problem {
@@ -453,7 +418,7 @@
 	}
 
 	.decision[data-decision='allow'] {
-		color: var(--peacock);
+		color: var(--laurel);
 	}
 	.decision[data-decision='deny'] {
 		color: var(--danger);
