@@ -105,8 +105,14 @@ code, in `hera_skillsets`.
   mind/                  a real git repository, one file per mind region
   skills/<name>/SKILL.md skill packages, syncable from a git repo
   mcp.json               Claude-Desktop-compatible `mcpServers` shape
-  config.toml            boot settings
+  config.toml            registered endpoints, written by the interface
 ```
+
+`config.toml` holds the model providers — several may be registered, one is active. Each library
+still reads its own `HERA_*` environment variables and the file is **seeded from them** the
+first time it is written, so an existing `HERA_PROVIDER_BASE_URL` is what you find already
+filled in on the Models screen. After that the file wins: a setting you can change on screen and
+that quietly does not apply is worse than one that overrides a variable.
 
 Boot refuses to start against a pre-v0.1 `~/.hera/` (it looks for `hera.db` and `*_legacy_v0*`
 tables) and tells you to move it aside. Nothing is ever deleted for you.

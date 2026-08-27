@@ -24,7 +24,6 @@ from hera_core.schemas import (
 )
 from hera_home import home
 from hera_permissions import Rule
-from hera_providers import ProviderSettings
 from hera_skillsets import SkillUsageRepository
 
 router = APIRouter(tags=["system"])
@@ -95,7 +94,7 @@ async def health(container: Container) -> HealthOut:
         ok=True,
         version=__version__,
         home=str(home()),
-        model=ProviderSettings().model,
+        model=container.model,
         skills=len(container.library.catalogue()),
         servers=servers,
     )

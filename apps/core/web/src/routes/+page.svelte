@@ -9,6 +9,7 @@
 	 * thing a person types is never lost to a page transition.
 	 */
 	import { goto } from '$app/navigation';
+	import type { Attachment } from '$lib/attachments';
 	import Composer from '$lib/components/Composer.svelte';
 	import Ocellus from '$lib/components/Ocellus.svelte';
 	import { greetingFor, t } from '$lib/i18n';
@@ -19,7 +20,7 @@
 
 	const greeting = greetingFor();
 
-	async function start(text: string) {
+	async function start(text: string, files: Attachment[]) {
 		busy = true;
 		error = null;
 		const chat = await workspace.createChat();
@@ -30,7 +31,7 @@
 		}
 		// Handed over through the store rather than a query string: a message is not a URL, and
 		// a refresh must not send it a second time.
-		workspace.handOff(text);
+		workspace.handOff(text, files);
 		await goto(`/chat/${chat.id}`);
 	}
 </script>

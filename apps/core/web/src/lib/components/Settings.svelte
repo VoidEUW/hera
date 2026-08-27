@@ -1,14 +1,19 @@
 <script lang="ts">
 	/**
-	 * Settings, as a modal.
+	 * Settings: **how she works**.
 	 *
-	 * Somewhere you go and come back from, with the conversation still visible behind it. Left
-	 * nav, content on the right.
+	 * Everything here changes her behaviour — what she runs on, who she is, what she knows, what
+	 * she may do. Nothing here is about you or about this browser; that lives behind the profile
+	 * card at the bottom of the rail, which is a different question and deserves a different
+	 * door.
 	 *
-	 * The four lists are all *renderings of state the server already reports* — a server row is
-	 * `ToolRegistry.status()`, a skill row is what the loader found wrong with it. Nothing here
-	 * computes whether something is connected or broken, because a settings screen that derives
-	 * its own view of that is a settings screen that can be wrong.
+	 * The nav is ordered by what a person reaches for. **Models** first, because until she is
+	 * pointed at an endpoint nothing else in Hera does anything. Then **Skills** and **Servers**,
+	 * which are the two you come back to. **Dreaming** is listed and disabled rather than hidden:
+	 * a v0.2 feature you can see coming is a promise, and one you cannot is a surprise.
+	 *
+	 * A modal, because settings is somewhere you go and come back from, and a modal keeps the
+	 * conversation visible behind it.
 	 */
 	import {
 		api,
@@ -19,7 +24,7 @@
 		type Skill
 	} from '$lib/api/client';
 	import { t } from '$lib/i18n';
-	import { theme, type Appearance } from '$lib/theme.svelte';
+	import Models from './settings/Models.svelte';
 
 	interface Props {
 		onclose?: () => void;
@@ -27,23 +32,20 @@
 
 	let { onclose }: Props = $props();
 
-	type Tab = 'general' | 'mind' | 'skills' | 'servers' | 'permissions';
+	type Tab = 'models' | 'skills' | 'servers' | 'permissions' | 'mind' | 'dreaming';
 
-	const TABS: Array<{ id: Tab; label: string }> = [
-		{ id: 'general', label: t.settings.general },
-		{ id: 'mind', label: t.settings.mind },
+	const TABS: Array<{ id: Tab; label: string; soon?: boolean }> = [
+		{ id: 'models', label: t.settings.models },
 		{ id: 'skills', label: t.settings.skills },
 		{ id: 'servers', label: t.settings.servers },
-		{ id: 'permissions', label: t.settings.permissions }
+		{ id: 'permissions', label: t.settings.permissions },
+		{ id: 'mind', label: t.settings.mind },
+		{ id: 'dreaming', label: t.settings.dreaming, soon: true }
 	];
 
-	const APPEARANCES: Array<{ id: Appearance; label: string }> = [
-		{ id: 'system', label: t.settings.system },
-		{ id: 'light', label: t.settings.light },
-		{ id: 'dark', label: t.settings.dark }
-	];
+	let tab = $state<Tab>('models');
+	let query = $state('');
 
-	let tab = $state<Tab>('general');
 	let regions = $state<Region[]>([]);
 	let skills = $state<Skill[]>([]);
 	let broken = $state<BrokenSkill[]>([]);
@@ -53,6 +55,23 @@
 	let drafts = $state<Record<string, string>>({});
 	let savedRegion = $state<string | null>(null);
 	let error = $state<string | null>(null);
+
+	const filter = $derived(query.trim().toLowerCase());
+
+	const visibleSkills = $derived(
+		skills.filter((s) => !filter || `${s.id} ${s.description}`.toLowerCase().includes(filter))
+	);
+	const visibleServers = $derived(
+		servers.filter((s) => !filter || s.name.toLowerCase().includes(filter))
+	);
+	const visibleRules = $derived(
+		rules.filter((r) => !filter || `${r.pattern} ${r.reason}`.toLowerCase().includes(filter))
+	);
+	const visibleRegions = $derived(
+		regions.filter(
+			(r) => !filter || `${r.id} ${r.title} ${r.purpose} ${r.text}`.toLowerCase().includes(filter)
+		)
+	);
 
 	$effect(() => {
 		void load(tab);
@@ -109,7 +128,10 @@
 
 <div class="sheet" role="dialog" aria-modal="true" aria-label={t.settings.title}>
 	<header>
-		<h2 class="display">{t.settings.title}</h2>
+		<div>
+			<h2 class="display">{t.settings.title}</h2>
+			<p class="caption">{t.settings.subtitle}</p>
+		</div>
 		<button class="close" type="button" onclick={() => onclose?.()}>
 			<span class="sr-only">{t.settings.close}</span>
 			<span aria-hidden="true">✕</span>
@@ -126,31 +148,27 @@
 					onclick={() => (tab = entry.id)}
 				>
 					{entry.label}
+					{#if entry.soon}<span class="soon">{t.settings.soon}</span>{/if}
 				</button>
 			{/each}
 		</nav>
 
 		<div class="panel">
+			<label class="search">
+				<span class="sr-only">{t.settings.search}</span>
+				<input type="search" bind:value={query} placeholder={t.settings.search} />
+			</label>
+
 			{#if error}
 				<p class="error">{error}</p>
 			{/if}
 
-			{#if tab === 'general'}
-				<h3>{t.settings.appearance}</h3>
-				<div class="segments">
-					{#each APPEARANCES as option (option.id)}
-						<button
-							class="segment"
-							class:active={theme.appearance === option.id}
-							type="button"
-							onclick={() => theme.set(option.id)}
-						>
-							{option.label}
-						</button>
-					{/each}
-				</div>
+			{#if tab === 'models'}
+				<Models {filter} />
+			{:else if tab === 'dreaming'}
+				<p class="empty">{t.settings.dreamingSoon}</p>
 			{:else if tab === 'mind'}
-				{#each regions as region (region.id)}
+				{#each visibleRegions as region (region.id)}
 					<section class="region">
 						<div class="region-head">
 							<h3>{region.title}</h3>
@@ -175,9 +193,11 @@
 							{/if}
 						</div>
 					</section>
+				{:else}
+					<p class="empty">{t.settings.noMatch}</p>
 				{/each}
 			{:else if tab === 'skills'}
-				{#each skills as skill (skill.id)}
+				{#each visibleSkills as skill (skill.id)}
 					<section class="row">
 						<div class="row-head">
 							<h3>{skill.id}</h3>
@@ -191,7 +211,7 @@
 						{/each}
 					</section>
 				{:else}
-					<p class="empty">{t.settings.noSkills}</p>
+					<p class="empty">{filter ? t.settings.noMatch : t.settings.noSkills}</p>
 				{/each}
 				{#each broken as item (item.id)}
 					<section class="row">
@@ -203,7 +223,7 @@
 					</section>
 				{/each}
 			{:else if tab === 'servers'}
-				{#each servers as server (server.name)}
+				{#each visibleServers as server (server.name)}
 					<section class="row">
 						<div class="row-head">
 							<h3>{server.name}</h3>
@@ -220,11 +240,11 @@
 						{/if}
 					</section>
 				{:else}
-					<p class="empty">{t.settings.noServers}</p>
+					<p class="empty">{filter ? t.settings.noMatch : t.settings.noServers}</p>
 				{/each}
 			{:else}
 				<p class="caption">Anything not matched below: <strong>{fallback}</strong></p>
-				{#each rules as rule (rule.pattern + (rule.profile ?? ''))}
+				{#each visibleRules as rule (rule.pattern + (rule.profile ?? ''))}
 					<section class="row">
 						<div class="row-head">
 							<h3 class="mono">{rule.pattern}</h3>
@@ -235,7 +255,7 @@
 						{/if}
 					</section>
 				{:else}
-					<p class="empty">{t.settings.noPermissions}</p>
+					<p class="empty">{filter ? t.settings.noMatch : t.settings.noPermissions}</p>
 				{/each}
 			{/if}
 		</div>
@@ -256,7 +276,7 @@
 		position: fixed;
 		inset: 6vh 50% auto auto;
 		transform: translateX(50%);
-		width: min(880px, 92vw);
+		width: min(900px, 92vw);
 		max-height: 88vh;
 		display: flex;
 		flex-direction: column;
@@ -277,8 +297,9 @@
 
 	header {
 		display: flex;
-		align-items: center;
+		align-items: flex-start;
 		justify-content: space-between;
+		gap: 16px;
 		padding: 16px 20px;
 		border-bottom: 1px solid var(--line);
 	}
@@ -286,6 +307,10 @@
 	h2 {
 		margin: 0;
 		font-size: 20px;
+	}
+
+	header .caption {
+		margin: 2px 0 0;
 	}
 
 	.close {
@@ -303,13 +328,16 @@
 		display: flex;
 		flex-direction: column;
 		gap: 2px;
-		width: 160px;
+		width: 168px;
 		flex: none;
 		padding: 14px 10px;
 		border-right: 1px solid var(--line);
 	}
 
 	.tab {
+		display: flex;
+		align-items: baseline;
+		gap: 6px;
 		padding: 7px 10px;
 		border-radius: var(--radius);
 		text-align: left;
@@ -327,39 +355,38 @@
 		color: var(--text);
 	}
 
+	.soon {
+		margin-left: auto;
+		font-size: 10.5px;
+		letter-spacing: 0.05em;
+		color: var(--text-faint);
+	}
+
 	.panel {
 		flex: 1;
 		min-width: 0;
-		padding: 18px 22px 24px;
+		padding: 14px 22px 24px;
 		overflow-y: auto;
+	}
+
+	.search {
+		display: block;
+		margin-bottom: 14px;
+	}
+
+	.search input {
+		width: 100%;
+		padding: 7px 10px;
+		background: var(--surface);
+		border: 1px solid var(--line);
+		border-radius: var(--radius);
+		font-size: 13px;
 	}
 
 	h3 {
 		margin: 0;
 		font-size: 14px;
 		font-weight: 500;
-	}
-
-	.segments {
-		display: inline-flex;
-		gap: 2px;
-		margin-top: 10px;
-		padding: 3px;
-		background: var(--surface);
-		border: 1px solid var(--line);
-		border-radius: var(--radius);
-	}
-
-	.segment {
-		padding: 5px 14px;
-		border-radius: 6px;
-		font-size: 13px;
-		color: var(--text-muted);
-	}
-
-	.segment.active {
-		background: var(--surface-raised);
-		color: var(--text);
 	}
 
 	.region,
@@ -437,7 +464,7 @@
 
 	.empty {
 		margin: 18px 0;
-		max-width: 56ch;
+		max-width: 60ch;
 		font-family: var(--font-body);
 		font-size: 15px;
 		line-height: 1.6;

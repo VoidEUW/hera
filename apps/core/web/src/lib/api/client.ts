@@ -43,6 +43,11 @@ export interface Chat {
 	last_message_at: string | null;
 }
 
+export interface AttachmentSummary {
+	name: string;
+	bytes: number;
+}
+
 export interface Message {
 	id: string;
 	role: 'user' | 'assistant';
@@ -50,6 +55,9 @@ export interface Message {
 	sequence: number;
 	created_at: string;
 	events: AnyEvent[];
+	/** Names and sizes only. The contents are not sent back — a chip needs two words, not a
+	 * megabyte of source on every chat load. */
+	attachments: AttachmentSummary[];
 }
 
 export interface ChatDetail {
@@ -95,6 +103,28 @@ export interface Rule {
 	decision: 'allow' | 'deny' | 'ask';
 	reason: string;
 	profile: string | null;
+}
+
+export interface Provider {
+	name: string;
+	base_url: string;
+	model: string;
+	embedding_model: string;
+	timeout_s: number;
+	connect_timeout_s: number;
+	/** Whether a key is stored. The key itself never leaves the machine it was typed on. */
+	api_key_set: boolean;
+}
+
+export interface Providers {
+	providers: Provider[];
+	active: string;
+}
+
+export interface Probe {
+	ok: boolean;
+	models: string[];
+	error: string;
 }
 
 export interface Health {
@@ -163,17 +193,32 @@ export const api = {
 	chat: (id: string) => request<ChatDetail>(`/chats/${id}`),
 	deleteChat: (id: string) => request<void>(`/chats/${id}`, { method: 'DELETE' }),
 
+	providers: () => request<Providers>('/providers'),
+	addProvider: (body: Partial<Provider> & { name: string; api_key?: string }) =>
+		request<Providers>('/providers', { method: 'POST', body: JSON.stringify(body) }),
+	updateProvider: (name: string, patch: Partial<Provider> & { api_key?: string }) =>
+		request<Providers>(`/providers/${name}`, { method: 'PATCH', body: JSON.stringify(patch) }),
+	activateProvider: (name: string) =>
+		request<Providers>(`/providers/${name}/activate`, { method: 'POST' }),
+	deleteProvider: (name: string) => request<Providers>(`/providers/${name}`, { method: 'DELETE' }),
+	probeProvider: (name: string) => request<Probe>(`/providers/${name}/models`),
+
 	skills: () => request<{ skills: Skill[]; broken: BrokenSkill[] }>('/skills'),
 	servers: () => request<Server[]>('/servers'),
 	permissions: () => request<{ fallback: string; rules: Rule[] }>('/permissions')
 };
 
 /** POST a message and get the raw streaming response back. The caller reads it with `frames`. */
-export function sendMessage(chatId: string, text: string, signal?: AbortSignal): Promise<Response> {
+export function sendMessage(
+	chatId: string,
+	text: string,
+	attachments: Array<{ name: string; text: string; bytes: number }> = [],
+	signal?: AbortSignal
+): Promise<Response> {
 	return fetch(`${API}/chats/${chatId}/messages`, {
 		method: 'POST',
 		headers: { 'content-type': 'application/json' },
-		body: JSON.stringify({ text }),
+		body: JSON.stringify({ text, attachments }),
 		signal
 	});
 }

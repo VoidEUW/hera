@@ -83,17 +83,24 @@ export const t = {
 
 	settings: {
 		title: 'Settings',
+		subtitle: 'How she works: what she runs on, what she knows, what she may do.',
 		close: 'Close',
-		general: 'General',
+		search: 'Search settings',
+		noMatch: 'Nothing here matches that.',
+		models: 'Models',
+		mind: 'Mind',
+		skills: 'Skills',
+		servers: 'Servers',
+		permissions: 'Permissions',
+		dreaming: 'Dreaming',
+		soon: 'v0.2',
+		dreamingSoon:
+			'Dreaming and experience training arrive in v0.2, together with memory. She will propose changes to her own evolvable mind regions, and nothing is written without you accepting it.',
 		appearance: 'Appearance',
 		system: 'System',
 		light: 'Light',
 		dark: 'Dark',
-		mind: 'Mind',
 		profiles: 'Profiles',
-		skills: 'Skills',
-		servers: 'Servers',
-		permissions: 'Permissions',
 		save: 'Save',
 		saved: 'Saved',
 		ownerFixed: 'Only you may change this',
@@ -110,6 +117,52 @@ export const t = {
 		lastUsed: 'Last used',
 		never: 'Never used',
 		usedTimes: (n: number) => `Used ${n} ${n === 1 ? 'time' : 'times'}`
+	},
+
+	models: {
+		blurb:
+			'Where she runs. Any OpenAI-compatible endpoint — LM Studio, llama.cpp, vLLM, Ollama, or a hosted API.',
+		active: 'Active',
+		activate: 'Use this one',
+		add: 'Add an endpoint',
+		name: 'Name',
+		baseUrl: 'Base URL',
+		model: 'Model',
+		embeddingModel: 'Embedding model',
+		embeddingHint: 'Optional. Empty means retrieval falls back to keyword overlap.',
+		apiKey: 'API key',
+		keyStored: 'A key is stored. Leave this empty to keep it.',
+		keyBlank: 'No key — the usual case for a local server.',
+		test: 'Test',
+		testing: 'Asking…',
+		reachable: (n: number) => `Reachable — ${n} ${n === 1 ? 'model' : 'models'}`,
+		pick: 'Use',
+		unreachable: 'Could not reach it',
+		remove: 'Remove',
+		none: 'No endpoint registered yet. Add one and she has somewhere to think.',
+		saved: 'Saved',
+		nameRule: 'Lowercase letters, digits, - and _'
+	},
+
+	profileMenu: {
+		open: 'You and this machine',
+		appearance: 'Appearance',
+		profiles: 'Answering as',
+		makeDefault: 'Make default',
+		language: 'Language',
+		languageOnly: 'English for now; the interface is ready for more.',
+		about: 'About',
+		version: (v: string) => `Hera ${v}`,
+		dataIn: 'Your data is in',
+		settings: 'Settings'
+	},
+
+	attach: {
+		add: 'Attach a file',
+		remove: 'Remove',
+		tooBig: (name: string) => `${name} is too large to attach — 256 KB is the limit.`,
+		notText: (name: string) => `${name} does not look like text, so there is nothing to send.`,
+		note: 'Attached files are sent as part of your message.'
 	},
 
 	empty: {

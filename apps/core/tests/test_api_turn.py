@@ -321,3 +321,77 @@ async def _client(services: Services) -> AsyncIterator[AsyncClient]:
         app.router.lifespan_context(app),
     ):
         yield http
+
+
+class TestAttachments:
+    async def test_a_file_reaches_the_model_and_the_chip_reaches_the_browser(
+        self, make_services: Any
+    ) -> None:
+        """Two different renderings of the same attachment: the model reads the file, and the
+        interface gets a name and a size to draw a chip from — no parsing either way."""
+        provider = FakeProvider([text_turn("Slide 14 does contradict slide 9.")])
+        services = make_services(provider)
+
+        async with _client(services) as client:
+            chat_id = await open_chat(client)
+            response = await client.post(
+                f"{API}/chats/{chat_id}/messages",
+                json={
+                    "text": "read this",
+                    "attachments": [
+                        {"name": "notes.md", "text": "slide 14 contradicts slide 9", "bytes": 28}
+                    ],
+                },
+            )
+            frames = sse(response)
+            detail = (await client.get(f"{API}/chats/{chat_id}")).json()
+
+        sent = provider.requests[0].messages[-1].content
+        assert "Attached file: notes.md" in sent
+        assert "slide 14 contradicts slide 9" in sent
+
+        user = detail["messages"][0]
+        assert user["content"] == "read this", "the stored message is what was typed"
+        assert user["attachments"] == [{"name": "notes.md", "bytes": 28}]
+        assert "slide 14" not in str(user["attachments"]), "contents do not come back"
+        assert names(frames)[-1] == "done"
+
+    async def test_a_file_on_its_own_is_a_fair_question(self, make_services: Any) -> None:
+        services = make_services(FakeProvider([text_turn("It looks fine.")]))
+
+        async with _client(services) as client:
+            chat_id = await open_chat(client)
+            response = await client.post(
+                f"{API}/chats/{chat_id}/messages",
+                json={"text": "", "attachments": [{"name": "a.py", "text": "x = 1", "bytes": 5}]},
+            )
+
+        assert response.status_code == 200
+
+    async def test_an_empty_message_with_no_file_is_refused(self, make_services: Any) -> None:
+        services = make_services(FakeProvider())
+
+        async with _client(services) as client:
+            chat_id = await open_chat(client)
+            response = await client.post(
+                f"{API}/chats/{chat_id}/messages", json={"text": "   ", "attachments": []}
+            )
+
+        assert response.status_code == 422
+
+    async def test_the_title_ignores_the_attachment(self, make_services: Any) -> None:
+        """A sidebar full of file contents is a sidebar you cannot skim."""
+        services = make_services(FakeProvider([text_turn("ok")]))
+
+        async with _client(services) as client:
+            chat_id = await open_chat(client)
+            await client.post(
+                f"{API}/chats/{chat_id}/messages",
+                json={
+                    "text": "Explain Kerberos",
+                    "attachments": [{"name": "notes.md", "text": "x" * 400, "bytes": 400}],
+                },
+            )
+            detail = (await client.get(f"{API}/chats/{chat_id}")).json()
+
+        assert detail["chat"]["title"] == "Explain Kerberos"

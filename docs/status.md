@@ -251,6 +251,38 @@ wrote.
   *failed* emotion keeps its row — one she showed and the system refused is exactly what
   openness means you get to see.
 
+### What the settings rework settled
+
+- **Endpoints are registered in `config.toml`, not in the environment.** There was no way to
+  point her at a model without an environment variable and a restart, which made "try the
+  current state" a research project. Several may be registered and one is active; ADR 2 fixes
+  the model *family* the prompt is written for and says nothing about how many endpoints you
+  may save. The file seeds itself from `HERA_PROVIDER_*` the first time it is written, and wins
+  afterwards — a setting you can change on screen that quietly does not apply is worse than one
+  that overrides a variable.
+- **A change takes effect without a restart.** `Services.use_provider()` swaps the client and
+  the model name together, because they are one decision: pointing a new server at the old
+  model's name fails as an unhelpful 404 from somebody else's API. Ownership of the provider is
+  opt-in, so a test's `FakeProvider` is never closed by a reconfiguration.
+- **The API key is write-only.** Responses carry `api_key_set`, never the key. A masked string
+  is something a person tries to edit and a client tries to send back, and both end with a key
+  of asterisks saved to disk. An omitted key on a PATCH keeps what is stored; an empty one
+  clears it.
+- **Probing is a normal answer, not a 500.** "Nothing is listening on that port" is the
+  commonest thing to be wrong on a fresh install, and it belongs on the screen you were already
+  looking at — next to the list of models the endpoint *did* report, each with a button that
+  fills the field.
+- **Two doors, two questions.** Settings is *how she works* — Models, Skills, Servers,
+  Permissions, Mind, and Dreaming listed as v0.2. The profile card at the bottom of the rail is
+  *you and this machine* — appearance, which of her answers, where your data is. Mixing them is
+  how a person scrolls past six model fields to find a light-mode toggle.
+- **Attachments are a field, not text.** The `＋` on the composer bar reads a file in the
+  browser and sends it as data; the model gets it inlined by `hera_chats.history.compose`, and
+  the interface draws a chip from a name and a size. Inlined, drawing that chip would mean
+  hunting for a fence and a filename in the prose — a parser, and the one rule this project will
+  not bend. `title_from` now takes only the opening paragraph, so a file under a question does
+  not end up in the sidebar.
+
 ### The guards
 
 Rules that would otherwise rot are tests, not prose:
@@ -353,9 +385,10 @@ whole path runs.
 2. **Her identity.** The twelve mind regions ship with placeholder text that says what belongs
    in each. Writing them is what makes her Hera, and it is a text editor in Settings → Mind,
    not code.
-3. **A real endpoint.** Everything so far runs against `FakeProvider`. Point
-   `HERA_PROVIDER_BASE_URL` at the local server and find out what Qwen3.6-35B actually does
-   with the prompt — the `xml` layout, the tool catalogue, the emotion vocabulary.
+3. **A real endpoint.** Everything so far runs against `FakeProvider`. Settings → Models now
+   registers one, tests it, and lists what it reports — so this is a matter of picking the right
+   name and finding out what Qwen3.6-35B actually does with the prompt: the `xml` layout, the
+   tool catalogue, the emotion vocabulary.
 4. **The gaps left on purpose.** The command palette behind `⌘K` (it opens Settings for now),
    the mobile sheet, project instructions in the interface, and the embedder seam.
 

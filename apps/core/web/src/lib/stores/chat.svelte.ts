@@ -9,6 +9,7 @@
  */
 
 import { api, answerPermission, sendMessage, type Chat, type Message } from '$lib/api/client';
+import type { Attachment } from '$lib/attachments';
 import type { AnyEvent } from '$lib/api/events';
 import { frames } from '$lib/api/sse';
 import { reduce, type Turn } from '$lib/turn';
@@ -24,6 +25,7 @@ export class ChatSession {
 
 	/** What the person just typed, shown immediately so the interface never looks asleep. */
 	pending = $state<string | null>(null);
+	pendingFiles = $state<Attachment[]>([]);
 
 	#abort: AbortController | null = null;
 
@@ -60,6 +62,7 @@ export class ChatSession {
 		this.draft = [];
 		this.error = null;
 		this.pending = null;
+		this.pendingFiles = [];
 	}
 
 	/** Abort the stream. The server sees the disconnect and closes the turn as `cancelled`,
@@ -70,10 +73,11 @@ export class ChatSession {
 		this.streaming = false;
 	}
 
-	async send(text: string) {
+	async send(text: string, attachments: Attachment[] = []) {
 		if (!this.chat || this.busy) return;
 		this.pending = text;
-		await this.#consume(() => sendMessage(this.chat!.id, text, this.#begin()));
+		this.pendingFiles = attachments;
+		await this.#consume(() => sendMessage(this.chat!.id, text, attachments, this.#begin()));
 	}
 
 	async answer(callIds: string[], allow: boolean, remember = false) {
@@ -130,6 +134,7 @@ export class ChatSession {
 
 	#settle(persisted: Message) {
 		this.pending = null;
+		this.pendingFiles = [];
 		this.draft = [];
 		const rest = this.messages.filter((existing) => existing.id !== persisted.id);
 		this.messages = [...rest, persisted].sort((a, b) => a.sequence - b.sequence);

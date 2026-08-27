@@ -25,7 +25,7 @@ from hera_storage import Entity, SoftDeletable, UTCDateTime
 _JSON: Any = JSON
 _TIMESTAMP: Any = UTCDateTime()
 
-JSON_FIELDS: tuple[str, ...] = ("pinned_skills", "events")
+JSON_FIELDS: tuple[str, ...] = ("pinned_skills", "events", "attachments")
 """Columns SQLAlchemy cannot notice an in-place change to.
 
 Same trap as ``hera_profiles.models.JSON_FIELDS``, same fix: the repositories flag these by
@@ -135,6 +135,18 @@ class Message(Entity, table=True):
     The source of truth. ``content`` is derived from it, the history sent to the model is
     rebuilt from it, and the interface re-renders from it at ``done`` — which is what makes the
     server render authoritative rather than merely agreed with.
+    """
+
+    attachments: list[dict[str, Any]] = Field(default_factory=list, sa_column=Column(_JSON))
+    """Files sent with a user message: ``name``, ``text``, ``bytes``.
+
+    A field rather than text pasted into ``content``, because the interface has to render them
+    as chips and the rule it is built on is that the browser parses nothing. Inlined, the only
+    way to draw "a file called notes.md" would be to look for a fence and a filename in the
+    prose — a parser, and one that would break the first time somebody wrote about a file.
+
+    The model still receives them inlined; :func:`hera_chats.history.compose` does that when
+    the wire message is built, which is the one place it happens.
     """
 
     profile_id: UUID | None = Field(default=None)

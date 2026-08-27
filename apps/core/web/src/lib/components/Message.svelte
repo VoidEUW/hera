@@ -7,6 +7,7 @@
 	 * source of bugs in the previous version, and it is designed out.
 	 */
 	import type { AnyEvent, PermissionRequired, ToolCallReady } from '$lib/api/events';
+	import { size } from '$lib/attachments';
 	import { t } from '$lib/i18n';
 	import { isAnswered, reduce } from '$lib/turn';
 	import ActivityRow from './ActivityRow.svelte';
@@ -17,6 +18,9 @@
 	interface Props {
 		role: 'user' | 'assistant';
 		content?: string;
+		/** Files sent with a user message. Names and sizes, drawn as chips — the contents went
+		 * to the model and are not needed to render them. */
+		attachments?: Array<{ name: string; bytes: number }>;
 		events?: AnyEvent[];
 		/** Whether this message is the turn currently arriving. */
 		streaming?: boolean;
@@ -27,6 +31,7 @@
 	let {
 		role,
 		content = '',
+		attachments = [],
 		events = [],
 		streaming = false,
 		busy = false,
@@ -58,7 +63,19 @@
 
 {#if role === 'user'}
 	<div class="mine">
-		<div class="bubble">{content}</div>
+		<div class="bubble">
+			{#if content.trim()}<p class="said">{content}</p>{/if}
+			{#if attachments.length}
+				<ul class="files">
+					{#each attachments as file (file.name)}
+						<li>
+							<span class="mono">{file.name}</span>
+							<span class="bytes">{size(file.bytes)}</span>
+						</li>
+					{/each}
+				</ul>
+			{/if}
+		</div>
 	</div>
 {:else}
 	<article class="hers">
@@ -107,6 +124,39 @@
 		margin: 22px 0;
 	}
 
+	.said {
+		margin: 0;
+		white-space: pre-wrap;
+	}
+
+	.files {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 6px;
+		list-style: none;
+		margin: 8px 0 0;
+		padding: 0;
+	}
+
+	.files:first-child {
+		margin-top: 0;
+	}
+
+	.files li {
+		display: flex;
+		align-items: baseline;
+		gap: 8px;
+		padding: 3px 10px;
+		background: var(--ground);
+		border: 1px solid var(--line);
+		border-radius: var(--radius);
+		font-size: 12.5px;
+	}
+
+	.bytes {
+		color: var(--text-faint);
+	}
+
 	.bubble {
 		max-width: 46ch;
 		padding: 10px 14px;
@@ -116,7 +166,6 @@
 		font-family: var(--font-body);
 		font-size: 16px;
 		line-height: 1.55;
-		white-space: pre-wrap;
 		overflow-wrap: anywhere;
 	}
 

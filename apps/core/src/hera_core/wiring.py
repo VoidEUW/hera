@@ -26,6 +26,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from hera_chats import ChatsSettings, TurnOrchestrator
+from hera_core.config import load as load_config
 from hera_core.settings import CoreSettings
 from hera_home import mind_dir, skills_dir
 from hera_permissions import Decision, PermissionSet, Policy, Rule
@@ -76,11 +77,52 @@ class Services:
     provider: Provider
     orchestrator: TurnOrchestrator
 
+    owns_provider: bool = False
+    """Whether closing this container should close the provider.
+
+    Defaults to **False**, so ownership is something the creator claims rather than something a
+    hand-built container inherits. ``build_services`` sets it when it constructed the provider
+    itself; a test passing its own ``FakeProvider`` keeps it, and a reconfiguration must not
+    close something it did not open.
+    """
+
+    async def use_provider(self, provider: Provider, *, model: str = "") -> None:
+        """Point her at a different endpoint, without a restart.
+
+        Changing the model is something a person does while trying to get Hera working at all,
+        and telling them to restart the server to find out whether the URL was right turns a
+        two-second correction into a minute.
+
+        ``model`` travels with the provider because the two are one decision: the endpoint
+        knows where to send a request and ``ChatsSettings.model`` decides what name goes in the
+        body, and leaving the second behind would point a new server at the old model's name —
+        which fails as an unhelpful 404 from somebody else's API.
+        """
+        previous, owned = self.provider, self.owns_provider
+        self.provider = provider
+        self.orchestrator.provider = provider
+        if model:
+            self.orchestrator.settings = self.orchestrator.settings.model_copy(
+                update={"model": model}
+            )
+        self.owns_provider = True
+        if owned:
+            # Closed after the swap, so a request arriving mid-change gets the new client
+            # rather than a closed one. A stream already running keeps its response: httpx
+            # finishes what it has begun.
+            await previous.aclose()
+
+    @property
+    def model(self) -> str:
+        """The model name requests are sent with. What the health check reports."""
+        return self.orchestrator.settings.model
+
     async def aclose(self) -> None:
         """Release everything that holds a connection or a subprocess open."""
         if self.registry is not None:
             await self.registry.aclose()
-        await self.provider.aclose()
+        if self.owns_provider:
+            await self.provider.aclose()
         self.database.dispose()
 
 
@@ -100,7 +142,11 @@ def build_services(
     settings = settings or CoreSettings()
     database = database or Database(StorageSettings(url=settings.database_url()))
 
-    provider_settings = ProviderSettings()
+    # config.toml is the source of truth for the endpoint, seeded from HERA_PROVIDER_* the
+    # first time it is written -- see hera_core.config.
+    entry = load_config().active()
+    provider_settings = entry.settings() if entry is not None else ProviderSettings()
+    injected = provider is not None
     if provider is None:
         provider = OpenAICompatibleProvider(provider_settings)
 
@@ -132,6 +178,7 @@ def build_services(
         router=router,
         registry=registry,
         provider=provider,
+        owns_provider=not injected,
         orchestrator=TurnOrchestrator(
             provider=provider,
             builder=builder,

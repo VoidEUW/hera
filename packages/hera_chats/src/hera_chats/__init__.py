@@ -28,7 +28,7 @@ from hera_chats.events import (
     coalesce,
     visible_text,
 )
-from hera_chats.history import build_history, events_of, turn_to_messages
+from hera_chats.history import Attachment, build_history, compose, events_of, turn_to_messages
 from hera_chats.models import Chat, Message, Project
 from hera_chats.ports import Tools
 from hera_chats.repository import (
@@ -44,6 +44,7 @@ from hera_chats.turn import Turn, TurnContext, TurnOrchestrator
 __all__ = [
     "CHAT_EVENT_ADAPTER",
     "LIST_ADAPTER",
+    "Attachment",
     "Chat",
     "ChatEvent",
     "ChatRepository",
@@ -64,6 +65,7 @@ __all__ = [
     "TurnOrchestrator",
     "build_history",
     "coalesce",
+    "compose",
     "events_of",
     "slugify",
     "title_from",

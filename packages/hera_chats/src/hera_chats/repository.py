@@ -15,6 +15,7 @@ from sqlalchemy.orm.attributes import flag_modified
 from sqlmodel import Session, col, desc, func
 
 from hera_chats.events import CHAT_EVENT_ADAPTER, ChatEvent, visible_text
+from hera_chats.history import Attachment
 from hera_chats.models import JSON_FIELDS, Chat, Message, Project
 from hera_storage import Repository, utcnow
 
@@ -30,10 +31,15 @@ def slugify(name: str) -> str:
 def title_from(text: str, *, limit: int = 60) -> str:
     """A chat title from its first message.
 
+    Only the opening paragraph. A message with a file under it, or a long one with a preamble
+    and then the question, would otherwise put its whole body in the sidebar — and a sidebar
+    you cannot skim is a sidebar that does not do its job.
+
     Cut on a word boundary where there is one within reach of the limit, because a title that
     ends mid-word looks like a bug rather than like a truncation.
     """
-    flat = " ".join(text.split())
+    opening = text.strip().split("\n\n", 1)[0]
+    flat = " ".join(opening.split())
     if len(flat) <= limit:
         return flat
     cut = flat[:limit]
@@ -161,7 +167,15 @@ class MessageRepository(Repository[Message]):
         _flag_json(self.session, obj)
         return super().save(obj)
 
-    def add_user_message(self, chat: Chat, text: str) -> Message:
+    def add_user_message(
+        self, chat: Chat, text: str, attachments: Sequence[Attachment] = ()
+    ) -> Message:
+        """What was typed, and the files sent with it.
+
+        ``content`` is the typed text alone. Composing the two into what the model reads is
+        ``hera_chats.history.compose``, and it happens when a wire message is built — so the
+        stored message stays the thing a person actually wrote.
+        """
         return self.add(
             Message(
                 owner_id=chat.owner_id,
@@ -169,6 +183,7 @@ class MessageRepository(Repository[Message]):
                 sequence=self.next_sequence(chat.id),
                 role="user",
                 content=text,
+                attachments=[item.model_dump() for item in attachments],
             )
         )
 

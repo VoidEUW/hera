@@ -63,10 +63,54 @@ def test_a_message_streams_back_and_survives_a_reload(page: Any) -> None:
     assert page.url == url
 
 
-def test_settings_opens_as_a_modal_over_the_conversation(page: Any) -> None:
+def test_settings_holds_what_changes_her_behaviour(page: Any) -> None:
+    """Models first, because nothing works until she is pointed at one; then the two lists a
+    person comes back to. Dreaming is listed and disabled rather than hidden — a v0.2 feature
+    you can see coming is a promise, and one you cannot is a surprise."""
     page.get_by_role("button", name="Settings").click()
     page.wait_for_selector("[role=dialog]", timeout=10_000)
-    assert page.locator("[role=dialog]").is_visible()
+
+    nav = page.locator("[role=dialog] nav.tabs button")
+    assert nav.all_inner_texts()[:4] == ["Models", "Skills", "Servers", "Permissions"]
+    assert "Dreaming" in nav.last.inner_text()
+
+    # The endpoint is registered and editable, which is the whole point of this screen.
+    page.wait_for_selector("text=Base URL", timeout=10_000)
 
     page.keyboard.press("Escape")
     page.wait_for_selector("[role=dialog]", state="detached", timeout=10_000)
+
+
+def test_the_profile_card_holds_everything_that_is_not_about_her(page: Any) -> None:
+    """Appearance and where your data lives are not model behaviour, and mixing the two is how
+    a person ends up scrolling past six model fields to find a light-mode toggle."""
+    page.locator("button.card").click()
+    page.wait_for_selector("[role=dialog]", timeout=10_000)
+
+    menu = page.locator("[role=dialog]")
+    assert "APPEARANCE" in menu.inner_text().upper()
+    assert "ABOUT" in menu.inner_text().upper()
+
+    page.keyboard.press("Escape")
+    page.wait_for_selector("[role=dialog]", state="detached", timeout=10_000)
+
+
+def test_a_file_can_be_attached_and_is_drawn_as_a_chip(page: Any, tmp_path: Any) -> None:
+    """The file reaches the model inlined and the browser draws a chip from a field — neither
+    side parses the other's rendering."""
+    note = tmp_path / "notes.md"
+    note.write_text("Slide 14 contradicts slide 9.")
+
+    page.set_input_files("input[type=file]", str(note))
+    page.wait_for_selector("text=notes.md", timeout=10_000)
+
+    composer = page.locator("textarea").first
+    composer.fill("What is wrong with these?")
+    composer.press("Enter")
+
+    page.wait_for_url("**/chat/**", timeout=15_000)
+    page.wait_for_selector("text=ticket-granting ticket", timeout=30_000)
+
+    # The chip survives, and the file's contents are not pasted into the bubble.
+    assert page.locator("li:has-text('notes.md')").count() >= 1
+    assert page.locator("text=Slide 14 contradicts slide 9.").count() == 0

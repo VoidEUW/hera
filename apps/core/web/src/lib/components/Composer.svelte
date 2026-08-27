@@ -2,13 +2,15 @@
 	/**
 	 * The composer. Stays put, focused on load, Enter to send.
 	 *
-	 * The dropdown is the **profile** — the mind she is answering from — not a model picker.
-	 * There is one model (ADR 2); there are many of her.
+	 * The bar under the field carries, left to right: **＋** to attach a file, the **profile**
+	 * she is answering from, and send. The dropdown is not a model picker — there is one model
+	 * (ADR 2); there are many of her.
 	 *
 	 * `/commands` are left in the text on purpose: the router strips them server-side, and a
 	 * browser that also stripped them would be a second implementation of the same rule.
 	 */
 	import type { Profile } from '$lib/api/client';
+	import { read, size, type Attachment } from '$lib/attachments';
 	import { t } from '$lib/i18n';
 
 	interface Props {
@@ -17,7 +19,7 @@
 		autofocus?: boolean;
 		profiles?: Profile[];
 		profileId?: string | null;
-		onsend?: (text: string) => void;
+		onsend?: (text: string, attachments: Attachment[]) => void;
 		onstop?: () => void;
 		onprofile?: (id: string) => void;
 	}
@@ -35,6 +37,9 @@
 
 	let text = $state('');
 	let field = $state<HTMLTextAreaElement | null>(null);
+	let picker = $state<HTMLInputElement | null>(null);
+	let attached = $state<Attachment[]>([]);
+	let refused = $state<string[]>([]);
 
 	$effect(() => {
 		if (autofocus) field?.focus();
@@ -49,11 +54,14 @@
 		field.style.height = `${Math.min(field.scrollHeight, 260)}px`;
 	});
 
+	const sendable = $derived(Boolean(text.trim()) || attached.length > 0);
+
 	function submit() {
-		const value = text.trim();
-		if (!value || busy) return;
-		onsend?.(value);
+		if (!sendable || busy) return;
+		onsend?.(text, attached);
 		text = '';
+		attached = [];
+		refused = [];
 	}
 
 	function onkeydown(event: KeyboardEvent) {
@@ -61,9 +69,42 @@
 		event.preventDefault();
 		submit();
 	}
+
+	async function pick(event: Event) {
+		const input = event.currentTarget as HTMLInputElement;
+		if (!input.files?.length) return;
+		const picked = await read(input.files);
+		attached = [...attached, ...picked.attachments];
+		refused = picked.rejected.map((item) => item.reason);
+		// Cleared so choosing the same file twice in a row still fires a change event.
+		input.value = '';
+	}
+
+	function drop(index: number) {
+		attached = attached.filter((_, at) => at !== index);
+	}
 </script>
 
 <div class="composer">
+	{#if attached.length}
+		<ul class="attached">
+			{#each attached as file, index (file.name + index)}
+				<li>
+					<span class="mono name">{file.name}</span>
+					<span class="size">{size(file.bytes)}</span>
+					<button type="button" onclick={() => drop(index)}>
+						<span class="sr-only">{t.attach.remove}</span>
+						<span aria-hidden="true">✕</span>
+					</button>
+				</li>
+			{/each}
+		</ul>
+	{/if}
+
+	{#each refused as reason (reason)}
+		<p class="refused">{reason}</p>
+	{/each}
+
 	<textarea
 		bind:this={field}
 		bind:value={text}
@@ -74,6 +115,12 @@
 	></textarea>
 
 	<div class="bar">
+		<button class="attach" type="button" title={t.attach.add} onclick={() => picker?.click()}>
+			<span class="sr-only">{t.attach.add}</span>
+			<span aria-hidden="true">＋</span>
+		</button>
+		<input bind:this={picker} class="sr-only" type="file" multiple tabindex="-1" onchange={pick} />
+
 		{#if profiles.length > 1}
 			<label class="profile">
 				<span class="sr-only">Profile</span>
@@ -93,7 +140,7 @@
 		{#if busy}
 			<button class="send stop" type="button" onclick={() => onstop?.()}>{t.composer.stop}</button>
 		{:else}
-			<button class="send" type="button" disabled={!text.trim()} onclick={submit}>
+			<button class="send" type="button" disabled={!sendable} onclick={submit}>
 				<span class="sr-only">{t.composer.send}</span>
 				<span aria-hidden="true">↑</span>
 			</button>
@@ -112,6 +159,52 @@
 
 	.composer:focus-within {
 		border-color: var(--text-faint);
+	}
+
+	.attached {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 6px;
+		list-style: none;
+		margin: 0 0 10px;
+		padding: 0;
+	}
+
+	.attached li {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		padding: 3px 6px 3px 10px;
+		background: var(--surface-raised);
+		border: 1px solid var(--line);
+		border-radius: var(--radius);
+		font-size: 12.5px;
+	}
+
+	.name {
+		max-width: 22ch;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.size {
+		color: var(--text-faint);
+	}
+
+	.attached button {
+		color: var(--text-faint);
+		font-size: 11px;
+	}
+
+	.attached button:hover {
+		color: var(--danger);
+	}
+
+	.refused {
+		margin: 0 0 8px;
+		font-size: 12.5px;
+		color: var(--danger);
 	}
 
 	textarea {
@@ -140,6 +233,26 @@
 		align-items: center;
 		gap: 10px;
 		margin-top: 8px;
+	}
+
+	.attach {
+		display: grid;
+		place-items: center;
+		width: 26px;
+		height: 26px;
+		flex: none;
+		border-radius: 50%;
+		border: 1px solid var(--line);
+		color: var(--text-muted);
+		font-size: 13px;
+		transition:
+			border-color var(--fade) var(--ease),
+			color var(--fade) var(--ease);
+	}
+
+	.attach:hover {
+		border-color: var(--brass);
+		color: var(--brass);
 	}
 
 	.profile select {

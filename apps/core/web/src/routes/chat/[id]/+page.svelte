@@ -33,7 +33,7 @@
 		// send it twice.
 		const first = workspace.takeHandoff();
 		await session.open(id);
-		if (first) await session.send(first);
+		if (first) await session.send(first.text, first.files);
 	}
 
 	// Follow the answer down, but only while the person is already at the bottom. Yanking the
@@ -77,14 +77,15 @@
 			<Message
 				role={message.role}
 				content={message.content}
+				attachments={message.attachments}
 				events={message.events}
 				busy={session.busy}
 				onanswer={answer}
 			/>
 		{/each}
 
-		{#if session.pending}
-			<Message role="user" content={session.pending} />
+		{#if session.pending !== null}
+			<Message role="user" content={session.pending} attachments={session.pendingFiles} />
 		{/if}
 
 		{#if session.draft.length || session.streaming}
@@ -111,7 +112,7 @@
 			busy={session.busy}
 			profiles={workspace.profiles}
 			profileId={session.chat?.profile_id ?? null}
-			onsend={(text) => session.send(text)}
+			onsend={(text, files) => session.send(text, files)}
 			onstop={() => session.stop()}
 		/>
 	</div>

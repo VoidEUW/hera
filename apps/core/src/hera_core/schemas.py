@@ -22,9 +22,10 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from hera_chats import Chat, Message, Project
+from hera_core.config import validate_provider_name
 from hera_profiles import MindRegion, Profile
 from hera_skillsets import BrokenSkill, Skill, SkillUsage
 
@@ -148,6 +149,13 @@ class MessageOut(BaseModel):
     created_at: datetime
     events: list[dict[str, Any]]
 
+    attachments: list[AttachmentSummary] = Field(default_factory=list)
+    """The files sent with it, **without their contents**.
+
+    A chip in the interface needs a name and a size; sending the text back would put a
+    megabyte of source into every chat load to render two words.
+    """
+
     @classmethod
     def of(cls, message: Message) -> MessageOut:
         return cls(
@@ -157,7 +165,22 @@ class MessageOut(BaseModel):
             sequence=message.sequence,
             created_at=message.created_at,
             events=list(message.events),
+            attachments=[
+                AttachmentSummary(
+                    name=str(item.get("name", "")), bytes=int(item.get("bytes", 0) or 0)
+                )
+                for item in message.attachments
+            ],
         )
+
+
+class AttachmentSummary(BaseModel):
+    """A file's name and size. Never its contents — see :class:`MessageOut`."""
+
+    model_config = ConfigDict(frozen=True)
+
+    name: str
+    bytes: int
 
 
 class ChatDetail(BaseModel):
@@ -167,10 +190,32 @@ class ChatDetail(BaseModel):
     messages: list[MessageOut]
 
 
+class AttachmentIn(BaseModel):
+    """A file sent with a message, read in the browser.
+
+    There is no upload endpoint, and that is deliberate rather than unfinished: a *project's*
+    files need embeddings and retrieval and are v0.2, while a file attached to one question is
+    context for that turn and nothing else.
+    """
+
+    name: str = Field(min_length=1, max_length=255)
+    text: str
+    bytes: int = 0
+
+
 class MessageIn(BaseModel):
-    text: str = Field(min_length=1)
+    text: str = ""
     """What the person typed, ``/commands`` included — the router strips them server-side, so
     the browser must not."""
+
+    attachments: list[AttachmentIn] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _says_something(self) -> MessageIn:
+        """A message has to carry *something*. A file on its own is a fair question."""
+        if not self.text.strip() and not self.attachments:
+            raise ValueError("a message needs text, a file, or both")
+        return self
 
 
 class PermissionAnswer(BaseModel):
@@ -284,6 +329,76 @@ class PermissionsOut(BaseModel):
 
     fallback: str
     rules: list[RuleOut]
+
+
+class ProviderOut(BaseModel):
+    """One registered endpoint. Never carries the key — see ``api_key_set``."""
+
+    model_config = ConfigDict(frozen=True)
+
+    name: str
+    base_url: str
+    model: str
+    embedding_model: str
+    timeout_s: float
+    connect_timeout_s: float
+    api_key_set: bool
+
+
+class ProvidersOut(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    providers: list[ProviderOut]
+    active: str
+
+
+class ProviderIn(BaseModel):
+    name: str = Field(min_length=1, max_length=40)
+    """Validated with the same function the stored entry uses, so a bad name is a 422 that
+    says what a name may contain rather than a 500 from inside the handler."""
+
+    base_url: str = Field(min_length=1)
+    model: str = Field(min_length=1)
+    api_key: str = ""
+    embedding_model: str = ""
+    timeout_s: float = 180.0
+    connect_timeout_s: float = 5.0
+
+    @field_validator("name")
+    @classmethod
+    def _usable_name(cls, name: str) -> str:
+        return validate_provider_name(name)
+
+
+class ProviderPatch(BaseModel):
+    """Every field optional. ``None`` means "leave it".
+
+    That is why ``api_key`` is ``str | None`` rather than ``str``: left out it keeps the key
+    already on disk, and sent as ``""`` it clears it. A screen that never receives the key
+    cannot otherwise preserve one.
+    """
+
+    base_url: str | None = Field(default=None, min_length=1)
+    model: str | None = Field(default=None, min_length=1)
+    api_key: str | None = None
+    embedding_model: str | None = None
+    timeout_s: float | None = None
+    connect_timeout_s: float | None = None
+
+
+class ProbeOut(BaseModel):
+    """What an endpoint answered when asked for its models.
+
+    A failure is a normal answer here, not an error status: "nothing is listening on that port"
+    is the commonest thing to be wrong on a fresh install and belongs on the screen you were
+    already looking at.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    ok: bool
+    models: list[str]
+    error: str
 
 
 class HealthOut(BaseModel):

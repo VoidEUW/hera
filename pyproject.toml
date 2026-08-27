@@ -91,6 +91,10 @@ select = ["E", "F", "I", "UP", "B", "SIM", "ANN", "RUF"]
 # to a recursive JSON alias would buy no safety -- the input is already `model_dump(mode="json")`
 # output -- and cost a cast at every call site (ANN401).
 "apps/core/src/hera_core/sse.py" = ["ANN401"]
+# Alembic revisions are generated. The template imports the column types autogenerate may write
+# out fully qualified, and any one revision uses only some of them; editing each to satisfy the
+# linter is a chore that would eventually be done by deleting an import the next one needs.
+"apps/core/src/hera_core/migrations/versions/*.py" = ["F401"]
 
 [tool.mypy]
 python_version = "3.12"

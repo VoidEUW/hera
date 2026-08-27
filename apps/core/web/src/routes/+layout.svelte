@@ -9,6 +9,7 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import Rail from '$lib/components/Rail.svelte';
+	import ProfileMenu from '$lib/components/ProfileMenu.svelte';
 	import Settings from '$lib/components/Settings.svelte';
 	import { workspace } from '$lib/stores/workspace.svelte';
 	import { theme } from '$lib/theme.svelte';
@@ -16,6 +17,7 @@
 
 	let { children } = $props();
 	let settingsOpen = $state(false);
+	let profileOpen = $state(false);
 
 	// Called directly rather than from an $effect. `ssr = false`, so this only ever runs in the
 	// browser -- and `theme.load()` both reads and writes the appearance, which inside an effect
@@ -50,6 +52,7 @@
 		{activeId}
 		onnew={newChat}
 		onsettings={() => (settingsOpen = true)}
+		onprofile={() => (profileOpen = true)}
 	/>
 
 	<main>
@@ -59,6 +62,14 @@
 
 {#if settingsOpen}
 	<Settings onclose={() => (settingsOpen = false)} />
+{/if}
+
+{#if profileOpen}
+	<ProfileMenu
+		profiles={workspace.profiles}
+		onclose={() => (profileOpen = false)}
+		onprofiles={(found) => (workspace.profiles = found)}
+	/>
 {/if}
 
 <style>

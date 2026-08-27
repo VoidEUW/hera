@@ -37,7 +37,7 @@ from hera_chats.events import (
     TurnClosed,
     coalesce,
 )
-from hera_chats.history import turn_to_messages
+from hera_chats.history import Attachment, compose, turn_to_messages
 from hera_chats.models import Chat, Project
 from hera_chats.ports import Tools
 from hera_chats.settings import ChatsSettings
@@ -111,6 +111,10 @@ class TurnContext:
     denied: Sequence[str] = ()
     """Call ids a person has just refused. Refused calls still get a result — the model is
     told it was not allowed, which is what lets it try something else instead of hanging."""
+
+    attachments: Sequence[Attachment] = ()
+    """Files sent with this message. Composed into the user turn by :func:`compose`, which is
+    the one place a file becomes text."""
 
     memories: str = ""
     """Pre-rendered recall for the ``memories`` slot. Empty until v0.2."""
@@ -296,8 +300,11 @@ class Turn:
 
         head, tail = _split_frame(frame.messages)
         messages = [*head, *context.history]
-        if self.cleaned_text.strip():
-            messages.append(ChatMessage(role=Role.USER, content=self.cleaned_text))
+        # The router strips the /command; the attachments are added after that, so a file is
+        # never scored as part of the turn's own words.
+        spoken = compose(self.cleaned_text, context.attachments)
+        if spoken.strip():
+            messages.append(ChatMessage(role=Role.USER, content=spoken))
         messages.extend(tail)
         return messages
 

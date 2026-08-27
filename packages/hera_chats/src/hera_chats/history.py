@@ -19,11 +19,50 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Sequence
 
+from pydantic import BaseModel, ConfigDict
+
 from hera_chats.events import LIST_ADAPTER, ChatEvent, ToolResultEvent
 from hera_chats.models import Message
 from hera_providers import ChatMessage, Role, TextDelta, ToolCall, ToolCallReady
 
-__all__ = ["build_history", "events_of", "turn_to_messages"]
+__all__ = ["Attachment", "build_history", "compose", "events_of", "turn_to_messages"]
+
+
+class Attachment(BaseModel):
+    """A file sent with a message."""
+
+    model_config = ConfigDict(frozen=True)
+
+    name: str
+    text: str
+    bytes: int = 0
+
+
+FENCE = "```"
+
+
+def compose(text: str, attachments: Sequence[Attachment]) -> str:
+    """What the **model** sees: the message, then each file in a fenced block.
+
+    The one place a file becomes text. The typed question goes first so it is the first thing
+    read rather than the last thing after ten kilobytes of source, and each block is named so
+    the model can tell which file it is looking at and where it stops.
+
+    A fence inside a file would close the block early, so those are broken with a soft hyphen
+    — invisible, and it keeps the structure honest without editing what the file says.
+    """
+    if not attachments:
+        return text
+    blocks = [
+        f"Attached file: {item.name}\n{FENCE}\n{item.text.replace(FENCE, '`\u00ad``')}\n{FENCE}"
+        for item in attachments
+    ]
+    return "\n\n".join([text.strip(), *blocks]).strip()
+
+
+def attachments_of(message: Message) -> list[Attachment]:
+    """The files stored with one message."""
+    return [Attachment.model_validate(item) for item in message.attachments]
 
 
 def events_of(message: Message) -> list[ChatEvent]:
@@ -36,8 +75,9 @@ def build_history(messages: Iterable[Message]) -> list[ChatMessage]:
     wire: list[ChatMessage] = []
     for message in messages:
         if message.role == "user":
-            if message.content.strip():
-                wire.append(ChatMessage(role=Role.USER, content=message.content))
+            content = compose(message.content, attachments_of(message))
+            if content.strip():
+                wire.append(ChatMessage(role=Role.USER, content=content))
             continue
         wire.extend(turn_to_messages(events_of(message)))
     return wire

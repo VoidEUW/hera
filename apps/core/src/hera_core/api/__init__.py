@@ -9,11 +9,12 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
-from hera_core.api import chats, profiles, projects, system
+from hera_core.api import chats, profiles, projects, providers, system
 
 router = APIRouter()
 router.include_router(chats.router)
 router.include_router(projects.router)
+router.include_router(providers.router)
 router.include_router(profiles.router)
 router.include_router(system.router)
 

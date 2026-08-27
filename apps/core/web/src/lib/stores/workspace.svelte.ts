@@ -6,6 +6,7 @@
  */
 
 import { api, type Chat, type Profile, type Project } from '$lib/api/client';
+import type { Attachment } from '$lib/attachments';
 
 class Workspace {
 	chats = $state<Chat[]>([]);
@@ -59,16 +60,16 @@ class Workspace {
 	 * `page.state`, and a first message quietly lost to a navigation is the worst possible
 	 * first impression. A field is also honest about the lifetime -- it is read once and
 	 * cleared, and a refresh must not send it again. */
-	#handoff: string | null = null;
+	#handoff: { text: string; files: Attachment[] } | null = null;
 
-	handOff(text: string) {
-		this.#handoff = text;
+	handOff(text: string, files: Attachment[] = []) {
+		this.#handoff = { text, files };
 	}
 
-	takeHandoff(): string | null {
-		const text = this.#handoff;
+	takeHandoff(): { text: string; files: Attachment[] } | null {
+		const carried = this.#handoff;
 		this.#handoff = null;
-		return text;
+		return carried;
 	}
 }
 

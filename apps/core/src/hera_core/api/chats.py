@@ -26,6 +26,7 @@ from hera_chats.events import ChatEvent, PermissionDecided, PermissionRequired
 from sqlmodel import Session
 
 from hera_chats import (
+    Attachment,
     Chat,
     ChatRepository,
     Message,
@@ -111,11 +112,12 @@ def send_message(
     chat = _require_chat(db, chat_id, owner)
     messages = MessageRepository(db)
 
-    messages.add_user_message(chat, payload.text)
+    attachments = [Attachment(**item.model_dump()) for item in payload.attachments]
+    messages.add_user_message(chat, payload.text, attachments)
     ChatRepository(db).touch(chat)
     assistant = messages.start_assistant_message(chat)
 
-    return _stream(container, db, chat, assistant, text=payload.text)
+    return _stream(container, db, chat, assistant, text=payload.text, attachments=attachments)
 
 
 @router.post("/chats/{chat_id}/permissions")

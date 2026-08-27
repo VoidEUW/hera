@@ -9,13 +9,13 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
+# Autogenerate writes column types out fully qualified but does not import them, so the two this
+# project defines are imported here whether or not this particular revision needs them. F401 is
+# switched off for this directory in pyproject.toml for exactly that reason.
+import hera_storage.base
 import sqlalchemy as sa
 import sqlmodel.sql.sqltypes
 from alembic import op
-
-# Column types this project defines. Autogenerate writes them out fully qualified but does not
-# import them, so the import lives in the template rather than being remembered each time.
-import hera_storage.base
 
 revision: str = ${repr(up_revision)}
 down_revision: str | None = ${repr(down_revision)}

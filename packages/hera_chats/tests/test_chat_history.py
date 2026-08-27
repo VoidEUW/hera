@@ -178,3 +178,76 @@ class TestWholeConversations:
 
         assert [m.role for m in wire] == [Role.ASSISTANT, Role.TOOL]
         assert wire[1].content == "contents"
+
+
+class TestAttachments:
+    """A file is data on the message, not text pasted into it — so the interface can draw a
+    chip without parsing prose, and the model still reads the file."""
+
+    def test_a_file_reaches_the_model_named_and_fenced(self) -> None:
+        from hera_chats import Attachment, compose
+
+        composed = compose("What is wrong here?", [Attachment(name="a.py", text="x = 1")])
+
+        assert composed.index("What is wrong here?") < composed.index("a.py")
+        assert "Attached file: a.py" in composed
+        assert "x = 1" in composed
+
+    def test_a_message_with_no_files_is_untouched(self) -> None:
+        from hera_chats import compose
+
+        assert compose("Explain Kerberos", []) == "Explain Kerberos"
+
+    def test_a_fence_inside_a_file_cannot_close_the_block_early(self) -> None:
+        from hera_chats import Attachment, compose
+
+        fence = "`" * 3
+        composed = compose("look", [Attachment(name="r.md", text=f"a\n{fence}\nb\n{fence}\nc")])
+
+        assert composed.count(f"\n{fence}\n") == 1, "only the opening fence stands alone"
+        assert composed.endswith(fence)
+
+    def test_a_file_survives_the_database_and_reaches_the_next_turn(
+        self, chats: ChatRepository, messages: MessageRepository, owner_id: UUID
+    ) -> None:
+        from hera_chats import Attachment
+
+        chat = chats.create(owner_id)
+        messages.add_user_message(
+            chat, "read this", [Attachment(name="notes.md", text="slide 14", bytes=8)]
+        )
+
+        wire = build_history(messages.for_chat(chat.id))
+
+        assert len(wire) == 1
+        assert "read this" in wire[0].content
+        assert "Attached file: notes.md" in wire[0].content
+        assert "slide 14" in wire[0].content
+
+    def test_the_stored_message_keeps_only_what_was_typed(
+        self, chats: ChatRepository, messages: MessageRepository, owner_id: UUID
+    ) -> None:
+        """`content` is the thing a person actually wrote. Composing happens when the wire
+        message is built, which is why the sidebar and the bubble stay readable."""
+        from hera_chats import Attachment
+
+        chat = chats.create(owner_id)
+        stored = messages.add_user_message(
+            chat, "read this", [Attachment(name="notes.md", text="slide 14", bytes=8)]
+        )
+
+        assert stored.content == "read this"
+        assert stored.attachments[0]["name"] == "notes.md"
+
+    def test_a_file_on_its_own_is_a_fair_question(
+        self, chats: ChatRepository, messages: MessageRepository, owner_id: UUID
+    ) -> None:
+        from hera_chats import Attachment
+
+        chat = chats.create(owner_id)
+        messages.add_user_message(chat, "", [Attachment(name="a.py", text="x = 1")])
+
+        wire = build_history(messages.for_chat(chat.id))
+
+        assert len(wire) == 1
+        assert "a.py" in wire[0].content

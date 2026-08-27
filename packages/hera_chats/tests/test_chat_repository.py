@@ -32,8 +32,16 @@ class TestNaming:
         assert title.endswith("…")
         assert "wor…" not in title
 
-    def test_whitespace_is_flattened(self) -> None:
-        assert title_from("two\n\nlines   here") == "two lines here"
+    def test_whitespace_within_the_opening_is_flattened(self) -> None:
+        assert title_from("two\nlines   here") == "two lines here"
+
+    def test_only_the_opening_paragraph_becomes_the_title(self) -> None:
+        """A message with a file under it, or a preamble and then the question, would otherwise
+        put its whole body in the sidebar -- and a sidebar you cannot skim is one that does not
+        do its job."""
+        assert title_from("Explain Kerberos\n\nAttached file: notes.md\nlots and lots") == (
+            "Explain Kerberos"
+        )
 
     def test_one_very_long_word_is_still_cut(self) -> None:
         assert title_from("x" * 200, limit=10) == f"{'x' * 10}…"

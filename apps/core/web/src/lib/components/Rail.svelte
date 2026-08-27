@@ -6,7 +6,6 @@
 	 * Projects disclose inline rather than navigating, because finding a chat under the thing it
 	 * belongs to is genuinely easier than finding it in one flat list sorted by time.
 	 */
-	import { goto } from '$app/navigation';
 	import type { Chat, Profile, Project } from '$lib/api/client';
 	import { t } from '$lib/i18n';
 	import Ocellus from './Ocellus.svelte';
@@ -18,9 +17,10 @@
 		activeId?: string | null;
 		onnew?: (projectId?: string) => void;
 		onsettings?: () => void;
+		onprofile?: () => void;
 	}
 
-	let { chats, projects, profile, activeId = null, onnew, onsettings }: Props = $props();
+	let { chats, projects, profile, activeId = null, onnew, onsettings, onprofile }: Props = $props();
 
 	let expanded = $state<Record<string, boolean>>({});
 
@@ -110,9 +110,13 @@
 		</button>
 
 		{#if profile}
-			<button class="card" type="button" onclick={() => goto('/')}>
+			<!-- Everything that is about *you* rather than about her behaviour lives behind this:
+			     appearance, which of her answers, where your data is. Settings above is the other
+			     half, and keeping them apart is why neither of them is a scroll. -->
+			<button class="card" type="button" onclick={() => onprofile?.()}>
 				<span class="initials">{initials(profile.name)}</span>
 				<span class="label">{profile.name}</span>
+				<span class="chevron up" aria-hidden="true">▴</span>
 			</button>
 		{/if}
 	</div>
@@ -236,6 +240,10 @@
 		border: 1px solid var(--line);
 		border-radius: var(--radius);
 		font-size: 13.5px;
+	}
+
+	.up {
+		margin-left: auto;
 	}
 
 	.initials {

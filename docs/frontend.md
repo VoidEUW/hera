@@ -299,11 +299,28 @@ The rail collapses to icons. Projects disclose their chats inline, as in the ref
 genuinely easier to find a chat under the thing it belongs to than in one flat list sorted by
 time. Settings sits directly above the profile card at the bottom, where the brief put it.
 
-### Settings
+### Settings, and the profile menu
 
-A modal, because the brief says so and the brief is right: settings is somewhere you *go and come
-back from*, and a modal keeps the conversation visible behind it. Left nav, content on the right,
-search at the top.
+**Two doors, because there are two questions.** *Settings* is **how she works** — what she runs
+on, who she is, what she knows, what she may do. The profile card at the bottom of the rail is
+**you and this machine** — appearance, which of her is answering, where your data lives. Mixing
+them is how a person ends up scrolling past six model fields to find a light-mode toggle.
+
+Settings is a modal, because the brief says so and the brief is right: it is somewhere you *go
+and come back from*, and a modal keeps the conversation visible behind it. Left nav, content on
+the right, search at the top. The nav is ordered by what you reach for:
+
+| | |
+|---|---|
+| **Models** | Registered endpoints. First, because nothing else in Hera does anything until she is pointed at one — and because *testing* one belongs here: the endpoint is asked what it has, and the answer either fills a list you can pick from or says plainly why it could not |
+| **Skills** | With usage counts, and whatever is wrong with each |
+| **Servers** | MCP, with the failure reason when there is one |
+| **Permissions** | allow · deny · ask, with rules from a card marked as such |
+| **Mind** | The twelve regions, each with its tier and its revision count |
+| **Dreaming** | Listed and disabled. A v0.2 feature you can see coming is a promise; one you cannot is a surprise |
+
+The profile menu is a popover rather than a second modal — four controls do not deserve a sheet
+over the conversation.
 
 ```
         ┌──────────────────────────────────────────────────────┐
