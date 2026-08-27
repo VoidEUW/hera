@@ -10,7 +10,9 @@ resolution-markers = [
 [manifest]
 members = [
     "hera",
+    "hera-home",
     "hera-permissions",
+    "hera-profiles",
     "hera-prompts",
     "hera-providers",
     "hera-storage",
@@ -498,6 +500,11 @@ dev = [
 ]
 
 [[package]]
+name = "hera-home"
+version = "0.1.0"
+source = { editable = "packages/hera_home" }
+
+[[package]]
 name = "hera-permissions"
 version = "0.1.0"
 source = { editable = "packages/hera_permissions" }
@@ -507,6 +514,27 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [{ name = "pydantic", specifier = ">=2.7" }]
+
+[[package]]
+name = "hera-profiles"
+version = "0.1.0"
+source = { editable = "packages/hera_profiles" }
+dependencies = [
+    { name = "hera-home" },
+    { name = "hera-prompts" },
+    { name = "hera-storage" },
+    { name = "pydantic" },
+    { name = "sqlmodel" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "hera-home", editable = "packages/hera_home" },
+    { name = "hera-prompts", editable = "packages/hera_prompts" },
+    { name = "hera-storage", editable = "packages/hera_storage" },
+    { name = "pydantic", specifier = ">=2.7" },
+    { name = "sqlmodel", specifier = ">=0.0.22" },
+]
 
 [[package]]
 name = "hera-prompts"
@@ -556,6 +584,7 @@ name = "hera-tools"
 version = "0.1.0"
 source = { editable = "packages/hera_tools" }
 dependencies = [
+    { name = "hera-home" },
     { name = "hera-permissions" },
     { name = "httpx2" },
     { name = "mcp" },
@@ -565,6 +594,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "hera-home", editable = "packages/hera_home" },
     { name = "hera-permissions", editable = "packages/hera_permissions" },
     { name = "httpx2", specifier = ">=2.12" },
     { name = "mcp", specifier = ">=2.1" },

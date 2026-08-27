@@ -5,23 +5,19 @@ Read from ``HERA_TOOLS_*`` environment variables, like every other package's set
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-DEFAULT_HOME = Path("~/.hera")
-CONFIG_FILENAME = "mcp.json"
+from hera_home import MCP_FILENAME, mcp_path
 
+CONFIG_FILENAME = MCP_FILENAME
+"""This package's name for the file ``hera_home`` calls ``MCP_FILENAME``.
 
-def hera_home() -> Path:
-    """The data directory, ``HERA_HOME`` or ``~/.hera``.
-
-    Defined here because ``hera_tools`` is the first package that needs to find a file inside
-    it. It is four lines and has no dependencies; when a second package needs the same answer,
-    lift it rather than copy it.
-    """
-    return Path(os.environ.get("HERA_HOME") or DEFAULT_HOME).expanduser()
+``hera_home`` owns where it lives, because ``hera_profiles`` needed the same answer for the
+mind directory and a second copy of the ``HERA_HOME`` lookup would have been two places that
+can disagree. The alias stays so nothing here has to say "MCP" twice.
+"""
 
 
 class ToolsSettings(BaseSettings):
@@ -52,4 +48,4 @@ class ToolsSettings(BaseSettings):
     """
 
     def resolved_config_path(self) -> Path:
-        return self.config_path if self.config_path is not None else hera_home() / CONFIG_FILENAME
+        return self.config_path if self.config_path is not None else mcp_path()

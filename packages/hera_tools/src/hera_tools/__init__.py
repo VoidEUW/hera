@@ -33,7 +33,7 @@ from hera_tools.ports import MemoryWriter, NoteWriter, SkillLibrary
 from hera_tools.registry import ServerStatus, ToolRegistry
 from hera_tools.results import Failure, ToolInvocation, ToolResult
 from hera_tools.server import ManagedServer
-from hera_tools.settings import ToolsSettings, hera_home
+from hera_tools.settings import ToolsSettings
 
 __all__ = [
     "BUILTIN_SERVER_NAME",
@@ -62,7 +62,6 @@ __all__ = [
     "ToolsSettings",
     "build_builtin_server",
     "expand_variables",
-    "hera_home",
     "parse_server",
     "qualify",
     "split",

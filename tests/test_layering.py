@@ -19,24 +19,29 @@ ROOT = Path(__file__).resolve().parent.parent
 PACKAGES = ROOT / "packages"
 
 ALLOWED: dict[str, frozenset[str]] = {
-    # Foundation. Both are domain-free by contract: they must work unchanged in a project that
-    # has nothing to do with Hera, so they import nothing of ours -- not even each other.
-    # hera_storage is listed explicitly everywhere it is used rather than treated as universally
-    # available, precisely so that this exclusion stays visible.
+    # Foundation. The first two are domain-free by contract: they must work unchanged in a
+    # project that has nothing to do with Hera, so they import nothing of ours -- not even each
+    # other. hera_storage is listed explicitly everywhere it is used rather than treated as
+    # universally available, precisely so that this exclusion stays visible.
     "hera_storage": frozenset(),
     "hera_prompts": frozenset(),
+    # hera_home is not domain-free -- it says the word "hera" and knows the shape of ~/.hera --
+    # but it is below everything, depends on nothing, and answers one question. It sits outside
+    # the layering argument the way a constant does.
+    "hera_home": frozenset(),
     # The model boundary and pure policy. Neither touches persistence.
     "hera_providers": frozenset(),
     "hera_permissions": frozenset(),
     # Capability layer.
-    "hera_tools": frozenset({"hera_permissions"}),
-    "hera_skillsets": frozenset({"hera_storage"}),
+    "hera_tools": frozenset({"hera_home", "hera_permissions"}),
+    "hera_skillsets": frozenset({"hera_home", "hera_storage"}),
     "hera_memories": frozenset({"hera_storage"}),
     # Assembly layer.
-    "hera_profiles": frozenset({"hera_storage", "hera_prompts"}),
+    "hera_profiles": frozenset({"hera_home", "hera_storage", "hera_prompts"}),
     # Orchestration.
     "hera_chats": frozenset(
         {
+            "hera_home",
             "hera_storage",
             "hera_prompts",
             "hera_providers",
