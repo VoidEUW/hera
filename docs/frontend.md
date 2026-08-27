@@ -39,6 +39,36 @@ choice is between **familiar** and **clever**, familiar wins: the muscle memory 
 Where it is between **borrowed** and **ours**, ours wins: a copy would remind him of Claude
 instead of being his. Most decisions here are one of those two sentences.
 
+## The three qualities
+
+The application has an identity of its own, separate from hers. Hera-the-assistant — her voice,
+her stance, how she behaves in a conversation — is deliberately **not** settled here; that comes
+later, and it belongs to the mind regions in `hera_profiles` rather than to a stylesheet. What
+follows is what the *application* should feel like:
+
+**Familiarity.** You already know how to use it. The layout is borrowed on purpose, muscle memory
+is the feature, and no interaction here is novel for its own sake. It is also the domestic half of
+her — the goddess of the household is someone you live with, not someone you consult. Concretely:
+no invented navigation patterns, no gestures to discover, sentence case everywhere, and nothing
+that has to be learned before the first message is sent.
+
+**Openness.** Two senses, and they reinforce each other. She is open about *what she is doing* —
+the activity gutter shows every skill she was given and why, every tool she called, every
+permission she wanted, every failure she hit, and none of it is hidden behind a summary. And the
+system is open: servers come from a JSON file you wrote, skills are Markdown directories you can
+read, the mind is a git repository you can `cd` into, and there is nothing in `~/.hera` you cannot
+open in an editor. The interface should never be the only way to see something.
+
+**The feeling of power.** She is sovereign, and using her should feel like operating something
+capable rather than something cute. That is keyboard-first, `⌘K`, parallel tool calls landing at
+once and visibly, profiles you switch between, and any MCP server in the world attachable in four
+lines of JSON. It is *not* density for its own sake or an aircraft cockpit — power reads as calm
+here. Restraint is what makes capability feel like control instead of noise.
+
+The three pull against each other in useful ways. Familiarity restrains openness from becoming
+clutter; openness keeps power honest; power stops familiarity from becoming a toy. When a design
+choice is hard, ask which of the three it is serving and which one it is spending.
+
 ## What we take, and what has to be ours
 
 The structural patterns are free to adopt, and we adopt them wholesale, because they are simply
@@ -466,8 +496,10 @@ direct and never coy. She is the goddess of the household, not a mascot.
 
 Waiting on the maintainer, who has said more of the story is coming:
 
-1. **The story behind Hera** — the fuller idea, which is what should confirm or overturn the
-   pomegranate/peacock/brass reading above.
+1. **Her identity as an assistant** — voice, stance, how she behaves in a conversation. Settled
+   later and in the mind regions, not here. It may still overturn the pomegranate / peacock /
+   brass reading, which is the one part of this document that is about *her* rather than about
+   the application.
 2. **Display face** — Fraunces (warm, slightly antique) or Cormorant Garamond (classical, Greek,
    more delicate)?
 3. **The mark** — does the ocellus land, and should the wordmark be set in the display face or
