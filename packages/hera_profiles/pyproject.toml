@@ -1,0 +1,32 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "hera-profiles"
+version = "0.1.0"
+description = "The mind: git-versioned regions, behaviour traits, profiles, and the builder that turns them into a prompt."
+readme = "README.md"
+requires-python = ">=3.12"
+authors = [{ name = "Void" }]
+license = { text = "MIT" }
+keywords = ["prompt", "persona", "git", "agent"]
+classifiers = [
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Typing :: Typed",
+]
+dependencies = [
+    "hera-home",
+    "hera-prompts",
+    "hera-storage",
+    "pydantic>=2.7",
+    "sqlmodel>=0.0.22",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/hera_profiles"]
+
+# Linting, typing, testing and coverage are configured once in the workspace root. This package
+# deliberately declares none of it, so there is only ever one answer to "which config applies".

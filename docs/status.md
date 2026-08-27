@@ -3,7 +3,7 @@
 Where the rebuild stands and what is settled, so a new session can pick up without re-reading
 the history. Updated as milestones land — this file is a snapshot, not a changelog.
 
-**Last updated:** 2026-08-27 · **Version:** v0.1 in progress
+**Last updated:** 2026-08-27 · **Version:** v0.1 in progress · **Strategy:** thin spine first
 
 ---
 
@@ -43,22 +43,26 @@ route, `owner_id` on every row); desktop-shaped interface, installable as a PWA 
 
 ```
 pyproject.toml            uv workspace root — ruff, mypy --strict, pytest, coverage, all shared
+packages/hera_home/       where ~/.hera is; no dependencies, no I/O
 packages/hera_storage/    vendored, unchanged in behaviour
 packages/hera_prompts/    vendored, unchanged in behaviour
 packages/hera_providers/  the model boundary: event union, Qwen adapter, transport, FakeProvider
 packages/hera_permissions/ allow · deny · ask, resolved by pattern and profile
 packages/hera_tools/      the MCP client, the namespaced catalogue, and her own server
+packages/hera_profiles/   the git-backed mind, behaviour traits, profiles, the PromptBuilder
 tests/                    repository-level guards (see below)
 .github/                  CI, CodeQL, release, templates, CODEOWNERS, dependabot
 docs/adr/                 nine decision records
 ```
 
-**The foundation layer is complete and merged.** All four packages that import no other `hera_*`
-package are on `main`. `FakeProvider` means every layer built on top of them is testable without
-a model running.
+**The foundation and capability layers are on `main`.** `hera_tools` merged as #6/#8 — 450
+tests, 99 % coverage. `FakeProvider` means every layer built on top is testable without a model
+running. The whole suite is 571 tests at 99 % coverage.
 
-**`hera_tools` is built** and sits on the branch `feat/hera-tools`, not yet merged. 450 tests,
-99 % coverage.
+**`hera_profiles` is built** and sits on the branch `feat/hera-profiles`. It brought
+`hera_home` with it: `HERA_HOME` had been resolved by `hera_tools.settings.hera_home()` with a
+note saying to lift it when a second package needed it, and the mind directory was that second
+package.
 
 Two things worth knowing before building on the foundation:
 
@@ -100,8 +104,34 @@ Two things worth knowing before building on the foundation:
   process. Without it, one crash is a dead tool until Hera restarts.
 - `~/.hera/mcp.json` is read in the Claude-Desktop shape with `${VAR}` expansion; an unset
   variable is an error, because a blank credential fails later and somewhere else. `HERA_HOME`
-  is resolved by `hera_tools.settings.hera_home()` — the first package that needed it. Lift it
-  when a second one does.
+  now comes from `hera_home.home()`; `hera_tools.settings.CONFIG_FILENAME` is an alias kept so
+  nothing here has to say "MCP" twice.
+
+### What `hera_profiles` settled
+
+- **Twelve regions, not fifteen.** `grammar` is gone: it described the EMOTION/NOTE/TRACE/CALL
+  text format that ADR 2 deleted, and shipping it would invite the model to use a call syntax
+  nothing parses. `mem_overview` folded into `memory_instr`, and `mem_ex` waits for
+  `hera_memories`, where it is a collection rather than a region.
+- **Two doors, not one door and a filter.** `MindRepository.write()` is the person's and opens
+  every region including `safety` — that is the actual mechanism behind "add a rule without
+  touching code". `propose()` is everything else's and raises `RegionLocked` on an owner-fixed
+  region. `hera_promptevo` will only ever call the second, so a bug in a proposer cannot become
+  a bug in her conduct.
+- **`git` the binary, not a binding.** Init, add, commit, log, show. Every invocation pins
+  `user.name`/`user.email` and sets `commit.gpgsign=false`, so a machine where git was never
+  configured is not a special case. Provenance rides in a `Hera-Origin` trailer, which
+  `git log --format` can read without parsing prose.
+- **A profile owns no text.** It disables regions, overrides individual ones, sets traits, and
+  pins skills *by name* — bare strings, because this package sits below `hera_skillsets`.
+- **`sqlalchemy.ext.mutable` does not work under SQLModel.** SQLModel's `__setattr__` calls
+  SQLAlchemy's `set_attribute` and then writes the raw value into the model's `__dict__`, so
+  the coerced `MutableDict` is overwritten the moment it is made. `ProfileRepository.save()`
+  flags the four JSON columns by name instead, and named setters cover the common edits. An
+  in-place edit followed by a bare `session.flush()` is silently lost — there is a test that
+  says so, so the trap is documented rather than hidden.
+- **Everything is synchronous**, like `hera_storage`. The turn orchestrator runs it in a
+  worker thread. An async facade over `subprocess` would be a thread pool wearing a costume.
 
 ### The guards
 
@@ -191,15 +221,27 @@ or pointed at directly by Claude Code. They live in the separate `hera-skills` r
 
 ## What comes next
 
-**v0.1 — the spine that runs.** In order: ~~`hera_tools`~~ → `hera_profiles` (git-backed mind
-regions, `PromptBuilder`) → `hera_skillsets` → `hera_chats` (turn orchestrator, persisted event
-stream) → `apps/core` → the end-to-end suite.
+**v0.1 — the spine that runs.** ~~`hera_tools`~~ → ~~`hera_profiles`~~ → `hera_skillsets` →
+`hera_chats` (turn orchestrator, persisted event stream) → `apps/core` → the end-to-end suite.
 
-`hera_profiles` is the next one. `hera_chats` is the one to think about before starting it: it
-is where a tool *result* has to become something persisted and rendered, and the event union in
-`hera_providers` deliberately has no variant for one — it defines what a **model** emits, and a
-tool result is not that. Whether `hera_chats` persists a superset of the union or the union
-grows a variant is the first decision that turn orchestrator makes.
+The order is unchanged, but the **depth** is: the remaining three go in thin first, until a
+message actually streams into the SvelteKit interface against `FakeProvider`, and are then
+deepened. `docs/frontend.md` says in as many words that the design language gets adjusted once
+there is a running build to react to, and it cannot be until there is one.
+
+`hera_skillsets` is the next one. It needs `SKILL.md` loading from `~/.hera/skills/` and the
+router — pinned and `/slash` only for the thin pass; retrieval needs embeddings, which is
+`hera_memories`, which is v0.2.
+
+`hera_chats` is the one to think about before starting it: it is where a tool *result* has to
+become something persisted and rendered, and the event union in `hera_providers` deliberately
+has no variant for one — it defines what a **model** emits, and a tool result is not that.
+Whether `hera_chats` persists a superset of the union or the union grows a variant is the first
+decision that turn orchestrator makes, and it wants an ADR either way.
+
+Two things `hera_profiles` leaves for whoever binds the slots: nothing yet renders a tool
+catalogue into `SLOT_TOOLS` or a skill into `SLOT_SKILLS`, and the strings those slots want are
+the two rendering decisions still open.
 
 **The application is one package now.** `hera-core` at `apps/core/` holds the API and, under
 `web/`, the SvelteKit interface — not two directories under `apps/`. See

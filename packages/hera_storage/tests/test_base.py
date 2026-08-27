@@ -34,14 +34,22 @@ def test_entity_status_values() -> None:
 
 
 def test_no_mixin_is_a_table() -> None:
-    """The whole library must not contribute a single table."""
+    """The whole library must not contribute a single table.
+
+    Checked by provenance rather than by allow-listing table names. Every hera package shares
+    one ``MetaData``, so by the time the full suite runs this metadata is full of other
+    packages' tables -- and a list of prefixes to ignore would have to grow with every new
+    package, which is a guard that quietly stops guarding.
+    """
     for mixin in (Entity, SoftDeletable, Versioned):
         assert not hasattr(mixin, "__table__")
 
-    library_tables = [
-        name for name in SQLModel.metadata.tables if not name.startswith(("test_", "plugin_"))
+    declared_here = [
+        mapper.class_.__name__
+        for mapper in SQLModel._sa_registry.mappers
+        if mapper.class_.__module__.split(".")[0] == "hera_storage"
     ]
-    assert library_tables == []
+    assert declared_here == []
 
 
 def test_all_three_mixins_combine() -> None:
