@@ -35,6 +35,7 @@ Each has a record in [adr/](adr/); read those before reopening one.
 | [8](adr/0008-github-flow-and-required-checks.md) | GitHub Flow, protected `main` | PR for everything, squash merge, linear history, required checks, zero required approvals (single maintainer) |
 | [9](adr/0009-one-application-package.md) | One application package, `hera-core` | `apps/core/` holds the API and the web app; `packages/` stays libraries only, so the layering guard keeps meaning what it means |
 | [10](adr/0010-chat-events-wrap-the-provider-union.md) | `ChatEvent` wraps `hera_providers.Event` | A skill selection, a tool result and a permission request are not model output. Two unions, one total mapping, still no parser — and `hera_providers` keeps its empty allow-list |
+| [11](adr/0011-markdown-and-tex-in-the-browser.md) | Her prose is typeset in the browser | Markdown and TeX are drawn as what they are. The rule that stands is about *structure*: what she did is always an event variant, never something read back out of text |
 
 Other constraints that are decided but did not need a record: English everywhere with an i18n
 seam; single-user login in v0.1 behind a multi-user-ready seam (`Depends(current_user)` on every
@@ -49,7 +50,8 @@ packages/hera_storage/    vendored, unchanged in behaviour
 packages/hera_prompts/    vendored, unchanged in behaviour
 packages/hera_providers/  the model boundary: event union, Qwen adapter, transport, FakeProvider
 packages/hera_permissions/ allow · deny · ask, resolved by pattern and profile
-packages/hera_tools/      the MCP client, the namespaced catalogue, and her own server
+packages/hera_mcp/        the MCP server she *is*: emotion, remember, note, skill, search, and their ports
+packages/hera_tools/      the MCP client: server lifecycle, the namespaced catalogue, dispatch
 packages/hera_profiles/   the git-backed mind, behaviour traits, profiles, the PromptBuilder
 packages/hera_skillsets/  SKILL.md packages, the router, usage counts
 packages/hera_chats/      projects, chats, the persisted event stream, the turn orchestrator
@@ -58,7 +60,7 @@ apps/core/web/            the SvelteKit interface, built into the directory the 
 tests/                    repository-level guards (see below)
 tests/e2e/                Playwright against the real application and FakeProvider
 .github/                  CI, CodeQL, release, templates, CODEOWNERS, dependabot
-docs/adr/                 nine decision records
+docs/adr/                 eleven decision records
 ```
 
 **The foundation and capability layers are on `main`.** `hera_tools` merged as #6/#8 — 450
@@ -71,7 +73,7 @@ typed into the browser reaches the model boundary through the router, the mind a
 orchestrator, and comes back as Server-Sent Events the interface renders — verified in a real
 Chromium against `FakeProvider`, including that a reload shows exactly what was streamed.
 
-838 tests at 99 % coverage, plus 18 vitest and 3 Playwright. Profiles brought `hera_home` with
+905 tests at 98 % coverage, plus 48 vitest and 10 Playwright. Profiles brought `hera_home` with
 them: `HERA_HOME` had been resolved by `hera_tools.settings.hera_home()` with a note saying to
 lift it when a second package needed it, and the mind directory was that second package.
 
@@ -91,17 +93,60 @@ Two things worth knowing before building on the foundation:
   answer already arrived. `StreamInterrupted` is the one to special-case: persist the partial
   events and close the list with a `cancelled` turn.
 
+### What `hera_mcp` settled
+
+- **Her own server is its own package.** `hera_tools` is the **client** — subprocess lifetimes,
+  namespacing, timeouts, retries, true of anybody's MCP server. `hera_mcp` is the **server she
+  is**, and everything in it is a statement about what Hera can do: the emotion vocabulary, the
+  sentence the model reads before calling `remember`. Those change for unrelated reasons, and
+  v0.3 serves this one over a transport of its own so Claude Code can attach to her.
+- **The client no longer names her.** `ToolRegistry.from_config(builtin=...)` mounts the server
+  under `server.name`, so `"hera"` is written in one place. `open()` used to construct an
+  unwired copy of her server when given none; a default that quietly mounts four tools is
+  something you discover from a catalogue listing rather than from the call site, and it is
+  gone. Nothing is mounted unless the application mounts it.
+- **The tools are `emotion`, `remember`, `note`, `skill` and `search`** — `hera__*` once the
+  client namespaces them, and `TOOL_NAMES` says so in code. Three are wired in v0.1: `emotion`
+  needs nothing, `skill` reaches `hera_skillsets` through a port, and `search` reaches
+  DuckDuckGo through another. `remember` waits for `hera_memories` and `note` for somewhere to
+  put a document; both are still listed and answer "not available in this deployment", because
+  a model that cannot see `remember` concludes it cannot remember and tells the person so.
+- **`search` is the one that leaves the machine**, and it is the one whose absence changed what
+  she *said* rather than what she could do: with no way to look anything up she did not answer
+  "I cannot check that", she guessed fluently. `Searcher` is a port like the rest and
+  `hera_core.search.DuckDuckGo` is the adapter — no key, so a fresh install can search, and
+  swapping it for SearXNG is a class and one line of wiring. It stays **allowed** by the default
+  policy: a card before each of the three or four lookups a real question takes would be as
+  unusable as one per emotion, and a search reads something public and changes nothing. A
+  *fetch* tool is the one that would deserve the card.
+- **Its tests use a real client, not a call to the function.** `mcp.Client` over the SDK's
+  in-memory transport, so the schema, the description and the `is_error` convention are part of
+  what is asserted. The client is opened per test rather than yielded from a fixture:
+  pytest-asyncio finalises an async fixture in a different task, and the SDK's client owns a
+  task-affine anyio group — the same trap `hera_tools` answers with a worker per server.
+- **`hera_tools`' own suite mounts a toy server** instead of hers. What fails there should be
+  the client; a stub called "hera" offering "emotion" would have been a copy of her server
+  living in the package that must not know about it.
+
+### MCP, end to end
+
+Verified against a real gateway, not only against `FakeProvider`: `~/.hera/mcp.json` with
+Docker's MCP Toolkit (`docker mcp gateway run`, stdio) connects and contributes its tools
+alongside her four, and a dispatch round-trips — `docker__mcp-find` came back in 1.7 s,
+`hera__emotion` in 24 ms. `apps/core`'s suite now has `TestARealMcpServer`, which runs a turn
+with a real `ToolRegistry` and a real `MCPServer` and fakes only the model, so nothing between
+the model and the tool is a stub.
+
 ### What `hera_tools` settled
 
 - **Above `ToolRegistry`, nothing raises.** Denied, misnamed, unreachable, timed out, or a tool
   that failed on purpose — all of them are a `ToolResult` with `ok=False` and a `text` written
   for the model to read and correct itself with. `ManagedServer` below it still raises, so it
   is honest used on its own. A turn therefore needs no `try` around a tool call.
-- **Her own tools are a real MCP server**, reached in-process by the same client every other
-  server is reached by. `emotion`, `remember`, `note`, `skill` under `hera__*`. The three that
-  touch the rest of the system take **ports** (`hera_tools.ports`), because this package may
-  not import memories, skills or chats — the application wires them, and what is unwired
-  answers "not available in this deployment" rather than vanishing from the catalogue.
+- **An in-process server is not a special case.** It is reached over the SDK's in-memory
+  transport by the same client every other server is reached by, listed in the same catalogue,
+  checked by the same policy. Her own four tools are one of these and now live in `hera_mcp`;
+  this package neither imports it nor knows what is on it.
 - **The SDK is `mcp` 2.x**, whose `Client` accepts a URL, `StdioServerParameters`, a transport,
   or a `Server` object for the in-process case. Note `httpx2`, not `httpx`: the MCP SDK ships
   its own HTTP client library, and that is how request headers reach a remote server.
@@ -120,10 +165,13 @@ Two things worth knowing before building on the foundation:
 
 ### What `hera_profiles` settled
 
-- **Twelve regions, not fifteen.** `grammar` is gone: it described the EMOTION/NOTE/TRACE/CALL
-  text format that ADR 2 deleted, and shipping it would invite the model to use a call syntax
-  nothing parses. `mem_overview` folded into `memory_instr`, and `mem_ex` waits for
-  `hera_memories`, where it is a collection rather than a region.
+- **Twelve regions, and which twelve has moved.** `grammar` is gone: it described the
+  EMOTION/NOTE/TRACE/CALL text format that ADR 2 deleted, and shipping it would invite the model
+  to use a call syntax nothing parses. `mem_overview` folded into `memory_instr`, and `mem_ex`
+  waits for `hera_memories`. Then `emotion_vocab` left and `language` arrived: the stance list
+  became data (a slot, `SLOT_EMOTIONS`, bound per turn) because the interface needs to know that
+  *doubt* is cool, and answering in English became a region because a behaviour with no line in
+  the mind is one nobody can find and nobody can change.
 - **Two doors, not one door and a filter.** `MindRepository.write()` is the person's and opens
   every region including `safety` — that is the actual mechanism behind "add a rule without
   touching code". `propose()` is everything else's and raises `RegionLocked` on an owner-fixed
@@ -199,6 +247,10 @@ wrote.
   call with no result still gets a message saying it never ran.
 - **Text is coalesced before storage.** Hundreds of `text_delta` events become one; the variant
   is unchanged, so live view and reload still render the same thing.
+- **A chat can pin skills.** `chat.pinned_skills`, merged by the turn ahead of the profile's and
+  the project's pins — the most specific and most deliberate of the three wins the budget. The
+  column is JSON, so `ChatRepository.save()` flags it the way `Project` and `Message` already
+  do; an in-place edit followed by a bare flush is silently lost.
 - **`Tools` is a narrowing port, not an inverting one.** `hera_chats` may import `hera_tools`
   and does; the protocol says which three methods a turn actually uses, and lets a test drive
   the loop without MCP servers.
@@ -246,6 +298,100 @@ wrote.
   scroll handler writes, and calling an initialiser from an `$effect` when the initialiser both
   reads and writes the same state. One-time setup goes at the top of the component; `ssr =
   false` means it only ever runs in the browser anyway.
+- **A tool call reads as an action, not as machinery.** `$lib/tools.ts` opens the qualified name
+  up: *called **Docker** fetch content*, with `docker__fetch_content` on hover and under the
+  permission card, because that is what a rule is written against. The server is set in the
+  sentence rather than boxed — five chips down a gutter read as a form, the same five words in
+  bold read as a list of things she did. The one liberty taken with somebody else's word is
+  raising its first letter, because a lowercase proper noun mid-sentence reads as a typo.
+  Otherwise it is a string transformation with **no table of known tools**: one would make an
+  unfamiliar server look broken next to a familiar one.
+- **Three marks in the gutter, split by what happened rather than by which event carried it.** A
+  thought keeps the ocellus. A skill gets a **scroll** — whether the router selected it before
+  the turn or she reached for it with `hera__skill` mid-task, because those are the same thing to
+  a reader and letting the plumbing decide the picture is how a category stops looking like one.
+  Everything else she reached for gets a **wrench**. Knowing those two names is not recognising
+  tools in general: `hera__*` is her namespace and the interface already draws one of them as a
+  card. Each mark sits on the ground colour and **breaks the hairline** rather than having it
+  drawn through — an eye with a wire through it is not an eye.
+- **A long tool result scrolls inside its row.** A skill body is a document arriving in a gutter
+  row; it now sits in a fixed frame with a line count under it, instead of pushing her answer
+  off the screen. A `text` block is no longer listed under the text it already showed.
+- **A fenced code block has a copy button.** Rendered as a `figure` with a caption bar — the
+  language on the left, *Copy* on the right — and the click is caught once on the container by
+  an action, because Svelte cannot bind a handler to markup it did not render. What it copies is
+  read off the DOM rather than carried in a `data-` attribute: an attribute would be a second
+  copy of every program she writes and a second thing to escape correctly.
+- **No stance she can hold is an error.** The emotion card was drawing *warm* in pomegranate,
+  which beside `--danger` in a dark interface reads as an alarm — so *agree* looked like
+  something had gone wrong. Warm and careful are both brass now, told apart by the glyph, and
+  nothing in that component may be the danger colour.
+- **The vocabulary is one list, editable.** Settings → Emotions writes `~/.hera/emotions.json`;
+  the same list renders into the prompt per turn and picks the colour the card is drawn in. It
+  is deliberately *not* in the tool description, which is fixed when the MCP server is built —
+  a vocabulary you can edit on screen has to apply on the next turn rather than the next
+  restart. **Reset** deletes the file, so "reset" and "never touched" are the same state and a
+  later change to the shipped list still reaches you.
+- **Skills can be started from the interface.** *Add a skill* writes the same `SKILL.md` a person
+  would write by hand. The writing is in `apps/core`, not `hera_skillsets`: that package reads
+  the skills directory and says it does not write to it, and a library that both discovers
+  content and creates it ends up owning a format it was only meant to read. The row now reads
+  author first, licence as a quiet chip after it, and the version on the right where a column of
+  them can be compared with what a repository says is current.
+- **An answer you did not want has three ways out.** Copy, edit the question, try again — a
+  quiet row under each message that appears on hover or focus. Edit and try again are one
+  request (`POST /chats/{id}/messages/{message_id}/redo`) because they are one idea: the
+  conversation goes forward from this point differently. Pointed at an answer, the question
+  above it is what gets replayed.
+- **A redo deletes what came after, rather than flagging it.** `MessageRepository.truncate_from`
+  removes the question and everything below it before the new turn starts. A chat *is* its
+  message list — history is rebuilt from it — so a `superseded` column would mean every reader
+  has to remember to filter, and the one that forgets shows the model a conversation nobody
+  had. The browser drops the same messages optimistically, so the screen is never still
+  showing an answer to a question that no longer exists.
+- **A chat is a thing you can rename and throw away.** The rail's `⋯` opens rename — an input
+  where the title was, not a prompt box — and delete behind a confirmation. `PATCH /chats/{id}`
+  is the whole backend of it. A title typed by hand sticks, because `ChatRepository.touch()`
+  only ever names a chat that has none; clearing it hands naming back to her.
+- **The composer says what she is running on and what is switched on.** The model selector sits
+  beside send and activates a registered endpoint without a restart, and a pill beside `＋`
+  counts pinned skills and connected servers with the names in its tooltip. Retrieval's picks
+  are deliberately not counted: this says what is *always* on, and a number that changed with
+  every message would be noise. The Enter hint moved to the top right of the field and fades as
+  soon as there is something to send.
+- **A person can say which skills apply.** ADR 5 keeps the *model* out of that decision; this is
+  the other half of the sentence. The composer's context pill opens a picker, and what it toggles
+  is `chat.pinned_skills` — a new JSON column, migration `0003`. The turn merges chat pins ahead
+  of the profile's and the project's, because the chat is the most specific and the most recent
+  thing anybody said about this conversation. It is not a filter: retrieval still runs and can
+  still add more. A pin whose folder is gone is *not* refused on the way in — the router already
+  reports it as `missing`, and refusing here would mean a skill moved aside for an afternoon
+  silently loses every pin that named it.
+- **A skill row answers who wrote it.** `author`, `license`, `icon` and `version` come from
+  frontmatter `hera_skillsets` still refuses to interpret, lifted into named fields in the API
+  where the audience is a screen. The verified mark comes from `~/.hera/trusted.json` — skill
+  id to SHA-256 — and has three states, because a skill you signed and somebody then edited is
+  not the same thing as one you never signed. Nothing is verified by default and that is not a
+  complaint; the signed registry it is a seam for does not exist yet.
+- **Her prose is typeset, not dumped** — [ADR 11](adr/0011-markdown-and-tex-in-the-browser.md).
+  `$lib/markdown.ts` renders Markdown and TeX and sanitises the result; `$lib/components/Prose`
+  draws it, and `app.css` styles it, because `{@html}` output is out of reach of Svelte's
+  scoped styles. Setext headings are disabled so `---` is always a rule rather than a promotion
+  of the line above it, and `$…$` is refused around anything that looks like a price. The rule
+  that has not moved is the one about structure: what she *did* is an event variant, never
+  something read back out of prose. Her **thinking** goes through the same renderer, a step
+  smaller and muted — it is written in the same notation her answers are.
+- **The reading column is the measure.** `--column` is 68ch of the body face at 17px, measured
+  in a browser with the webfont loaded — Georgia, the fallback, is a sixth wider, so the number
+  is 612px and not the 710px you get from measuring too early. Before this the column was
+  760px and only the prose was capped, so her answer stopped 100px short of the edge the user
+  bubble, the cards and the composer all reached, and the whole message read as nudged
+  off-centre.
+- **A section waiting on a request keeps its heading.** The profile card's *About* block was
+  hidden until `health` came back, so the menu grew under the pointer and an end-to-end test
+  failed roughly one run in six — the click was sometimes faster than the round trip. The
+  heading renders immediately with a line saying it is asking. Worth the note because the
+  symptom was a flaky test and the cause was an interface that changed shape after opening.
 - **An emotion is drawn once.** Its `tool_call_ready` renders as a card inline; the matching
   `tool_result` would otherwise fall through to a gutter row and draw the same thing twice. A
   *failed* emotion keeps its row — one she showed and the system refused is exactly what
@@ -272,16 +418,35 @@ wrote.
   commonest thing to be wrong on a fresh install, and it belongs on the screen you were already
   looking at — next to the list of models the endpoint *did* report, each with a button that
   fills the field.
+- **One version, declared once and read back.** `apps/core/pyproject.toml` is where it is
+  written; `hera_core.__version__` asks `importlib.metadata` for the installed distribution
+  rather than repeating the number, `/health` reports it, and the interface holds it on
+  `workspace.version` so a second place that shows it costs a field rather than a request. It is
+  on the start screen, centred at the foot. `release.yml` now checks the application tag against
+  that file the way it always checked a package tag, so `v1.2.3` cannot ship an About box saying
+  something else.
+- **New chat goes to the start screen.** It used to create a chat and navigate into it, which
+  opened every conversation as an empty transcript — the one screen in the application with
+  nothing on it — and left an empty row in the rail if you walked away. The start screen is
+  already where beginning a conversation is designed to happen. A project's own **＋** carries
+  the project through the store, the same way the first message does.
 - **Two doors, two questions.** Settings is *how she works* — Models, Skills, Servers,
   Permissions, Mind, and Dreaming listed as v0.2. The profile card at the bottom of the rail is
   *you and this machine* — appearance, which of her answers, where your data is. Mixing them is
   how a person scrolls past six model fields to find a light-mode toggle.
 - **Attachments are a field, not text.** The `＋` on the composer bar reads a file in the
-  browser and sends it as data; the model gets it inlined by `hera_chats.history.compose`, and
-  the interface draws a chip from a name and a size. Inlined, drawing that chip would mean
-  hunting for a fence and a filename in the prose — a parser, and the one rule this project will
-  not bend. `title_from` now takes only the opening paragraph, so a file under a question does
-  not end up in the sidebar.
+  browser and sends it as data; the model gets it composed by `hera_chats.history.content_of`,
+  and the interface draws a chip from a name, a size and a media type. Inlined, drawing that chip
+  would mean hunting for a fence and a filename in the prose — a parser, and the one rule this
+  project will not bend. `title_from` now takes only the opening paragraph, so a file under a
+  question does not end up in the sidebar.
+- **A picture is a content part.** `ChatMessage.content` is a string *or* a list of
+  `TextPart | ImagePart`, and `content_of` is the only place that decides which. A message with
+  no picture in it stays a bare string on the wire, because that is the shape every local server
+  has been serving since before parts existed and being unremarkable is worth more than being
+  uniform. Limits: 2 MB a text file, 12 MB a picture, PNG/JPEG/WebP/GIF. Whether the endpoint
+  behind the active model can *see* is the endpoint's business — a text-only server answers with
+  an error, and that error is the honest one.
 
 ### The guards
 
@@ -372,7 +537,7 @@ or pointed at directly by Claude Code. They live in the separate `hera-skills` r
 
 ## What comes next
 
-**v0.1 is spine-complete.** ~~`hera_tools`~~ → ~~`hera_profiles`~~ → ~~`hera_skillsets`~~ →
+**v0.1 is spine-complete.** ~~`hera_tools`~~ → ~~`hera_mcp`~~ → ~~`hera_profiles`~~ → ~~`hera_skillsets`~~ →
 ~~`hera_chats`~~ → ~~`apps/core`~~ → ~~the end-to-end suite~~. Every package exists and the
 whole path runs.
 
@@ -391,6 +556,15 @@ whole path runs.
    tool catalogue, the emotion vocabulary.
 4. **The gaps left on purpose.** The command palette behind `⌘K` (it opens Settings for now),
    the mobile sheet, project instructions in the interface, and the embedder seam.
+5. **The rest of the tool surface.** `hera__search` now exists — see below — but `fetch` does
+   not, so she can find a page and not read it. That and the rest of what using the build argued
+   for (a per-chat scratchpad, an emotion that can ask a question back, artifacts, and the
+   eventual split into `hera_code_mcp` and `hera_sandbox`) are written up in
+   [tooling.md](tooling.md). Notes rather than decisions: nothing there has an ADR yet.
+
+**PDFs are in v0.1.0.** Reading them is scoped in rather than deferred — a paper, a spec and a
+scanned invoice are ordinary things to put in front of her, and the composer currently refuses
+all three. Where the extraction happens is open; see [tooling.md](tooling.md) § 6.
 
 **v0.2 — what makes her Hera.** `hera_memories` (embeddings, retrieval, caps, dedup, hits),
 trace compaction and the context meter, `hera_promptevo` (dreaming and experience training).

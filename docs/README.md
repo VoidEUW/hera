@@ -5,6 +5,7 @@
 | [status.md](status.md) | Where the rebuild stands, what is settled, what comes next. **Start here** after a break. |
 | [adr/](adr/) | Architecture decision records — why the system has the shape it has. |
 | [frontend.md](frontend.md) | The design language of the interface: the story, the palette, the type, and how a turn is rendered. Provisional until there is a build to argue with. |
+| [tooling.md](tooling.md) | What she should be able to reach for and cannot: search, a scratchpad, artifacts, an emotion that asks. **Notes, not decisions** — argued from using the build, and none of it has an ADR yet. |
 | [hera-storage.md](hera-storage.md) | The specification `hera_storage` was built against. A contract, in German, kept as written. |
 | [hera-prompts.md](hera-prompts.md) | The specification the `hera_prompts` compiler was built against. A contract, in German, kept as written. |
 | [prototype.md](prototype.md) | The guidance file of the previous version of Hera. **Historical.** |

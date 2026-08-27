@@ -28,17 +28,25 @@ jobs:
             package="${BASH_REMATCH[1]}"
             echo "package=$package" >> "$GITHUB_OUTPUT"
             echo "directory=packages/${package//-/_}" >> "$GITHUB_OUTPUT"
+            echo "version=${GITHUB_REF_NAME##*-v}" >> "$GITHUB_OUTPUT"
           else
             echo "package=" >> "$GITHUB_OUTPUT"
-            echo "directory=." >> "$GITHUB_OUTPUT"
+            # The application is `hera-core` at apps/core, and its pyproject is what
+            # `hera_core.__version__` reads back out of the installed distribution — so this
+            # is the file the tag has to agree with for the About box to be telling the truth.
+            echo "directory=apps/core" >> "$GITHUB_OUTPUT"
+            echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
           fi
 
+      # Every tag, the application's included. The version is declared in exactly one file per
+      # thing that can be released and read back from packaging at runtime, so this is the only
+      # place the two could drift apart -- and it is a release that fails rather than an
+      # interface quietly showing the version of the release before it.
       - name: Check the tag matches the declared version
-        if: steps.target.outputs.package != ''
         run: |
           directory='${{ steps.target.outputs.directory }}'
           declared=$(grep -m1 '^version = ' "$directory/pyproject.toml" | cut -d'"' -f2)
-          tagged="${GITHUB_REF_NAME##*-v}"
+          tagged='${{ steps.target.outputs.version }}'
           if [ "$declared" != "$tagged" ]; then
             echo "::error::$directory/pyproject.toml declares $declared but the tag says $tagged"
             exit 1

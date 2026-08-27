@@ -8,8 +8,11 @@ from **experience training** you feed her, reflects on her own conversations (**
 speaks with **emotion cards** next to her prose. Her tools come from **MCP servers** and her
 know-how from **`SKILL.md` skills**, so both are portable to and from the rest of the ecosystem.
 
-> Status: v0.1 is under construction. The tree is being rebuilt from scratch; see
-> [ARCHITECTURE.md](ARCHITECTURE.md) for the target and [docs/adr/](docs/adr/) for why.
+> Status: **v0.1 is complete and the spine runs end to end** — a message typed into the browser
+> reaches a model through the skill router, the mind and the turn orchestrator, and comes back as
+> events the interface renders. See [CHANGELOG.md](CHANGELOG.md) for what is in it and what is
+> deliberately not, [ARCHITECTURE.md](ARCHITECTURE.md) for the shape, and [docs/adr/](docs/adr/)
+> for why. Memory, retrieval and dreaming are v0.2.
 
 ## What makes it different
 

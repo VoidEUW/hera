@@ -11,7 +11,7 @@ dependency is wrong, not the design.
    hera_profiles         hera_promptevo              │
    hera_tools            hera_memories        hera_skillsets
    hera_prompts *        hera_providers       hera_permissions      hera_chats
-                        hera_storage *
+                        hera_storage *          hera_mcp
                          hera_home
 ```
 
@@ -20,6 +20,12 @@ rest, but they know nothing about Hera and never will: no table, no chat, no too
 and no import of another `hera_*` package — not even each other. Either must be liftable into an
 unrelated project unchanged. `tests/test_layering.py` gives them an empty allow-list so this is
 checked, not trusted.
+
+`hera_mcp` has an empty allow-list too, for a different reason: it is *entirely* about Hera —
+her own tools, the vocabulary of `emotion`, the sentence a model reads before calling
+`remember` — but what it needs from the rest of the system arrives as a port, so it imports
+nothing of ours. It is the server she **is**; `hera_tools` is the client she **has**, and the
+client does not know it exists. The application mounts one into the other.
 
 `hera_home` is the exception that proves the layering rule rather than a violation of it. It is
 *not* domain-free — it says the word "hera" and knows the shape of `~/.hera` — but it depends on
@@ -37,7 +43,8 @@ as an empty mind directory rather than as an error.
 | `hera_prompts` | The prompt compiler: `Prompt`, `Section`, traits, renderers, budget, `fingerprint()`. Foreign content enters only as pre-rendered strings through named slots. | Does not know what a tool, memory, skill or chat is; no persistence, no I/O |
 | `hera_providers` | Talking to a model. httpx streaming, the Qwen adapter, embeddings, and a `FakeProvider` for tests. Emits one normalised event union. | Knows nothing about chats, prompts or tools |
 | `hera_permissions` | Whether a tool call may run: allow / deny / ask, per pattern, per profile. Pure logic. | No I/O, no registry of actual tools |
-| `hera_tools` | The MCP client: server lifecycle, tool catalogue, namespacing, dispatch — plus Hera's own built-in server (`emotion`, `remember`, `note`, `skill`), which takes what it needs from above as injected **ports**. Above `ToolRegistry`, a failed call is a `ToolResult`, never an exception. | Does not decide policy, does not build prompts, does not import memories, skills or chats |
+| `hera_mcp` | The MCP server Hera **is**: `emotion`, `remember`, `note`, `skill` on a real `MCPServer`, the **ports** the three that touch the rest of the system take, and the stance vocabulary `hera__emotion` draws on. The tool descriptions are prompt text — changing them changes her behaviour. | Imports no other `hera_*` package. Does no I/O: where the person's own vocabulary is stored is `hera_core.emotions` |
+| `hera_tools` | The MCP **client**: server lifecycle, tool catalogue, namespacing, dispatch. Mounts whatever in-process server it is handed, under that server's own name. Above `ToolRegistry`, a failed call is a `ToolResult`, never an exception. | Does not decide policy, does not build prompts, does not import memories, skills or chats — and does not know `hera_mcp` exists |
 | `hera_skillsets` | `SKILL.md` packages on disk, the **router** that picks them server-side — pinned, `/slash`, retrieved — and per-owner usage counts. Bad content is a reported problem, never an exception. | Does not ask the model which skill it wants; does not write to the skills directory; does not know what a profile or a project is |
 | `hera_profiles` | The mind: twelve named regions as files in a git repository, behaviour traits, profiles that select and override them, and the builder that turns the lot into a `hera_prompts.Prompt` with slots left open. Answers *who she is*; a project answers *what we are working on*. | Does not render, does not stream, does not know what fills a slot |
 | `hera_chats` | **Projects**, chats, messages, the persisted `ChatEvent` stream (ADR 10), and the turn orchestrator. A project is a container with behaviour — instructions, pinned skills, a default profile, and later its own files — not a folder. | Does not know which provider or which tools exist — both arrive injected; does not answer *who she is*, which is `hera_profiles`; raises nothing — a turn closes with a reason |
@@ -106,7 +113,17 @@ code, in `hera_skillsets`.
   skills/<name>/SKILL.md skill packages, syncable from a git repo
   mcp.json               Claude-Desktop-compatible `mcpServers` shape
   config.toml            registered endpoints, written by the interface
+  trusted.json           skill ids and the SHA-256 you accepted; optional
+  emotions.json          her stance vocabulary, once it has been changed; optional
 ```
+
+`trusted.json` is what a **verified** mark on the Skills screen means, and it is the only thing
+that can mean it: a skill that declared its own trustworthiness would have declared nothing.
+`hera_skillsets` digests each `SKILL.md` because it is already holding the bytes; `apps/core`
+decides what the digest means, because one file covers both skills and — later — MCP servers,
+and neither of those packages may import the other. A listed id whose digest no longer matches
+reads as **changed**, which is a different sentence from *never verified* and the one worth
+saying out loud.
 
 `config.toml` holds the model providers — several may be registered, one is active. Each library
 still reads its own `HERA_*` environment variables and the file is **seeded from them** the

@@ -14,6 +14,8 @@ OpenAI-compatible endpoint.
 - `ARCHITECTURE.md` — the packages, the layering rule, the shape of a turn
 - `docs/adr/` — why the structure looks like this; read 2 (Qwen only), 3 (emotions as tool
   calls) and 5 (deterministic skill routing) before changing model-facing behaviour
+- `docs/tooling.md` — what she should be able to reach for and cannot. Notes, not decisions;
+  read it before adding a tool, and read § 1 before concluding she has no search *on purpose*
 - `CONTRIBUTING.md` — setup, the check loop, branching
 - `docs/README.md` — what the prototype document is still good for, and what it is wrong about
 
@@ -34,16 +36,24 @@ endpoint; it never runs in CI.
 ## Rules that are not negotiable
 
 **Imports point downwards.** The table in `ARCHITECTURE.md` is the authority, and
-`tests/test_layering.py` enforces it. `hera_storage`, `hera_prompts`, `hera_providers` and
-`hera_permissions` import no other `hera_*` package; the first two contain no domain concept at
-all and must stay liftable into an unrelated project.
+`tests/test_layering.py` enforces it. `hera_storage`, `hera_prompts`, `hera_providers`,
+`hera_permissions` and `hera_mcp` import no other `hera_*` package; the first two contain no
+domain concept at all and must stay liftable into an unrelated project.
+
+**Two MCP packages, and the difference matters.** `hera_mcp` is the server she *is* —
+`hera__emotion`, `hera__remember`, `hera__note`, `hera__skill`, `hera__search`, and the ports
+the last four take. `hera_tools` is the client she *has*, and it does not know the other exists: it mounts
+whatever in-process server the application hands it, under that server's own name. Her tool
+descriptions are prompt text; edit them in `hera_mcp` and her behaviour changes.
 
 **One event union.** `hera_providers` defines what a model can emit; everything above consumes
 it. If you are writing a parser for model output outside that package, something is wrong — the
 answer is almost always a tool call.
 
 **No second parser in the browser.** The frontend renders event variants it is given. This is
-the single largest source of bugs in the previous version and it is designed out.
+the single largest source of bugs in the previous version and it is designed out. Typesetting
+her prose as Markdown and TeX is not that parser and may not become one — it draws text as what
+it is and reads no meaning back out of it. See ADR 11.
 
 **The server render is authoritative.** The client replaces its optimistic view with the
 persisted event list at `done`.
@@ -56,6 +66,39 @@ goes through i18n so a German locale can be added later.
 
 **Tables** carry a package-prefixed `__tablename__`; cross-package references are bare `UUID`
 columns, never `ForeignKey`; migrations live in `apps/core`.
+
+## What lives in `~/.hera`
+
+| | |
+|---|---|
+| `hera.sqlite3` | everything relational |
+| `mind/` | a real git repository, one file per mind region |
+| `skills/<name>/SKILL.md` | skill packages |
+| `mcp.json` | MCP servers, in the Claude-Desktop `mcpServers` shape |
+| `config.toml` | registered model endpoints, written by the interface |
+| `trusted.json` | **where trusted skills are recorded** — optional |
+| `emotions.json` | her stance vocabulary, when it has been changed — optional |
+
+`trusted.json` is the only thing that can put a *verified* mark on a skill, because a skill
+vouching for itself has vouched for nothing. It maps an identifier to the SHA-256 of the content
+you accepted:
+
+```json
+{ "skills": { "tdd": "9f2c…" } }
+```
+
+`hera_skillsets` digests each `SKILL.md` (it is already holding the bytes); `hera_core.trust`
+decides what the digest means, because the same file will cover MCP servers and neither package
+may import the other. Three verdicts: **verified**, **modified** — listed but the content has
+changed since, which is worth saying loudly — and **unknown**, which is the ordinary state and
+not a complaint. No file means nothing is verified; the signed registry this is a seam for does
+not exist yet.
+
+**Her vocabulary is data, her behaviour is prose.** The stances she can show live in
+`emotions.json` (`hera_mcp.DEFAULT_EMOTIONS` until something is changed), edited on
+Settings → Emotions, rendered into the prompt per turn *and* used to colour the card — one list,
+so the two cannot disagree. Which language she answers in is the `language` mind region, edited
+on Settings → Mind like every other behaviour.
 
 ## State of the build
 

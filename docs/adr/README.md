@@ -17,3 +17,4 @@ later.
 | [8](0008-github-flow-and-required-checks.md) | GitHub Flow, protected `main`, required checks | accepted |
 | [9](0009-one-application-package.md) | One application package, `hera-core` at `apps/core/` | accepted |
 | [10](0010-chat-events-wrap-the-provider-union.md) | The persisted stream wraps the provider union rather than extending it | accepted |
+| [11](0011-markdown-and-tex-in-the-browser.md) | Her prose is typeset in the browser, as Markdown and TeX | accepted |

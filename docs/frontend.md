@@ -87,9 +87,11 @@ Three things cannot be borrowed and should not be:
   her own, and the shortlist below picks warmth over prestige.
 - **The mark.** The orange starburst is Anthropic's trademark. Hera needs her own, and she has a
   far better one available — see *The signature*.
-- **The exact palette.** Copying the clay orange is what would make this read as a Claude
-  reskin rather than as Hera. The *temperature* is the thing worth keeping; the hues should come
-  from her.
+- **The exact palette.** Not the accent — the accent was never in danger, because rose, teal and
+  gold together are nobody's but hers. It is the **neutrals**: a cream ground under white cards
+  is the thing a person recognises from across a room, and no amount of unfamiliar accent on top
+  of it changes that. The *temperature* is worth keeping and the *hue* had to come from her, so
+  the ground is a red-warm plaster rather than a yellow-warm oatmeal. See **Colour**.
 
 That is not a legal footnote, it is the whole difference between a clone and the "special
 feeling" the brief asks for. Take the bones, bring our own blood.
@@ -145,15 +147,23 @@ she did, and where. Nothing else in the interface may use concentric circles.
 
 ## Colour
 
-Warm on both ends. The dark ground is a warm charcoal, never blue-grey; the light ground is warm
-paper, never white. The three accents are not interchangeable — each one means something, and
-using the wrong one is a bug:
+**Parchment and laurel — gold leads.** She is a goddess and the interface should be able to say
+so, so the ground itself is gold: aged vellum by day, a gold-brown black by night. The green
+beside it is what keeps that from being gaudy — laurel is the thing that grows, and warm gold
+against a living green is the oldest familiar pairing there is. Natural, domestic, and not
+borrowed from anybody.
+
+Nothing here is pure white or pure black, and the parchment is deliberately *saturated*: a pale
+gold at four percent is not parchment, it is cream.
+
+The three accents are not interchangeable — each one means something, and using the wrong one is
+a bug:
 
 | Token | Means | Used for |
 |---|---|---|
-| `pomegranate` | **her** | The mark, the send action, the active chat, her name |
-| `peacock` | **her attention** | Thinking, a tool running, the ocellus iris, live state |
-| `brass` | **her authority** | Skills, permission cards, the ring of the mark, emphasis |
+| `brass` | **her authority** | The leading colour: the mark's ring, skills, permission cards, the active chat, emphasis |
+| `laurel` | **her attention** | Thinking, a tool running, the ocellus iris, live state |
+| `pomegranate` | **her** | The send action and her name — the two places that are *her*, and nothing else |
 
 Mapping meaning onto hue is what keeps the palette from being decoration. If a colour appears
 somewhere and you cannot say which of the three sentences above it is saying, it does not belong
@@ -162,36 +172,54 @@ there.
 ### Dark (default)
 
 ```
---ground            #15100E   the page
---surface           #1E1815   sidebar, composer, cards
---surface-raised    #272019   modal, hover, the settings sheet
---line              #362C26   hairlines, dividers, the activity gutter
---text              #F2E9E1   prose
---text-muted        #A79A90   labels, metadata, collapsed activity
---text-faint        #7A6E66   placeholders, disabled
+--ground            #17130A   the page — gold-brown black
+--surface           #211B10   sidebar, composer, cards
+--surface-raised    #2C2416   modal, hover, the settings sheet
+--line              #3D3421   hairlines, dividers, the activity gutter
+--text              #F4EEDF   prose
+--text-muted        #B0A68D   labels, metadata, collapsed activity
+--text-faint        #7F7660   placeholders, disabled
 
---pomegranate       #D9636B
---peacock           #35A093
---brass             #C9A24C
+--brass             #D9AE52   leads
+--laurel            #7FB069
+--pomegranate       #DE4E64   crimson, not coral
 --danger            #E0685E   refusals, failed tools
 ```
 
 ### Light
 
 ```
---ground            #FBF7F2
---surface           #FFFFFF
---surface-raised    #F4EDE4
---line              #E4D9CD
---text              #1E1613
---text-muted        #6E625A
---text-faint        #968A81
+--ground            #F6EEDB   vellum — saturated, so it is parchment and not cream
+--surface           #FDFAF1   off-white on purpose; see below
+--surface-raised    #EFE4CC
+--line              #E0D2B4
+--text              #201B10
+--text-muted        #6B6250
+--text-faint        #9A8F79
 
---pomegranate       #A93744
---peacock           #1D6157
---brass             #8E6E27
+--brass             #8A6A1C
+--laurel            #3F6B32
+--pomegranate       #A82A45
 --danger            #B03A2E
 ```
+
+**How this got here, in two moves.** The first pass said *warm charcoal, never blue-grey; warm
+paper, never white*, and produced `#FBF7F2` under `#FFFFFF` cards — a cream ground under white
+cards, which is the most recognisable arrangement in this whole category. The accents were never
+the problem; the **neutrals** were, because they are what a person recognises from across a room
+before they have read a word.
+
+The ground moved twice: first off cream and onto a rose plaster, then onto gold — which is where
+it belonged, because gold is the thing that is actually *about her*. The saturation is what makes
+that safe. A gold neutral pale enough to be tasteful is a cream, and this one is not pale.
+
+`peacock` became `laurel` in the same move. The teal was the eye of the peacock and the eye is
+still an ocellus — peacock plumage is green as well as blue — but a leaf green does the job the
+colour actually has, which is to look like motion when something is running.
+
+`danger` stays a salmon-orange and is deliberately *not* harmonised with the crimson. The two
+never appear near each other, and a failure that looked like her would be the wrong kind of
+quiet.
 
 Three appearance settings, matching the reference: **system**, **light**, **dark**. System is the
 default, because a person who has already told their machine wants the same answer here.
@@ -223,6 +251,26 @@ mono         13.5 / 1.55 IBM Plex Mono
 ```
 
 Measure caps at **68ch**. Longer lines are the fastest way to make a reading interface tiring.
+The reading column **is** that measure — `--column`, 612px, which is 68ch of Source Serif 4 at
+17px with the webfont actually loaded — so her prose, a user bubble, the activity gutter, the
+cards and the composer all sit on one axis. A column wider than the measure is the version of
+this that looks broken: only the prose gets capped, so her answer stops short of the edge
+everything around it reaches and the message reads as nudged off-centre.
+
+### How prose is set
+
+Her answers are Markdown with TeX in them, and they are typeset rather than shown as source —
+[ADR 11](adr/0011-markdown-and-tex-in-the-browser.md). Headings follow the scale above, a fenced
+block gets the mono face on `--surface` inside a hairline, a table scrolls inside the column
+rather than widening it, and a formula is set by KaTeX in the text colour so it reads as part of
+the sentence rather than as an image dropped into it.
+
+`---` is a hairline with air on both sides: a separator when she meant a break in the argument,
+a breath when she meant a gap between two parts. It is never a heading — Markdown's setext form
+would promote the sentence *above* it, which is the opposite of what she meant by it.
+
+Syntax highlighting is not in yet. It is a palette decision of its own and belongs in the same
+pass as everything else under **Open**.
 
 ## Motion
 
@@ -391,7 +439,7 @@ and it is designed out (`CLAUDE.md`, ADR 2, ADR 3).
 | Event | Renders as |
 |---|---|
 | `text_delta` | Her prose, `body`, streamed in |
-| `thinking_delta` | The reasoning channel — collapsed by default, one line in the gutter |
+| `thinking_delta` | The reasoning channel — collapsed by default, one line in the gutter per **block** |
 | `tool_call_ready` | A gutter row: ocellus, verb, target, and its result when it lands |
 | `tool_call_ready` where `name == "hera__emotion"` | An **emotion card**, inline where it was called |
 | `turn_end` | Ends the turn; `reason: cancelled` marks it visibly as interrupted |
@@ -407,11 +455,34 @@ Everything she did before speaking stacks above the prose as collapsed rows, eac
 verb, the target, and how long it took:
 
 ```
-┆◉  used   writing                                    skill · pinned
-┆◉  read   fs__read_file    ~/notes/kerberos.md              12 ms
-┆◉  ran    shell__git       status                          210 ms
-┆◉  thought for 4s                                              ▾
+┆◉  thought    61 words                                            Show
+┆▤  skill      writing                                   skill · pinned
+┆◍  search     kerberos ticket lifetime                          719 ms
+┆✎  note       kerberos                                           12 ms
+┆🔧 called     Docker mcp find                                   210 ms
 ```
+
+**Her own tools name what they did; everybody else's name where they came from.** The mark has
+already said whose tool it is, so *called **Hera** skill* spends half a short row repeating it —
+where a reader wants *which* skill. A foreign tool is the opposite: the server is the most
+important thing about `mcp-find`, so it keeps *called **Docker** mcp find* and its wrench. The
+mapping from a tool name to a mark lives in `$lib/tools` and reads `hera__*` only; a table that
+learned somebody else's server would make one you have not configured look broken beside one you
+have.
+
+**A shut block still shows the last two lines of it.** A collapsed row saying *thought · 213
+words · Show* is a receipt: it tells you something happened and nothing about what, and following
+her reasoning meant opening a panel that grows under your cursor while the turn is still running.
+The tail is anchored to the *bottom* of a two-line box, so what you are looking at is the most
+recent thing she wrote, with the cut above it faded rather than chopped.
+
+**The gutter is in event order, and reasoning comes in blocks.** She thinks, calls something,
+reads the result and thinks again — so that is two rows with the call between them, not one row
+that grew. Folding a turn's reasoning into a single row at the top puts the second half of her
+thinking above the call that caused it, and the only way to read the turn in order is to scroll
+back to a block that has changed since you last looked at it. The rule for where a block ends is
+the server's coalescing rule (`hera_chats.coalesce`): anything between two fragments stops the
+merge, so the live view and the reload cannot disagree about how many rows there are.
 
 **Skills say why they are there.** ADR 5 selects them in code — pinned, `/slash`, or retrieved by
 similarity — and the interface shows which of the three it was. A person needs to be able to tell
@@ -506,7 +577,9 @@ direct and never coy. She is the goddess of the household, not a mascot.
 ## Constraints the design cannot negotiate with
 
 - **No parser in the browser.** The frontend renders event variants it is handed. A new thing she
-  can do is a new variant, never a new regular expression.
+  can do is a new variant, never a new regular expression. Typesetting her prose as Markdown and
+  TeX is not an exception to this and is not allowed to become one: it draws text as what it is
+  and reads no meaning back out of it (ADR 11).
 - **The server render is authoritative** at `done`.
 - **Every event variant needs a component**, including ones that arrive unknown — degrade
   visibly, never silently.

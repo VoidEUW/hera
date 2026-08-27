@@ -40,7 +40,8 @@ Open a pull request, let CI and CodeRabbit run, squash-merge, delete the branch.
 branches, no direct pushes to `main`, no merge commits — history stays linear.
 
 Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/):
-`feat(chats): stream tool results as events`. The type drives the changelog.
+`feat(chats): stream tool results as events`. The type drives the changelog — see
+[CHANGELOG.md](CHANGELOG.md), which is written per release rather than generated per commit.
 
 ## Writing code here
 
@@ -110,9 +111,18 @@ only thing that gets deployed:
 | `v1.2.3` | the application | the deployment |
 | `hera-skillsets-v0.1.0` | one package, wheel attached | other projects, e.g. `hera-code` |
 
-`release.yml` refuses a package tag whose version disagrees with that package's
-`pyproject.toml`, so a consumer can never be pinned to a lie. `main` being green means it is
-*releasable*, not released.
+`release.yml` refuses **any** tag whose version disagrees with the `pyproject.toml` it belongs
+to — `packages/<name>/` for a package, `apps/core/` for the application — so a consumer can never
+be pinned to a lie and the interface can never show the version of the release before it.
+`main` being green means it is *releasable*, not released.
+
+**One version per releasable thing, declared once.** `pyproject.toml` is where it is written and
+packaging is where it is read back: `hera_core.__version__` asks `importlib.metadata` for the
+installed distribution rather than repeating the number, `/api/v1/health` reports that, and the
+interface shows it from `workspace.version`. To display it somewhere new, read that field —
+do not add a constant.
+
+To cut an application release, bump `version` in `apps/core/pyproject.toml` and tag `v1.2.3`.
 
 While developing both sides at once, point at the checkout instead:
 
@@ -120,7 +130,7 @@ While developing both sides at once, point at the checkout instead:
 hera-prompts = { path = "../hera/packages/hera_prompts", editable = true }
 ```
 
-To cut a package release, bump `version` in its `pyproject.toml` and tag:
+To cut a *package* release, bump `version` in its `pyproject.toml` and tag:
 
 ```bash
 git tag hera-prompts-v0.1.3 && git push origin hera-prompts-v0.1.3
