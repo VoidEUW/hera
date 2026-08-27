@@ -3,12 +3,17 @@
 The design language of `apps/core/web`: what it feels like, what it is made of, and how a turn
 is put on screen.
 
-**Status:** first pass, written from the initial brief. It is expected to deepen once there is a
-running build to react to — the maintainer has said explicitly that the design language gets
-adjusted then. Treat the *direction* as settled and the *values* as proposals: every hex code
-and typeface below is a recommendation with a reason attached, and reasons can be argued with.
+**Status:** first pass, written from the initial brief — and now **built**, so the argument can
+start. Treat the *direction* as settled and the *values* as proposals: every hex code and
+typeface below is a recommendation with a reason attached, and reasons can be argued with.
 
-**Last updated:** 2026-08-27
+Everything structural in this document exists in `apps/core/web`: the rail with projects
+disclosing their chats, the start screen, settings as a modal with its own left nav, the ocellus
+at all three sizes, the activity gutter with a reason on every skill, emotion cards inline,
+the permission card, dark and light. What is *not* built is listed under **Open** at the bottom,
+plus the command palette behind ⌘K (it opens Settings for now) and the mobile sheet.
+
+**Last updated:** 2026-08-27 · **Built:** yes — `uv run hera serve`
 
 ---
 
@@ -509,5 +514,6 @@ Waiting on the maintainer, who has said more of the story is coming:
    *and* carry instructions. If that turns out to be one control too many, instructions win and
    the profile becomes a per-chat choice only.
 
-Everything in this document is provisional until there is a build to argue with, which is the
-point at which it gets rewritten rather than amended.
+Everything in this document was provisional until there was a build to argue with. There is one
+now, so this is the point at which it gets rewritten rather than amended — and the rewrite
+should be driven by looking at it, not by reading this.

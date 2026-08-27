@@ -3,7 +3,7 @@
 Where the rebuild stands and what is settled, so a new session can pick up without re-reading
 the history. Updated as milestones land — this file is a snapshot, not a changelog.
 
-**Last updated:** 2026-08-27 · **Version:** v0.1 in progress · **Strategy:** thin spine first
+**Last updated:** 2026-08-27 · **Version:** v0.1, the spine runs · **Strategy:** thin spine first, then deepen
 
 ---
 
@@ -53,7 +53,10 @@ packages/hera_tools/      the MCP client, the namespaced catalogue, and her own 
 packages/hera_profiles/   the git-backed mind, behaviour traits, profiles, the PromptBuilder
 packages/hera_skillsets/  SKILL.md packages, the router, usage counts
 packages/hera_chats/      projects, chats, the persisted event stream, the turn orchestrator
+apps/core/                hera-core: the FastAPI JSON/SSE API, alembic, the CLI
+apps/core/web/            the SvelteKit interface, built into the directory the API serves
 tests/                    repository-level guards (see below)
+tests/e2e/                Playwright against the real application and FakeProvider
 .github/                  CI, CodeQL, release, templates, CODEOWNERS, dependabot
 docs/adr/                 nine decision records
 ```
@@ -62,11 +65,15 @@ docs/adr/                 nine decision records
 tests, 99 % coverage. `FakeProvider` means every layer built on top is testable without a model
 running. The whole suite is 571 tests at 99 % coverage.
 
-**`hera_profiles`, `hera_skillsets` and `hera_chats` are built**, on the stacked branches
-`feat/hera-profiles`, `feat/hera-skillsets` and `feat/hera-chats`. Every package of v0.1 now
-exists; `apps/core` is the only thing left. Profiles brought `hera_home` with it:
-`HERA_HOME` had been resolved by `hera_tools.settings.hera_home()` with a note saying to lift
-it when a second package needed it, and the mind directory was that second package.
+**The whole of v0.1 exists and the spine runs**, on four stacked branches off `main`:
+`feat/hera-profiles`, `feat/hera-skillsets`, `feat/hera-chats`, `feat/hera-core`. A message
+typed into the browser reaches the model boundary through the router, the mind and the turn
+orchestrator, and comes back as Server-Sent Events the interface renders — verified in a real
+Chromium against `FakeProvider`, including that a reload shows exactly what was streamed.
+
+838 tests at 99 % coverage, plus 18 vitest and 3 Playwright. Profiles brought `hera_home` with
+them: `HERA_HOME` had been resolved by `hera_tools.settings.hera_home()` with a note saying to
+lift it when a second package needed it, and the mind directory was that second package.
 
 Two things worth knowing before building on the foundation:
 
@@ -196,6 +203,54 @@ wrote.
   and does; the protocol says which three methods a turn actually uses, and lets a test drive
   the loop without MCP servers.
 
+### What `apps/core` settled
+
+- **The streaming route commits before it streams.** A `Depends`-provided session commits at
+  teardown, which for a `StreamingResponse` is *after the last byte* — so the recording session
+  opened at the end of the stream found no assistant row and persisted the whole turn into the
+  void. The answer streamed perfectly and was gone on reload. The route now commits and
+  `expunge_all()`s deliberately: the first so another session can see the rows, the second
+  because `commit()` expires every instance and the turn reads the profile and project from a
+  worker thread.
+- **In-memory SQLite hid it.** `Database.in_memory()` uses a `StaticPool` — one connection
+  shared by every session — so a second session sees the first's *uncommitted* rows. The API
+  tests now use a file per test, which is the only way they can tell that class of bug apart
+  from correctness. Thirteen of them fail if the commit is removed.
+- **A single-page fallback is not `html=True`.** That flag serves `index.html` for a
+  *directory*; `/chat/<uuid>` — every deep link and every reload inside a conversation — comes
+  back 404. `_Interface` catches the 404 and serves the index, and a catch-all under `/api`
+  is registered *before* the mount so an unknown endpoint still answers JSON.
+- **Her own tools are allowed by default.** `Policy(fallback=ASK)` means every tool asks,
+  including `hera__emotion`, which ADR 3 makes the everyday case — a confirmation card several
+  times a turn teaches a person to click through cards without reading them, which is the
+  failure that actually matters. `DEFAULT_POLICY` allows `hera__*` and asks for the rest.
+- **Embeddings are deliberately unwired.** `SkillRouter.select()` is synchronous and
+  `hera_chats` runs it in a worker thread, so reaching the event loop from there means
+  threading the loop handle down to the embedder, and getting it subtly wrong deadlocks a turn.
+  ADR 5's keyword fallback is what runs. The cost is worse ranking, not a missing feature, and
+  `Embedder` is the seam it lands on in v0.2.
+
+### What the interface settled
+
+- **One reducer, two callers.** `turn.ts` runs on the live stream and on the persisted list, so
+  "the server render is authoritative" is a property rather than an intention — there is a test
+  asserting a coalesced list and a streamed one reduce to the same thing.
+- **The only parser in the browser is the SSE transport.** `EventSource` cannot POST, so the
+  response body is split on the protocol's own frame boundary. What comes out is JSON the
+  server already discriminated; nothing parses model output.
+- **An unknown variant renders as a row saying so.** An interface that drops what it does not
+  recognise makes a missing feature and a broken one look identical.
+- **Two reactive loops cost an afternoon.** `effect_update_depth_exceeded` stops Svelte
+  rendering the page at all, with nothing on screen to say why. Both causes are worth
+  remembering: assigning `scrollTop` inside an `$effect` that also reads the `$state` its own
+  scroll handler writes, and calling an initialiser from an `$effect` when the initialiser both
+  reads and writes the same state. One-time setup goes at the top of the component; `ssr =
+  false` means it only ever runs in the browser anyway.
+- **An emotion is drawn once.** Its `tool_call_ready` renders as a card inline; the matching
+  `tool_result` would otherwise fall through to a gutter row and draw the same thing twice. A
+  *failed* emotion keeps its row — one she showed and the system refused is exactly what
+  openness means you get to see.
+
 ### The guards
 
 Rules that would otherwise rot are tests, not prose:
@@ -209,8 +264,9 @@ Rules that would otherwise rot are tests, not prose:
 ### CI
 
 `lint` (ruff + every pre-commit hook) · `types` (mypy --strict) · `test` (3.12 and 3.13, 90 %
-coverage gate) · `web` · `e2e` · `analyze` (CodeQL, `python` and `actions`). The `web` and `e2e`
-jobs guard on `apps/core/web` existing and stay green until it lands.
+coverage gate) · `web` (prettier, eslint, svelte-check, vitest, build) · `e2e` (Playwright
+against the real application) · `analyze` (CodeQL, `python` and `actions`). The `web` and `e2e`
+guards now find what they were waiting for, so both do real work.
 
 **Known open:** CodeQL's `actions` queries report `actions/missing-workflow-permissions` five
 times against `ci.yml`, which declares no `permissions:` block and so runs every job with the
@@ -284,25 +340,28 @@ or pointed at directly by Claude Code. They live in the separate `hera-skills` r
 
 ## What comes next
 
-**v0.1 — the spine that runs.** ~~`hera_tools`~~ → ~~`hera_profiles`~~ → `hera_skillsets` →
-`hera_chats` (turn orchestrator, persisted event stream) → `apps/core` → the end-to-end suite.
+**v0.1 is spine-complete.** ~~`hera_tools`~~ → ~~`hera_profiles`~~ → ~~`hera_skillsets`~~ →
+~~`hera_chats`~~ → ~~`apps/core`~~ → ~~the end-to-end suite~~. Every package exists and the
+whole path runs.
 
-The order is unchanged, but the **depth** is: the remaining three go in thin first, until a
-message actually streams into the SvelteKit interface against `FakeProvider`, and are then
-deepened. `docs/frontend.md` says in as many words that the design language gets adjusted once
-there is a running build to react to, and it cannot be until there is one.
+**Now the deepening pass**, which is what the thin-spine strategy was for. In rough order:
 
-`hera_chats` is the next one, and it is the last package before the application.
+1. **React to the build.** `docs/frontend.md` says the design language gets adjusted once there
+   is something to argue with. There is now: run `uv run hera serve` and argue with it. Open
+   questions it can now answer — the display face, whether the ocellus lands, where thinking
+   lives, the exact palette.
+2. **Her identity.** The twelve mind regions ship with placeholder text that says what belongs
+   in each. Writing them is what makes her Hera, and it is a text editor in Settings → Mind,
+   not code.
+3. **A real endpoint.** Everything so far runs against `FakeProvider`. Point
+   `HERA_PROVIDER_BASE_URL` at the local server and find out what Qwen3.6-35B actually does
+   with the prompt — the `xml` layout, the tool catalogue, the emotion vocabulary.
+4. **The gaps left on purpose.** The command palette behind `⌘K` (it opens Settings for now),
+   the mobile sheet, project instructions in the interface, and the embedder seam.
 
-`hera_chats` is the one to think about before starting it: it is where a tool *result* has to
-become something persisted and rendered, and the event union in `hera_providers` deliberately
-has no variant for one — it defines what a **model** emits, and a tool result is not that.
-Whether `hera_chats` persists a superset of the union or the union grows a variant is the first
-decision that turn orchestrator makes, and it wants an ADR either way.
-
-Two things `hera_profiles` leaves for whoever binds the slots: nothing yet renders a tool
-catalogue into `SLOT_TOOLS` or a skill into `SLOT_SKILLS`, and the strings those slots want are
-the two rendering decisions still open.
+**v0.2 — what makes her Hera.** `hera_memories` (embeddings, retrieval, caps, dedup, hits),
+trace compaction and the context meter, `hera_promptevo` (dreaming and experience training).
+Retrieval and the embedder land together, which is why the seam is left rather than filled.
 
 **The application is one package now.** `hera-core` at `apps/core/` holds the API and, under
 `web/`, the SvelteKit interface — not two directories under `apps/`. See
@@ -311,9 +370,6 @@ ADR 6 and leaves everything else in both standing. It stays out of `packages/` o
 directory means *a library another project can consume*, and `tests/test_layering.py` scans it
 and demands an allow-list per member. The application is the one thing that legitimately imports
 everything.
-
-**v0.2 — what makes her Hera.** `hera_memories` (embeddings, retrieval, caps, dedup, hits),
-trace compaction and the context meter, `hera_promptevo` (dreaming and experience training).
 
 **v0.3 — reach.** Hera as an MCP server so Claude Code can read her memory and skills, scheduled
 dreaming, agent personas branching the mind repository, a coding agent profile.

@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+		<meta name="color-scheme" content="dark light" />
+		<meta name="theme-color" content="#15100E" />
+		<title>Hera</title>
+		<link rel="icon" href="%sveltekit.assets%/favicon.svg" />
+		<script>
+			// Before the first paint: a dark-preferring visitor must not see a light flash, and
+			// this is the only place that can run early enough to prevent it.
+			try {
+				const stored = localStorage.getItem('hera:appearance') || 'system';
+				const dark =
+					stored === 'dark' ||
+					(stored === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
+				document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+			} catch (_) {
+				document.documentElement.dataset.theme = 'dark';
+			}
+		</script>
+		%sveltekit.head%
+	</head>
+	<body data-sveltekit-preload-data="hover">
+		<div style="display: contents">%sveltekit.body%</div>
+	</body>
+</html>

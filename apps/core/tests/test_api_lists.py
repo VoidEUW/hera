@@ -2,11 +2,17 @@
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
 from core_support import API, WriteSkill
-from httpx import AsyncClient
+from httpx import ASGITransport, AsyncClient
+
+from hera_core.app import create_app
+from hera_core.wiring import Services
 
 
 class TestProfiles:
@@ -203,3 +209,68 @@ def _region(response: Any, region_id: str) -> Any:
 
 def _find(regions: list[dict[str, Any]], region_id: str) -> dict[str, Any]:
     return next(region for region in regions if region["id"] == region_id)
+
+
+class TestServingTheInterface:
+    """The built application is served from the same origin (ADR 6), and its client-side
+    router needs every unknown path to resolve to index.html."""
+
+    async def test_a_deep_link_serves_the_application(
+        self, services: Services, tmp_path: Path
+    ) -> None:
+        """Every reload inside a conversation lands on a path the server has no file for."""
+        async with _serving(services, tmp_path / "static") as http:
+            response = await http.get("/chat/3f2a1b4c-0000-0000-0000-000000000000")
+
+        assert response.status_code == 200
+        assert response.text == "<!doctype html>the app"
+
+    async def test_a_real_asset_is_still_served(self, services: Services, tmp_path: Path) -> None:
+        async with _serving(services, tmp_path / "static") as http:
+            response = await http.get("/favicon.svg")
+
+        assert response.text == "<svg/>"
+
+    async def test_the_api_is_not_swallowed_by_the_fallback(
+        self, services: Services, tmp_path: Path
+    ) -> None:
+        """An HTML 404 arriving at a fetch() is a parse error blamed on the wrong layer."""
+        async with _serving(services, tmp_path / "static") as http:
+            response = await http.get(f"{API}/nope")
+
+        assert response.status_code == 404
+        assert response.headers["content-type"].startswith("application/json")
+
+    async def test_no_build_means_no_route_rather_than_a_crash(
+        self, services: Services, tmp_path: Path
+    ) -> None:
+        """Python-only development: a missing static/ must not stop the API from running."""
+        settings = services.settings.model_copy(update={"static_dir": str(tmp_path / "absent")})
+        app = create_app(settings, services=services)
+
+        async with (
+            AsyncClient(transport=ASGITransport(app=app), base_url="http://hera.test") as http,
+            app.router.lifespan_context(app),
+        ):
+            assert (await http.get("/")).status_code == 404
+            assert (await http.get(f"{API}/health")).status_code == 200
+
+
+@asynccontextmanager
+async def _serving(services: Services, static: Path) -> AsyncIterator[AsyncClient]:
+    """A client for an app that has a built interface behind it.
+
+    The real `static/` is only there after `npm run build`, and the Python test job does not
+    run one — so the fixture writes the two files this actually needs.
+    """
+    static.mkdir(parents=True, exist_ok=True)
+    (static / "index.html").write_text("<!doctype html>the app")
+    (static / "favicon.svg").write_text("<svg/>")
+
+    settings = services.settings.model_copy(update={"static_dir": str(static)})
+    app = create_app(settings, services=services)
+    async with (
+        AsyncClient(transport=ASGITransport(app=app), base_url="http://hera.test") as http,
+        app.router.lifespan_context(app),
+    ):
+        yield http

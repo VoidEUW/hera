@@ -16,9 +16,12 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.requests import Request
+from starlette.responses import Response
+from starlette.types import Scope
 
 from hera_core import __version__
 from hera_core.api import router as api_router
@@ -71,30 +74,60 @@ def create_app(
         return JSONResponse(status_code=500, content={"detail": str(exc)})
 
     app.include_router(api_router, prefix=settings.api_prefix)
+
+    # Registered after the real routes, so they win, and before the interface mount, so the
+    # mount never sees a path under /api. Without it the single-page fallback answers an
+    # unknown API path with the application's HTML, which arrives at a `fetch()` as a parse
+    # error and gets blamed on the wrong layer entirely.
+    @app.api_route(
+        "/api/{rest:path}",
+        include_in_schema=False,
+        methods=["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"],
+    )
+    async def _api_not_found(rest: str) -> JSONResponse:
+        return JSONResponse(status_code=404, content={"detail": f"no such endpoint: /api/{rest}"})
+
     _mount_interface(app, settings)
     return app
+
+
+class _Interface(StaticFiles):
+    """Static files that fall back to ``index.html`` for anything they do not have.
+
+    A single-page application needs this and ``html=True`` does not provide it: that flag only
+    serves ``index.html`` for a *directory*, so ``/`` works and ``/chat/<uuid>`` — a real URL to
+    the browser and an unknown file to the server — comes back 404. Every deep link and every
+    reload inside a conversation lands on that path.
+
+    Only a 404 is caught. A 405 or a permissions error is a real problem and should say so
+    rather than quietly rendering the application.
+    """
+
+    async def get_response(self, path: str, scope: Scope) -> Response:
+        try:
+            return await super().get_response(path, scope)
+        except StarletteHTTPException as exc:
+            if exc.status_code != 404:
+                raise
+            return await super().get_response("index.html", scope)
 
 
 def _mount_interface(app: FastAPI, settings: CoreSettings) -> None:
     """Serve the built SvelteKit app, if it has been built.
 
-    Absent during Python-only development and in every API test, which is why this is a
-    condition rather than an assumption — a missing ``static/`` should not stop the API from
-    running, it should just mean there is nothing at ``/``.
+    Absent during Python-only development, which is why this is a condition rather than an
+    assumption — a missing ``static/`` should not stop the API from running, it should just
+    mean there is nothing at ``/``.
+
+    Mounted last and catching everything, so an unknown path under ``/api`` still gets a JSON
+    404 from the router. HTML arriving at a ``fetch()`` is a parse error blamed on the wrong
+    layer.
     """
     root = Path(settings.static_dir) if settings.static_dir else STATIC_DIR
-    index = root / "index.html"
-    if not index.is_file():
+    if not (root / "index.html").is_file():
         return
 
-    @app.get("/", include_in_schema=False)
-    async def _index() -> FileResponse:
-        return FileResponse(index)
-
-    # `html=True` makes StaticFiles fall back to index.html for a path it does not have, which
-    # is what a client-side router needs: /chats/<uuid> is a real URL to the browser and an
-    # unknown file to the server.
-    app.mount("/", StaticFiles(directory=root, html=True), name="interface")
+    app.mount("/", _Interface(directory=root, html=True), name="interface")
 
 
 def build_app() -> FastAPI:

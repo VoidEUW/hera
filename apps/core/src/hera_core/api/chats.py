@@ -28,6 +28,7 @@ from sqlmodel import Session
 from hera_chats import (
     Chat,
     ChatRepository,
+    Message,
     MessageRepository,
     ProjectRepository,
     Turn,
@@ -111,11 +112,10 @@ def send_message(
     messages = MessageRepository(db)
 
     messages.add_user_message(chat, payload.text)
-    ChatRepository(db).touch(chat, title=title_from(payload.text))
+    ChatRepository(db).touch(chat)
     assistant = messages.start_assistant_message(chat)
 
-    context = _context(db, chat, text=payload.text)
-    return _stream(container, chat, assistant.id, context)
+    return _stream(container, db, chat, assistant, text=payload.text)
 
 
 @router.post("/chats/{chat_id}/permissions")
@@ -142,15 +142,17 @@ def answer_permission(
     if payload.remember and container.registry is not None:
         _remember(container, recorded, answered, allow=payload.allow)
 
-    context = _context(
+    return _stream(
+        container,
         db,
         chat,
+        assistant,
         text="",
+        lead=decisions,
         resume=[*recorded, *decisions],
         confirmed=payload.call_ids if payload.allow else [],
         denied=[] if payload.allow else payload.call_ids,
     )
-    return _stream(container, chat, assistant.id, context, lead=decisions)
 
 
 # -- the streaming half ------------------------------------------------------------------
@@ -158,27 +160,39 @@ def answer_permission(
 
 def _stream(
     container: Container,
+    db: Session,
     chat: Chat,
-    message_id: UUID,
-    context: TurnContext,
+    assistant: Message,
     *,
+    text: str,
     lead: Sequence[ChatEvent] = (),
+    **extra: object,
 ) -> StreamingResponse:
-    """Stream a turn, optionally preceded by events this request itself created.
+    """Close this request's unit of work, then stream the turn.
 
-    ``lead`` is the permission decisions. They travel in ``context.resume`` so the turn
-    records and persists them, and a resumed turn deliberately does not re-stream what it
-    inherited — the client is already rendering that half of the message. These are the
-    exception: they were made by *this* request, so the live view has not seen them yet, and
-    without them the card only settles on the ``done`` re-render.
+    **The commit here is load-bearing.** A ``Depends``-provided session commits when the
+    dependency is torn down, which for a streaming response is *after the last byte* — so
+    without this, the recording session opened further down would look for an assistant row
+    that is still sitting uncommitted in another transaction, find nothing, and persist the
+    whole turn into the void. The answer would stream perfectly and be gone on reload.
+
+    **The expunge is load-bearing too.** ``commit()`` expires every instance, and the turn
+    reads the profile and the project from a worker thread. Detaching them while their columns
+    are loaded makes them plain readable objects; leaving them attached would have SQLAlchemy
+    refresh them from a session it does not own, off the thread that opened it.
+
+    ``lead`` is the permission decisions. They travel in ``resume`` so the turn records and
+    persists them, and a resumed turn deliberately does not re-stream what it inherited — the
+    client is already rendering that half. These are the exception: they were made by *this*
+    request, so without them the card only settles on the ``done`` re-render.
     """
-    turn = container.orchestrator.begin(context)
+    db.commit()
 
-    # Read off the row *now*, while its session is still open. The generator below runs after
-    # the request's unit of work has committed and closed, and touching a detached instance
-    # there raises DetachedInstanceError from inside a stream that has already begun -- which
-    # arrives at the browser as a connection that stopped for no stated reason.
-    owner_id, chat_id = chat.owner_id, chat.id
+    context = _context(db, chat, text=text, **extra)
+    owner_id, chat_id, message_id = chat.owner_id, chat.id, assistant.id
+    db.expunge_all()
+
+    turn = container.orchestrator.begin(context)
 
     async def frames() -> AsyncIterator[str]:
         try:
@@ -202,10 +216,10 @@ def _record(
 ) -> dict[str, Any] | None:
     """Store the turn in its own short unit of work, and return the ``done`` payload.
 
-    Its own, because the request's session was closed before streaming started. Serialised
-    **inside** the block for the same reason the ids are captured outside it: the instance is
-    expired the moment the session closes, so a `MessageOut.of` after the fact would refresh
-    a detached row.
+    Its own, because the request's unit of work was committed and detached before streaming
+    started. Serialised **inside** the block for the same reason the ids are captured outside
+    it: the instance is expired the moment the session closes, so a `MessageOut.of` after the
+    fact would try to refresh a detached row.
 
     The payload is what the client replaces its optimistic view with, which is what makes the
     server render authoritative rather than merely agreed with.
@@ -220,7 +234,9 @@ def _record(
             SkillUsageRepository(session).record(owner_id, turn.skill_ids)
         chat = ChatRepository(session).get(chat_id)
         if chat is not None:
-            ChatRepository(session).touch(chat)
+            # Titled from the text the router *kept*. `/tdd` is addressed to the application
+            # rather than to her, and a sidebar full of commands is a sidebar you cannot skim.
+            ChatRepository(session).touch(chat, title=title_from(turn.cleaned_text))
         return MessageOut.of(message).model_dump(mode="json")
 
 

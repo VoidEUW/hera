@@ -22,17 +22,17 @@ htmlcov/
 *.sqlite3-wal
 *.sqlite3-shm
 
-# Web
+# Web. The paths are ADR 9's: one application package at apps/core, with the interface under
+# web/ building into the directory the API serves.
 node_modules/
-apps/web/.svelte-kit/
-apps/web/build/
-apps/api/src/hera_api/static/
+apps/core/web/.svelte-kit/
+apps/core/web/openapi.json
+# Build output, not source. The wheel ships it, so `npm run build` comes before `uv build`.
+apps/core/src/hera_core/static/*
+!apps/core/src/hera_core/static/.gitkeep
 test-results/
 playwright-report/
 blob-report/
-
-# Generated API client
-apps/web/src/lib/api/generated/
 
 # OS / editors
 .DS_Store

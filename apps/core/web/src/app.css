@@ -1,0 +1,184 @@
+/**
+ * The design language of docs/frontend.md, as tokens.
+ *
+ * Warm on both ends: the dark ground is a warm charcoal and never blue-grey, the light ground
+ * is warm paper and never white. The three accents are not interchangeable — each one means
+ * something, and using the wrong one is a bug:
+ *
+ *   pomegranate  her            the mark, the send action, the active chat, her name
+ *   peacock      her attention  thinking, a tool running, the ocellus iris, live state
+ *   brass        her authority  skills, permission cards, the ring of the mark, emphasis
+ *
+ * If a colour appears somewhere and you cannot say which of those three sentences it is
+ * saying, it does not belong there.
+ */
+
+@import '@fontsource-variable/fraunces';
+@import '@fontsource-variable/source-serif-4';
+@import '@fontsource-variable/figtree';
+@import '@fontsource/ibm-plex-mono/400.css';
+@import '@fontsource/ibm-plex-mono/500.css';
+
+:root {
+	--font-display: 'Fraunces Variable', Georgia, serif;
+	--font-body: 'Source Serif 4 Variable', Georgia, serif;
+	--font-ui: 'Figtree Variable', system-ui, sans-serif;
+	--font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+
+	--measure: 68ch;
+	--rail: 264px;
+	--radius: 10px;
+	--radius-lg: 16px;
+
+	/* Motion. She is ox-eyed: wide, calm, unhurried. Nothing flickers, nothing bounces. */
+	--fade: 120ms;
+	--disclose: 160ms;
+	--ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+/* Dark is the default, and the tokens live on :root so a system-dark visitor gets them before
+   any JavaScript has run — a light flash on load is the one thing a warm interface cannot
+   afford. */
+:root,
+[data-theme='dark'] {
+	--ground: #15100e;
+	--surface: #1e1815;
+	--surface-raised: #272019;
+	--line: #362c26;
+	--text: #f2e9e1;
+	--text-muted: #a79a90;
+	--text-faint: #7a6e66;
+
+	--pomegranate: #d9636b;
+	--peacock: #35a093;
+	--brass: #c9a24c;
+	--danger: #e0685e;
+
+	--shadow: 0 12px 32px rgb(0 0 0 / 0.4);
+	color-scheme: dark;
+}
+
+[data-theme='light'] {
+	--ground: #fbf7f2;
+	--surface: #ffffff;
+	--surface-raised: #f4ede4;
+	--line: #e4d9cd;
+	--text: #1e1613;
+	--text-muted: #6e625a;
+	--text-faint: #968a81;
+
+	--pomegranate: #a93744;
+	--peacock: #1d6157;
+	--brass: #8e6e27;
+	--danger: #b03a2e;
+
+	--shadow: 0 12px 32px rgb(30 22 19 / 0.12);
+	color-scheme: light;
+}
+
+*,
+*::before,
+*::after {
+	box-sizing: border-box;
+}
+
+html,
+body {
+	height: 100%;
+	margin: 0;
+}
+
+body {
+	background: var(--ground);
+	color: var(--text);
+	font-family: var(--font-ui);
+	font-size: 14px;
+	line-height: 1.45;
+	-webkit-font-smoothing: antialiased;
+}
+
+button,
+input,
+textarea,
+select {
+	font: inherit;
+	color: inherit;
+}
+
+button {
+	background: none;
+	border: 0;
+	cursor: pointer;
+	padding: 0;
+}
+
+/* Keyboard first: a visible focus ring everywhere, never removed. */
+:focus-visible {
+	outline: 2px solid var(--peacock);
+	outline-offset: 2px;
+	border-radius: 4px;
+}
+
+a {
+	color: inherit;
+}
+
+.prose {
+	font-family: var(--font-body);
+	font-size: 17px;
+	line-height: 1.65;
+	max-width: var(--measure);
+	overflow-wrap: anywhere;
+}
+
+.prose p {
+	margin: 0 0 1em;
+}
+
+.prose > :last-child {
+	margin-bottom: 0;
+}
+
+.prose code,
+.mono {
+	font-family: var(--font-mono);
+	font-size: 13.5px;
+}
+
+.display {
+	font-family: var(--font-display);
+	font-variation-settings:
+		'SOFT' 60,
+		'WONK' 0;
+	font-weight: 500;
+	letter-spacing: -0.01em;
+}
+
+.caption {
+	font-size: 12.5px;
+	line-height: 1.4;
+	color: var(--text-muted);
+}
+
+.sr-only {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	padding: 0;
+	margin: -1px;
+	overflow: hidden;
+	clip: rect(0, 0, 0, 0);
+	white-space: nowrap;
+	border: 0;
+}
+
+/* The interface must be completely usable and completely legible with all motion off. */
+@media (prefers-reduced-motion: reduce) {
+	*,
+	*::before,
+	*::after {
+		animation-duration: 0.001ms !important;
+		animation-iteration-count: 1 !important;
+		transition-duration: 0.001ms !important;
+	}
+}

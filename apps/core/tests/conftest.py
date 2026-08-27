@@ -31,7 +31,7 @@ from hera_permissions import Decision, PermissionSet, Policy, Rule
 from hera_profiles import MindRepository, ProfileRepository, PromptBuilder
 from hera_providers import FakeProvider
 from hera_skillsets import SkillLibrary, SkillRouter
-from hera_storage import Database
+from hera_storage import Database, StorageSettings
 
 
 @pytest.fixture(autouse=True)
@@ -95,12 +95,20 @@ def make_services(tmp_path: Path, skills_path: Path) -> Iterator[object]:
     against it.
     """
     built: list[Services] = []
+    made = 0
 
     def make(
         provider: FakeProvider | None = None,
         registry: StubTools | None = None,
     ) -> Services:
-        database = Database.in_memory()
+        nonlocal made
+        made += 1
+        # A file, not Database.in_memory(). In-memory SQLite uses a StaticPool -- one
+        # connection shared by every session -- so a second session sees the first's
+        # *uncommitted* rows. That hid a real bug: the streaming route was persisting a turn
+        # into a transaction nobody had committed, which worked in memory and lost the whole
+        # answer against a file. The suite has to be able to tell those apart.
+        database = Database(StorageSettings(url=f"sqlite:///{tmp_path / f'hera-{made}.sqlite3'}"))
         database.create_all()
         mind = MindRepository(tmp_path / "mind")
         mind.ensure()
@@ -144,8 +152,16 @@ def services(make_services: object) -> Services:
 
 
 @pytest.fixture
-def app(services: Services) -> FastAPI:
-    return create_app(services.settings, services=services)
+def app(services: Services, tmp_path: Path) -> FastAPI:
+    """The API with no interface behind it.
+
+    Pointed at an empty directory on purpose: whether `npm run build` has been run is not
+    something an API test should depend on, and a suite that passes only on a machine that
+    happens to have built the front end is a suite that fails in CI for a reason nobody can
+    see.
+    """
+    settings = services.settings.model_copy(update={"static_dir": str(tmp_path / "no-build")})
+    return create_app(settings, services=services)
 
 
 @pytest.fixture

@@ -28,12 +28,34 @@ from dataclasses import dataclass
 from hera_chats import ChatsSettings, TurnOrchestrator
 from hera_core.settings import CoreSettings
 from hera_home import mind_dir, skills_dir
-from hera_permissions import Policy
+from hera_permissions import Decision, PermissionSet, Policy, Rule
 from hera_profiles import MindRepository, PromptBuilder
 from hera_providers import OpenAICompatibleProvider, Provider, ProviderSettings
 from hera_skillsets import SkillLibrary, SkillLibraryPort, SkillRouter
 from hera_storage import Database, StorageSettings
 from hera_tools import ToolRegistry, ToolsSettings, build_builtin_server
+
+DEFAULT_POLICY = Policy(
+    base=PermissionSet(
+        rules=[
+            Rule(
+                pattern="hera__*",
+                decision=Decision.ALLOW,
+                reason="one of her own tools, which touch nothing outside Hera",
+            )
+        ]
+    ),
+    fallback=Decision.ASK,
+)
+"""What a deployment with no permission rules of its own gets.
+
+``ask`` for everything is the right default for a *foreign* tool — a tool nobody has an opinion
+about is exactly the case a person should see once. It is the wrong default for hers.
+``hera__emotion`` is called several times in an ordinary turn (ADR 3), and a confirmation card
+for each one would make the feature unusable and teach a person to click through cards without
+reading them, which is the failure that matters. Her four built-ins reach only her own mind,
+memories and skills, so they are allowed and everything else still asks.
+"""
 
 
 @dataclass
@@ -89,7 +111,7 @@ def build_services(
 
     if registry is None:
         registry = ToolRegistry.open(
-            policy=policy,
+            policy=policy if policy is not None else DEFAULT_POLICY,
             settings=ToolsSettings(),
             # hera_tools may not import hera_skillsets, so the library arrives as a port.
             # Memories and notes stay unwired until v0.2; the tools still appear in the

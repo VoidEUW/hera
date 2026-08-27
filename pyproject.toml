@@ -48,6 +48,10 @@ dev = [
     # Serves a real MCP server over HTTP in the hera_tools transport tests. It arrives with
     # the MCP SDK anyway; declared here so the suite does not depend on that staying true.
     "uvicorn>=0.30",
+    # Drives the built interface in the end-to-end suite. CI installs the browser with
+    # `uv run playwright install --with-deps chromium`; without this the command has no
+    # package to come from.
+    "playwright>=1.49",
 ]
 
 # ---------------------------------------------------------------------------
@@ -119,12 +123,13 @@ files = [
     "packages/hera_tools/tests",
 ]
 
-# Two packages with a conftest.py resolve to one module name -- mypy derives it from the file
-# name, and pytest requires that name. pytest itself is fine because it loads conftest by path;
-# mypy has no equivalent, and refuses to check either file rather than pick one. Excluding them
-# is the narrowest fix available: ruff still lints them under the full rule set including ANN,
-# and a fixture that does not type-check shows up as a failure in every test that uses it.
-exclude = ["/tests/conftest\\.py$"]
+# Every conftest.py resolves to the same module name -- mypy derives it from the file name, and
+# pytest requires that name. pytest itself is fine because it loads conftest by path; mypy has
+# no equivalent, and given several it picks one and then cannot find the others' fixtures.
+# Excluding them all is the narrowest fix available: ruff still lints them under the full rule
+# set including ANN, and a fixture that does not type-check shows up as a failure in every test
+# that uses it.
+exclude = ["(^|/)conftest\\.py$"]
 
 [[tool.mypy.overrides]]
 module = ["tests.*", "*.tests.*"]
