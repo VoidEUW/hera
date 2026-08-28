@@ -38,7 +38,7 @@ as an empty mind directory rather than as an error.
 
 | Package | Owns | Never |
 |---|---|---|
-| `hera_home` | Where `~/.hera` is and the well-known paths inside it. Reads the environment on every call; caches nothing, creates nothing. | No I/O, no dependency, no opinion about what lives in those paths |
+| `hera_home` | Where `~/.hera` is and the well-known paths inside it. Reads the environment on every call; caches nothing, creates nothing. `chat_dir()` is the one that refuses its argument — a chat id arrives from a tool call, and `..` there would put a scratchpad in the mind repository | No I/O, no dependency, no opinion about what lives in those paths |
 | `hera_storage` | The persistence foundation: engine, sessions, `Entity`/`SoftDeletable`/`Versioned` mixins, a generic `Repository`, snapshot versioning, pytest fixtures. | No table, no domain concept, no other `hera_*` import |
 | `hera_prompts` | The prompt compiler: `Prompt`, `Section`, traits, renderers, budget, `fingerprint()`. Foreign content enters only as pre-rendered strings through named slots. | Does not know what a tool, memory, skill or chat is; no persistence, no I/O |
 | `hera_providers` | Talking to a model. httpx streaming, the Qwen adapter, embeddings, and a `FakeProvider` for tests. Emits one normalised event union. | Knows nothing about chats, prompts or tools |
@@ -111,6 +111,7 @@ code, in `hera_skillsets`.
   hera.sqlite3           everything relational
   mind/                  a real git repository, one file per mind region
   skills/<name>/SKILL.md skill packages, syncable from a git repo
+  chats/<id>/scratch/    her working files for one conversation; gone when the chat is
   mcp.json               Claude-Desktop-compatible `mcpServers` shape
   config.toml            registered endpoints, written by the interface
   trusted.json           skill ids and the SHA-256 you accepted; optional

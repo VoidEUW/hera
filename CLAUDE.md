@@ -43,12 +43,22 @@ endpoint; it never runs in CI.
 domain concept at all and must stay liftable into an unrelated project.
 
 **Two MCP packages, and the difference matters.** `hera_mcp` is the server she *is* —
-`hera__emotion`, `hera__ask`, `hera__remember`, `hera__note`, `hera__skill`, `hera__search`, and
-the ports four of them take. `hera__ask` is the one that is never *run*: `hera_chats` recognises
-it by name (`ChatsSettings.asking_tools`, filled in by the application) and suspends the turn the
-way a permission card does, so a person's reply becomes that call's result. `hera_tools` is the client she *has*, and it does not know the other exists: it mounts
+`hera__emotion`, `hera__ask`, `hera__remember`, `hera__note`, `hera__skill`, `hera__search`, the
+three `hera__scratch_*`, and the ports they take. `hera__ask` is the one that is never *run*:
+`hera_chats` recognises it by name (`ChatsSettings.asking_tools`, filled in by the application)
+and suspends the turn the way a permission card does, so a person's reply becomes that call's
+result. `hera_tools` is the client she *has*, and it does not know the other exists: it mounts
 whatever in-process server the application hands it, under that server's own name. Her tool
 descriptions are prompt text; edit them in `hera_mcp` and her behaviour changes.
+
+**A tool learns which chat it is in from `_meta`, never from an argument** — [ADR 12](docs/adr/0012-a-chat-has-a-scratchpad.md).
+The model chooses arguments, so a `chat_id` field is one it would invent; a `ctx: Context`
+parameter is kept out of the tool's schema by the SDK, so there is nothing to invent. `hera_tools`
+carries an opaque mapping and does not read it, `hera_mcp.CHAT_ID_META` is where the key is
+written, and `ChatsSettings.chat_meta_key` is how it travels — the same arrangement as
+`asking_tools`, because the two packages may not import each other. A `contextvars.ContextVar`
+does **not** work here and does not fail either: every call runs in a worker task created when the
+server connected, so it reads back empty.
 
 **One event union.** `hera_providers` defines what a model can emit; everything above consumes
 it. If you are writing a parser for model output outside that package, something is wrong — the
@@ -78,6 +88,7 @@ columns, never `ForeignKey`; migrations live in `apps/core`.
 | `hera.sqlite3` | everything relational |
 | `mind/` | a real git repository, one file per mind region |
 | `skills/<name>/SKILL.md` | skill packages |
+| `chats/<id>/scratch/` | her working files for one conversation. A cache, not something you keep — deleting the chat deletes it |
 | `mcp.json` | MCP servers, in the Claude-Desktop `mcpServers` shape |
 | `config.toml` | registered model endpoints, written by the interface |
 | `trusted.json` | **where trusted skills are recorded** — optional |

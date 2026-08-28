@@ -7,7 +7,17 @@ from pathlib import Path
 import pytest
 
 import hera_home
-from hera_home import config_path, database_path, home, mcp_path, mind_dir, skills_dir
+from hera_home import (
+    chat_dir,
+    chats_dir,
+    config_path,
+    database_path,
+    home,
+    mcp_path,
+    mind_dir,
+    scratch_dir,
+    skills_dir,
+)
 
 
 def test_defaults_to_dot_hera_in_the_users_home(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -48,6 +58,9 @@ def test_every_well_known_path_sits_under_the_home(
     assert database_path() == tmp_path / "hera.sqlite3"
     assert mcp_path() == tmp_path / "mcp.json"
     assert config_path() == tmp_path / "config.toml"
+    assert chats_dir() == tmp_path / "chats"
+    assert chat_dir("c-1") == tmp_path / "chats" / "c-1"
+    assert scratch_dir("c-1") == tmp_path / "chats" / "c-1" / "scratch"
 
 
 def test_nothing_is_created_by_asking(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -55,4 +68,27 @@ def test_nothing_is_created_by_asking(monkeypatch: pytest.MonkeyPatch, tmp_path:
     root = tmp_path / "absent"
     monkeypatch.setenv(hera_home.HOME_ENV, str(root))
     for path in (home(), mind_dir(), skills_dir(), database_path()):
+        assert not path.exists()
+
+
+@pytest.mark.parametrize("chat_id", ["", ".", "..", "../mind", "a/b", "a\\b", "/etc"])
+def test_a_chat_id_that_is_not_one_path_segment_is_refused(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, chat_id: str
+) -> None:
+    """The id reaches this from a tool call, so it reaches it from *somewhere*.
+
+    A ``..`` here would put a scratchpad in the mind repository and a leading ``/`` would put it
+    outside ``~/.hera`` altogether, and both of those are one string away from a directory this
+    package hands to somebody who will write into it.
+    """
+    monkeypatch.setenv(hera_home.HOME_ENV, str(tmp_path))
+    with pytest.raises(ValueError, match="not a usable chat id"):
+        chat_dir(chat_id)
+
+
+def test_a_chat_directory_is_not_created_by_asking(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv(hera_home.HOME_ENV, str(tmp_path))
+    for path in (chats_dir(), chat_dir("c-1"), scratch_dir("c-1")):
         assert not path.exists()

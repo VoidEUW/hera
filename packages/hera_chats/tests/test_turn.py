@@ -9,6 +9,7 @@ permission card that never closes the stream, a cancellation that loses the half
 from __future__ import annotations
 
 from collections.abc import AsyncIterator, Callable, Sequence
+from uuid import uuid4
 
 import pytest
 from chat_support import StubTools, WriteSkill, drain, kinds
@@ -16,6 +17,7 @@ from hera_providers.events import TurnEnd
 
 from hera_chats import (
     AnswerRequired,
+    Chat,
     ChatsSettings,
     PermissionRequired,
     SkillSelected,
@@ -182,8 +184,6 @@ class TestSkills:
         ]
 
     async def test_project_instructions_reach_the_prompt(self, make_orchestrator: Make) -> None:
-        from uuid import uuid4
-
         from hera_chats.models import Project
 
         provider = FakeProvider([text_turn("ok")])
@@ -812,3 +812,52 @@ async def test_an_empty_message_sends_no_user_turn(make_orchestrator: Make, text
     await drain(make_orchestrator(provider).begin(TurnContext(text=text)).stream())
 
     assert all(m.text.strip() for m in provider.requests[0].messages)
+
+
+class TestWhatACallIsToldAboutTheTurn:
+    """ADR 12: a tool cannot know which conversation it is in unless the turn says so.
+
+    What this package contributes is deliberately small — it holds a *key* it was given and
+    pairs it with the chat it already has. It does not know that the key means anything to
+    anybody, which is the same arrangement `asking_tools` has and for the same reason: the
+    package that reads it is her own MCP server, and this one may not learn that it exists.
+    """
+
+    async def test_the_chat_id_travels_with_every_call(
+        self, make_orchestrator: Make, tools: StubTools, settings: ChatsSettings
+    ) -> None:
+        chat = Chat(owner_id=uuid4(), title="")
+        provider = FakeProvider([tool_turn(tool_call("fs__read_file")), text_turn("done")])
+        orchestrator = make_orchestrator(provider, tools)
+        orchestrator.settings = settings.model_copy(update={"chat_meta_key": "hera/chatId"})
+
+        await drain(orchestrator.begin(TurnContext(text="go", chat=chat)).stream())
+
+        assert tools.context_seen == [{"hera/chatId": str(chat.id)}]
+
+    async def test_no_key_configured_sends_nothing(
+        self, make_orchestrator: Make, tools: StubTools
+    ) -> None:
+        """The default. A deployment that configures none of this is one where no tool asks
+        which conversation it is in — not one that sends a blank field to every server."""
+        chat = Chat(owner_id=uuid4(), title="")
+        provider = FakeProvider([tool_turn(tool_call("fs__read_file")), text_turn("done")])
+
+        await drain(
+            make_orchestrator(provider, tools).begin(TurnContext(text="go", chat=chat)).stream()
+        )
+
+        assert tools.context_seen == [{}]
+
+    async def test_a_turn_with_no_chat_sends_nothing(
+        self, make_orchestrator: Make, tools: StubTools, settings: ChatsSettings
+    ) -> None:
+        """Every other test in this file runs without one, and a turn outside a conversation is
+        a script rather than a person waiting. The tool that needs a chat then says so."""
+        provider = FakeProvider([tool_turn(tool_call("fs__read_file")), text_turn("done")])
+        orchestrator = make_orchestrator(provider, tools)
+        orchestrator.settings = settings.model_copy(update={"chat_meta_key": "hera/chatId"})
+
+        await drain(orchestrator.begin(TurnContext(text="go")).stream())
+
+        assert tools.context_seen == [{}]

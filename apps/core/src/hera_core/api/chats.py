@@ -62,6 +62,7 @@ from hera_core.schemas import (
     QuestionAnswer,
     RedoIn,
 )
+from hera_core.scratch import forget_chat
 from hera_core.sse import HEADERS, MEDIA_TYPE, event_frame, frame
 from hera_mcp import DEFAULT_EMOTIONS, render_emotions
 from hera_permissions import Decision, Rule
@@ -155,6 +156,11 @@ def delete_chat(chat_id: UUID, owner: Owner, db: Db) -> None:
     chat = _require_chat(db, chat_id, owner)
     MessageRepository(db).delete_for_chat(chat.id)
     ChatRepository(db).revoke(chat.id)
+    # ADR 12 is explicit that the scratchpad is a cache rather than something a person keeps, so
+    # cleaning it up is part of deleting the chat rather than a chore for later. It never
+    # raises: a row that is gone and a directory that would not go is a stale directory, and
+    # failing the delete button over it would leave the row behind as well.
+    forget_chat(str(chat.id))
 
 
 @router.post("/chats/{chat_id}/messages")

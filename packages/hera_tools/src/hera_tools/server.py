@@ -24,7 +24,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from collections.abc import AsyncIterator, Awaitable, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable, Mapping
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from dataclasses import dataclass, field
 from typing import Any, TypeVar, cast
@@ -168,16 +168,30 @@ class ManagedServer:
         return self._tools
 
     async def call(
-        self, tool: str, arguments: dict[str, Any] | None = None, *, timeout_s: float | None = None
+        self,
+        tool: str,
+        arguments: dict[str, Any] | None = None,
+        *,
+        timeout_s: float | None = None,
+        context: Mapping[str, str] | None = None,
     ) -> CallToolResult:
         """Call one tool by its **local** name and return the protocol result.
 
         A tool that fails on purpose comes back with ``is_error`` set, not as an exception --
         that is the protocol's own distinction and it is worth preserving this far up.
+
+        ``context`` rides in the request's ``_meta`` rather than in ``arguments``, and this
+        package never looks inside it (ADR 12). Two reasons it is not an argument: the model
+        chooses arguments, so anything the caller must decide would be forgeable; and a field in
+        the schema is a field the model can see and will try to fill in. Anything sent here has
+        to be a string the *application* put there.
         """
         budget = timeout_s or self._call_timeout_s
+        meta = dict(context) if context else None
         return await self._submit(
-            lambda client: client.call_tool(tool, arguments or {}),
+            # `meta` is a TypedDict at runtime, which is to say a dict. Passing one with keys the
+            # SDK does not declare is how a namespaced extension is meant to travel.
+            lambda client: client.call_tool(tool, arguments or {}, meta=cast(Any, meta)),
             timeout_s=budget,
             label=f"{self.name}: {tool}",
         )

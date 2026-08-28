@@ -62,6 +62,19 @@ section fills in as milestones land.
   `what_time_is_it` call would spend a round trip to learn something free, and would only be made
   by a model that already suspected it needed to. An IANA name rather than an offset, because an
   offset is wrong twice a year.
+- **A scratchpad, per conversation.** Somewhere to put a plan, an intermediate result, a list of
+  what has been checked so far — `hera__scratch_write`, `hera__scratch_read` and
+  `hera__scratch_list` over `~/.hera/chats/<chat id>/scratch/`. It is hers rather than something
+  you read, and the win is the *next* turn: she picks up where she left off without the whole
+  thing being replayed through the context window. `hera__note` keeps the description it has and
+  stops being reached for as working memory, which is what it was actually being used as. Deleting
+  a chat deletes the directory, because a cache that outlives what it belongs to is litter.
+- **A tool call knows which conversation it is in.** Nothing could, before: her server is built
+  once at startup and every call runs in a worker task created when the server connected, so the
+  obvious `contextvars` answer reads back *empty* rather than failing. It travels in MCP's `_meta`
+  now — never in the arguments, because the model chooses those and would invent a chat id, and a
+  `Context` parameter is kept out of the tool's schema entirely so there is nothing to invent.
+  `hera__remember(scope="chat")` has been missing exactly this since 0.1.0.
 - **One selector, and one popup.** `Select.svelte` replaces every dropdown in the application. The
   trigger is the composer's pill — the shape that was already right — and the popup is the *skill
   picker's*: raised surface, hairline, large radius, the same shadow, a brass check on the chosen
@@ -115,9 +128,6 @@ section fills in as milestones land.
 - **Artifacts** — a diagram, a document, a workflow chart as an object with an identity and
   versions, not prose in a code fence. A tool call like everything else (ADR 11 forbids the browser
   discovering one), rendered as Mermaid, Markdown, code or sandboxed HTML.
-- **A scratchpad, per conversation.** Somewhere to put a plan, an intermediate result, a list of
-  what has been checked so far — hers to write and hers to read back, so a long chat stops
-  surviving by re-reading itself. `hera__note` stops being used for something it never described.
 - **Skill resources become readable.** `hera_skillsets` already tells the model a skill has files
   beside it; `hera__read_resource` makes that sentence true, which is what Anthropic's
   reference-heavy skills need.

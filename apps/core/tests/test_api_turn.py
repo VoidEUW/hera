@@ -16,8 +16,10 @@ from core_support import API, StubTools, WriteSkill, names, payload, sse
 from httpx import ASGITransport, AsyncClient
 
 from hera_core.app import create_app
+from hera_core.scratch import FileScratchpad
 from hera_core.wiring import Services
-from hera_mcp import TOOL_NAMES, build_builtin_server
+from hera_home import scratch_dir
+from hera_mcp import BUILTIN_SERVER_NAME, TOOL_NAMES, build_builtin_server
 from hera_permissions import PermissionSet, Policy
 from hera_providers import FakeProvider, text_turn, thinking_turn, tool_call, tool_turn
 from hera_skillsets import SkillLibrary, SkillLibraryPort
@@ -199,6 +201,81 @@ class TestARealMcpServer:
         assert results["hera__skill"]["text"] == "Red, green, refactor."
         assert names(frames)[-2:] == ["turn_closed", "done"]
 
+    async def test_a_scratchpad_write_lands_in_this_conversations_directory(
+        self, make_services: Any, mcp_registry: ToolRegistry
+    ) -> None:
+        """The whole of ADR 12 in one assertion, with nothing stubbed between the model and the
+        disk. What is being proved is the part that has no other way of being observed: the
+        chat id was never in the model's arguments, and the file still landed under this chat
+        and not another. A `contextvars` implementation passes every unit test above this one
+        and fails here, because `ManagedServer` runs the call in a worker task created when the
+        server connected.
+        """
+        provider = FakeProvider(
+            [
+                tool_turn(
+                    tool_call("hera__scratch_write", {"name": "plan.md", "text": "1. read it"})
+                ),
+                text_turn("Noted."),
+            ]
+        )
+        services = make_services(provider, mcp_registry)
+        async with _client(services) as client:
+            chat_id = await open_chat(client)
+            frames = await talk(client, chat_id, "make a plan")
+
+        assert payload(frames, "tool_result")["ok"]
+        assert (scratch_dir(chat_id) / "plan.md").read_text() == "1. read it"
+        # And the model was never offered the field it would have had to guess.
+        written = provider.requests[0].tools
+        schema = next(spec for spec in written if spec.name == "hera__scratch_write").parameters
+        assert set(schema.get("properties", {})) == {"name", "text", "append"}
+
+    async def test_she_reads_back_what_an_earlier_turn_wrote(
+        self, make_services: Any, mcp_registry: ToolRegistry
+    ) -> None:
+        """The reason the scratchpad is worth building: the second turn picks it up without the
+        first having to be replayed through the context window."""
+        provider = FakeProvider(
+            [
+                tool_turn(
+                    tool_call("hera__scratch_write", {"name": "plan.md", "text": "1. read it"})
+                ),
+                text_turn("Noted."),
+                tool_turn(tool_call("hera__scratch_read", {"name": "plan.md"})),
+                text_turn("Where we left off."),
+            ]
+        )
+        services = make_services(provider, mcp_registry)
+        async with _client(services) as client:
+            chat_id = await open_chat(client)
+            await talk(client, chat_id, "make a plan")
+            frames = await talk(client, chat_id, "where were we?")
+
+        assert payload(frames, "tool_result")["text"] == "1. read it"
+
+    async def test_another_conversation_cannot_read_it(
+        self, make_services: Any, mcp_registry: ToolRegistry
+    ) -> None:
+        """One server, two chats, and the only thing keeping them apart is the `_meta` the turn
+        put on the call."""
+        provider = FakeProvider(
+            [
+                tool_turn(tool_call("hera__scratch_write", {"name": "plan.md", "text": "mine"})),
+                text_turn("Noted."),
+                tool_turn(tool_call("hera__scratch_read", {"name": "plan.md"})),
+                text_turn("Nothing there."),
+            ]
+        )
+        services = make_services(provider, mcp_registry)
+        async with _client(services) as client:
+            await talk(client, await open_chat(client), "make a plan")
+            frames = await talk(client, await open_chat(client), "where were we?")
+
+        result = payload(frames, "tool_result")
+        assert not result["ok"]
+        assert "no file named" in result["text"]
+
     async def test_a_tool_that_fails_comes_back_as_a_result(
         self, make_services: Any, mcp_registry: ToolRegistry
     ) -> None:
@@ -226,14 +303,11 @@ class TestARealMcpServer:
             await talk(client, await open_chat(client), "hello")
 
         offered = {spec.name for spec in provider.requests[0].tools}
-        assert offered == {
-            "hera__emotion",
-            "hera__ask",
-            "hera__remember",
-            "hera__note",
-            "hera__skill",
-            "hera__search",
-        }
+        # Against TOOL_NAMES rather than a literal list, because the assertion is *her whole
+        # catalogue arrives*, not *these six do*. Spelled out, this test fails every time a tool
+        # is added to her server, and the fix is always to paste the new name in — which is a
+        # test that costs maintenance and catches nothing.
+        assert offered == {f"{BUILTIN_SERVER_NAME}__{name}" for name in TOOL_NAMES}
 
     async def test_the_settings_screen_sees_the_server_it_is_talking_to(
         self, make_services: Any, mcp_registry: ToolRegistry
@@ -258,7 +332,10 @@ async def mcp_registry(skills_path: Any) -> AsyncIterator[ToolRegistry]:
     registry = ToolRegistry.open(
         policy=Policy(base=PermissionSet.of(allow=["*"])),
         settings=ToolsSettings(),
-        builtin=build_builtin_server(skills=SkillLibraryPort(SkillLibrary(skills_path))),
+        builtin=build_builtin_server(
+            skills=SkillLibraryPort(SkillLibrary(skills_path)),
+            scratchpad=FileScratchpad(),
+        ),
     )
     try:
         yield registry

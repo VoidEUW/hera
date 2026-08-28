@@ -16,7 +16,7 @@ import asyncio
 import difflib
 import logging
 import time
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 
 from mcp.server.mcpserver import MCPServer
 from pydantic import BaseModel, ConfigDict
@@ -169,12 +169,20 @@ class ToolRegistry:
         *,
         profile: str | None = None,
         confirmed: bool = False,
+        context: Mapping[str, str] | None = None,
     ) -> ToolResult:
         """Check, dispatch, and answer -- with a result whatever happens.
 
         ``confirmed`` is the answer to an ``ask``: the person said yes to this one call, so
         the check is satisfied without the policy having changed. A ``deny`` is still a deny;
         a confirmation cannot overrule a rule that says no.
+
+        ``context`` is what the caller knows about the situation and the model does not -- which
+        conversation this is, in practice. It travels in the request's ``_meta`` (ADR 12) and
+        this package does not read it: like ``builtin``, it is something the application filled
+        in and this one only carries. It goes to **every** server, including foreign ones, which
+        is deliberate -- the keys are namespaced and a server that does not know them ignores
+        them, and the alternative is this package learning which servers are Hera's.
         """
         started = time.monotonic()
         outcome = self.check(invocation.tool, profile=profile)
@@ -195,7 +203,7 @@ class ToolRegistry:
 
         server = self._server(tool.server)
         try:
-            result = await server.call(tool.local_name, invocation.arguments)
+            result = await server.call(tool.local_name, invocation.arguments, context=context)
         except ToolTimeout as exc:
             return ToolResult.failed(
                 call_id=invocation.call_id,
@@ -228,6 +236,7 @@ class ToolRegistry:
         *,
         profile: str | None = None,
         confirmed: Sequence[str] = (),
+        context: Mapping[str, str] | None = None,
     ) -> list[ToolResult]:
         """Run several calls at once, in the order they were given.
 
@@ -235,14 +244,20 @@ class ToolRegistry:
         emotions is the everyday case (ADR 3); running them one after another would turn one
         round-trip into four.
 
-        ``confirmed`` lists the call ids a person has just approved.
+        ``confirmed`` lists the call ids a person has just approved. ``context`` is the same for
+        every call in the batch, because it describes the turn rather than the call.
         """
         approved = set(confirmed)
         calls = list(invocations)
         return list(
             await asyncio.gather(
                 *(
-                    self.dispatch(call, profile=profile, confirmed=call.call_id in approved)
+                    self.dispatch(
+                        call,
+                        profile=profile,
+                        confirmed=call.call_id in approved,
+                        context=context,
+                    )
                     for call in calls
                 )
             )

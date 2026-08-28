@@ -17,7 +17,7 @@ one that narrows it.
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from typing import Protocol, runtime_checkable
 
 from hera_permissions import Outcome
@@ -46,6 +46,12 @@ class Tools(Protocol):
         *,
         profile: str | None = None,
         confirmed: Sequence[str] = (),
+        context: Mapping[str, str] | None = None,
     ) -> list[ToolResult]:
-        """Run several calls at once. Parallel is the point — see ADR 3."""
+        """Run several calls at once. Parallel is the point — see ADR 3.
+
+        ``context`` is what the turn knows and the model does not — which conversation this is
+        (ADR 12). It rides in each call's ``_meta`` and nothing between here and the tool reads
+        it, which is what lets this package pass a key it was handed rather than one it knows.
+        """
         ...

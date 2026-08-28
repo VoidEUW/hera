@@ -1,6 +1,7 @@
 """The MCP server Hera **is**, as opposed to the ones she can reach.
 
-Four tools — ``emotion``, ``remember``, ``note`` and ``skill`` — on a real
+Her own tools — ``emotion``, ``ask``, ``remember``, ``note``, ``skill``, ``search`` and the
+scratchpad — on a real
 :class:`~mcp.server.mcpserver.MCPServer`. The application mounts it in-process through
 ``hera_tools``, which reaches it with the same client it reaches a filesystem server with, lists
 it in the same catalogue and checks it with the same policy (ADR 4).
@@ -19,10 +20,20 @@ arrives as :mod:`hera_mcp.ports`.
 from __future__ import annotations
 
 from hera_mcp.emotions import DEFAULT_EMOTIONS, Emotion, Tone, render_emotions
-from hera_mcp.ports import Hit, MemoryWriter, NoteWriter, Searcher, SkillLibrary
+from hera_mcp.ports import (
+    Hit,
+    MemoryWriter,
+    NoteWriter,
+    ScratchFile,
+    Scratchpad,
+    Searcher,
+    SkillLibrary,
+)
 from hera_mcp.server import (
     ASK_TOOL,
     BUILTIN_SERVER_NAME,
+    CHAT_ID_META,
+    SCRATCH_LISTING_LIMIT,
     SEARCH_LIMIT,
     TOOL_NAMES,
     build_builtin_server,
@@ -31,13 +42,17 @@ from hera_mcp.server import (
 __all__ = [
     "ASK_TOOL",
     "BUILTIN_SERVER_NAME",
+    "CHAT_ID_META",
     "DEFAULT_EMOTIONS",
+    "SCRATCH_LISTING_LIMIT",
     "SEARCH_LIMIT",
     "TOOL_NAMES",
     "Emotion",
     "Hit",
     "MemoryWriter",
     "NoteWriter",
+    "ScratchFile",
+    "Scratchpad",
     "Searcher",
     "SkillLibrary",
     "Tone",

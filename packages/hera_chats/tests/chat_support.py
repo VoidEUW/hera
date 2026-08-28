@@ -7,7 +7,7 @@ to import by name lives here instead.
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator, Iterable, Sequence
+from collections.abc import AsyncIterator, Iterable, Mapping, Sequence
 from pathlib import Path
 from typing import Protocol
 
@@ -61,6 +61,7 @@ class StubTools:
         self.results = results or {}
         self.dispatched: list[list[ToolInvocation]] = []
         self.confirmed_seen: list[tuple[str, ...]] = []
+        self.context_seen: list[Mapping[str, str] | None] = []
 
     def check(self, tool: str, *, profile: str | None = None) -> Outcome:
         return self.policy.check(tool, profile=profile)
@@ -74,10 +75,12 @@ class StubTools:
         *,
         profile: str | None = None,
         confirmed: Sequence[str] = (),
+        context: Mapping[str, str] | None = None,
     ) -> list[ToolResult]:
         calls = list(invocations)
         self.dispatched.append(calls)
         self.confirmed_seen.append(tuple(confirmed))
+        self.context_seen.append(context)
         return [self._answer(call) for call in calls]
 
     def _answer(self, call: ToolInvocation) -> ToolResult:

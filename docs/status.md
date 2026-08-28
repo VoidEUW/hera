@@ -60,7 +60,34 @@ it was designed around. `hera__remember(scope="chat")` has been missing exactly 
 explicitly not the second, with what would upgrade the claim named. Docker becomes a requirement
 for one tool and is absent rather than broken without it.
 
-M2a starts from `main`, on `feat/chat-scratchpad`.
+**M2a is built**, on `feat/chat-scratchpad` off `main`. What it turned up:
+
+- **The `_meta` mechanism had to be verified against the SDK before it was designed around**, and
+  it holds: `client.call_tool(..., meta=…)` arrives at `ctx.request_context.meta`, and a
+  `ctx: Context` parameter is **excluded from the tool's input schema** — so the model does not
+  see a `chat_id` field and cannot fill one in with a guess. There is a test asserting the schema
+  has exactly `name`, `text` and `append` on it, because that exclusion is the whole safety
+  argument and it is somebody else's behaviour.
+- **A hand-built container drifts from `build_services` silently.** The suite assembles `Services`
+  itself rather than calling the real wiring, so it was missing `chat_meta_key` — the turn ran,
+  every call succeeded, and the only symptom was her scratchpad answering *this call is not part
+  of a conversation* in the middle of a working conversation. `apps/core/tests/test_wiring.py` is
+  the guard, and it drives the real registry rather than inspecting the wiring: a
+  `scratchpad=` argument can be present and be `None`.
+- **The containment check runs after `resolve`, not on the string.** A symlink in the scratchpad
+  is a traversal that every string check reads as an ordinary filename, so both the write and the
+  read are refused through it — refusing one and allowing the other would make the scratchpad a
+  file reader for anything a link already points at.
+- **A size refusal happens before the file is opened.** `open("wb")` truncates, so a check after
+  it would answer *no* and destroy the plan in the same call.
+- **The toy server in `hera_tools`' suite grew a tool**, which broke two tests asserting a count
+  of 2 on an unrelated server. `TOY_TOOL_COUNT` now, so a test about a server being *unreachable*
+  does not fail because a tool was added to the reachable one beside it. Same move on
+  `apps/core`'s catalogue assertion, which now reads `hera_mcp.TOOL_NAMES` rather than six
+  literals — spelled out, that test fails every time a tool is added and the fix is always to
+  paste the name in.
+
+1031 tests at 98 % coverage, plus 86 vitest and 12 Playwright. M2b starts from here.
 
 ---
 

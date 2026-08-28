@@ -21,23 +21,30 @@ DEFAULT_HOME = Path("~/.hera")
 
 MIND_DIRNAME = "mind"
 SKILLS_DIRNAME = "skills"
+CHATS_DIRNAME = "chats"
+SCRATCH_DIRNAME = "scratch"
 DATABASE_FILENAME = "hera.sqlite3"
 MCP_FILENAME = "mcp.json"
 CONFIG_FILENAME = "config.toml"
 
 __all__ = [
+    "CHATS_DIRNAME",
     "CONFIG_FILENAME",
     "DATABASE_FILENAME",
     "DEFAULT_HOME",
     "HOME_ENV",
     "MCP_FILENAME",
     "MIND_DIRNAME",
+    "SCRATCH_DIRNAME",
     "SKILLS_DIRNAME",
+    "chat_dir",
+    "chats_dir",
     "config_path",
     "database_path",
     "home",
     "mcp_path",
     "mind_dir",
+    "scratch_dir",
     "skills_dir",
 ]
 
@@ -60,6 +67,29 @@ def mind_dir() -> Path:
 def skills_dir() -> Path:
     """The directory holding one ``SKILL.md`` package per subdirectory."""
     return home() / SKILLS_DIRNAME
+
+
+def chats_dir() -> Path:
+    """Where everything a single conversation owns on disk lives, one directory per chat."""
+    return home() / CHATS_DIRNAME
+
+
+def chat_dir(chat_id: str) -> Path:
+    """One conversation's directory. The id is the name, and nothing else is.
+
+    ``chat_id`` reaches this from a tool call, which means it reaches it from *somewhere*, and
+    the answer to how much this function trusts it is **not at all**: anything that is not a
+    single plain path segment raises. A ``..`` here would put a scratchpad in the mind
+    repository, and a leading ``/`` would put it outside ``~/.hera`` altogether.
+    """
+    if not chat_id or chat_id in {".", ".."} or "/" in chat_id or "\\" in chat_id:
+        raise ValueError(f"not a usable chat id: {chat_id!r}")
+    return chats_dir() / chat_id
+
+
+def scratch_dir(chat_id: str) -> Path:
+    """One conversation's scratchpad — hers to write, and gone when the chat is (ADR 12)."""
+    return chat_dir(chat_id) / SCRATCH_DIRNAME
 
 
 def database_path() -> Path:

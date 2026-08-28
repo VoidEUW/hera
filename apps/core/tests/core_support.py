@@ -7,7 +7,7 @@ to one module name and it has no by-path loading the way pytest does.
 from __future__ import annotations
 
 import json
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from pathlib import Path
 from typing import Any, Protocol
 
@@ -46,6 +46,7 @@ class StubTools:
         )
         self._policy = policy or Policy(fallback=Decision.ALLOW)
         self.dispatched: list[list[ToolInvocation]] = []
+        self.context_seen: list[Mapping[str, str] | None] = []
 
     @property
     def policy(self) -> Policy:
@@ -55,6 +56,7 @@ class StubTools:
         replacement = StubTools(policy=policy)
         replacement.catalogue_value = self.catalogue_value
         replacement.dispatched = self.dispatched
+        replacement.context_seen = self.context_seen
         return replacement
 
     def check(self, tool: str, *, profile: str | None = None) -> Outcome:
@@ -74,9 +76,11 @@ class StubTools:
         *,
         profile: str | None = None,
         confirmed: Sequence[str] = (),
+        context: Mapping[str, str] | None = None,
     ) -> list[ToolResult]:
         calls = list(invocations)
         self.dispatched.append(calls)
+        self.context_seen.append(context)
         return [self._answer(call) for call in calls]
 
     async def aclose(self) -> None:

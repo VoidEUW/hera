@@ -79,6 +79,46 @@ class NoteWriter(Protocol):
         ...
 
 
+@dataclass(frozen=True, slots=True)
+class ScratchFile:
+    """One file in a conversation's scratchpad, as a listing shows it."""
+
+    name: str
+    size: int
+
+
+@runtime_checkable
+class Scratchpad(Protocol):
+    """Her working files for one conversation (ADR 12).
+
+    Not the notes vault above and not a memory: this is the sheet of paper beside the work,
+    where a plan or a half-finished result goes so that the *next* turn can pick it up without
+    the whole thing being replayed through the context window.
+
+    Every method takes the conversation it belongs to, because the tools are built once at
+    startup and cannot close over one. The id arrives in the call's ``_meta`` -- see
+    :data:`hera_mcp.CHAT_ID_META` -- and the implementation is what decides that a name is
+    usable, because it is the one holding a filesystem.
+    """
+
+    async def write(self, chat_id: str, name: str, text: str, *, append: bool = False) -> str:
+        """Write one file and return a short confirmation for the model."""
+        ...
+
+    async def read(self, chat_id: str, name: str) -> str | None:
+        """The contents of one file, or ``None`` if there is no such file.
+
+        ``None`` rather than an exception for the same reason :meth:`SkillLibrary.load` uses it:
+        having looked and found nothing is an ordinary answer, and one she should be told
+        plainly enough to try a different name.
+        """
+        ...
+
+    async def files(self, chat_id: str) -> Sequence[ScratchFile]:
+        """Everything in this conversation's scratchpad. Empty is normal, not a failure."""
+        ...
+
+
 @runtime_checkable
 class SkillLibrary(Protocol):
     """The ``SKILL.md`` packages on disk. Implemented by ``hera_skillsets``.

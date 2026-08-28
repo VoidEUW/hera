@@ -18,7 +18,7 @@ from hera_tools.registry import ToolRegistry
 from hera_tools.results import Failure, ToolInvocation
 from hera_tools.server import ManagedServer
 from mcp.server.mcpserver import MCPServer
-from tools_support import STDIO_SERVER_SOURCE
+from tools_support import CALLER_META, STDIO_SERVER_SOURCE, TOY_TOOL_COUNT
 
 from hera_permissions import Decision, PermissionSet, Policy, Rule
 from hera_tools import ToolsSettings
@@ -148,7 +148,7 @@ class TestDegrading:
         catalogue = await registry.catalogue()
 
         assert len(catalogue.for_server("ghost")) == 0
-        assert len(catalogue.for_server("toy")) == 2
+        assert len(catalogue.for_server("toy")) == TOY_TOOL_COUNT
         assert (await registry.dispatch(_emotion())).ok
         await registry.aclose()
 
@@ -168,7 +168,7 @@ class TestDegrading:
         status = {server.name: server for server in await registry.status()}
 
         assert status["toy"].connected
-        assert status["toy"].tools == 2
+        assert status["toy"].tools == TOY_TOOL_COUNT
         assert not status["ghost"].connected
         assert status["ghost"].failure
         await registry.aclose()
@@ -332,3 +332,49 @@ class TestSettings:
     def test_hera_home_expands_a_tilde(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.delenv("HERA_HOME", raising=False)
         assert ToolsSettings().resolved_config_path().is_absolute()
+
+
+class TestCallContext:
+    """ADR 12: the caller can tell a server something the model did not choose.
+
+    What is being proved is a round trip, not a data structure. The obvious alternative — a
+    ``contextvars.ContextVar`` — reads back *empty* here rather than failing, because
+    ``ManagedServer`` runs every call as a child of a worker task created when the server
+    connected, and Python copies a context at task creation. That is the bug this mechanism
+    exists to not have, and it is invisible without a server that reports what it received.
+    """
+
+    def _caller(self, call_id: str = "c1") -> ToolInvocation:
+        return ToolInvocation(call_id=call_id, tool="toy__caller", arguments={})
+
+    async def test_it_reaches_the_server_as_meta(self, registry: ToolRegistry) -> None:
+        result = await registry.dispatch(self._caller(), context={CALLER_META: "abc-123"})
+
+        assert result.ok
+        assert result.text == "abc-123"
+
+    async def test_no_context_is_a_normal_call(self, registry: ToolRegistry) -> None:
+        """Empty means no ``_meta`` at all rather than a key with nothing behind it, so a
+        deployment that configures none of this is not sending a blank field to every server."""
+        result = await registry.dispatch(self._caller())
+
+        assert result.ok
+        assert result.text == "nobody"
+
+    async def test_the_whole_batch_gets_it(self, registry: ToolRegistry) -> None:
+        """``context`` describes the turn rather than the call, so it is the same for all of
+        them — including the ones running in parallel, which is the everyday case (ADR 3)."""
+        results = await registry.dispatch_all(
+            [self._caller("c1"), self._caller("c2")], context={CALLER_META: "abc-123"}
+        )
+
+        assert [r.text for r in results] == ["abc-123", "abc-123"]
+
+    async def test_this_package_does_not_read_it(self, registry: ToolRegistry) -> None:
+        """A key it has never heard of travels untouched, which is the property that lets the
+        application decide what goes in without this package learning what Hera is."""
+        result = await registry.dispatch(
+            self._caller(), context={"something/else": "x", CALLER_META: "abc-123"}
+        )
+
+        assert result.text == "abc-123"

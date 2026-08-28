@@ -30,12 +30,14 @@ the kind that survives.
 
 from __future__ import annotations
 
+from collections.abc import Iterator
+from contextlib import contextmanager
 from typing import Literal
 
-from mcp.server.mcpserver import MCPServer
+from mcp.server.mcpserver import Context, MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
 
-from hera_mcp.ports import Hit, MemoryWriter, NoteWriter, Searcher, SkillLibrary
+from hera_mcp.ports import Hit, MemoryWriter, NoteWriter, Scratchpad, Searcher, SkillLibrary
 
 BUILTIN_SERVER_NAME = "hera"
 """Her tools are namespaced ``hera__emotion``, ``hera__remember`` and so on.
@@ -54,10 +56,39 @@ are. The application reads this and configures ``ChatsSettings.asking_tools`` wi
 qualified name, so the string is written once and travels rather than being agreed on twice.
 """
 
-TOOL_NAMES = ("emotion", "ask", "remember", "note", "skill", "search")
+CHAT_ID_META = "hera/chatId"
+"""Where a call says which conversation it belongs to (ADR 12).
+
+A key in the request's ``_meta``, not an argument: the model chooses arguments, so a ``chat_id``
+in the schema would be one the model invents. The tools below read it through a ``ctx: Context``
+parameter, which the SDK keeps out of the tool's input schema entirely, so it is not something
+the model can see or forge.
+
+Named as a constant for the reason :data:`ASK_TOOL` is. ``hera_tools`` carries an opaque mapping
+and does not read it; the *application* is what fills it in, so the string is written here and
+travels rather than being agreed on by two packages that may not import each other. Namespaced,
+because the mapping goes to every server including somebody else's.
+"""
+
+TOOL_NAMES = (
+    "emotion",
+    "ask",
+    "remember",
+    "note",
+    "skill",
+    "search",
+    "scratch_write",
+    "scratch_read",
+    "scratch_list",
+)
 """What this server offers, in the order they were added. Qualified, that is ``hera__emotion``
 and its siblings — the ones a catalogue reports for the ``hera`` server, which is the question
 a settings screen showing "5 tools" leaves a person asking."""
+
+SCRATCH_LISTING_LIMIT = 100
+"""How many files one ``scratch_list`` reports. A ceiling for the same reason
+:data:`SEARCH_LIMIT` is one: a listing longer than this is not an answer, it is the context
+window spent on filenames."""
 
 SEARCH_LIMIT = 20
 """The most results one call may ask for. A ceiling rather than a preference: a model that asks
@@ -71,6 +102,7 @@ def build_builtin_server(
     notes: NoteWriter | None = None,
     skills: SkillLibrary | None = None,
     searcher: Searcher | None = None,
+    scratchpad: Scratchpad | None = None,
     version: str = "0.1.0",
 ) -> MCPServer:
     """Assemble the in-process server, wired to whichever ports this deployment has.
@@ -211,7 +243,114 @@ def build_builtin_server(
             return f"no results for {asked!r}"
         return "\n\n".join(_result(index, hit) for index, hit in enumerate(hits, start=1))
 
+    # The scratchpad, ADR 12. Three tools rather than two: folding the listing into `read` with
+    # an empty name would be one fewer description at the cost of a conditional in prose, and
+    # this project has already made that trade the other way once -- `ask` is a separate tool
+    # from `emotion` for exactly this reason.
+    #
+    # None of them says "scratchpad" without saying what it is *for*. A model given a place to
+    # write and no account of when to use it either never writes or writes everything down.
+
+    @server.tool(
+        name="scratch_write",
+        title="Write to your scratchpad",
+        description=(
+            "Write a file to your scratchpad for this conversation -- a plan, a set of findings "
+            "so far, a draft you are still working on. It is yours, not something the person "
+            "reads, and it survives into later turns of this conversation, so use it for what "
+            "you would otherwise have to re-derive or re-read the whole chat to recover. Prefer "
+            "it to a very long answer whose real purpose is to remember something. `name` is a "
+            "plain filename such as `plan.md`. `append=true` adds to the end instead of "
+            "replacing. For a document the person keeps, use `note`; for a lasting fact about "
+            "them, use `remember`."
+        ),
+    )
+    async def scratch_write(name: str, text: str, ctx: Context, append: bool = False) -> str:
+        if scratchpad is None:
+            raise ToolError("a scratchpad is not available in this deployment")
+        with _readable("write to the scratchpad"):
+            return await scratchpad.write(_chat_of(ctx), name.strip(), text, append=append)
+
+    @server.tool(
+        name="scratch_read",
+        title="Read from your scratchpad",
+        description=(
+            "Read back a file you wrote to your scratchpad in this conversation. Use it at the "
+            "start of a turn when you left yourself something and need it in front of you "
+            "again. `scratch_list` says what is there."
+        ),
+    )
+    async def scratch_read(name: str, ctx: Context) -> str:
+        if scratchpad is None:
+            raise ToolError("a scratchpad is not available in this deployment")
+        with _readable("read the scratchpad"):
+            body = await scratchpad.read(_chat_of(ctx), name.strip())
+        if body is None:
+            raise ToolError(f"no file named {name!r} in this conversation's scratchpad")
+        return body
+
+    @server.tool(
+        name="scratch_list",
+        title="List your scratchpad",
+        description=(
+            "List what you have written to your scratchpad in this conversation, with sizes. "
+            "Cheap; call it when you are unsure whether you left yourself anything."
+        ),
+    )
+    async def scratch_list(ctx: Context) -> str:
+        if scratchpad is None:
+            raise ToolError("a scratchpad is not available in this deployment")
+        with _readable("list the scratchpad"):
+            found = await scratchpad.files(_chat_of(ctx))
+        if not found:
+            # Not a ToolError: an empty scratchpad is the ordinary state of a new conversation,
+            # and telling her it *failed* is how a tool stops being used. Same reasoning as
+            # "no results" in `search`.
+            return "your scratchpad for this conversation is empty"
+        listed = sorted(found, key=lambda file: file.name)[:SCRATCH_LISTING_LIMIT]
+        lines = [f"{file.name} ({file.size} bytes)" for file in listed]
+        if len(found) > len(listed):
+            lines.append(f"… and {len(found) - len(listed)} more")
+        return "\n".join(lines)
+
     return server
+
+
+@contextmanager
+def _readable(what: str) -> Iterator[None]:
+    """Let whatever the adapter said reach the model, instead of the SDK's generic sentence.
+
+    Without this the SDK replaces any exception that is not a ``ToolError`` with "Error
+    executing tool scratch_write", which tells her nothing to act on — and the adapter's
+    refusals are the ones most worth reading: *that is not a plain filename*, *that would put
+    it over the size limit*. Both have an obvious next move and neither survives being
+    generalised.
+
+    Broad on purpose, and it hides nothing: a ``ToolError`` already carries its own message and
+    passes through untouched.
+    """
+    try:
+        yield
+    except ToolError:
+        raise
+    except Exception as cause:
+        raise ToolError(f"could not {what}: {cause}") from cause
+
+
+def _chat_of(ctx: Context) -> str:
+    """Which conversation this call is part of, from the request's ``_meta`` (ADR 12).
+
+    Reached only by the tools that are meaningless outside one. Missing means this server is
+    being driven directly -- over the transport v0.3 exposes, or by a test -- and saying so
+    plainly beats inventing a directory and writing into it, which nobody would find.
+    """
+    meta = getattr(ctx.request_context, "meta", None) or {}
+    chat_id = meta.get(CHAT_ID_META)
+    if not isinstance(chat_id, str) or not chat_id:
+        raise ToolError(
+            "the scratchpad belongs to a conversation, and this call is not part of one"
+        )
+    return chat_id
 
 
 def _result(index: int, hit: Hit) -> str:

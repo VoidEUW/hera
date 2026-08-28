@@ -109,3 +109,24 @@ describe('subject', () => {
 		expect(subject('hera__skill', { name: 42 })).toBe('');
 	});
 });
+
+describe('the scratchpad in the gutter', () => {
+	it('draws all three of its calls with the quill', () => {
+		// Writing something down and reading it back are one habit to a reader. Two marks for
+		// one habit would make the second look like a different capability.
+		expect(mark('hera__scratch_write')).toBe('note');
+		expect(mark('hera__scratch_read')).toBe('note');
+		expect(mark('hera__scratch_list')).toBe('note');
+		expect(mark('hera__note')).toBe('note');
+	});
+
+	it('names the file, never the body', () => {
+		// A write is a whole document and the row is one line.
+		expect(subject('hera__scratch_write', { name: 'plan.md', text: '1. read it' })).toBe('plan.md');
+		expect(subject('hera__scratch_read', { name: 'plan.md' })).toBe('plan.md');
+	});
+
+	it('says nothing for a listing, which takes no arguments', () => {
+		expect(subject('hera__scratch_list', {})).toBe('');
+	});
+});

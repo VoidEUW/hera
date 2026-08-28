@@ -523,6 +523,7 @@ class Turn:
                 ],
                 profile=self._profile_slug,
                 confirmed=self.context.confirmed,
+                context=self._call_context(),
             )
 
         for ran in results:
@@ -579,6 +580,22 @@ class Turn:
     @property
     def _profile_slug(self) -> str | None:
         return self.context.profile.slug if self.context.profile is not None else None
+
+    def _call_context(self) -> dict[str, str]:
+        """What every tool call in this turn is told about the situation (ADR 12).
+
+        Which conversation it is, and only that. The key comes from settings rather than from
+        here, because the package that *reads* it is her own MCP server and this one may not
+        know that package exists — the same arrangement as ``asking_tools``.
+
+        Empty when the key is unset or there is no chat, and empty means no ``_meta`` is sent
+        at all. A tool that needs a conversation then says so, which is the right failure: a
+        turn running outside a chat is a test or a script, not a person waiting.
+        """
+        key = self._settings.chat_meta_key
+        if not key or self.context.chat is None:
+            return {}
+        return {key: str(self.context.chat.id)}
 
     def _record(self, event: ChatEvent) -> ChatEvent:
         self._recorded.append(event)

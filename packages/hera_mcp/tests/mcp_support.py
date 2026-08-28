@@ -8,12 +8,13 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager
+from typing import cast
 
 from mcp import Client
 from mcp.server.mcpserver import MCPServer
-from mcp.types import CallToolResult
+from mcp.types import CallToolResult, RequestParamsMeta
 
-from hera_mcp import Hit
+from hera_mcp import CHAT_ID_META, Hit, ScratchFile
 
 
 class FakeMemories:
@@ -71,6 +72,53 @@ class FakeSearch:
         return self.hits[:limit]
 
 
+class FakeScratchpad:
+    """A :class:`~hera_mcp.ports.Scratchpad` that keeps files in memory, per chat.
+
+    Per chat rather than in one bag, because the thing worth being able to assert here is that
+    the id from the call's ``_meta`` is what decided where the write went — a fake that ignored
+    it would pass every test in this file and hide the only bug the mechanism can have.
+    """
+
+    def __init__(self) -> None:
+        self.chats: dict[str, dict[str, str]] = {}
+
+    async def write(self, chat_id: str, name: str, text: str, *, append: bool = False) -> str:
+        files = self.chats.setdefault(chat_id, {})
+        files[name] = files.get(name, "") + text if append else text
+        return f"wrote {name} ({len(files[name])} bytes)"
+
+    async def read(self, chat_id: str, name: str) -> str | None:
+        return self.chats.get(chat_id, {}).get(name)
+
+    async def files(self, chat_id: str) -> Sequence[ScratchFile]:
+        return [
+            ScratchFile(name=name, size=len(body))
+            for name, body in self.chats.get(chat_id, {}).items()
+        ]
+
+
+class AngryScratchpad:
+    """A scratchpad that refuses everything, with a sentence worth reading.
+
+    For the one thing the tools do that the port does not: an adapter's refusal has to survive
+    into the model's result rather than being replaced by the SDK's generic "Error executing
+    tool" -- the traversal and size messages are the ones with an obvious next move in them.
+    """
+
+    def __init__(self, complaint: str = "'../x' is not a plain filename") -> None:
+        self.complaint = complaint
+
+    async def write(self, chat_id: str, name: str, text: str, *, append: bool = False) -> str:
+        raise ValueError(self.complaint)
+
+    async def read(self, chat_id: str, name: str) -> str | None:
+        raise ValueError(self.complaint)
+
+    async def files(self, chat_id: str) -> Sequence[ScratchFile]:
+        raise ValueError(self.complaint)
+
+
 @asynccontextmanager
 async def talking_to(server: MCPServer) -> AsyncIterator[Client]:
     """Open a client for the length of one test, and close it in the same task.
@@ -87,3 +135,13 @@ async def talking_to(server: MCPServer) -> AsyncIterator[Client]:
 def said(result: CallToolResult) -> str:
     """The text the model would read, flattened out of the content blocks."""
     return "".join(getattr(block, "text", "") for block in result.content)
+
+
+def in_chat(chat_id: str) -> RequestParamsMeta:
+    """The ``_meta`` a turn in that conversation would send (ADR 12).
+
+    A plain dict, which is what ``RequestParamsMeta`` is at runtime: it is a ``TypedDict``, and
+    carrying a namespaced key it does not declare is how an extension is meant to travel. The
+    cast is what says that out loud -- ``hera_tools`` does the same on the sending side.
+    """
+    return cast(RequestParamsMeta, {CHAT_ID_META: chat_id})

@@ -9,9 +9,25 @@ from __future__ import annotations
 
 import pytest
 from mcp.server.mcpserver import MCPServer
-from mcp_support import FakeMemories, FakeNotes, FakeSearch, FakeSkills, said, talking_to
+from mcp_support import (
+    AngryScratchpad,
+    FakeMemories,
+    FakeNotes,
+    FakeScratchpad,
+    FakeSearch,
+    FakeSkills,
+    in_chat,
+    said,
+    talking_to,
+)
 
-from hera_mcp import BUILTIN_SERVER_NAME, SEARCH_LIMIT, TOOL_NAMES, build_builtin_server
+from hera_mcp import (
+    BUILTIN_SERVER_NAME,
+    SCRATCH_LISTING_LIMIT,
+    SEARCH_LIMIT,
+    TOOL_NAMES,
+    build_builtin_server,
+)
 
 
 async def test_it_offers_her_whole_catalogue_under_her_name(wired: MCPServer) -> None:
@@ -202,6 +218,9 @@ class TestUnwiredPorts:
             ("note", {"text": "x"}),
             ("skill", {"name": "writing"}),
             ("search", {"query": "kerberos"}),
+            ("scratch_write", {"name": "plan.md", "text": "x"}),
+            ("scratch_read", {"name": "plan.md"}),
+            ("scratch_list", {}),
         ],
     )
     async def test_they_answer_that_they_are_unavailable(
@@ -218,3 +237,152 @@ class TestUnwiredPorts:
             result = await client.call_tool("emotion", {"kind": "hope"})
 
         assert not result.is_error
+
+
+class TestTheScratchpad:
+    """ADR 12. Three tools, and the interesting part is not any of them individually — it is
+    that a call knows which conversation it belongs to without the model being able to say."""
+
+    async def test_a_write_goes_to_the_chat_the_call_names(
+        self, wired: MCPServer, scratchpad: FakeScratchpad
+    ) -> None:
+        async with talking_to(wired) as client:
+            result = await client.call_tool(
+                "scratch_write", {"name": "plan.md", "text": "1. read it"}, meta=in_chat("c-1")
+            )
+
+        assert not result.is_error
+        assert scratchpad.chats == {"c-1": {"plan.md": "1. read it"}}
+
+    async def test_two_conversations_do_not_share_one(
+        self, wired: MCPServer, scratchpad: FakeScratchpad
+    ) -> None:
+        """The whole point of the ``_meta`` mechanism, stated as a test: a scratchpad that
+        ignored the id would pass every other assertion in this class."""
+        async with talking_to(wired) as client:
+            await client.call_tool(
+                "scratch_write", {"name": "plan.md", "text": "mine"}, meta=in_chat("c-1")
+            )
+            result = await client.call_tool(
+                "scratch_read", {"name": "plan.md"}, meta=in_chat("c-2")
+            )
+
+        assert result.is_error
+        assert "no file named" in said(result)
+
+    async def test_the_chat_id_is_not_in_the_schema(self, wired: MCPServer) -> None:
+        """A ``Context`` parameter is excluded by the SDK, which is what makes this safe: a
+        field in the schema is a field the model can see and will fill in with a guess."""
+        async with talking_to(wired) as client:
+            listing = await client.list_tools()
+
+        for name in ("scratch_write", "scratch_read", "scratch_list"):
+            tool = next(t for t in listing.tools if t.name == name)
+            properties = tool.input_schema.get("properties", {})
+            assert "ctx" not in properties
+            assert not any("chat" in key.lower() for key in properties)
+
+    async def test_a_call_outside_a_conversation_says_so(self, wired: MCPServer) -> None:
+        """Reached over the transport v0.3 exposes, or by a script. Refusing beats inventing a
+        directory and writing into one nobody would find."""
+        async with talking_to(wired) as client:
+            result = await client.call_tool("scratch_write", {"name": "plan.md", "text": "x"})
+
+        assert result.is_error
+        assert "not part of one" in said(result)
+
+    async def test_appending_adds_rather_than_replaces(
+        self, wired: MCPServer, scratchpad: FakeScratchpad
+    ) -> None:
+        async with talking_to(wired) as client:
+            await client.call_tool(
+                "scratch_write", {"name": "log.md", "text": "one\n"}, meta=in_chat("c-1")
+            )
+            await client.call_tool(
+                "scratch_write",
+                {"name": "log.md", "text": "two\n", "append": True},
+                meta=in_chat("c-1"),
+            )
+
+        assert scratchpad.chats["c-1"]["log.md"] == "one\ntwo\n"
+
+    async def test_reading_back_what_was_written(self, wired: MCPServer) -> None:
+        async with talking_to(wired) as client:
+            await client.call_tool(
+                "scratch_write", {"name": "plan.md", "text": "1. read it"}, meta=in_chat("c-1")
+            )
+            result = await client.call_tool(
+                "scratch_read", {"name": "plan.md"}, meta=in_chat("c-1")
+            )
+
+        assert not result.is_error
+        assert said(result) == "1. read it"
+
+    async def test_a_missing_file_is_a_failed_result_naming_it(self, wired: MCPServer) -> None:
+        async with talking_to(wired) as client:
+            result = await client.call_tool(
+                "scratch_read", {"name": "gone.md"}, meta=in_chat("c-1")
+            )
+
+        assert result.is_error
+        assert "gone.md" in said(result)
+
+    async def test_an_empty_scratchpad_is_not_an_error(self, wired: MCPServer) -> None:
+        """Same reasoning as ``search`` returning nothing: a model told the tool is broken stops
+        using it, and a model told there is nothing there writes something."""
+        async with talking_to(wired) as client:
+            result = await client.call_tool("scratch_list", {}, meta=in_chat("c-1"))
+
+        assert not result.is_error
+        assert "empty" in said(result)
+
+    async def test_a_listing_names_each_file_with_its_size(self, wired: MCPServer) -> None:
+        async with talking_to(wired) as client:
+            await client.call_tool(
+                "scratch_write", {"name": "plan.md", "text": "abcd"}, meta=in_chat("c-1")
+            )
+            result = await client.call_tool("scratch_list", {}, meta=in_chat("c-1"))
+
+        assert said(result) == "plan.md (4 bytes)"
+
+    async def test_a_long_listing_is_capped_and_says_so(
+        self, wired: MCPServer, scratchpad: FakeScratchpad
+    ) -> None:
+        """A ceiling for the reason ``SEARCH_LIMIT`` is one: past a point a listing is not an
+        answer, it is the context window spent on filenames."""
+        extra = 5
+        scratchpad.chats["c-1"] = {
+            f"note-{index:03}.md": "x" for index in range(SCRATCH_LISTING_LIMIT + extra)
+        }
+        async with talking_to(wired) as client:
+            result = await client.call_tool("scratch_list", {}, meta=in_chat("c-1"))
+
+        lines = said(result).splitlines()
+        assert len(lines) == SCRATCH_LISTING_LIMIT + 1
+        assert lines[-1] == f"… and {extra} more"
+
+    async def test_an_adapters_refusal_reaches_the_model(self, scratchpad: FakeScratchpad) -> None:
+        """Without the wrapping, the SDK replaces this with "Error executing tool
+        scratch_write" — and the refusals worth reading are exactly the ones with a next move
+        in them: *that is not a plain filename*, *that is over the size limit*."""
+        angry = build_builtin_server(scratchpad=AngryScratchpad())
+        async with talking_to(angry) as client:
+            result = await client.call_tool(
+                "scratch_write", {"name": "../x", "text": "x"}, meta=in_chat("c-1")
+            )
+
+        assert result.is_error
+        assert "not a plain filename" in said(result)
+
+    async def test_the_three_descriptions_say_what_it_is_for(self, wired: MCPServer) -> None:
+        """Tool descriptions are prompt text. A place to write with no account of when to use
+        it produces a model that either never writes or writes everything down."""
+        async with talking_to(wired) as client:
+            listing = await client.list_tools()
+
+        write = next(t for t in listing.tools if t.name == "scratch_write")
+        assert write.description is not None
+        # It has to be told what the *other* two tools are for, or the three overlap and the
+        # choice between them becomes arbitrary.
+        assert "note" in write.description
+        assert "remember" in write.description

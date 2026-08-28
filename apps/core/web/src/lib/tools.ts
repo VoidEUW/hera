@@ -35,9 +35,10 @@ export type Mark = 'thinking' | 'skill' | 'search' | 'note' | 'memory' | 'tool';
  * `default` below rather than an exhaustive map: adding a tool to `hera_mcp` must not be able to
  * break this file, and a tool this build has never heard of gets the honest generic mark.
  *
- * Adding one when the scratchpad lands (`docs/tooling.md` § 2) is one line: writing to it is a
- * `note`, and so is reading it back — the reader's question is *did she write something down*,
- * not which call carried it.
+ * The scratchpad (`docs/tooling.md` § 2, ADR 12) is drawn with the quill, and all three of its
+ * calls share it: writing something down and reading it back are the same fact to a reader, which
+ * is *she is keeping notes on this*. Splitting them would put two marks in the gutter for one
+ * habit and make the second look like a different capability.
  */
 export function mark(qualified: string): Mark {
 	if (!qualified.startsWith(HERA)) return 'tool';
@@ -48,6 +49,9 @@ export function mark(qualified: string): Mark {
 		case 'fetch':
 			return 'search';
 		case 'note':
+		case 'scratch_write':
+		case 'scratch_read':
+		case 'scratch_list':
 			return 'note';
 		case 'remember':
 			return 'memory';
@@ -83,7 +87,12 @@ const SUBJECT: Record<string, readonly string[]> = {
 	search: ['query'],
 	note: ['title', 'text'],
 	remember: ['text'],
-	emotion: ['kind']
+	emotion: ['kind'],
+	// The filename, never the body: a scratchpad write is a whole document, and the gutter row is
+	// one line. `scratch_list` takes no arguments and falls through to nothing, which is right —
+	// the row already says she listed it.
+	scratch_write: ['name'],
+	scratch_read: ['name']
 };
 
 /** The subject of one of her calls, or `''` when there is nothing worth showing. */

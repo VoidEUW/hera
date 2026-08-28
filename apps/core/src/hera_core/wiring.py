@@ -27,10 +27,11 @@ from dataclasses import dataclass
 
 from hera_chats import ChatsSettings, TurnOrchestrator
 from hera_core.config import load as load_config
+from hera_core.scratch import FileScratchpad
 from hera_core.search import DuckDuckGo
 from hera_core.settings import CoreSettings
 from hera_home import mind_dir, skills_dir
-from hera_mcp import ASK_TOOL, BUILTIN_SERVER_NAME, build_builtin_server
+from hera_mcp import ASK_TOOL, BUILTIN_SERVER_NAME, CHAT_ID_META, build_builtin_server
 from hera_permissions import Decision, PermissionSet, Policy, Rule
 from hera_profiles import MindRepository, PromptBuilder
 from hera_providers import OpenAICompatibleProvider, Provider, ProviderSettings
@@ -179,6 +180,10 @@ def build_services(
             builtin=build_builtin_server(
                 skills=SkillLibraryPort(library),
                 searcher=DuckDuckGo(),
+                # Which conversation a write belongs to arrives per call, in `_meta` -- see
+                # ChatsSettings.chat_meta_key below. This object is a singleton and knows
+                # nothing about any one chat, which is the whole reason that mechanism exists.
+                scratchpad=FileScratchpad(),
             ),
         )
 
@@ -208,6 +213,11 @@ def build_services(
                 # Qualified here because `hera_tools` namespaces by server name, and that name
                 # travels on the server object rather than being written twice.
                 asking_tools=(f"{BUILTIN_SERVER_NAME}__{ASK_TOOL}",),
+                # And the one place the key her scratchpad reads the chat id from is named to
+                # the turn layer (ADR 12). `hera_tools` carries the mapping without looking in
+                # it and `hera_mcp` reads it; neither may import the other, so the application
+                # is what makes them agree -- exactly as it does for `ask` above.
+                chat_meta_key=CHAT_ID_META,
             ),
         ),
     )

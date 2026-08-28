@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import pytest
 from mcp.server.mcpserver import MCPServer
-from mcp_support import FakeMemories, FakeNotes, FakeSearch, FakeSkills
+from mcp_support import FakeMemories, FakeNotes, FakeScratchpad, FakeSearch, FakeSkills
 
 from hera_mcp import Hit, build_builtin_server
 
@@ -43,11 +43,26 @@ def searcher() -> FakeSearch:
 
 
 @pytest.fixture
+def scratchpad() -> FakeScratchpad:
+    return FakeScratchpad()
+
+
+@pytest.fixture
 def wired(
-    memories: FakeMemories, notes: FakeNotes, skills: FakeSkills, searcher: FakeSearch
+    memories: FakeMemories,
+    notes: FakeNotes,
+    skills: FakeSkills,
+    searcher: FakeSearch,
+    scratchpad: FakeScratchpad,
 ) -> MCPServer:
     """Everything wired, which is what a v0.2 deployment looks like."""
-    return build_builtin_server(memories=memories, notes=notes, skills=skills, searcher=searcher)
+    return build_builtin_server(
+        memories=memories,
+        notes=notes,
+        skills=skills,
+        searcher=searcher,
+        scratchpad=scratchpad,
+    )
 
 
 @pytest.fixture

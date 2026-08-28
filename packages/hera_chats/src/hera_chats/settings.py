@@ -64,3 +64,17 @@ class ChatsSettings(BaseSettings):
     own server would be this package learning what Hera *is*, and the next such tool would be a
     second string in a second place.
     """
+
+    chat_meta_key: str = ""
+    """Where a tool call is told which conversation it belongs to (ADR 12).
+
+    A key, not a value: the turn knows the chat and the tool layer knows how to carry a mapping,
+    and this is the word the two agree on. Set, every dispatch in the turn goes out with
+    ``{chat_meta_key: <chat id>}`` in the call's ``_meta``; empty — the default — sends nothing,
+    which is a deployment where no tool asks which conversation it is in rather than a broken
+    one.
+
+    The same shape as :attr:`asking_tools` and for the same reason. ``hera_mcp.CHAT_ID_META`` is
+    where the string is written; this package must not learn it, because ``hera_tools`` carries
+    the mapping opaquely and ``hera_mcp`` reads it, and neither may import the other.
+    """
