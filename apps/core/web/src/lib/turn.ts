@@ -7,16 +7,20 @@
  * the two disagreed, the answer would visibly change the moment it finished — so they are the
  * same code path over the same variants, and there is nothing for them to disagree about.
  *
- * It groups rather than transforms. Every event keeps its identity; this only decides which of
- * three places it belongs in — the gutter above the prose, the prose itself, or a card in the
- * flow — and pairs a tool result with the call that produced it.
+ * It groups rather than transforms. Every event keeps its identity; this only decides how it is
+ * drawn — as a row in the gutter, as prose, or as a card in the flow — and pairs a tool result
+ * with the call that produced it.
  *
- * The gutter is in **event order**, and that is the whole reason reasoning is broken into
- * blocks rather than collected into one. A turn that thinks, calls a tool, reads the result and
- * thinks again is a trace you follow downwards; folding both stretches of reasoning into a
- * single row at the top means the second half of her thinking appears above the call that
- * caused it, and the only way to read the turn in order is to scroll back up to a block that
- * has grown since you last looked at it.
+ * **A turn is one list, in event order.** That is the property everything else here serves. It
+ * used to be two — every gutter row, then all the prose — which reads correctly only for the
+ * turn that does its thinking up front. The moment she speaks, thinks again and speaks again,
+ * the second thought was drawn *above* the sentence that prompted it, and the turn could not be
+ * read downwards at all. So `blocks` is the render order: a run of consecutive gutter rows is
+ * one block, and prose and cards sit between the runs where she put them.
+ *
+ * The same rule is why reasoning is broken into pieces rather than collected into one. Anything
+ * a person can *see* closes the block in progress, so the thought after a tool call is a new row
+ * below it rather than more text appended to a row above it.
  */
 
 import type { AnyEvent, ChatEvent, ToolCallReady, ToolResultEvent } from './api/events';
@@ -24,7 +28,11 @@ import { isAsk, isEmotion } from './api/events';
 
 /** A row in the activity gutter: something she did before or between speaking. */
 export interface Activity {
-	kind: 'skill' | 'tool' | 'thinking' | 'permission' | 'unknown';
+	// No `permission`: a card is drawn in the flow where the call would have happened, never as
+	// a gutter row, and `ActivityRow` has never had a branch for one. Listing it here made the
+	// two unions overlap on a kind neither side produces, which is the sort of thing that is
+	// only ever discovered by a bug.
+	kind: 'skill' | 'tool' | 'thinking' | 'unknown';
 	key: string;
 	event: AnyEvent;
 	/** The result, for a tool row whose call has come back. Absent while it is still running,
@@ -47,8 +55,23 @@ export interface Inline {
 	event?: AnyEvent;
 }
 
+/** One run of consecutive gutter rows, drawn as a single bordered block. */
+export interface Gutter {
+	kind: 'gutter';
+	key: string;
+	rows: Activity[];
+}
+
+/** What a message renders, top to bottom. */
+export type Block = Gutter | Inline;
+
 export interface Turn {
+	/** The render order: gutter runs, prose and cards interleaved as they happened. */
+	blocks: Block[];
+	/** Every gutter row, flattened. A view over `blocks`, for callers that want the count or the
+	 * lot without walking runs. */
 	activity: Activity[];
+	/** Everything that renders in the flow of the answer, flattened. Also a view. */
 	inline: Inline[];
 	/** The one terminator. `null` while the turn is still running. */
 	closed: Extract<ChatEvent, { type: 'turn_closed' }> | null;
@@ -66,6 +89,10 @@ export interface Turn {
 }
 
 export function reduce(events: AnyEvent[]): Turn {
+	// One list, in the order things happened. `activity` and `inline` are read back out of it at
+	// the end rather than filled alongside — two lists that have to stay in step is exactly the
+	// arrangement that produced the out-of-order gutter.
+	const ordered: Array<Activity | Inline> = [];
 	const activity: Activity[] = [];
 	const inline: Inline[] = [];
 	const awaiting: Turn['awaiting'] = [];
@@ -91,8 +118,19 @@ export function reduce(events: AnyEvent[]): Turn {
 
 	const flush = () => {
 		if (!prose) return;
-		inline.push({ kind: 'prose', key: `prose-${proseAt}`, text: prose });
+		ordered.push({ kind: 'prose', key: `prose-${proseAt}`, text: prose });
 		prose = '';
+	};
+
+	/** A gutter row, after whatever she had already said.
+	 *
+	 * The flush is the fix: without it, prose written before a tool call and prose written after
+	 * it merge into one block, and the row lands after both — so the call appears below the
+	 * sentence it produced. Every gutter row goes through here for that reason. */
+	const row = (item: Activity) => {
+		flush();
+		ordered.push(item);
+		return item;
 	};
 
 	/** Close the block of reasoning in progress and put it in the gutter where it happened.
@@ -110,7 +148,7 @@ export function reduce(events: AnyEvent[]): Turn {
 	 * A no-op when there is no reasoning in progress, so callers do not have to check. */
 	const settle = (last = false) => {
 		if (!thought) return;
-		activity.push({
+		row({
 			kind: 'thinking',
 			key: `thinking-${thoughtAt}`,
 			event: { type: 'thinking_delta', text: thought },
@@ -140,7 +178,7 @@ export function reduce(events: AnyEvent[]): Turn {
 
 			case 'skill_selected':
 				settle();
-				activity.push({ kind: 'skill', key, event });
+				row({ kind: 'skill', key, event });
 				break;
 
 			case 'tool_call_ready': {
@@ -151,7 +189,7 @@ export function reduce(events: AnyEvent[]): Turn {
 					// is where she meant it (ADR 3). It is not a gutter row, but it is on screen,
 					// so reasoning either side of it is two thoughts rather than one.
 					flush();
-					inline.push({ kind: 'emotion', key, event: call });
+					ordered.push({ kind: 'emotion', key, event: call });
 					emotions.add(call.id);
 					break;
 				}
@@ -161,17 +199,15 @@ export function reduce(events: AnyEvent[]): Turn {
 					// question twice, once as machinery and once as the thing she said.
 					break;
 				}
-				const row: Activity = { kind: 'tool', key, event: call };
-				activity.push(row);
-				byCall.set(call.id, row);
+				byCall.set(call.id, row({ kind: 'tool', key, event: call }));
 				break;
 			}
 
 			case 'tool_result': {
 				const result = event as ToolResultEvent;
-				const row = byCall.get(result.call_id);
-				if (row) {
-					row.result = result;
+				const waiting = byCall.get(result.call_id);
+				if (waiting) {
+					waiting.result = result;
 				} else if (asked.has(result.call_id)) {
 					// The person's reply, shaped as this call's result so the model reads it as
 					// one. On screen it is already on the card they typed it into.
@@ -182,13 +218,13 @@ export function reduce(events: AnyEvent[]): Turn {
 					// see, so that one keeps its row.
 					if (!result.ok) {
 						settle();
-						activity.push({ kind: 'tool', key, event: result });
+						row({ kind: 'tool', key, event: result });
 					}
 				} else {
 					// A result whose call is not in this list -- half a turn, reloaded. Keeping
 					// it beats hiding the one record that something actually ran.
 					settle();
-					activity.push({ kind: 'tool', key, event: result });
+					row({ kind: 'tool', key, event: result });
 				}
 				break;
 			}
@@ -197,7 +233,7 @@ export function reduce(events: AnyEvent[]): Turn {
 				const card = event as Extract<ChatEvent, { type: 'permission_required' }>;
 				settle();
 				flush();
-				inline.push({ kind: 'permission', key, event: card });
+				ordered.push({ kind: 'permission', key, event: card });
 				awaiting.push(card);
 				break;
 			}
@@ -210,7 +246,7 @@ export function reduce(events: AnyEvent[]): Turn {
 				const card = event as Extract<ChatEvent, { type: 'answer_required' }>;
 				settle();
 				flush();
-				inline.push({ kind: 'question', key, event: card });
+				ordered.push({ kind: 'question', key, event: card });
 				awaiting.push(card);
 				asked.add(card.call_id);
 				break;
@@ -229,14 +265,30 @@ export function reduce(events: AnyEvent[]): Turn {
 				// because an interface that drops what it does not recognise makes a missing
 				// feature and a broken one look identical.
 				settle();
-				activity.push({ kind: 'unknown', key, event });
+				row({ kind: 'unknown', key, event });
 		}
 	}
 
 	flush();
 	settle(true);
 
+	// Consecutive gutter rows become one block, so the hairline and the marks still read as a
+	// group. A run ends the moment something she said lands, which is the whole point.
+	const blocks: Block[] = [];
+	for (const item of ordered) {
+		if (isActivity(item)) {
+			activity.push(item);
+			const last = blocks.at(-1);
+			if (last && last.kind === 'gutter') last.rows.push(item);
+			else blocks.push({ kind: 'gutter', key: `gutter-${item.key}`, rows: [item] });
+			continue;
+		}
+		inline.push(item);
+		blocks.push(item);
+	}
+
 	return {
+		blocks,
 		activity,
 		inline,
 		closed,
@@ -248,6 +300,17 @@ export function reduce(events: AnyEvent[]): Turn {
 		thinking
 	};
 }
+
+/** A gutter row rather than something she said.
+ *
+ * Discriminated on `kind`, which the two unions no longer share a value of. A second tag field
+ * would be one more thing to keep in step, and TypeScript narrows this correctly.
+ */
+function isActivity(item: Activity | Inline): item is Activity {
+	return !INLINE_KINDS.has(item.kind);
+}
+
+const INLINE_KINDS = new Set<string>(['prose', 'emotion', 'permission', 'question']);
 
 /** Whether a card is still open, for a message rendered from the persisted list.
  *

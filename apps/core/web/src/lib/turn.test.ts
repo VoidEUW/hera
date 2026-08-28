@@ -302,6 +302,64 @@ describe('question cards', () => {
 	});
 });
 
+describe('a turn is one list, in order', () => {
+	const think = (t: string): AnyEvent => ({ type: 'thinking_delta', text: t });
+
+	it('puts a second thought below the sentence that prompted it', () => {
+		// The bug this replaced: every gutter row was drawn first and all the prose after, so a
+		// turn that speaks, thinks again and speaks again showed the second thought above the
+		// first answer — and could not be read downwards at all.
+		const turn = reduce([
+			think('first'),
+			text('An answer.'),
+			think('second'),
+			text('More.'),
+			closed()
+		]);
+
+		expect(turn.blocks.map((b) => b.kind)).toEqual(['gutter', 'prose', 'gutter', 'prose']);
+	});
+
+	it('groups consecutive rows into one block', () => {
+		const turn = reduce([
+			think('planning'),
+			call('c1', 'fs__read_file'),
+			result('c1', 'fs__read_file'),
+			text('Done.'),
+			closed()
+		]);
+
+		const gutters = turn.blocks.filter((b) => b.kind === 'gutter');
+		expect(gutters).toHaveLength(1);
+		expect(gutters[0].kind === 'gutter' && gutters[0].rows.map((r) => r.kind)).toEqual([
+			'thinking',
+			'tool'
+		]);
+	});
+
+	it('does not let prose written after a tool call jump above it', () => {
+		// Prose used to accumulate across a tool call and land as one block, so the call showed
+		// up after both halves of what it produced.
+		const turn = reduce([
+			text('Looking that up.'),
+			call('c1', 'fs__read_file'),
+			result('c1', 'fs__read_file'),
+			text('It said so.'),
+			closed()
+		]);
+
+		expect(turn.blocks.map((b) => b.kind)).toEqual(['prose', 'gutter', 'prose']);
+	});
+
+	it('keeps the flat views as views over the same list', () => {
+		const turn = reduce([think('a'), text('one'), think('b'), text('two'), closed()]);
+
+		expect(turn.activity).toHaveLength(2);
+		expect(turn.inline).toHaveLength(2);
+		expect(turn.activity.every((row) => row.kind === 'thinking')).toBe(true);
+	});
+});
+
 describe('the terminator', () => {
 	it('is null while the turn is running', () => {
 		expect(reduce([text('partial')]).closed).toBeNull();

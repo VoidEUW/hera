@@ -187,20 +187,19 @@
 	</div>
 {:else}
 	<article class="hers">
-		{#if turn.activity.length}
-			<div class="gutter">
-				{#each turn.activity as row (row.key)}
-					<ActivityRow {row} {streaming} />
-				{/each}
-			</div>
-		{/if}
-
-		{#if waiting}
-			<p class="waiting"><Ocellus size={16} alive /> <span class="sr-only">Thinking</span></p>
-		{/if}
-
-		{#each turn.inline as item (item.key)}
-			{#if item.kind === 'prose'}
+		<!-- One list, in the order things happened. It used to be every gutter row and then all
+		     the prose, which reads correctly only for a turn that does its thinking up front: the
+		     moment she speaks, thinks again and speaks again, the second thought was drawn above
+		     the sentence that prompted it. A run of consecutive rows is still one bordered block,
+		     so the gutter reads as a group where it is one. -->
+		{#each turn.blocks as item (item.key)}
+			{#if item.kind === 'gutter'}
+				<div class="gutter">
+					{#each item.rows as row (row.key)}
+						<ActivityRow {row} {streaming} />
+					{/each}
+				</div>
+			{:else if item.kind === 'prose'}
 				<Prose text={item.text ?? ''} />
 			{:else if item.kind === 'emotion'}
 				<EmotionCard call={item.event as ToolCallReady} />
@@ -222,6 +221,10 @@
 				/>
 			{/if}
 		{/each}
+
+		{#if waiting}
+			<p class="waiting"><Ocellus size={16} alive /> <span class="sr-only">Thinking</span></p>
+		{/if}
 
 		{#if note}
 			<p class="note" class:bad={closed?.reason === 'failed'}>{note}</p>
@@ -376,8 +379,14 @@
 		margin: 22px 0 30px;
 	}
 
+	/* Space on both sides now: a gutter block can sit between two things she said, where it
+	   used to only ever sit above all of them. */
 	.gutter {
-		margin-bottom: 12px;
+		margin: 12px 0;
+	}
+
+	.gutter:first-child {
+		margin-top: 0;
 	}
 
 	.waiting {

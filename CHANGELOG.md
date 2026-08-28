@@ -84,6 +84,12 @@ section fills in as milestones land.
   names the file it actually looked at, and gives both commands. It refuses rather than repairs:
   stamping the database back leaves columns a later upgrade then fails to add, and downgrading it
   drops data because a shell was in the wrong directory.
+- **A turn could not be read downwards.** Every gutter row was drawn first and all the prose
+  after, which is correct only for a turn that does its thinking up front — the moment she
+  speaks, thinks again and speaks again, the second thought appeared *above* the sentence that
+  prompted it. A turn is one ordered list now: a run of consecutive gutter rows is one block, and
+  prose and cards sit between the runs where she put them. Prose written after a tool call no
+  longer merges with prose written before it, which was the same bug from the other side.
 - **The composer did not block while a card was waiting on you**, though two documents said it
   did — nothing read that field. Sending past an open card wrote a fresh assistant row, and the
   resume routes work from the latest one, so the suspended turn was orphaned and its permission
