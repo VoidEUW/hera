@@ -38,7 +38,16 @@ and answering them separately produces two.
 | | |
 |---|---|
 | **M2a** | The scratchpad, and a tool call that knows which chat it is in — [ADR 12](adr/0012-a-chat-has-a-scratchpad.md) |
-| **M2b** | Artifacts and skill resources — [ADR 13](adr/0013-artifacts-are-tool-calls-with-versions.md), [ADR 14](adr/0014-skill-resources-are-readable.md) |
+| **M2b** | Artifacts and skill resources — [ADR 13](adr/0013-an-artifact-is-a-kept-scratchpad-file.md), [ADR 14](adr/0014-skill-resources-are-readable.md) |
+
+**ADR 13 was rewritten before anything was built on it**, and the rewrite is most of the reason M2b
+is small. The first draft made an artifact *a tool call with an identity and versions* — a package,
+two tables, `~/.hera/artifacts/<id>/v<N>.<ext>` — a day after the scratchpad shipped a directory
+that already did the storage. `tooling.md` § 5 had warned about exactly that (*"they want the same
+storage and answering them separately produces two"*) and the draft answered them separately
+anyway. An artifact is now **a scratchpad file she marked as one**: `kept.json` beside `scratch/`,
+one new tool, no package and no versions. Two placements fall out of it — a card where she kept it,
+which for an `.svg` or an `.mmd` *is* the chart, and a drawer with the file bar and the full view.
 
 **A third stage was planned and dropped, and the reason is worth keeping because the mistake is
 easy to make twice.** The sandbox was pulled forward from *not in v0.2* on the assumption that

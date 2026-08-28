@@ -22,7 +22,7 @@ ports bound; `hera_chats` dispatches through `hera_tools`; and `ManagedServer` r
 child of a worker task created when the server *connected*. Python copies a context at task
 creation, so the obvious answer — a `contextvars.ContextVar` set around the turn — reads back empty
 in the tool, and does so silently. Anything per-conversation is blocked on this: the scratchpad,
-artifacts ([ADR 13](0013-artifacts-are-tool-calls-with-versions.md)), the sandbox's working
+artifacts ([ADR 13](0013-an-artifact-is-a-kept-scratchpad-file.md)), the sandbox's working
 directory ([ADR 15](0015-running-code-in-a-container.md)), and `hera__remember(scope="chat")`,
 whose port has been shipping since v0.1 with a `scope` argument and no way to say *which* chat.
 
@@ -37,11 +37,13 @@ three tools — `hera__scratch_write`, `hera__scratch_read`, `hera__scratch_list
 optional `Scratchpad` port in `hera_mcp`. `hera__note` keeps the description it has and stays
 unwired; the two stop overlapping because one of them finally says what it is for.
 
-**A directory rather than one file**, which is the question § 2 left open. The deciding argument is
-[ADR 15](0015-running-code-in-a-container.md): a container running a script needs a working
-directory with several files in it, and `NOTE.md` is clobbered by the second thing she wants to
-write. Free filenames, no database row, no versioning — an artifact is what you get when you want
-those, and it is a different record for that reason.
+**A directory rather than one file**, which is the question § 2 left open. `NOTE.md` is clobbered
+by the second thing she wants to write, and a plan and the draft it produced are two files by
+nature. Free filenames, no database row, no versioning.
+
+That last point aged into something load-bearing: [ADR 13](0013-an-artifact-is-a-kept-scratchpad-file.md)
+turned out not to need a store of its own at all. An artifact is one of *these* files with a bit
+set on it, so the directory below is where a conversation's work lives, full stop.
 
 **A tool call carries its conversation in MCP's `_meta`**, not in its arguments and not in a
 context variable.
