@@ -53,6 +53,14 @@ def test_a_message_streams_back_and_survives_a_reload(page: Any) -> None:
     # An emotion renders as a card, inline, where she called it (ADR 3).
     page.wait_for_selector("text=curious", timeout=15_000)
 
+    # And now wait for the turn to actually be over. The emotion closes the *first* round trip,
+    # not the turn: the script answers a second time after it, and everything below is written
+    # about a finished turn — the tail preview being gone, and a row that stays open once it is
+    # clicked. Until `done` arrives the client is still rendering optimistically and then
+    # replaces the lot with the persisted list, which on a slow runner lands after the click and
+    # takes the opened row with it.
+    page.wait_for_selector("text=Ask me for the detail", timeout=30_000)
+
     # The thinking channel is a gutter row, never mixed into the prose. Asserted against the
     # prose rather than against the whole page: the gutter previews the tail of a block while
     # it is still being written, so "the words are nowhere on screen" stopped being the same
