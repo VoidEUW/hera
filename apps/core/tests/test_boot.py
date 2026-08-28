@@ -15,13 +15,20 @@ import pytest
 from sqlalchemy import inspect
 from sqlmodel import SQLModel
 
-from hera_core.boot import LEGACY_DATABASE, LegacyHome, check_home, prepare
+from hera_core.boot import (
+    LEGACY_DATABASE,
+    DatabaseAhead,
+    LegacyHome,
+    check_home,
+    check_revision,
+    prepare,
+)
 from hera_core.cli import main
 from hera_core.migrations import upgrade_to_head
 from hera_core.models import TABLE_NAMES
 from hera_home import DATABASE_FILENAME
 from hera_profiles import MindRepository, ProfileRepository
-from hera_storage import Database
+from hera_storage import Database, StorageSettings
 
 
 class TestRefusingAnOldHome:
@@ -70,6 +77,65 @@ class TestRefusingAnOldHome:
         """A guess from this function would be worse than the error SQLAlchemy produces."""
         (tmp_path / DATABASE_FILENAME).write_text("not a database at all")
         check_home(tmp_path)
+
+
+class TestRefusingADatabaseFromTheFuture:
+    """Checking out an older branch against a `~/.hera` a newer build already migrated.
+
+    The everyday version of this is reviewing two branches that both touch the schema. Alembic
+    notices, but as forty frames ending in `Can't locate revision identified by '0004'` — at a
+    point where nothing connects it to the branch you just switched to.
+    """
+
+    def test_a_database_this_build_made_is_fine(self, tmp_path: Path) -> None:
+        database = Database(StorageSettings(url=f"sqlite:///{tmp_path / 'hera.sqlite3'}"))
+        upgrade_to_head(database)
+
+        check_revision(database)
+        database.dispose()
+
+    def test_a_fresh_database_is_fine(self, tmp_path: Path) -> None:
+        """No `alembic_version` row at all. That is what `prepare` is about to create, and
+        refusing it would refuse every first boot."""
+        database = Database(StorageSettings(url=f"sqlite:///{tmp_path / 'hera.sqlite3'}"))
+
+        check_revision(database)
+        database.dispose()
+
+    def test_an_unknown_revision_says_what_to_do(self, tmp_path: Path) -> None:
+        path = tmp_path / "hera.sqlite3"
+        database = Database(StorageSettings(url=f"sqlite:///{path}"))
+        upgrade_to_head(database)
+        with sqlite3.connect(path) as connection:
+            connection.execute("UPDATE alembic_version SET version_num = '0099'")
+
+        with pytest.raises(DatabaseAhead) as caught:
+            check_revision(database)
+
+        message = str(caught.value)
+        assert "0099" in message
+        # The file it actually looked at, not `~/.hera` — HERA_STORAGE_URL can point elsewhere,
+        # and naming a file it did not check is worse than naming none.
+        assert str(path) in message
+        assert "downgrade" in message
+        assert "Nothing has been changed." in message
+        database.dispose()
+
+    def test_it_runs_before_the_upgrade(self, tmp_path: Path) -> None:
+        """`prepare` has to refuse rather than let alembic raise. Repairing is not on the table:
+        stamping back leaves columns a later upgrade then fails to add, and downgrading drops
+        somebody's data because their shell was in the wrong directory."""
+        path = tmp_path / "hera.sqlite3"
+        database = Database(StorageSettings(url=f"sqlite:///{path}"))
+        upgrade_to_head(database)
+        with sqlite3.connect(path) as connection:
+            connection.execute("UPDATE alembic_version SET version_num = '0099'")
+        mind = MindRepository(tmp_path / "mind")
+
+        with pytest.raises(DatabaseAhead):
+            prepare(database, mind, owner_id=uuid4())
+
+        database.dispose()
 
 
 class TestMigrations:

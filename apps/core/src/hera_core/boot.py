@@ -1,13 +1,18 @@
 """What has to be true before the first request.
 
-Two jobs, in order: refuse to run against a data directory from before v0.1, then make the
-things a fresh install needs exist.
+Three jobs, in order: refuse to run against a data directory from before v0.1, refuse one whose
+schema is *ahead* of this build, then make the things a fresh install needs exist.
 
-The refusal is [ADR 7](../../../docs/adr/0007-fresh-start-no-legacy-import.md). There is no
+The first refusal is [ADR 7](../../../docs/adr/0007-fresh-start-no-legacy-import.md). There is no
 importer from the previous version — its schema, its prompts and its tool grammar are all
 wrong now — and the dangerous failure is not "it does not work", it is "it half works and
 writes into the old directory". So boot looks for the old shape, stops, and says what to move
 aside. **Nothing is ever deleted for you.**
+
+The second is the everyday one, and it is about *going backwards*: checking out an older branch,
+or downgrading Hera, against a `~/.hera` that a newer build has already migrated. Alembic's own
+answer to that is a forty-line traceback ending in ``Can't locate revision identified by
+'0004'``, which says nothing about what to do. This says it in a sentence.
 """
 
 from __future__ import annotations
@@ -16,7 +21,11 @@ import sqlite3
 from pathlib import Path
 from uuid import UUID
 
-from hera_core.migrations import upgrade_to_head
+from alembic.migration import MigrationContext
+from alembic.script import ScriptDirectory
+from alembic.util.exc import CommandError
+
+from hera_core.migrations import alembic_config, upgrade_to_head
 from hera_home import DATABASE_FILENAME, home
 from hera_profiles import MindRepository, ProfileRepository
 from hera_storage import Database
@@ -33,6 +42,15 @@ class LegacyHome(RuntimeError):
 
     Not a warning and not something to work around. The message names the directory, says what
     was found, and gives the one command that resolves it.
+    """
+
+
+class DatabaseAhead(RuntimeError):
+    """The database has been migrated by a build newer than this one.
+
+    Its own exception rather than a `LegacyHome`, because the remedy is the opposite: nothing is
+    wrong with the directory and nothing should be moved aside. The code is behind, and either
+    the code or the database has to move.
     """
 
 
@@ -84,6 +102,55 @@ def _has_legacy_tables(database: Path) -> bool:
     return bool(rows)
 
 
+def check_revision(database: Database) -> None:
+    """Refuse a database stamped with a revision this build does not have.
+
+    The ordinary way to arrive here is checking out an older branch — or downgrading Hera —
+    against a ``~/.hera`` a newer build already migrated. Alembic notices, but only as
+    ``Can't locate revision identified by '0004'`` under forty lines of its own frames, at a
+    point where the reader has no reason to connect it to the branch they just switched to.
+
+    **Refusing rather than repairing is the whole point.** Stamping the database back would
+    leave columns behind that a later upgrade then fails to add; downgrading it would drop
+    somebody's data because their shell was in the wrong directory. Both are decisions for a
+    person, so this names the revision, names the file, and gives the command.
+
+    A database with no ``alembic_version`` row at all is a fresh one and is fine — that is what
+    :func:`prepare` is about to create.
+    """
+    script = ScriptDirectory.from_config(alembic_config(database))
+    with database.engine.connect() as connection:
+        stamped = MigrationContext.configure(connection).get_current_heads()
+
+    unknown = [revision for revision in stamped if _missing(script, revision)]
+    if not unknown:
+        return
+
+    head = script.get_current_head() or "nothing"
+    # The engine's own URL, not `home() / DATABASE_FILENAME`: `HERA_STORAGE_URL` can point
+    # somewhere else entirely, and an error naming a file it did not look at is worse than one
+    # naming no file at all.
+    where = database.engine.url.database or str(database.engine.url)
+    raise DatabaseAhead(
+        f"{where} is at migration {', '.join(unknown)}, which this build of Hera does not "
+        f"have — it knows up to {head}. The database was migrated by a newer version, so "
+        f"either the code is behind or the wrong branch is checked out.\n"
+        f"  Go forward:  git switch <the branch that has {unknown[0]}>\n"
+        f"  Or go back:  on that branch, uv run alembic downgrade {head}\n"
+        f"Nothing has been changed."
+    )
+
+
+def _missing(script: ScriptDirectory, revision: str) -> bool:
+    try:
+        return script.get_revision(revision) is None
+    except CommandError:
+        # What alembic raises for a revision it cannot resolve, which is precisely the case
+        # this function exists to report. Anything else is a broken migrations directory and
+        # deserves to propagate.
+        return True
+
+
 def prepare(database: Database, mind: MindRepository, *, owner_id: UUID) -> None:
     """Make a fresh install usable: the schema, the mind, and one profile.
 
@@ -91,6 +158,7 @@ def prepare(database: Database, mind: MindRepository, *, owner_id: UUID) -> None
     profile or a mind file should get it back, and discovering on the first turn that there is
     nobody to answer as is a worse way to find out.
     """
+    check_revision(database)
     upgrade_to_head(database)
     mind.ensure()
     with database.session() as session:

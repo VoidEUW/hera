@@ -70,6 +70,13 @@ section fills in as milestones land.
   `default_profile_id is not None`, which is right for every other field on that body and wrong for
   this one: choosing the screen's empty option was a no-op, and the control snapped back on the
   next load with nothing to explain it.
+- **Booting against a database from a newer build crashed with alembic's stack trace.** Checking
+  out an older branch — or downgrading Hera — against a `~/.hera` a newer build already migrated
+  ended in forty frames and `Can't locate revision identified by '0004'`, at a point where nothing
+  connects it to the branch you just switched to. `boot.check_revision` now names the revision,
+  names the file it actually looked at, and gives both commands. It refuses rather than repairs:
+  stamping the database back leaves columns a later upgrade then fails to add, and downgrading it
+  drops data because a shell was in the wrong directory.
 - **The composer did not block while a card was waiting on you**, though two documents said it
   did — nothing read that field. Sending past an open card wrote a fresh assistant row, and the
   resume routes work from the latest one, so the suspended turn was orphaned and its permission
