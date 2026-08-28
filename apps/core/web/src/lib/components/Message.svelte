@@ -90,9 +90,20 @@
 				.trim()
 	);
 
-	// Nothing to act on while the answer is still arriving, and nothing to act on for a turn
-	// that produced no text at all.
-	const actionable = $derived(!streaming && !busy && Boolean(copyable || attachments.length));
+	/** Whether this message's own controls are live. Nothing to act on while the answer is still
+	 * arriving, or while another turn is. */
+	const settled = $derived(!streaming && !busy);
+
+	/** Copy is about the words, so it needs some. A button that puts an empty string on the
+	 * clipboard is worse than no button. */
+	const canCopy = $derived(settled && Boolean(copyable || attachments.length));
+
+	/** **Try again** and **edit** are about the *question*, not about the answer — so they do not
+	 * need one. These used to share a flag with Copy, which meant the single case where trying
+	 * again matters most had no way to: a turn that failed before she said anything produced no
+	 * text, so the whole row was withheld from the one message a person was staring at wanting
+	 * to retry. A failed turn is exactly a turn worth asking again. */
+	const canRedo = $derived(settled && Boolean(onredo));
 
 	async function copy() {
 		try {
@@ -175,10 +186,14 @@
 				{/if}
 			</div>
 
-			{#if actionable}
+			{#if canCopy || canRedo}
 				<div class="actions right">
-					<button type="button" onclick={copy}>{copied ? t.message.copied : t.message.copy}</button>
-					{#if onredo}
+					{#if canCopy}
+						<button type="button" onclick={copy}>
+							{copied ? t.message.copied : t.message.copy}
+						</button>
+					{/if}
+					{#if canRedo}
 						<button type="button" onclick={startEdit}>{t.message.edit}</button>
 					{/if}
 				</div>
@@ -230,11 +245,13 @@
 			<p class="note" class:bad={closed?.reason === 'failed'}>{note}</p>
 		{/if}
 
-		{#if actionable}
+		{#if canCopy || canRedo}
 			<div class="actions">
-				<button type="button" onclick={copy}>{copied ? t.message.copied : t.message.copy}</button>
-				{#if onredo}
-					<button type="button" onclick={() => onredo()}>{t.message.retry}</button>
+				{#if canCopy}
+					<button type="button" onclick={copy}>{copied ? t.message.copied : t.message.copy}</button>
+				{/if}
+				{#if canRedo}
+					<button type="button" onclick={() => onredo?.()}>{t.message.retry}</button>
 				{/if}
 			</div>
 		{/if}

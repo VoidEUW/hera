@@ -105,6 +105,23 @@ same branch:
   weights, and prefilling a prompt that has grown a skill body and six rounds of history. A local
   35B asked for a whole HTML page fell off the end of three minutes, and what a person saw was
   `did not answer in time` under an answer that had been going fine.
+- **Raising that default did nothing, which was the more interesting bug.** `config.toml` is
+  seeded from the environment on first run and *every* field is dumped, so the file records the
+  defaults of whichever version wrote it first — and the file wins afterwards. Every default this
+  project ever improves is therefore silently dead for anybody who has already run Hera. It
+  surfaced as `timeout_s = 180.0` sitting in a real install that nobody had ever chosen it for.
+  `config.TUNING_FIELDS` is now omitted on write unless it differs from the default, so the file
+  means *what I decided* rather than *what the defaults were the day I installed it*. A value
+  somebody sets is still written and still wins. The endpoint's own fields are always written,
+  because they are what you came to the file to read.
+- **A failed turn could not be tried again.** `actionable` gated Copy and *Try again* on the same
+  flag, and that flag required something to copy — so a turn that failed before she said anything
+  had no controls at all, which is the one case a person is staring at wanting to retry. Copy is
+  about the answer and needs one; **try again is about the question and does not.** Found by
+  scripting a mid-stream `ProviderTimeout` and driving a real browser at it, which also gave
+  `FakeProvider` the ability to raise from *inside* a turn — an unreachable endpoint and a
+  connection that breaks half way through close a turn differently, and only the first was
+  scriptable before.
 
 1042 tests at 98 % coverage, plus 94 vitest and 12 Playwright. M2b starts from here.
 

@@ -196,13 +196,48 @@ def save(config: HeraConfig, path: Path | None = None) -> None:
     Written whole and replaced atomically. A half-written ``config.toml`` is a Hera that will
     not start, and the moment it happens is the moment somebody was changing the endpoint
     because the old one had stopped working.
+
+    Not every field is written — see :data:`TUNING_FIELDS`.
     """
     path = path if path is not None else config_path()
     path.parent.mkdir(parents=True, exist_ok=True)
-    body = tomli_w.dumps(config.model_dump(mode="python"))
+    body = tomli_w.dumps(_writable(config))
     temporary = path.with_suffix(f"{path.suffix}.writing")
     temporary.write_text(_HEADER + body, encoding="utf-8")
     temporary.replace(path)
+
+
+TUNING_FIELDS = ("timeout_s", "connect_timeout_s")
+"""Fields written **only when they differ from the default**.
+
+The rest of an entry is written whether or not it was changed, because the rest of an entry is
+what you came to the file to read: an endpoint with no ``base_url`` in it is a worse file even
+when the URL is the default one.
+
+These two are different, and the difference cost a real afternoon. The file is *seeded* from the
+environment on first run and every field is dumped, so it records the defaults of whichever
+version happened to write it first — and the file wins afterwards. That means a default this
+project later improves is silently dead for everybody who has already run Hera, which is the
+opposite of what "the file wins" is supposed to protect. It surfaced as a turn ending in *did
+not answer in time* on an install whose ``timeout_s = 180.0`` nobody had ever chosen.
+
+Omitting them unless they were set makes the file mean *what I decided* rather than *what the
+defaults were the day I installed it*. A value a person actually sets is written and still wins;
+one they never touched follows the project. What it costs is that the file no longer lists every
+knob — which is why the Models screen shows the effective value in a field rather than leaving
+it to be discovered.
+"""
+
+
+def _writable(config: HeraConfig) -> dict[str, Any]:
+    """The document as it goes to disk. See :data:`TUNING_FIELDS`."""
+    document = config.model_dump(mode="python")
+    blank = ProviderEntry(name="seed")
+    for entry, dumped in zip(config.providers, document["providers"], strict=True):
+        for field in TUNING_FIELDS:
+            if getattr(entry, field) == getattr(blank, field):
+                dumped.pop(field, None)
+    return document
 
 
 class ConfigError(RuntimeError):

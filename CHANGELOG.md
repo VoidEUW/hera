@@ -99,6 +99,16 @@ section fills in as milestones land.
   prompt that has grown a skill body and six rounds of history. Three minutes was not enough for a
   local 35B asked to write a whole page, and what that looked like was a failure under an answer
   that had been going fine.
+- **A turn that failed could not be tried again.** *Copy* and *Try again* were drawn by the same
+  rule, and that rule required something to copy — so an answer that failed before she had said
+  anything offered neither, which is the one message a person is looking at wanting to retry.
+  Copy is about the answer and needs one; try again is about the question and does not.
+- **A setting you never chose was still recorded, and then outranked its own improvement.**
+  `config.toml` is seeded on first run and wins afterwards, which is right — but it was seeded
+  with *every* field, so it captured the defaults of whichever version wrote it first and no
+  later improvement could reach an existing install. That is why raising the timeout above did
+  nothing on a machine that had already run Hera. Values you have not set are no longer written
+  down; ones you set still are, and still win.
 - **Her own tool names were clipped in the activity gutter.** `scratch write` and `scratch read`
   both came out as `scratch …`, so the two rows a reader most needs to tell apart were the two the
   column made identical.

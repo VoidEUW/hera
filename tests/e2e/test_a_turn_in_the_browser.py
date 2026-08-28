@@ -355,3 +355,62 @@ class TestSheAsksAndWaits:
         page.wait_for_selector("text=The 2024 one.", timeout=15_000)
         page.wait_for_selector("text=three slides on ticket lifetime", timeout=15_000)
         assert page.url == url
+
+
+class TestATurnThatFailed:
+    """The turn you most want to try again is the one with no answer in it.
+
+    A provider that stops responding closes the turn with `failed` and whatever arrived before
+    it — which for a model that was still thinking is a gutter and no prose at all. The message
+    then had nothing to act on, so *Try again* was not drawn on the one message that needed it,
+    and the question above it could not be edited either.
+    """
+
+    @pytest.fixture
+    def script(self) -> list[Any]:
+        from hera_providers import ProviderTimeout, ThinkingDelta
+
+        return [
+            # Thinks, and then the endpoint stops answering mid-stream. The error sits *among*
+            # the events, so the thinking has already been streamed when it is raised — which is
+            # the shape that matters here: a turn that failed with a gutter and no prose in it.
+            [
+                ThinkingDelta(text="They want a whole page of markup."),
+                ProviderTimeout("http://localhost:1234/v1 did not answer in time"),
+            ],
+            text_turn("Second time lucky."),
+        ]
+
+    def _fail(self, page: Any) -> None:
+        composer = page.locator("textarea").first
+        composer.fill("Build me a page")
+        composer.press("Enter")
+        page.wait_for_url("**/chat/**", timeout=15_000)
+        page.wait_for_selector("text=did not answer in time", timeout=30_000)
+
+    def test_the_failed_answer_can_be_tried_again(self, page: Any) -> None:
+        self._fail(page)
+
+        page.locator(".hers").last.hover()
+        page.get_by_role("button", name="Try again").click()
+
+        page.wait_for_selector("text=Second time lucky.", timeout=30_000)
+
+    def test_the_question_above_it_can_still_be_edited(self, page: Any) -> None:
+        self._fail(page)
+
+        page.locator(".mine").first.hover()
+        page.get_by_role("button", name="Edit").click()
+        field = page.locator(".editor textarea")
+        field.fill("Build me a smaller page")
+        page.get_by_role("button", name="Ask again").click()
+
+        page.wait_for_selector("text=Second time lucky.", timeout=30_000)
+
+    def test_there_is_nothing_to_copy_and_it_does_not_pretend_otherwise(self, page: Any) -> None:
+        """Copy is about the answer, and there is no answer. Drawing a button that puts an
+        empty string on the clipboard would be worse than leaving it out."""
+        self._fail(page)
+
+        page.locator(".hers").last.hover()
+        assert page.locator(".hers").last.get_by_role("button", name="Copy").count() == 0

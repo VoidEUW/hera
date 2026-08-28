@@ -13,7 +13,7 @@ import pytest
 from core_support import API
 from httpx import AsyncClient
 
-from hera_core.config import ProviderEntry, load, save
+from hera_core.config import HeraConfig, ProviderEntry, load, save
 
 
 class TestReading:
@@ -206,3 +206,56 @@ class TestTheFile:
         )
         active = load(path).active()
         assert active is not None and active.name == "local"
+
+
+class TestWhatIsWrittenDown:
+    """`config.toml` should mean *what I decided*, not *what the defaults were the day I
+    installed it*.
+
+    The file is seeded from the environment on first run and wins afterwards, which is right.
+    What was wrong is that seeding dumped every field including the ones nobody had an opinion
+    about — so a default this project later improves was silently dead for anybody who had
+    already run Hera. It surfaced as a turn ending in *did not answer in time* against an
+    install whose `timeout_s = 180.0` had never been chosen by a person.
+    """
+
+    def test_an_untouched_tuning_field_is_left_out(self, tmp_path: Path) -> None:
+        path = tmp_path / "config.toml"
+        save(HeraConfig(providers=[ProviderEntry(name="local")], active_provider="local"), path)
+
+        assert "timeout_s" not in path.read_text(encoding="utf-8")
+
+    def test_a_value_somebody_set_is_written(self, tmp_path: Path) -> None:
+        path = tmp_path / "config.toml"
+        save(
+            HeraConfig(providers=[ProviderEntry(name="local", timeout_s=45.0)]),
+            path,
+        )
+
+        assert "timeout_s = 45.0" in path.read_text(encoding="utf-8")
+
+    def test_a_value_somebody_set_still_wins_on_the_way_back(self, tmp_path: Path) -> None:
+        path = tmp_path / "config.toml"
+        save(HeraConfig(providers=[ProviderEntry(name="local", timeout_s=45.0)]), path)
+
+        assert load(path).providers[0].timeout_s == 45.0
+
+    def test_an_omitted_field_follows_the_default(self, tmp_path: Path) -> None:
+        """The property the whole change exists for: improve the default, and an install that
+        never expressed an opinion gets the improvement."""
+        path = tmp_path / "config.toml"
+        save(HeraConfig(providers=[ProviderEntry(name="local")]), path)
+
+        assert load(path).providers[0].timeout_s == ProviderEntry(name="x").timeout_s
+
+    def test_the_endpoint_itself_is_written_even_when_it_is_the_default(
+        self, tmp_path: Path
+    ) -> None:
+        """The rest of an entry is what you came to the file to read. An endpoint with no
+        `base_url` in it is a worse file even when the URL is the default one."""
+        path = tmp_path / "config.toml"
+        save(HeraConfig(providers=[ProviderEntry(name="local")]), path)
+
+        body = path.read_text(encoding="utf-8")
+        assert "base_url" in body
+        assert "model" in body
