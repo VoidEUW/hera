@@ -8,24 +8,30 @@ the history. Updated as milestones land — this file is a snapshot, not a chang
 **v0.2 is planned in [versions/v0.2.0.md](versions/v0.2.0.md)** — five milestones, in the order
 *organise → produce → make room → remember → reflect*.
 
-Four branches are open, **stacked in this order**, and none is merged yet:
+**M1 and three fixes are on `main`**, merged bottom-up as #10 → #11 → #12 → #13:
 
-| Branch | Based on | What is on it |
-|---|---|---|
-| `feat/project-folders` | `main` | **M1.** Projects you can make, rename, remove and move chats between; the project screen at `/project/<id>`; `Select.svelte`, which is now every dropdown in the application |
-| `fix/mind-error-and-uncertainty` | ↑ | **Two mind regions the model asked for** — `uncertainty` and `correction` — plus `hera__ask`, without which the first is advice she cannot act on; **the date in every prompt**; the boot guard below |
-| `fix/linear-turn-order` | ↑ | A turn renders in the order it happened, rather than every gutter row and then all the prose |
-| `fix/repeated-tool-calls` | ↑ | An identical call runs at most twice a turn, and spending the tool budget ends with an answer instead of a half-sentence |
+| Landed as | What it was |
+|---|---|
+| #10 `feat/project-folders` | **M1.** Projects you can make, rename, remove and move chats between; the project screen at `/project/<id>`; `Select.svelte`, which is now every dropdown in the application |
+| #11 `fix/mind-error-and-uncertainty` | **Two mind regions the model asked for** — `uncertainty` and `correction` — plus `hera__ask`, without which the first is advice she cannot act on; **the date in every prompt**; the boot guard below |
+| #12 `fix/linear-turn-order` | A turn renders in the order it happened, rather than every gutter row and then all the prose |
+| #13 `fix/repeated-tool-calls` | An identical call runs at most twice a turn, and spending the tool budget ends with an answer instead of a half-sentence |
 
-**Stacked rather than independent, and for a concrete reason.** Migration `0004` lives on the
-first, so a `~/.hera` used to review it is stamped `0004`; checking out a branch without that
-revision made alembic refuse to boot with `Can't locate revision identified by '0004'`. Two
-branches that both touch the schema cannot be reviewed against one data directory unless the
-later one contains the earlier, and everything after inherits the same constraint. So they merge
-bottom-up. `boot.check_revision` now catches that class of mismatch and says what to do rather
-than raising alembic's stack trace.
+**They were stacked rather than independent, for a concrete reason worth keeping.** Migration
+`0004` lives on the first, so a `~/.hera` used to review it is stamped `0004`; checking out a
+branch without that revision made alembic refuse to boot with `Can't locate revision identified
+by '0004'`. Two branches that both touch the schema cannot be reviewed against one data
+directory unless the later one contains the earlier, and everything after inherits the same
+constraint — so they merged bottom-up, each rebased onto `main` after the one below it squashed.
+`boot.check_revision` now catches that class of mismatch and says what to do rather than raising
+alembic's stack trace.
 
-M2 (artifacts and skill resources) is next, and starts from `main` once these land.
+**A squash merge makes the branch above it lie.** `mergeStateStatus: CLEAN` means no conflicts,
+not a correct diff: a branch still based on the pre-squash tip proposes to *undo* whatever exists
+only in the squash. Checking `git diff --name-status origin/main HEAD` for deletions before each
+merge is what caught `.gitkeep` going missing, and it is worth doing every time.
+
+M2 (artifacts and skill resources) is next, and starts from `main`.
 
 ---
 
@@ -603,8 +609,19 @@ Three consequences, each of which has already cost a blocked merge:
   before merging, and rebase with `git rebase --onto origin/main <old-base>` so only your own
   commits replay.
 
-GitHub refuses `gh pr merge` for anything it considers part of a stack. Use
-`PUT /repos/{owner}/{repo}/pulls/{n}/merge-async` with `sha=` pinning the head you verified.
+`gh pr merge --squash --match-head-commit <sha>` is what to use, and it worked for the whole
+v0.2 M1 stack. `--match-head-commit` is the point rather than a flourish: it pins the merge to
+the head you actually ran the checks against, so a push landing between the check and the merge
+stops it instead of shipping something unverified.
+
+Two things that cost time and are not obvious:
+
+- **Retarget the branch above by hand.** Merging the base of a stacked pull request does not
+  retarget the one on top of it; the PR keeps pointing at a branch that no longer moves. Set it
+  with `gh pr edit <n> --base main` after each merge.
+- **A force-push does not always fire `synchronize`.** Twice here the rebased head landed and no
+  workflow ran, so the pull request sat with *no checks reported* and could never satisfy the
+  ruleset. Closing and reopening the pull request triggers the run.
 
 ## Releases and deployment
 
