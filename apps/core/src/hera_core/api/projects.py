@@ -27,6 +27,7 @@ def create_project(payload: ProjectIn, owner: Owner, db: Db) -> ProjectOut:
         instructions=payload.instructions,
         pinned_skills=list(payload.pinned_skills),
         default_profile_id=payload.default_profile_id,
+        color=payload.color,
     )
     return ProjectOut.of(project)
 
@@ -38,7 +39,7 @@ def read_project(project_id: UUID, owner: Owner, db: Db) -> ProjectOut:
 
 @router.patch("/projects/{project_id}", response_model=ProjectOut)
 def update_project(project_id: UUID, payload: ProjectPatch, owner: Owner, db: Db) -> ProjectOut:
-    """Patch, not put: the settings screen edits one field at a time, and a full replace would
+    """Patch, not put: the project screen edits one field at a time, and a full replace would
     make a stale tab overwrite everything else on the way past."""
     projects = ProjectRepository(db)
     project = _require(db, project_id, owner)
@@ -47,12 +48,18 @@ def update_project(project_id: UUID, payload: ProjectPatch, owner: Owner, db: Db
         project.name = payload.name
     if payload.instructions is not None:
         project.instructions = payload.instructions
-    if payload.default_profile_id is not None:
-        project.default_profile_id = payload.default_profile_id
     if payload.archived is not None:
         project.archived = payload.archived
+    if payload.color is not None:
+        project.color = payload.color
     if payload.pinned_skills is not None:
         project.pinned_skills = list(payload.pinned_skills)
+    if "default_profile_id" in payload.model_fields_set:
+        # The one field here where `None` is a value: *no default*, which is what the screen's
+        # empty option means and the only way back to it. Testing for `None` instead — the
+        # convention everywhere else in this module — made choosing that option a no-op, so the
+        # control snapped back to the old profile on the next load with nothing to explain it.
+        project.default_profile_id = payload.default_profile_id
 
     return ProjectOut.of(projects.save(project))
 

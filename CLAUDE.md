@@ -11,6 +11,8 @@ OpenAI-compatible endpoint.
 ## Read first
 
 - `docs/status.md` — where the rebuild stands, what is settled, what is next. Start here
+- `docs/versions/` — what the version in progress is for and in what order it lands. v0.2 is
+  five milestones; read the one you are working on before touching its packages
 - `ARCHITECTURE.md` — the packages, the layering rule, the shape of a turn
 - `docs/adr/` — why the structure looks like this; read 2 (Qwen only), 3 (emotions as tool
   calls) and 5 (deterministic skill routing) before changing model-facing behaviour

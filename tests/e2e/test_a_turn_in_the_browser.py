@@ -160,14 +160,41 @@ def test_a_chat_is_renamed_and_deleted_from_the_rail(page: Any) -> None:
 
 def test_the_composer_says_what_she_runs_on(page: Any) -> None:
     """The model is a control beside send rather than a setting two screens away, and the
-    Enter hint gets out of the way as soon as there is something to send."""
-    assert page.locator("label.model select").first.input_value() != ""
+    Enter hint gets out of the way as soon as there is something to send.
+
+    The control is `Select`, not a native `<select>`: it draws its own popup so that a list
+    looks the same wherever it was opened from. So what is asserted is what a person sees — the
+    pill naming the active endpoint — rather than a form value nothing renders.
+    """
+    model = page.get_by_label("Model", exact=True)
+    assert model.inner_text().strip() != ""
 
     hint = page.locator("span.hint").first
     assert "gone" not in (hint.get_attribute("class") or "")
 
     page.locator("textarea").first.fill("Explain Kerberos")
     assert "gone" in (page.locator("span.hint").first.get_attribute("class") or "")
+
+
+def test_a_dropdown_opens_the_interfaces_own_list(page: Any) -> None:
+    """Not the platform's. Every popup in the application is one frame — the raised surface,
+    the hairline, the large radius — so a dropdown and the skill picker read as the same act.
+
+    Worth a browser rather than a unit test, because what is being checked is that opening it
+    produces our markup at all: a native `<select>` renders its list outside the DOM, where
+    nothing here could see it and this assertion would be impossible to write.
+    """
+    page.get_by_label("Model", exact=True).click()
+    page.wait_for_selector('[role="listbox"]', timeout=5_000)
+
+    listbox = page.locator('[role="listbox"]')
+    assert listbox.locator('[role="option"]').count() >= 1
+    # The current value is marked in the list, not only shown on the pill.
+    assert listbox.locator('[role="option"][aria-selected="true"]').count() == 1
+
+    # Escape closes it and hands focus back, so the keyboard is not left inside a closed popup.
+    page.keyboard.press("Escape")
+    page.wait_for_selector('[role="listbox"]', state="detached", timeout=5_000)
 
 
 def test_a_skill_is_switched_on_for_one_chat(page: Any) -> None:

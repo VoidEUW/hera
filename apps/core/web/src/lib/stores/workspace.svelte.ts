@@ -11,6 +11,7 @@ import {
 	type Emotion,
 	type Profile,
 	type Project,
+	type ProjectPatch,
 	type Provider,
 	type Server
 } from '$lib/api/client';
@@ -202,6 +203,74 @@ class Workspace {
 		try {
 			await api.deleteChat(id);
 			this.chats = this.chats.filter((chat) => chat.id !== id);
+			return true;
+		} catch (cause) {
+			this.error = cause instanceof Error ? cause.message : String(cause);
+			return false;
+		}
+	}
+
+	/** Move a chat into a project, or out of every project with `null`.
+	 *
+	 * Optimistic like renaming, and for the same reason: the rail is what is being looked at
+	 * while it happens, and a row that jumps a beat after the click reads as a glitch rather
+	 * than as an answer. */
+	async moveChat(id: string, projectId: string | null): Promise<boolean> {
+		const previous = this.chats;
+		this.chats = this.chats.map((chat) =>
+			chat.id === id ? { ...chat, project_id: projectId } : chat
+		);
+		try {
+			const updated = await api.moveChat(id, projectId);
+			this.chats = this.chats.map((chat) => (chat.id === id ? updated : chat));
+			return true;
+		} catch (cause) {
+			this.chats = previous;
+			this.error = cause instanceof Error ? cause.message : String(cause);
+			return false;
+		}
+	}
+
+	/** Make a project. Returns it so the caller can navigate into it, which is what the rail's
+	 * ＋ does — a project with no instructions is not yet a project, and the screen is where
+	 * they get written. */
+	async createProject(name: string): Promise<Project | null> {
+		try {
+			const project = await api.createProject(name);
+			this.projects = [...this.projects, project];
+			return project;
+		} catch (cause) {
+			this.error = cause instanceof Error ? cause.message : String(cause);
+			return null;
+		}
+	}
+
+	/** Patch one or more fields of a project and fold the answer back into the rail.
+	 *
+	 * Not optimistic: unlike a rename, most of what this changes — instructions, pins, the
+	 * default profile — is not what the rail is drawing, so there is nothing to keep in step
+	 * and a rollback would be invisible anyway. */
+	async patchProject(id: string, patch: ProjectPatch): Promise<Project | null> {
+		try {
+			const updated = await api.updateProject(id, patch);
+			this.projects = this.projects.map((project) => (project.id === id ? updated : project));
+			return updated;
+		} catch (cause) {
+			this.error = cause instanceof Error ? cause.message : String(cause);
+			return null;
+		}
+	}
+
+	/** Revoke a project. Its chats keep their `project_id` on the server and come back as loose
+	 * ones here, which is what the API means by revoke rather than delete — nothing a person
+	 * said is thrown away because the container around it was. */
+	async deleteProject(id: string): Promise<boolean> {
+		try {
+			await api.deleteProject(id);
+			this.projects = this.projects.filter((project) => project.id !== id);
+			this.chats = this.chats.map((chat) =>
+				chat.project_id === id ? { ...chat, project_id: null } : chat
+			);
 			return true;
 		} catch (cause) {
 			this.error = cause instanceof Error ? cause.message : String(cause);

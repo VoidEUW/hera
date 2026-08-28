@@ -31,7 +31,28 @@ export interface Project {
 	instructions: string;
 	pinned_skills: string[];
 	default_profile_id: string | null;
+	/** Which agent a new chat here starts with, once there are agents. Read-only: nothing writes
+	 * it in v0.2, and the project screen draws the control disabled rather than absent. */
+	default_agent_id: string | null;
+	/** A palette token name, or empty for the ordinary colour. Not a hex — see `$lib/projects`. */
+	color: string;
 	archived: boolean;
+}
+
+/** What a project PATCH may carry.
+ *
+ * Not `Partial<Project>`: `id`, `slug` and `default_agent_id` are not writable, and spreading a
+ * whole project into a patch is how a stale tab overwrites a field somebody else just changed.
+ * A key left out means *leave it*, on every field including `default_profile_id` — sending that
+ * one as `null` is what clears it.
+ */
+export interface ProjectPatch {
+	name?: string;
+	instructions?: string;
+	pinned_skills?: string[];
+	default_profile_id?: string | null;
+	color?: string;
+	archived?: boolean;
 }
 
 export interface Chat {
@@ -213,9 +234,10 @@ export const api = {
 		request<Region>(`/mind/${id}`, { method: 'PUT', body: JSON.stringify({ text }) }),
 
 	projects: () => request<Project[]>('/projects'),
+	project: (id: string) => request<Project>(`/projects/${id}`),
 	createProject: (name: string) =>
 		request<Project>('/projects', { method: 'POST', body: JSON.stringify({ name }) }),
-	updateProject: (id: string, patch: Partial<Project>) =>
+	updateProject: (id: string, patch: ProjectPatch) =>
 		request<Project>(`/projects/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
 	deleteProject: (id: string) => request<void>(`/projects/${id}`, { method: 'DELETE' }),
 
@@ -227,6 +249,13 @@ export const api = {
 		request<Chat>(`/chats/${id}`, { method: 'PATCH', body: JSON.stringify({ title }) }),
 	pinSkills: (id: string, pinned_skills: string[]) =>
 		request<Chat>(`/chats/${id}`, { method: 'PATCH', body: JSON.stringify({ pinned_skills }) }),
+	/** Move a chat into a project, or out of every project with `null`.
+	 *
+	 * `project_id` is sent explicitly either way, because the server distinguishes *omitted*
+	 * from *null* on this one field — omitting it means "leave it", so a `null` that never
+	 * reaches the wire is a move that silently does nothing. */
+	moveChat: (id: string, project_id: string | null) =>
+		request<Chat>(`/chats/${id}`, { method: 'PATCH', body: JSON.stringify({ project_id }) }),
 	deleteChat: (id: string) => request<void>(`/chats/${id}`, { method: 'DELETE' }),
 
 	providers: () => request<Providers>('/providers'),

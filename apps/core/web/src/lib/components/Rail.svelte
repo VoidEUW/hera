@@ -6,12 +6,19 @@
 	 * Projects disclose inline rather than navigating, because finding a chat under the thing it
 	 * belongs to is genuinely easier than finding it in one flat list sorted by time.
 	 *
-	 * Every chat carries a **⋯** menu: rename in place, delete behind a confirmation. Renaming
-	 * is an input where the title was rather than a prompt box, because the thing being renamed
-	 * is a line in a list and you should be able to see the list while you retype it.
+	 * Every chat carries a **⋯** menu: rename in place, move to a project, delete behind a
+	 * confirmation. A project carries the same menu with its own verbs. Renaming is an input
+	 * where the title was rather than a prompt box, because the thing being renamed is a line in
+	 * a list and you should be able to see the list while you retype it.
+	 *
+	 * Both row kinds share one set of menu state, keyed by `{ kind, id }` rather than by a bare
+	 * id. Ids are UUIDs and would not collide, but *which menu is open* and *what its items mean*
+	 * are the same question, and answering it with two parallel sets of fields is how a project
+	 * ends up being renamed by the chat handler.
 	 */
 	import type { Chat, Profile, Project } from '$lib/api/client';
 	import { t } from '$lib/i18n';
+	import { colourOf } from '$lib/projects';
 	import Ocellus from './Ocellus.svelte';
 
 	interface Props {
@@ -19,11 +26,16 @@
 		projects: Project[];
 		profile: Profile | null;
 		activeId?: string | null;
+		activeProjectId?: string | null;
 		onnew?: (projectId?: string) => void;
 		onsettings?: () => void;
 		onprofile?: () => void;
 		onrename?: (id: string, title: string) => void;
 		ondelete?: (id: string) => void;
+		onmove?: (chatId: string, projectId: string | null) => void;
+		onnewproject?: (name: string) => void;
+		onprojectrename?: (id: string, name: string) => void;
+		onprojectdelete?: (id: string) => void;
 	}
 
 	let {
@@ -31,22 +43,36 @@
 		projects,
 		profile,
 		activeId = null,
+		activeProjectId = null,
 		onnew,
 		onsettings,
 		onprofile,
 		onrename,
-		ondelete
+		ondelete,
+		onmove,
+		onnewproject,
+		onprojectrename,
+		onprojectdelete
 	}: Props = $props();
+
+	type Kind = 'chat' | 'project';
+	type Target = { kind: Kind; id: string };
 
 	let expanded = $state<Record<string, boolean>>({});
 
-	/** The chat whose ⋯ menu is open, the one being renamed, and the one being confirmed for
-	 * deletion. Three separate ids rather than one mode, because only one of each can be true
+	/** The row whose ⋯ menu is open, the one being renamed, and the one being confirmed for
+	 * deletion. Three separate fields rather than one mode, because only one of each can be true
 	 * at a time and a single field would let "renaming" survive the menu closing. */
-	let menuFor = $state<string | null>(null);
-	let renaming = $state<string | null>(null);
-	let confirming = $state<string | null>(null);
+	let menuFor = $state<Target | null>(null);
+	let renaming = $state<Target | null>(null);
+	let confirming = $state<Target | null>(null);
+	/** The chat whose **Move to…** list is showing. A second level inside the menu rather than a
+	 * submenu that opens sideways: the rail is 264px wide and there is nowhere sideways to go. */
+	let moving = $state<string | null>(null);
 	let draft = $state('');
+	/** Naming a new project happens in the list, in the place the project will appear, rather
+	 * than in a dialog — the same reasoning as renaming in place. */
+	let creating = $state(false);
 
 	const loose = $derived(chats.filter((chat) => !chat.project_id));
 
@@ -54,27 +80,62 @@
 		return chats.filter((chat) => chat.project_id === projectId);
 	}
 
+	function is(target: Target | null, kind: Kind, id: string): boolean {
+		return target?.kind === kind && target.id === id;
+	}
+
 	function closeMenu() {
 		menuFor = null;
 		confirming = null;
+		moving = null;
 	}
 
-	function startRename(chat: Chat) {
+	function startRename(kind: Kind, id: string, current: string) {
 		closeMenu();
-		renaming = chat.id;
-		draft = chat.title;
+		renaming = { kind, id };
+		draft = current;
 	}
 
-	function commitRename(chat: Chat) {
-		const title = draft.trim();
+	/** Both of these are reached twice for one commit, and only the first may act.
+	 *
+	 * Enter runs the handler, which unmounts the input, which fires `blur` on the way out — so
+	 * the same name is submitted a second time. Renaming survived that by accident, because the
+	 * second call compares against the name it just set and does nothing. Creating did not:
+	 * pressing Enter made *two* projects, and the pair raced for the same slug closely enough
+	 * that the loser came back a 500. The guard is the state field that is already there. */
+	function commitRename(kind: Kind, id: string, current: string) {
+		if (!renaming) return;
+		const name = draft.trim();
 		renaming = null;
-		if (title && title !== chat.title) onrename?.(chat.id, title);
+		if (!name || name === current) return;
+		if (kind === 'chat') onrename?.(id, name);
+		else onprojectrename?.(id, name);
+	}
+
+	function commitCreate() {
+		if (!creating) return;
+		const name = draft.trim();
+		creating = false;
+		if (name) onnewproject?.(name);
+	}
+
+	function startCreate() {
+		closeMenu();
+		renaming = null;
+		draft = '';
+		creating = true;
+	}
+
+	function move(chatId: string, projectId: string | null) {
+		closeMenu();
+		onmove?.(chatId, projectId);
 	}
 
 	function onkeydown(event: KeyboardEvent) {
 		if (event.key !== 'Escape') return;
 		closeMenu();
 		renaming = null;
+		creating = false;
 	}
 
 	/** The field takes the cursor and the whole title with it. The menu item that opened it is
@@ -98,15 +159,15 @@
 
 {#snippet row(chat: Chat)}
 	<li class="item">
-		{#if renaming === chat.id}
+		{#if is(renaming, 'chat', chat.id)}
 			<input
 				class="rename"
 				use:takeover
 				bind:value={draft}
 				aria-label={t.rail.rename}
-				onblur={() => commitRename(chat)}
+				onblur={() => commitRename('chat', chat.id, chat.title)}
 				onkeydown={(event) => {
-					if (event.key === 'Enter') commitRename(chat);
+					if (event.key === 'Enter') commitRename('chat', chat.id, chat.title);
 					if (event.key === 'Escape') renaming = null;
 				}}
 			/>
@@ -116,23 +177,24 @@
 			</a>
 			<button
 				class="more"
-				class:shown={menuFor === chat.id}
+				class:shown={is(menuFor, 'chat', chat.id)}
 				type="button"
 				aria-label={t.rail.chatOptions}
 				aria-haspopup="menu"
-				aria-expanded={menuFor === chat.id}
+				aria-expanded={is(menuFor, 'chat', chat.id)}
 				onclick={() => {
 					confirming = null;
-					menuFor = menuFor === chat.id ? null : chat.id;
+					moving = null;
+					menuFor = is(menuFor, 'chat', chat.id) ? null : { kind: 'chat', id: chat.id };
 				}}
 			>
 				<span aria-hidden="true">⋯</span>
 			</button>
 		{/if}
 
-		{#if menuFor === chat.id}
+		{#if is(menuFor, 'chat', chat.id)}
 			<div class="menu" role="menu">
-				{#if confirming === chat.id}
+				{#if is(confirming, 'chat', chat.id)}
 					<p class="ask caption">{t.rail.deleteAsk}</p>
 					<button
 						class="option danger"
@@ -148,20 +210,172 @@
 					<button class="option" type="button" role="menuitem" onclick={closeMenu}>
 						{t.rail.cancel}
 					</button>
+				{:else if moving === chat.id}
+					<!-- The project it is already in is listed and marked rather than left out: a
+					     list that silently drops one entry makes you check twice which one. -->
+					{#each projects as project (project.id)}
+						<button
+							class="option"
+							type="button"
+							role="menuitemradio"
+							aria-checked={chat.project_id === project.id}
+							disabled={chat.project_id === project.id}
+							onclick={() => move(chat.id, project.id)}
+						>
+							{project.name}
+						</button>
+					{/each}
+					<button
+						class="option"
+						type="button"
+						role="menuitemradio"
+						aria-checked={chat.project_id === null}
+						disabled={chat.project_id === null}
+						onclick={() => move(chat.id, null)}
+					>
+						{t.rail.noProject}
+					</button>
 				{:else}
-					<button class="option" type="button" role="menuitem" onclick={() => startRename(chat)}>
+					<button
+						class="option"
+						type="button"
+						role="menuitem"
+						onclick={() => startRename('chat', chat.id, chat.title)}
+					>
 						{t.rail.rename}
 					</button>
+					{#if projects.length}
+						<button class="option" type="button" role="menuitem" onclick={() => (moving = chat.id)}>
+							{t.rail.moveTo}
+						</button>
+					{/if}
 					<button
 						class="option danger"
 						type="button"
 						role="menuitem"
-						onclick={() => (confirming = chat.id)}
+						onclick={() => (confirming = { kind: 'chat', id: chat.id })}
 					>
 						{t.rail.delete}
 					</button>
 				{/if}
 			</div>
+		{/if}
+	</li>
+{/snippet}
+
+{#snippet projectRow(project: Project)}
+	{@const open = expanded[project.id] ?? false}
+	{@const accent = colourOf(project.color)}
+	<li>
+		<!-- The project's own line gets the positioning context, not the `li`. A disclosed project
+		     `li` is as tall as the whole group inside it, and `.more` is centred on its containing
+		     block — so the ⋯ drifted down into the chat list and sat on top of a row, which is
+		     both unreachable and unclickable-through. The menu hangs off this too, so it opens
+		     under the project rather than under the last chat in it. -->
+		<div class="item head">
+			{#if is(renaming, 'project', project.id)}
+				<input
+					class="rename"
+					use:takeover
+					bind:value={draft}
+					aria-label={t.rail.rename}
+					onblur={() => commitRename('project', project.id, project.name)}
+					onkeydown={(event) => {
+						if (event.key === 'Enter') commitRename('project', project.id, project.name);
+						if (event.key === 'Escape') renaming = null;
+					}}
+				/>
+			{:else}
+				<button
+					class="entry project"
+					class:active={project.id === activeProjectId}
+					type="button"
+					aria-expanded={open}
+					onclick={() => (expanded = { ...expanded, [project.id]: !open })}
+				>
+					<span class="chevron" aria-hidden="true">{open ? '▾' : '▸'}</span>
+					<span class="dot" style:background={accent ?? 'var(--text-faint)'} aria-hidden="true"
+					></span>
+					<span class="label">{project.name}</span>
+				</button>
+				<button
+					class="more"
+					class:shown={is(menuFor, 'project', project.id)}
+					type="button"
+					aria-label={t.rail.projectOptions}
+					aria-haspopup="menu"
+					aria-expanded={is(menuFor, 'project', project.id)}
+					onclick={() => {
+						confirming = null;
+						moving = null;
+						menuFor = is(menuFor, 'project', project.id)
+							? null
+							: { kind: 'project', id: project.id };
+					}}
+				>
+					<span aria-hidden="true">⋯</span>
+				</button>
+			{/if}
+
+			{#if is(menuFor, 'project', project.id)}
+				<div class="menu" role="menu">
+					{#if is(confirming, 'project', project.id)}
+						<!-- "Its chats are kept" is on the card because it is true and surprising:
+						     the API revokes rather than deletes, and nothing anybody said goes away. -->
+						<p class="ask caption">{t.rail.removeProjectAsk}</p>
+						<button
+							class="option danger"
+							type="button"
+							role="menuitem"
+							onclick={() => {
+								closeMenu();
+								onprojectdelete?.(project.id);
+							}}
+						>
+							{t.rail.removeProject}
+						</button>
+						<button class="option" type="button" role="menuitem" onclick={closeMenu}>
+							{t.rail.cancel}
+						</button>
+					{:else}
+						<a class="option" role="menuitem" href="/project/{project.id}" onclick={closeMenu}>
+							{t.rail.open}
+						</a>
+						<button
+							class="option"
+							type="button"
+							role="menuitem"
+							onclick={() => startRename('project', project.id, project.name)}
+						>
+							{t.rail.rename}
+						</button>
+						<button
+							class="option danger"
+							type="button"
+							role="menuitem"
+							onclick={() => (confirming = { kind: 'project', id: project.id })}
+						>
+							{t.rail.removeProject}
+						</button>
+					{/if}
+				</div>
+			{/if}
+		</div>
+
+		{#if open}
+			<ul class="list nested">
+				{#each inside(project.id) as chat (chat.id)}
+					{@render row(chat)}
+				{:else}
+					<li class="hint caption">{t.rail.noChats}</li>
+				{/each}
+				<li>
+					<button class="entry add" type="button" onclick={() => onnew?.(project.id)}>
+						<span class="glyph" aria-hidden="true">＋</span>
+						{t.rail.newChat}
+					</button>
+				</li>
+			</ul>
 		{/if}
 	</li>
 {/snippet}
@@ -189,40 +403,40 @@
 		{t.rail.newChat}
 	</button>
 
-	{#if projects.length}
+	<!-- Always shown, where it used to appear only once a project existed. A heading with a ＋
+	     under it is how you find out projects are a thing; a section that is invisible until you
+	     already have one can only be discovered by accident. -->
+	<div class="heading-row">
 		<p class="heading">{t.rail.projects}</p>
-		<ul class="list">
-			{#each projects as project (project.id)}
-				{@const open = expanded[project.id] ?? false}
-				<li>
-					<button
-						class="entry project"
-						type="button"
-						aria-expanded={open}
-						onclick={() => (expanded = { ...expanded, [project.id]: !open })}
-					>
-						<span class="chevron" aria-hidden="true">{open ? '▾' : '▸'}</span>
-						<span class="label">{project.name}</span>
-					</button>
-					{#if open}
-						<ul class="list nested">
-							{#each inside(project.id) as chat (chat.id)}
-								{@render row(chat)}
-							{:else}
-								<li class="hint caption">{t.rail.noChats}</li>
-							{/each}
-							<li>
-								<button class="entry add" type="button" onclick={() => onnew?.(project.id)}>
-									<span class="glyph" aria-hidden="true">＋</span>
-									{t.rail.newChat}
-								</button>
-							</li>
-						</ul>
-					{/if}
-				</li>
-			{/each}
-		</ul>
-	{/if}
+		<button class="new" type="button" aria-label={t.rail.newProject} onclick={startCreate}>
+			<span aria-hidden="true">＋</span>
+		</button>
+	</div>
+
+	<ul class="list">
+		{#each projects as project (project.id)}
+			{@render projectRow(project)}
+		{/each}
+
+		{#if creating}
+			<li class="item">
+				<input
+					class="rename"
+					use:takeover
+					bind:value={draft}
+					aria-label={t.rail.newProject}
+					placeholder={t.rail.projectNamePlaceholder}
+					onblur={commitCreate}
+					onkeydown={(event) => {
+						if (event.key === 'Enter') commitCreate();
+						if (event.key === 'Escape') creating = false;
+					}}
+				/>
+			</li>
+		{:else if !projects.length}
+			<li class="hint caption">{t.rail.noProjects}</li>
+		{/if}
+	</ul>
 
 	<p class="heading">{t.rail.chats}</p>
 	<ul class="list scroll">
@@ -286,6 +500,46 @@
 		color: var(--text-faint);
 	}
 
+	.heading-row {
+		display: flex;
+		align-items: center;
+	}
+
+	.heading-row .heading {
+		flex: 1;
+	}
+
+	/* Always visible, unlike a row's ⋯. This is the only way to make a project, so hiding it
+	   until the pointer finds it would hide the feature. */
+	.new {
+		display: grid;
+		place-items: center;
+		width: 22px;
+		height: 22px;
+		margin-right: 6px;
+		border-radius: 6px;
+		color: var(--text-faint);
+		font-size: 13px;
+		line-height: 1;
+		transition:
+			background var(--fade) var(--ease),
+			color var(--fade) var(--ease);
+	}
+
+	.new:hover {
+		background: var(--surface-raised);
+		color: var(--text);
+	}
+
+	/* The project's colour, if it has one. Four pixels is enough to group a list and not enough
+	   to compete with the chat you are in, which is the only thing in this rail that is brass. */
+	.dot {
+		width: 4px;
+		height: 4px;
+		flex: none;
+		border-radius: 50%;
+	}
+
 	.list {
 		list-style: none;
 		margin: 0;
@@ -340,9 +594,17 @@
 		white-space: nowrap;
 	}
 
-	/* One chat: the link, the ⋯, and the popup either of them can open. */
+	/* One row: the link, the ⋯, and the popup either of them can open. On a chat this is the
+	   `li`; on a project it is a wrapper around the project's own line, because the `li` there
+	   also holds the disclosed chats and is as tall as all of them. */
 	.item {
 		position: relative;
+	}
+
+	/* The project's own line. `.item` alone would be enough; the class exists so that what the
+	   wrapper is for is legible from the markup rather than only from this comment. */
+	.head {
+		display: block;
 	}
 
 	/* Room for the ⋯ so a long title is cut by the button rather than sliding under it. */
@@ -401,36 +663,67 @@
 		z-index: 20;
 	}
 
+	/* The same popup `Select` and the skill picker draw: raised surface, hairline, the large
+	   radius, the same shadow and the same fade in. A menu and a dropdown are not the same
+	   control, but they are the same *gesture* — a small list, next to the thing it is about —
+	   and three different frames for that was the thing that read as unfinished. */
 	.menu {
 		position: absolute;
-		top: calc(100% - 2px);
+		top: calc(100% + 1px);
 		right: 4px;
 		z-index: 21;
 		display: flex;
 		flex-direction: column;
-		min-width: 148px;
-		padding: 4px;
+		min-width: 168px;
+		max-height: 44vh;
+		overflow-y: auto;
+		padding: 5px;
 		background: var(--surface-raised);
 		border: 1px solid var(--line);
-		border-radius: var(--radius);
+		border-radius: var(--radius-lg);
 		box-shadow: var(--shadow);
+		animation: fade var(--fade) var(--ease);
+	}
+
+	@keyframes fade {
+		from {
+			opacity: 0;
+		}
 	}
 
 	.option {
-		padding: 6px 8px;
-		border-radius: 6px;
+		display: block;
+		width: 100%;
+		padding: 7px 8px;
+		border-radius: var(--radius);
 		text-align: left;
 		font-size: 13px;
 		color: var(--text-muted);
+		text-decoration: none;
+		transition: background var(--fade) var(--ease);
 	}
 
-	.option:hover {
+	.option:hover,
+	.option:focus-visible {
 		background: var(--surface);
 		color: var(--text);
+		outline: none;
 	}
 
 	.option.danger:hover {
 		color: var(--danger);
+	}
+
+	/* The project a chat is already in, in the move list. Shown rather than dropped, so the list
+	   is the same length every time you open it and you can see what the answer currently is. */
+	.option:disabled {
+		color: var(--brass);
+		cursor: default;
+	}
+
+	.option:disabled:hover {
+		background: none;
+		color: var(--brass);
 	}
 
 	.ask {

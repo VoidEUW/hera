@@ -11,6 +11,67 @@ without pinning Hera. `release.yml` refuses a tag whose version disagrees with t
 so the number in this file, on the tag, and in the interface cannot drift apart. See
 [CONTRIBUTING.md](CONTRIBUTING.md) and [ADR 8](docs/adr/0008-github-flow-and-required-checks.md).
 
+## [0.2.0] — unreleased
+
+**The deepening pass: what makes her accumulate.** v0.1.0 runs a turn end to end and forgets it
+happened. This version adds the four things that change: projects you can actually make, artifacts
+she can produce and revise, memory across conversations, and dreaming — she re-reads her own chats
+and proposes changes you accept or reject.
+
+The order is **organise → produce → make room → remember → reflect**, and it is not aesthetic:
+artifacts and memory both want a panel beside the conversation, so the interface pass sits between
+them; dreaming reads memories and proposes to the mind, so it cannot come earlier.
+
+Planned, in [docs/versions/v0.2.0.md](docs/versions/v0.2.0.md) — the reasoning lives there, and this
+section fills in as milestones land.
+
+### Added
+
+- **Projects you can actually make.** The server half shipped in 0.1.0 and nothing could reach it:
+  `Project` had instructions, pinned skills and a default profile, and no screen created one. There
+  is now a **＋** on the rail's `PROJECTS` heading, a `⋯` on every project row (open · rename ·
+  remove), and a project screen at `/project/<id>` carrying the instructions, the pinned skills,
+  the default profile and its chats. Not a Settings tab — Settings is *how she works*, a project is
+  the work.
+- **A chat can be moved between projects**, from its own `⋯`. `PATCH /chats/{id}` grew a
+  `project_id`, and it is the one field on that endpoint where `null` means *loose* rather than
+  *leave it* — the route reads `model_fields_set` rather than putting a tri-state on the wire.
+- **A project has a colour**, from the palette rather than from a colour wheel: a token name, so
+  each theme resolves it to its own value and a hue picked in the dark is still legible on vellum.
+- **A seam for agent selection.** `Project.default_agent_id` is a column nothing reads, drawn as a
+  disabled control saying v0.3 — the same call Settings → Dreaming makes.
+- **One selector, and one popup.** `Select.svelte` replaces every dropdown in the application. The
+  trigger is the composer's pill — the shape that was already right — and the popup is the *skill
+  picker's*: raised surface, hairline, large radius, the same shadow, a brass check on the chosen
+  row. Before this the composer's two pills were a native `<select>` wearing `appearance: none`,
+  which gave back the frame and left the list the platform's, and every other selector was bare
+  native. A person should not be able to tell from the way a list looks whether it came from a
+  dialog, a dropdown or a `⋯` menu — the rail's menus share the frame too. Keyboard throughout:
+  arrows walk it, Home and End jump, Escape closes and hands focus back.
+
+### Fixed
+
+- **`PATCH /projects/{id}` could not clear a default profile.** The route tested
+  `default_profile_id is not None`, which is right for every other field on that body and wrong for
+  this one: choosing the screen's empty option was a no-op, and the control snapped back on the
+  next load with nothing to explain it.
+
+### Still to come in this version
+
+- **Artifacts** — a diagram, a document, a workflow chart as an object with an identity and
+  versions, not prose in a code fence. A tool call like everything else (ADR 11 forbids the browser
+  discovering one), rendered as Mermaid, Markdown, code or sandboxed HTML.
+- **Skill resources become readable.** `hera_skillsets` already tells the model a skill has files
+  beside it; `hera__read_resource` makes that sentence true, which is what Anthropic's
+  reference-heavy skills need. Script-running skills report honestly instead — running code is
+  `hera_sandbox`, and it is not this version.
+- **`hera_memories`.** Retrieval with per-tier caps, write-dedup, hit counts. `hera__remember` stops
+  answering "not available in this deployment", and the embedder seam v0.1 left open closes.
+- **`hera_promptevo`.** Dreaming, proposing to evolvable mind regions and to memory. Every proposal
+  is a card; nothing is applied automatically, and a rejection comes back as a counter-example.
+- **An interface pass** — one drawer the three new panels share, the `⌘K` command palette, and the
+  rail and transcript rework the new features need.
+
 ## [0.1.0] — unreleased
 
 **The first release: the spine runs end to end.** A message typed into the browser reaches a
@@ -153,4 +214,5 @@ Deliberate, and listed so a missing feature and a broken one do not look alike:
 [docs/tooling.md](docs/tooling.md) argues for the rest of the tool surface — a per-chat
 scratchpad, an emotion that can ask a question back, artifacts — as notes rather than decisions.
 
+[0.2.0]: https://github.com/VoidEUW/hera/releases/tag/v0.2.0
 [0.1.0]: https://github.com/VoidEUW/hera/releases/tag/v0.1.0

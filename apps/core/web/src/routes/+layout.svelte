@@ -25,7 +25,13 @@
 	theme.load();
 	void workspace.load();
 
-	const activeId = $derived(page.params.id ?? null);
+	// Scoped to the chat route, not just `page.params.id`. `/project/<uuid>` fills the same
+	// parameter name, and a rail that compared it against chat ids would go quiet the moment you
+	// opened a project — nothing would match, so nothing would be marked as where you are.
+	const activeId = $derived(page.route.id?.startsWith('/chat') ? (page.params.id ?? null) : null);
+	const activeProjectId = $derived(
+		page.route.id?.startsWith('/project') ? (page.params.id ?? null) : null
+	);
 
 	/** **New chat** goes to the start screen rather than making a chat.
 	 *
@@ -49,6 +55,19 @@
 		// Only when the conversation on screen is the one that just went. Deleting another
 		// chat from the rail must not take you away from what you were reading.
 		if (removed && page.params.id === id) await goto('/');
+	}
+
+	/** A new project opens its own screen. A project is instructions and pinned skills; one with
+	 * neither is a name, and the screen is where it becomes a project. */
+	async function newProject(name: string) {
+		const project = await workspace.createProject(name);
+		if (project) await goto(`/project/${project.id}`);
+	}
+
+	async function removeProject(id: string) {
+		const removed = await workspace.deleteProject(id);
+		// Same rule as a chat: only navigate away if you were looking at the thing that went.
+		if (removed && page.url.pathname === `/project/${id}`) await goto('/');
 	}
 
 	/** The composer shows what she can reach, and settings is where that changes. */
@@ -78,11 +97,16 @@
 		projects={workspace.projects}
 		profile={workspace.activeProfile}
 		{activeId}
+		{activeProjectId}
 		onnew={newChat}
 		onsettings={() => workspace.openSettings()}
 		onprofile={() => (profileOpen = true)}
 		onrename={(id, title) => workspace.renameChat(id, title)}
 		ondelete={removeChat}
+		onmove={(id, projectId) => workspace.moveChat(id, projectId)}
+		onnewproject={newProject}
+		onprojectrename={(id, name) => workspace.patchProject(id, { name })}
+		onprojectdelete={removeProject}
 	/>
 
 	<main>

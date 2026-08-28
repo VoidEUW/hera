@@ -20,6 +20,7 @@
 	import type { Profile, Provider, Server } from '$lib/api/client';
 	import { isImage, read, size, type Attachment } from '$lib/attachments';
 	import { t } from '$lib/i18n';
+	import Select from './Select.svelte';
 	import SkillPicker from './SkillPicker.svelte';
 
 	interface Props {
@@ -217,32 +218,37 @@
 		{/if}
 
 		{#if profiles.length > 1}
-			<label class="profile">
-				<span class="sr-only">Profile</span>
-				<select
+			<div class="profile">
+				<Select
+					choices={profiles.map((profile) => ({
+						value: profile.id,
+						label: profile.name,
+						hint: profile.description
+					}))}
 					value={profileId ?? ''}
-					onchange={(event) => onprofile?.(event.currentTarget.value)}
-				>
-					{#each profiles as profile (profile.id)}
-						<option value={profile.id}>{profile.name}</option>
-					{/each}
-				</select>
-			</label>
+					label={t.composer.profile}
+					placement="above"
+					onchange={(id) => onprofile?.(id)}
+				/>
+			</div>
 		{/if}
 
 		{#if providers.length}
-			<label class="model">
-				<span class="sr-only">{t.composer.model}</span>
-				<select
+			<div class="model">
+				<Select
+					choices={providers.map((entry) => ({
+						value: entry.name,
+						label: entry.model || entry.name,
+						hint: entry.base_url
+					}))}
 					value={activeProvider}
+					label={t.composer.model}
+					placement="above"
+					align="end"
 					title={model ? `${model.name} · ${model.base_url}` : ''}
-					onchange={(event) => onmodel?.(event.currentTarget.value)}
-				>
-					{#each providers as entry (entry.name)}
-						<option value={entry.name}>{entry.model || entry.name}</option>
-					{/each}
-				</select>
-			</label>
+					onchange={(name) => onmodel?.(name)}
+				/>
+			</div>
 		{:else}
 			<!-- Nothing registered. Saying so where the model belongs beats an empty gap, and it
 			     is one click from the screen that fixes it. -->
@@ -419,67 +425,16 @@
 		background: var(--text-faint);
 	}
 
-	/* Both dropdowns are drawn as the same pill the context chip is, because they sit in the
-	   same row and mean the same *kind* of thing — one switch each, currently set to this. A
-	   native `<select>` here brought the operating system's own border, radius and arrow into a
-	   bar of hand-drawn controls, and no amount of matching the font hid that. `appearance:
-	   none` gives the frame back, and the chevron below is the one part that has to be redrawn
-	   by hand. The popup itself stays native and unstyleable, which is correct: it is the
-	   platform's list and behaves the way that platform's lists do. */
+	/* Both dropdowns are `Select`, which owns the pill and the popup. They used to be a native
+	   `<select>` with `appearance: none` and a chevron drawn on this element — which gave back
+	   the frame and left the *list* the platform's, so opening one dropped the operating
+	   system's own panel into an interface that draws everything else itself. What is left here
+	   is only where they sit in the row. */
 	.profile,
 	.model {
-		position: relative;
 		display: flex;
 		align-items: center;
 		min-width: 0;
-	}
-
-	.profile select,
-	.model select {
-		appearance: none;
-		width: 100%;
-		background: none;
-		border: 1px solid var(--line);
-		border-radius: 999px;
-		padding: 3px 24px 3px 10px;
-		font-size: 12.5px;
-		line-height: 1.45;
-		color: var(--text-muted);
-		cursor: pointer;
-		text-overflow: ellipsis;
-		transition:
-			border-color var(--fade) var(--ease),
-			color var(--fade) var(--ease);
-	}
-
-	.profile select:hover,
-	.model select:hover {
-		border-color: var(--text-faint);
-		color: var(--text);
-	}
-
-	/* The popup is the platform's, so its rows are too — but a system that has not been told
-	   which end of the theme we are on paints them white. `color-scheme` on :root covers the
-	   two big browsers; this covers the rest. */
-	.profile option,
-	.model option {
-		background: var(--surface-raised);
-		color: var(--text);
-	}
-
-	/* The chevron the native control is no longer drawing. Two borders on a rotated square:
-	   one shape, no asset, and it takes the colour of the row like everything else here. */
-	.profile::after,
-	.model::after {
-		content: '';
-		position: absolute;
-		right: 10px;
-		width: 5px;
-		height: 5px;
-		border-right: 1.5px solid var(--text-faint);
-		border-bottom: 1.5px solid var(--text-faint);
-		transform: translateY(-2px) rotate(45deg);
-		pointer-events: none;
 	}
 
 	.model,

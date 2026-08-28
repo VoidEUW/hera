@@ -28,9 +28,15 @@ export const t = {
 		stop: 'Stop',
 		hint: 'Enter to send, Shift+Enter for a new line',
 		model: 'Model',
+		profile: 'Profile',
 		noModel: 'No model',
 		skillCount: (n: number) => `${n} ${n === 1 ? 'skill' : 'skills'}`,
 		serverCount: (n: number) => `${n} ${n === 1 ? 'server' : 'servers'}`
+	},
+
+	select: {
+		none: '—',
+		empty: 'Nothing to choose from.'
 	},
 
 	rail: {
@@ -45,10 +51,40 @@ export const t = {
 		noChats: 'No chats yet.',
 		noProjects: 'No projects yet.',
 		chatOptions: 'Chat options',
+		projectOptions: 'Project options',
 		rename: 'Rename',
 		delete: 'Delete',
 		deleteAsk: 'Delete this chat?',
-		cancel: 'Cancel'
+		cancel: 'Cancel',
+		open: 'Open',
+		archive: 'Archive',
+		moveTo: 'Move to…',
+		noProject: 'No project',
+		// "Remove" rather than "Delete": the chats inside are kept and come back as loose ones,
+		// and a word that promises otherwise is the wrong word on a confirmation.
+		removeProject: 'Remove project',
+		removeProjectAsk: 'Remove this project? Its chats are kept.',
+		projectNamePlaceholder: 'Project name'
+	},
+
+	project: {
+		instructions: 'Instructions',
+		instructionsHint:
+			'What we are working on. If a sentence would still be true in a project about something else, it belongs in her mind instead.',
+		skills: 'Pinned skills',
+		skillsHint: 'Every chat in this project carries these, ahead of the profile’s.',
+		chooseSkills: 'Choose skills',
+		defaultProfile: 'Default profile',
+		defaultProfileHint: 'Who a new chat here starts as.',
+		noDefaultProfile: 'No default',
+		defaultAgent: 'Default agent',
+		defaultAgentSoon: 'Agents arrive in v0.3.',
+		chats: 'Chats',
+		noChats: 'No chats in this project yet.',
+		save: 'Save',
+		saved: 'Saved',
+		notFound: 'There is no such project.',
+		colour: 'Colour'
 	},
 
 	activity: {

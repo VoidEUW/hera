@@ -3,7 +3,11 @@
 Where the rebuild stands and what is settled, so a new session can pick up without re-reading
 the history. Updated as milestones land — this file is a snapshot, not a changelog.
 
-**Last updated:** 2026-08-27 · **Version:** v0.1, the spine runs · **Strategy:** thin spine first, then deepen
+**Last updated:** 2026-08-28 · **Version:** v0.2 in progress, M1 landed · **Strategy:** thin spine first, then deepen
+
+**v0.2 is planned in [versions/v0.2.0.md](versions/v0.2.0.md)** — five milestones, in the order
+*organise → produce → make room → remember → reflect*. M1 (project folders) is done; M2 (artifacts
+and skill resources) is next.
 
 ---
 
@@ -396,6 +400,12 @@ wrote.
   `tool_result` would otherwise fall through to a gutter row and draw the same thing twice. A
   *failed* emotion keeps its row — one she showed and the system refused is exactly what
   openness means you get to see.
+- **Every popup is one frame** (v0.2 M1). `Select.svelte` owns every dropdown: the composer's pill
+  as the trigger, the skill picker's panel as the list. The composer's two used to be a native
+  `<select>` with `appearance: none`, which gave the frame back and left the *list* the platform's;
+  everything else was bare native. The rail's `⋯` menus share the frame. Popups are anchored
+  popovers with no scrim — the skill picker is a sheet because choosing skills is a task you go and
+  do, and picking one value from four is not.
 
 ### What the settings rework settled
 
@@ -555,7 +565,8 @@ whole path runs.
    name and finding out what Qwen3.6-35B actually does with the prompt: the `xml` layout, the
    tool catalogue, the emotion vocabulary.
 4. **The gaps left on purpose.** The command palette behind `⌘K` (it opens Settings for now),
-   the mobile sheet, project instructions in the interface, and the embedder seam.
+   the mobile sheet, and the embedder seam. ~~Project instructions in the interface~~ landed with
+   v0.2's M1 — the rail makes and renames projects, and `/project/<id>` edits one.
 5. **The rest of the tool surface.** `hera__search` now exists — see below — but `fetch` does
    not, so she can find a page and not read it. That and the rest of what using the build argued
    for (a per-chat scratchpad, an emotion that can ask a question back, artifacts, and the

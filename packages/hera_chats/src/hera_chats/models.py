@@ -62,6 +62,25 @@ class Project(Entity, SoftDeletable, table=True):
     default_profile_id: UUID | None = Field(default=None)
     """Which of her a new chat here starts as. A bare UUID: no cross-package foreign keys."""
 
+    default_agent_id: UUID | None = Field(default=None)
+    """Which agent a new chat here starts with, once there are agents. Nothing reads it yet.
+
+    A column rather than a note, because the alternative is a migration later for a field whose
+    shape is already known — and because a project screen that shows the control disabled says
+    *this is coming* where a screen with nothing there says *this was not thought about*. The
+    turn does not look at it in v0.2; an agent is a v0.3 concept (a persona branching the mind
+    repository) and the thing it would select does not exist to be selected yet.
+    """
+
+    color: str = ""
+    """An accent for this project's rows in the rail, as a token name rather than a hex.
+
+    Empty means the ordinary colour, which is what every project starts as. A name — not
+    ``#7f4a2e`` — because the palette has two themes and a hex chosen against the dark one is
+    illegible on vellum; ``docs/frontend.md`` owns which names exist and the interface resolves
+    them per theme.
+    """
+
     archived: bool = Field(default=False, index=True)
 
 

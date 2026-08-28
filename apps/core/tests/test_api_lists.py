@@ -133,6 +133,62 @@ class TestProjects:
         inside = (await client.get(f"{API}/chats?project_id={project['id']}")).json()
         assert [c["id"] for c in inside] == [chat["id"]]
 
+    async def test_two_projects_may_share_a_name(self, client: AsyncClient) -> None:
+        """The slug is what has to be unique, and it is derived rather than typed — so naming a
+        second project the same thing is a person's business, not an error."""
+        first = (await client.post(f"{API}/projects", json={"name": "Hera"})).json()
+        second = await client.post(f"{API}/projects", json={"name": "Hera"})
+
+        assert second.status_code == 201
+        assert second.json()["slug"] != first["slug"]
+
+    async def test_a_colour_is_kept_and_reported(self, client: AsyncClient) -> None:
+        created = (
+            await client.post(f"{API}/projects", json={"name": "Hera", "color": "laurel"})
+        ).json()
+        assert created["color"] == "laurel"
+
+        patched = (await client.patch(f"{API}/projects/{created['id']}", json={"color": ""})).json()
+        assert patched["color"] == ""
+
+    async def test_a_default_profile_can_be_cleared(self, client: AsyncClient) -> None:
+        """`None` means *no default* on this field, not *leave it*.
+
+        The rest of the patch body follows the opposite convention, which is exactly why this
+        has a test: reading `payload.default_profile_id is not None` made the screen's empty
+        option a no-op, and the control snapped back on the next load with nothing to explain it.
+        """
+        profile = (await client.get(f"{API}/profiles")).json()[0]
+        created = (
+            await client.post(
+                f"{API}/projects", json={"name": "Hera", "default_profile_id": profile["id"]}
+            )
+        ).json()
+        assert created["default_profile_id"] == profile["id"]
+
+        cleared = (
+            await client.patch(f"{API}/projects/{created['id']}", json={"default_profile_id": None})
+        ).json()
+        assert cleared["default_profile_id"] is None
+
+        # And omitting it still means "leave it", which is the convention the field breaks.
+        kept = (await client.patch(f"{API}/projects/{created['id']}", json={"name": "H"})).json()
+        assert kept["default_profile_id"] is None
+
+    async def test_the_agent_seam_is_reported_and_not_writable(self, client: AsyncClient) -> None:
+        """Nothing reads it in v0.2 and nothing may write it, but the screen draws the control
+        from it — so it has to come back, and it has to come back empty."""
+        created = (await client.post(f"{API}/projects", json={"name": "Hera"})).json()
+        assert created["default_agent_id"] is None
+
+        patched = (
+            await client.patch(
+                f"{API}/projects/{created['id']}",
+                json={"default_agent_id": "0f9b1a2c-0000-4000-8000-000000000000"},
+            )
+        ).json()
+        assert patched["default_agent_id"] is None
+
 
 class TestChats:
     async def test_a_new_chat_takes_the_default_profile(self, client: AsyncClient) -> None:
@@ -156,6 +212,45 @@ class TestChats:
         assert response.status_code == 200
         assert response.json()["title"] == "Kerberos"
         assert (await client.get(f"{API}/chats")).json()[0]["title"] == "Kerberos"
+
+    async def test_a_chat_can_be_moved_into_a_project_and_back_out(
+        self, client: AsyncClient
+    ) -> None:
+        """`project_id: null` is a move, not an omission — see ``ChatPatch``. The route reads
+        ``model_fields_set`` rather than testing for ``None``, so both directions work and a
+        patch that never mentions the field leaves it where it was."""
+        project = (await client.post(f"{API}/projects", json={"name": "Hera"})).json()
+        chat = (await client.post(f"{API}/chats", json={})).json()
+        assert chat["project_id"] is None
+
+        moved = (
+            await client.patch(f"{API}/chats/{chat['id']}", json={"project_id": project["id"]})
+        ).json()
+        assert moved["project_id"] == project["id"]
+
+        # A patch about something else must not carry it back out again.
+        renamed = (
+            await client.patch(f"{API}/chats/{chat['id']}", json={"title": "Kerberos"})
+        ).json()
+        assert renamed["project_id"] == project["id"]
+
+        loose = (await client.patch(f"{API}/chats/{chat['id']}", json={"project_id": None})).json()
+        assert loose["project_id"] is None
+
+    async def test_moving_into_a_project_that_is_not_yours_is_a_404(
+        self, client: AsyncClient
+    ) -> None:
+        """`project_id` is a bare UUID with no foreign key, so nothing below this route would
+        notice — and a chat pointing at somebody else's project would show its instructions to
+        the wrong person."""
+        chat = (await client.post(f"{API}/chats", json={})).json()
+
+        response = await client.patch(
+            f"{API}/chats/{chat['id']}",
+            json={"project_id": "0f9b1a2c-0000-4000-8000-000000000000"},
+        )
+
+        assert response.status_code == 404
 
     async def test_skills_can_be_pinned_to_one_chat(
         self, client: AsyncClient, write_skill: WriteSkill

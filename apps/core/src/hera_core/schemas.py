@@ -71,6 +71,8 @@ class ProjectOut(BaseModel):
     instructions: str
     pinned_skills: list[str]
     default_profile_id: UUID | None
+    default_agent_id: UUID | None
+    color: str
     archived: bool
 
     @classmethod
@@ -82,6 +84,8 @@ class ProjectOut(BaseModel):
             instructions=project.instructions,
             pinned_skills=list(project.pinned_skills),
             default_profile_id=project.default_profile_id,
+            default_agent_id=project.default_agent_id,
+            color=project.color or "",
             archived=project.archived,
         )
 
@@ -91,17 +95,29 @@ class ProjectIn(BaseModel):
     instructions: str = ""
     pinned_skills: list[str] = Field(default_factory=list)
     default_profile_id: UUID | None = None
+    color: str = Field(default="", max_length=32)
 
 
 class ProjectPatch(BaseModel):
     """Every field optional. ``None`` means "leave it", which is why nothing here has a
-    meaningful ``None`` value of its own."""
+    meaningful ``None`` value of its own.
+
+    ``default_profile_id`` is the exception and it is handled at the route rather than here: a
+    project *can* stop naming a default, so the route reads ``model_fields_set`` instead of
+    testing for ``None``. See :func:`hera_core.api.projects.update_project`.
+    """
 
     name: str | None = Field(default=None, min_length=1, max_length=120)
     instructions: str | None = None
     pinned_skills: list[str] | None = None
     default_profile_id: UUID | None = None
+    color: str | None = Field(default=None, max_length=32)
     archived: bool | None = None
+
+    # `default_agent_id` is deliberately not here. It is reported on `ProjectOut` so the screen
+    # can show the control filled in, and there is nothing to fill it with until agents exist —
+    # a writable field pointing at a concept with no rows would only let a client store a UUID
+    # that resolves to nothing, which is worse than the control being disabled.
 
 
 class ChatOut(BaseModel):
@@ -137,7 +153,7 @@ class ChatIn(BaseModel):
 
 
 class ChatPatch(BaseModel):
-    """Renaming. ``None`` means "leave it", as everywhere else here.
+    """Renaming, re-pinning, and moving. ``None`` means "leave it", as everywhere else here.
 
     A title typed by hand sticks: :meth:`hera_chats.ChatRepository.touch` only ever names a
     chat that has no name, so the next turn will not quietly rename it back. Clearing it to
@@ -150,6 +166,17 @@ class ChatPatch(BaseModel):
     """Skills switched on for this conversation. The whole list, because it is a set of
     toggles and three endpoints for add, remove and reorder would each have an opinion about
     an order the person can see."""
+
+    project_id: UUID | None = None
+    """Which project this chat lives in. **``None`` does not mean "leave it" here** — it means
+    *loose*, which is a move a person makes deliberately and the only way back out of a project.
+
+    That breaks this module's convention, so the route does not test for ``None``: it asks
+    ``"project_id" in payload.model_fields_set`` and only touches the column when the field was
+    actually sent. The alternative — a sentinel string, or a second endpoint for *remove from
+    project* — would put the tri-state in the wire format, where every client has to know about
+    it, instead of in the one route that cares.
+    """
 
 
 class MessageOut(BaseModel):

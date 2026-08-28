@@ -31,6 +31,7 @@ from hera_chats import (
     ChatRepository,
     Message,
     MessageRepository,
+    Project,
     ProjectRepository,
     Turn,
     TurnContext,
@@ -106,7 +107,7 @@ def read_chat(chat_id: UUID, owner: Owner, db: Db) -> ChatDetail:
 
 @router.patch("/chats/{chat_id}", response_model=ChatOut)
 def update_chat(chat_id: UUID, payload: ChatPatch, owner: Owner, db: Db) -> ChatOut:
-    """Rename a chat, or change which skills are switched on inside it.
+    """Rename a chat, move it between projects, or change which skills are switched on inside it.
 
     Whitespace is stripped from a title, and a title of nothing is allowed: it hands the name
     back to her, since a chat with no title is the one case a finished turn will name.
@@ -114,6 +115,11 @@ def update_chat(chat_id: UUID, payload: ChatPatch, owner: Owner, db: Db) -> Chat
     Pinning here is ADR 5 in the person's hands. Retrieval decides what *might* apply; a pin
     says *use this*, and the turn puts the chat's pins ahead of the profile's and the
     project's — the most specific and the most deliberate of the three.
+
+    Moving is the one field where ``None`` is a value rather than an omission — see
+    :class:`~hera_core.schemas.ChatPatch`. It changes which project's instructions and pins the
+    *next* turn carries and nothing about the turns already taken, which is the honest
+    behaviour: a conversation is a record of what was said under the conditions of the time.
     """
     chat = _require_chat(db, chat_id, owner)
     chats = ChatRepository(db)
@@ -124,6 +130,13 @@ def update_chat(chat_id: UUID, payload: ChatPatch, owner: Owner, db: Db) -> Chat
         # the router as `missing`, which is the useful outcome — refusing it here would mean a
         # skill temporarily moved aside silently loses every pin that named it.
         chats.set_pinned_skills(chat, payload.pinned_skills)
+    if "project_id" in payload.model_fields_set:
+        # Checked, unlike a skill pin: a project is a row this owner either has or does not,
+        # and a chat pointing at somebody else's project would show its instructions to the
+        # wrong person. `project_id` is a bare UUID with no foreign key to catch that.
+        if payload.project_id is not None:
+            _require_project(db, payload.project_id, owner)
+        chat.project_id = payload.project_id
     return ChatOut.of(chats.save(chat))
 
 
@@ -425,3 +438,18 @@ def _require_chat(session: Session, chat_id: UUID, owner: UUID) -> Chat:
     if chat is None or chat.owner_id != owner:
         raise not_found("chat")
     return chat
+
+
+def _require_project(session: Session, project_id: UUID, owner: UUID) -> Project:
+    """A project this owner has, or a 404.
+
+    Deliberately the same answer for *no such project* and *somebody else's project*: the second
+    is the first as far as this owner is concerned, and a 403 would confirm the row exists.
+    ``hera_core.api.projects`` has the same helper for the same reason; they are not shared
+    because a route module importing another route module for one function is how a request
+    layer grows a private API.
+    """
+    project = ProjectRepository(session).get(project_id)
+    if project is None or project.owner_id != owner:
+        raise not_found("project")
+    return project
