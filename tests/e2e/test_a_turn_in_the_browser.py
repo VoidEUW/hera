@@ -11,6 +11,8 @@ from typing import Any
 
 import pytest
 
+from hera_providers import TextDelta, TurnEnd, text_turn, tool_call
+
 playwright = pytest.importorskip(
     "playwright.sync_api", reason="playwright is not installed; run `uv run playwright install`"
 )
@@ -269,3 +271,69 @@ def test_a_file_can_be_attached_and_is_drawn_as_a_chip(page: Any, tmp_path: Any)
     # The chip survives, and the file's contents are not pasted into the bubble.
     assert page.locator("li:has-text('notes.md')").count() >= 1
     assert page.locator("text=Slide 14 contradicts slide 9.").count() == 0
+
+
+ASKING_SCRIPT: list[Any] = [
+    # She asks before answering, which is what the `uncertainty` mind region tells her to do
+    # when being wrong would cost real work. The turn stops here.
+    [
+        TextDelta(text="Before I summarise it — "),
+        tool_call("hera__ask", {"question": "Which deck do you mean?", "kind": "unsure"}),
+        TurnEnd(reason="tool_calls"),
+    ],
+    # And carries on with the reply in hand, as the result of its own call.
+    text_turn("The 2024 one, then: three slides on ticket lifetime."),
+]
+"""Its own script rather than more turns on the shared one: every test starts a fresh provider
+at turn zero, so a question buried at index four would never be reached.
+
+Here rather than in ``conftest.py`` because mypy excludes that file — pytest loads it by path
+and mypy does not — so anything imported from it is invisible to the type checker.
+"""
+
+
+class TestSheAsksAndWaits:
+    """`hera__ask` in a real browser: the turn stops, a card takes a reply, and the answer she
+    was given becomes the result of her own call.
+
+    Its own script, because every test starts a fresh provider at turn zero.
+    """
+
+    @pytest.fixture
+    def script(self) -> list[Any]:
+        """Overrides the fixture in ``conftest.py``, which serves the shared script."""
+        return ASKING_SCRIPT
+
+    def test_a_question_stops_the_turn_and_the_reply_resumes_it(self, page: Any) -> None:
+        composer = page.locator("textarea").first
+        composer.fill("Summarise the deck")
+        composer.press("Enter")
+
+        page.wait_for_url("**/chat/**", timeout=15_000)
+        page.wait_for_selector("text=Which deck do you mean?", timeout=30_000)
+
+        # The stance she asked in, from the same open vocabulary an emotion card draws on.
+        page.wait_for_selector("text=unsure", timeout=5_000)
+
+        # The composer is blocked while the question is open: there is one thing to answer and
+        # two places to type it would be a question about which one counts.
+        assert page.locator("textarea[disabled]").count() >= 1
+
+        reply = page.locator("aside textarea").first
+        reply.fill("The 2024 one.")
+        reply.press("Enter")
+
+        page.wait_for_selector("text=three slides on ticket lifetime", timeout=30_000)
+
+        # One assistant message, not two: she asked, waited, and carried on.
+        assert page.locator("article.hers").count() == 1
+
+        url = page.url
+        page.reload(wait_until="networkidle")
+
+        # The server render is authoritative here too: the settled card comes back with the
+        # reply on it, rather than as a live field asking again.
+        page.wait_for_selector("text=Which deck do you mean?", timeout=15_000)
+        page.wait_for_selector("text=The 2024 one.", timeout=15_000)
+        page.wait_for_selector("text=three slides on ticket lifetime", timeout=15_000)
+        assert page.url == url

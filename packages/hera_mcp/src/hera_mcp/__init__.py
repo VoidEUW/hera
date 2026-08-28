@@ -21,6 +21,7 @@ from __future__ import annotations
 from hera_mcp.emotions import DEFAULT_EMOTIONS, Emotion, Tone, render_emotions
 from hera_mcp.ports import Hit, MemoryWriter, NoteWriter, Searcher, SkillLibrary
 from hera_mcp.server import (
+    ASK_TOOL,
     BUILTIN_SERVER_NAME,
     SEARCH_LIMIT,
     TOOL_NAMES,
@@ -28,6 +29,7 @@ from hera_mcp.server import (
 )
 
 __all__ = [
+    "ASK_TOOL",
     "BUILTIN_SERVER_NAME",
     "DEFAULT_EMOTIONS",
     "SEARCH_LIMIT",

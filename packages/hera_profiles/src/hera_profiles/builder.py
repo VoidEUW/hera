@@ -122,7 +122,26 @@ LAYOUT: tuple[Node, ...] = (
             Node(key="identity.language", title="Language", priority=31, region="language"),
         ),
     ),
-    Node(key="approach", title="Approach", priority=40, region="approach"),
+    Node(
+        key="approach",
+        title="Approach",
+        priority=40,
+        children=(
+            Node(key="approach.method", title="How to work", priority=40, region="approach"),
+            Node(
+                key="approach.uncertainty",
+                title="When you are not sure",
+                priority=41,
+                region="uncertainty",
+            ),
+            Node(
+                key="approach.correction",
+                title="When you are wrong",
+                priority=42,
+                region="correction",
+            ),
+        ),
+    ),
     Node(
         key="emotions",
         title="Emotions",
@@ -178,8 +197,11 @@ message survive any budget, and the things she can look up again — the tool ca
 recalled memories, project context — are what gives way. A skill the router chose sits below
 those, because dropping it silently would defeat the point of choosing it in code.
 
-Two nodes are top-level leaves rather than groups with one child: ``approach`` and ``skills``.
-A group wrapping a single section renders as a tag inside an identical tag and says nothing.
+``skills`` is a top-level leaf rather than a group with one child: a group wrapping a single
+section renders as a tag inside an identical tag and says nothing. ``approach`` was one too
+until ``uncertainty`` and ``correction`` joined it, which is what earned it the group — three
+sections about how she works a problem, kept together so the model reads them as one stance
+rather than as three unrelated paragraphs.
 """
 
 

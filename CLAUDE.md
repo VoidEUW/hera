@@ -43,8 +43,10 @@ endpoint; it never runs in CI.
 domain concept at all and must stay liftable into an unrelated project.
 
 **Two MCP packages, and the difference matters.** `hera_mcp` is the server she *is* —
-`hera__emotion`, `hera__remember`, `hera__note`, `hera__skill`, `hera__search`, and the ports
-the last four take. `hera_tools` is the client she *has*, and it does not know the other exists: it mounts
+`hera__emotion`, `hera__ask`, `hera__remember`, `hera__note`, `hera__skill`, `hera__search`, and
+the ports four of them take. `hera__ask` is the one that is never *run*: `hera_chats` recognises
+it by name (`ChatsSettings.asking_tools`, filled in by the application) and suspends the turn the
+way a permission card does, so a person's reply becomes that call's result. `hera_tools` is the client she *has*, and it does not know the other exists: it mounts
 whatever in-process server the application hands it, under that server's own name. Her tool
 descriptions are prompt text; edit them in `hera_mcp` and her behaviour changes.
 

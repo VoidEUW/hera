@@ -3,11 +3,26 @@
 Where the rebuild stands and what is settled, so a new session can pick up without re-reading
 the history. Updated as milestones land — this file is a snapshot, not a changelog.
 
-**Last updated:** 2026-08-28 · **Version:** v0.2 in progress, M1 landed · **Strategy:** thin spine first, then deepen
+**Last updated:** 2026-08-28 · **Version:** v0.2 in progress · **Strategy:** thin spine first, then deepen
 
 **v0.2 is planned in [versions/v0.2.0.md](versions/v0.2.0.md)** — five milestones, in the order
-*organise → produce → make room → remember → reflect*. M1 (project folders) is done; M2 (artifacts
-and skill resources) is next.
+*organise → produce → make room → remember → reflect*.
+
+Two branches are open, **stacked**, and neither is merged yet:
+
+| Branch | Based on | What is on it |
+|---|---|---|
+| `feat/project-folders` | `main` | **M1.** Projects you can make, rename, remove and move chats between; the project screen at `/project/<id>`; `Select.svelte`, which is now every dropdown in the application |
+| `fix/mind-error-and-uncertainty` | `feat/project-folders` | **Two mind regions the model asked for** — `uncertainty` and `correction` — and `hera__ask`, without which the first of them is advice she cannot act on |
+
+**Stacked rather than independent, and for a concrete reason.** Migration `0004` lives on the
+first, so a `~/.hera` used to review it is stamped `0004`; checking out a branch without that
+revision made alembic refuse to boot with `Can't locate revision identified by '0004'`. Two
+branches that both touch the schema cannot be reviewed against one data directory unless the
+later one contains the earlier. So M1 merges first. `boot.check_home` now catches that class of
+mismatch and says what to do rather than raising alembic's stack trace.
+
+M2 (artifacts and skill resources) is next, and starts from `main` once these land.
 
 ---
 
@@ -54,7 +69,7 @@ packages/hera_storage/    vendored, unchanged in behaviour
 packages/hera_prompts/    vendored, unchanged in behaviour
 packages/hera_providers/  the model boundary: event union, Qwen adapter, transport, FakeProvider
 packages/hera_permissions/ allow · deny · ask, resolved by pattern and profile
-packages/hera_mcp/        the MCP server she *is*: emotion, remember, note, skill, search, and their ports
+packages/hera_mcp/        the MCP server she *is*: emotion, ask, remember, note, skill, search, and their ports
 packages/hera_tools/      the MCP client: server lifecycle, the namespaced catalogue, dispatch
 packages/hera_profiles/   the git-backed mind, behaviour traits, profiles, the PromptBuilder
 packages/hera_skillsets/  SKILL.md packages, the router, usage counts
@@ -109,8 +124,11 @@ Two things worth knowing before building on the foundation:
   unwired copy of her server when given none; a default that quietly mounts four tools is
   something you discover from a catalogue listing rather than from the call site, and it is
   gone. Nothing is mounted unless the application mounts it.
-- **The tools are `emotion`, `remember`, `note`, `skill` and `search`** — `hera__*` once the
-  client namespaces them, and `TOOL_NAMES` says so in code. Three are wired in v0.1: `emotion`
+- **The tools are `emotion`, `ask`, `remember`, `note`, `skill` and `search`** — `hera__*` once
+  the client namespaces them, and `TOOL_NAMES` says so in code. `ask` is the one that is never
+  *run*: `hera_chats` recognises it by name before dispatch and suspends the turn, and the body on
+  the server refuses, which is what a caller reaching it from outside a turn deserves to be told.
+  Three were wired in v0.1: `emotion`
   needs nothing, `skill` reaches `hera_skillsets` through a port, and `search` reaches
   DuckDuckGo through another. `remember` waits for `hera_memories` and `note` for somewhere to
   put a document; both are still listed and answer "not available in this deployment", because
@@ -169,6 +187,19 @@ the model and the tool is a stub.
 
 ### What `hera_profiles` settled
 
+- **Fourteen regions, and the last two were the model's idea.** Asked to read its own prompt, it
+  reported two gaps in the same shape: nothing said what to do when it is **unsure** of an
+  answer, and nothing said what to do when it notices mid-task that it is **on the wrong track**.
+  Both are behaviours it will have anyway — every model has some default for them — and a default
+  that is nowhere in the mind is one nobody can find and nobody can change, which is the argument
+  that gave `language` its own region. They sit under `approach` rather than under `conduct`,
+  because being unsure and being wrong are part of *how she works a problem* rather than of what
+  she will and will not do; that also makes them evolvable, which is right, since the useful
+  version of "when should I ask?" is learned from conversations that went badly. `approach` became
+  a group to hold the three.
+- **`uncertainty` is half a sentence without `hera__ask`.** Telling her to ask when a question is
+  worth asking, with no mechanism to ask one, produces a model that announces its confusion and
+  then guesses anyway. The two shipped together for that reason.
 - **Twelve regions, and which twelve has moved.** `grammar` is gone: it described the
   EMOTION/NOTE/TRACE/CALL text format that ADR 2 deleted, and shipping it would invite the model
   to use a call syntax nothing parses. `mem_overview` folded into `memory_instr`, and `mem_ex`
@@ -242,6 +273,19 @@ wrote.
   `TurnContext.resume`. A turn holding an SSE response open waiting for a person dies with the
   tab. A resumed turn does not re-route skills and does not re-stream what the client already
   has.
+- **Two things suspend a turn now, through one mechanism.** `hera__ask` closes it with
+  `awaiting_answer` and `AnswerRequired`; replying resumes the same message and the reply becomes
+  that call's `tool_result`, so nothing on the model's side of the loop learns a person was in
+  it. `docs/tooling.md` § 4 argued for generalising the permission path rather than building a
+  second suspension beside it, and this is that — the only new machinery is a reply field.
+- **The turn does not know `hera__ask` exists.** It takes `ChatsSettings.asking_tools` and
+  suspends on a *name*; `apps/core` fills it in from `hera_mcp.ASK_TOOL`. A deployment that
+  configures nothing runs the tool like any other and the server refuses it, which is the honest
+  degradation. `hera_chats` naming a tool on her own server would be this package learning what
+  Hera is.
+- **The calls beside a question are dropped rather than run.** She asked and stopped; running the
+  rest would act on the assumption the question was about. History already says a call with no
+  result never ran, so the model reads it correctly on resume.
 - **Nothing raises into the caller's loop**, and there is no error module at all. A dead
   provider, a broken stream, a runaway tool loop: each closes the turn with a reason.
   `Turn.recorded` is correct at every moment, so a cancelled turn keeps the text that arrived.
@@ -406,6 +450,19 @@ wrote.
   everything else was bare native. The rail's `⋯` menus share the frame. Popups are anchored
   popovers with no scrim — the skill picker is a sheet because choosing skills is a task you go and
   do, and picking one value from four is not.
+- **A question is drawn once too, out of three events.** The `hera__ask` call, the
+  `answer_required` card and the synthesised `tool_result` are all about the same question, and
+  only the card is a thing a person is meant to read. `QuestionCard` is `PermissionCard` with a
+  field instead of buttons — same inline placement, same settled state read from a persisted
+  event (`answer_given`) rather than inferred from what turned up afterwards.
+- **`busy` and `blocked` are different questions, and conflating them was a bug.** Both this file
+  and `docs/tooling.md` claimed the composer "already blocks while `awaiting` is non-empty".
+  Nothing read that field. Sending past an open card writes a fresh assistant row, and the resume
+  routes work from `latest_assistant` — so the suspended turn was orphaned and its card could
+  never be answered. The composer is now closed while a card is open, and the card's own controls
+  stay live, which is why the two cannot be one flag. `busy` still only decides send-versus-Stop:
+  a suspended turn is not a running one, and offering **Stop** for something that already stopped
+  is a lie about what is happening.
 
 ### What the settings rework settled
 

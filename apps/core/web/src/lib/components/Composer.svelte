@@ -25,7 +25,13 @@
 
 	interface Props {
 		placeholder?: string;
+		/** A turn is streaming. Swaps send for **Stop**, which is the only thing this decides —
+		 * it is about something being *in flight*, not about whether you may type. */
 		busy?: boolean;
+		/** The composer may not take a new message: a turn is running, or a card is open waiting
+		 * on you. Kept apart from `busy` because a suspended turn is not a running one, and
+		 * offering **Stop** for something that already stopped is a lie about what is happening. */
+		blocked?: boolean;
 		autofocus?: boolean;
 		profiles?: Profile[];
 		profileId?: string | null;
@@ -49,6 +55,7 @@
 	let {
 		placeholder = t.composer.placeholder,
 		busy = false,
+		blocked = false,
 		autofocus = false,
 		profiles = [],
 		profileId = null,
@@ -115,7 +122,7 @@
 	const model = $derived(providers.find((entry) => entry.name === activeProvider) ?? null);
 
 	function submit() {
-		if (!sendable || busy) return;
+		if (!sendable || blocked) return;
 		onsend?.(text, attached);
 		text = '';
 		attached = [];
@@ -180,18 +187,26 @@
 	{/each}
 
 	<div class="field">
+		<!-- Disabled while a turn is running or a card is open. The second case is the one that
+		     matters: sending past an open card writes a fresh assistant row, and the resume
+		     routes work from the latest one — so the suspended turn would be orphaned and its
+		     question could never be answered. `submit()` refuses too, because a disabled field
+		     is a hint and not a guarantee. -->
 		<textarea
 			bind:this={field}
 			bind:value={text}
 			{placeholder}
 			{onkeydown}
 			rows="1"
+			disabled={blocked}
 			aria-label={placeholder}
 		></textarea>
 
 		<!-- Beside the first line rather than under the bar, and gone the moment there is
 		     something to send: it is the one thing here that a person needs exactly once. -->
-		<span class="hint caption" class:gone={Boolean(text)}>{t.composer.hint}</span>
+		<!-- Gone once there is something to send, and gone while the field is closed: a hint
+		     about how to send in a box you cannot type in is instructions for nothing. -->
+		<span class="hint caption" class:gone={Boolean(text) || blocked}>{t.composer.hint}</span>
 	</div>
 
 	<div class="bar">
@@ -260,7 +275,7 @@
 		{#if busy}
 			<button class="send stop" type="button" onclick={() => onstop?.()}>{t.composer.stop}</button>
 		{:else}
-			<button class="send" type="button" disabled={!sendable} onclick={submit}>
+			<button class="send" type="button" disabled={!sendable || blocked} onclick={submit}>
 				<span class="sr-only">{t.composer.send}</span>
 				<span aria-hidden="true">↑</span>
 			</button>
@@ -360,6 +375,13 @@
 
 	textarea:focus {
 		outline: none;
+	}
+
+	/* Kept legible rather than greyed out. Whatever was half-typed is still yours, and the
+	   reason you cannot send it is a card on screen a few lines up. */
+	textarea:disabled {
+		color: var(--text-muted);
+		cursor: default;
 	}
 
 	textarea::placeholder {

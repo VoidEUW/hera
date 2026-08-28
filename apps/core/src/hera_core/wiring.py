@@ -30,7 +30,7 @@ from hera_core.config import load as load_config
 from hera_core.search import DuckDuckGo
 from hera_core.settings import CoreSettings
 from hera_home import mind_dir, skills_dir
-from hera_mcp import build_builtin_server
+from hera_mcp import ASK_TOOL, BUILTIN_SERVER_NAME, build_builtin_server
 from hera_permissions import Decision, PermissionSet, Policy, Rule
 from hera_profiles import MindRepository, PromptBuilder
 from hera_providers import OpenAICompatibleProvider, Provider, ProviderSettings
@@ -200,6 +200,14 @@ def build_services(
             builder=builder,
             router=router,
             registry=registry,
-            settings=ChatsSettings(model=provider_settings.model),
+            settings=ChatsSettings(
+                model=provider_settings.model,
+                # The one place her `ask` tool is named to the turn layer. `hera_chats` does
+                # not know what a Hera tool is and must not learn; it takes the qualified name
+                # and suspends on it, the way it takes a policy rather than a list of rules.
+                # Qualified here because `hera_tools` namespaces by server name, and that name
+                # travels on the server object rather than being written twice.
+                asking_tools=(f"{BUILTIN_SERVER_NAME}__{ASK_TOOL}",),
+            ),
         ),
     )

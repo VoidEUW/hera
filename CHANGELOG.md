@@ -40,6 +40,21 @@ section fills in as milestones land.
   each theme resolves it to its own value and a hue picked in the dark is still legible on vellum.
 - **A seam for agent selection.** `Project.default_agent_id` is a column nothing reads, drawn as a
   disabled control saying v0.3 — the same call Settings → Dreaming makes.
+- **She can ask you something and wait for the answer.** `hera__ask(question, kind)` stops the
+  turn, draws a card with a reply field where she asked, and resumes the *same* assistant message
+  with what you typed as the result of her own call — so nothing on the model's side of the loop
+  learns a person was in it. Deliberately the permission card's machinery rather than a second
+  suspension beside it ([docs/tooling.md](docs/tooling.md) § 4): a new close reason
+  (`awaiting_answer`), two event variants, and `POST /chats/{id}/answers`. `hera_chats` does not
+  know the tool exists — it suspends on a name it is given.
+- **Two mind regions, and the model asked for both.** Reading its own prompt it reported two gaps
+  in the same shape: nothing said what to do when it is **unsure** of an answer, and nothing said
+  what to do when it notices mid-task that it is **on the wrong track**. Both are behaviours it
+  has anyway, and a default that is nowhere in the mind is one nobody can find and nobody can
+  change. `uncertainty` and `correction` join `approach`, which became a group to hold the three.
+  Evolvable, because the useful version of *when should I ask?* is learned from conversations that
+  went badly. `uncertainty` and `hera__ask` shipped together: telling her to ask, with no way to,
+  produces a model that announces its confusion and guesses anyway.
 - **One selector, and one popup.** `Select.svelte` replaces every dropdown in the application. The
   trigger is the composer's pill — the shape that was already right — and the popup is the *skill
   picker's*: raised surface, hairline, large radius, the same shadow, a brass check on the chosen
@@ -55,6 +70,12 @@ section fills in as milestones land.
   `default_profile_id is not None`, which is right for every other field on that body and wrong for
   this one: choosing the screen's empty option was a no-op, and the control snapped back on the
   next load with nothing to explain it.
+- **The composer did not block while a card was waiting on you**, though two documents said it
+  did — nothing read that field. Sending past an open card wrote a fresh assistant row, and the
+  resume routes work from the latest one, so the suspended turn was orphaned and its permission
+  card or question could never be answered. `busy` and `blocked` are now separate, because the
+  card's own controls must stay live while the composer does not — and because offering **Stop**
+  for a turn that already stopped is a lie about what is happening.
 
 ### Still to come in this version
 

@@ -330,6 +330,22 @@ class PermissionAnswer(BaseModel):
     once** afterwards, or nobody can tell whether the decision stuck."""
 
 
+class QuestionAnswer(BaseModel):
+    """A person's reply to a question she asked.
+
+    One call, not a list, which is where this differs from :class:`PermissionAnswer`: several
+    permissions can be settled with one click because the answer is the same word, and two
+    questions cannot — each wants its own sentence. The turn only ever poses one at a time for
+    the same reason.
+    """
+
+    call_id: str = Field(min_length=1)
+    text: str = Field(max_length=8000)
+    """What they typed. May be empty: saying nothing is an answer, and she is told so rather
+    than being left waiting. Capped because it becomes a tool result inside the next prompt,
+    and an unbounded paste there is a context window spent without anybody choosing to."""
+
+
 class EmotionOut(BaseModel):
     """One stance, as the Emotions screen and the emotion card see it."""
 

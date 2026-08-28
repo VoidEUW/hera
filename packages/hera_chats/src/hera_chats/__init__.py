@@ -18,6 +18,8 @@ from __future__ import annotations
 from hera_chats.events import (
     CHAT_EVENT_ADAPTER,
     LIST_ADAPTER,
+    AnswerGiven,
+    AnswerRequired,
     ChatEvent,
     CloseReason,
     PermissionDecided,
@@ -52,6 +54,8 @@ from hera_chats.turn import Turn, TurnContext, TurnOrchestrator
 __all__ = [
     "CHAT_EVENT_ADAPTER",
     "LIST_ADAPTER",
+    "AnswerGiven",
+    "AnswerRequired",
     "Attachment",
     "Chat",
     "ChatEvent",

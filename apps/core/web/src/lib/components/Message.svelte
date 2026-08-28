@@ -15,14 +15,20 @@
 	 * edit itself: you can see the answer you are about to replace while you retype the
 	 * question.
 	 */
-	import type { AnyEvent, PermissionRequired, ToolCallReady } from '$lib/api/events';
+	import type {
+		AnswerRequired,
+		AnyEvent,
+		PermissionRequired,
+		ToolCallReady
+	} from '$lib/api/events';
 	import { size } from '$lib/attachments';
 	import { t } from '$lib/i18n';
-	import { isAnswered, reduce } from '$lib/turn';
+	import { isAnswered, reduce, replyTo } from '$lib/turn';
 	import ActivityRow from './ActivityRow.svelte';
 	import EmotionCard from './EmotionCard.svelte';
 	import Ocellus from './Ocellus.svelte';
 	import PermissionCard from './PermissionCard.svelte';
+	import QuestionCard from './QuestionCard.svelte';
 	import Prose from './Prose.svelte';
 
 	interface Props {
@@ -38,6 +44,8 @@
 		streaming?: boolean;
 		busy?: boolean;
 		onanswer?: (callId: string, allow: boolean, remember: boolean) => void;
+		/** Reply to a question she asked. The turn resumes with the words as that call's result. */
+		onreply?: (callId: string, text: string) => void;
 		/** Ask again from this message. Text rewords the question; nothing repeats it. */
 		onredo?: (text?: string) => void;
 	}
@@ -50,6 +58,7 @@
 		streaming = false,
 		busy = false,
 		onanswer,
+		onreply,
 		onredo
 	}: Props = $props();
 
@@ -202,6 +211,14 @@
 					decided={decision(card.call_id)}
 					{busy}
 					onanswer={(allow, remember) => onanswer?.(card.call_id, allow, remember)}
+				/>
+			{:else if item.kind === 'question'}
+				{@const card = item.event as AnswerRequired}
+				<QuestionCard
+					{card}
+					reply={isAnswered(events, card.call_id) ? replyTo(events, card.call_id) : null}
+					{busy}
+					onreply={(text) => onreply?.(card.call_id, text)}
 				/>
 			{/if}
 		{/each}

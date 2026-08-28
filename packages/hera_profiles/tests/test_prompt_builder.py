@@ -137,7 +137,11 @@ class TestProfiles:
     ) -> None:
         prompt = builder.build(profile(overrides={"approach": "Write the test first."}))
 
-        section = prompt.get("approach")
+        # Keyed by *region id* on the way in and by *section key* on the way out, and the two
+        # stopped being the same string when `approach` became a group: the region is still
+        # `approach` and its text now renders at `approach.method`. Worth asserting both, since
+        # a profile's overrides are stored by region id and a rename there would orphan them.
+        section = prompt.get("approach.method")
         assert section is not None and section.content is not None
         assert "Write the test first." in section.content
         assert "Write the test first." not in mind.read("approach")

@@ -45,7 +45,16 @@ whatever it is handed under ``server.name``, so this constant is the only place 
 written and renaming her server does not need the client's permission.
 """
 
-TOOL_NAMES = ("emotion", "remember", "note", "skill", "search")
+ASK_TOOL = "ask"
+"""The one tool here that is answered by a *person* rather than run.
+
+Named as a constant because the layer that suspends the turn has to recognise it, and that
+layer is ``hera_chats``, which does not import this package and must not learn what her tools
+are. The application reads this and configures ``ChatsSettings.asking_tools`` with the
+qualified name, so the string is written once and travels rather than being agreed on twice.
+"""
+
+TOOL_NAMES = ("emotion", "ask", "remember", "note", "skill", "search")
 """What this server offers, in the order they were added. Qualified, that is ``hera__emotion``
 and its siblings — the ones a catalogue reports for the ``hera`` server, which is the question
 a settings screen showing "5 tools" leaves a person asking."""
@@ -95,6 +104,32 @@ def build_builtin_server(
         it. Returning anything substantial would only spend tokens on the way back in.
         """
         return "shown"
+
+    # The one tool on this server that is *not* run. `hera_chats` recognises it before dispatch,
+    # records the question, and closes the turn the way a permission card closes it -- so the
+    # answer that comes back is a person's words, and this body is only reached when something
+    # calls it outside a turn.
+    @server.tool(
+        name=ASK_TOOL,
+        title="Ask the person a question",
+        description=(
+            "Ask the person something and wait for their answer. This stops your turn: they "
+            "see your question, type a reply, and you continue with it. Use it when being "
+            "wrong would cost them real work -- a fact only they have, two readings of the "
+            "request that lead somewhere genuinely different, or something hard to undo. Do "
+            "not use it to be reassured, to ask what you could look up, or to check in; and "
+            "ask one question rather than a list. If you can sensibly choose and say what you "
+            "chose, do that instead."
+        ),
+    )
+    async def ask(question: str, kind: str = "unsure") -> str:
+        # Reached only when this server is driven directly -- over the transport v0.3 exposes,
+        # or by a test. Inside a turn the question never gets here. Saying so plainly beats
+        # returning something that looks like an answer nobody gave.
+        raise ToolError(
+            "this question was not put to anybody: `ask` suspends a turn so a person can "
+            "reply, and nothing here is running one"
+        )
 
     @server.tool(
         name="remember",

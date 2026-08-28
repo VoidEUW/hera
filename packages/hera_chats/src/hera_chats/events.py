@@ -33,6 +33,7 @@ CloseReason = Literal[
     "completed",
     "cancelled",
     "awaiting_permission",
+    "awaiting_answer",
     "max_iterations",
     "failed",
 ]
@@ -42,6 +43,12 @@ Wider than the provider's ``FinishReason`` because more can happen to a turn tha
 generation: it can be waiting for a person, or have gone round the tool loop too many times.
 ``awaiting_permission`` is not a failure — the turn is intact and resumable, and the interface
 shows a card rather than an error.
+
+``awaiting_answer`` is the same shape and a different question. A permission card asks *may
+I?*; an answer card asks something she wants to know, and the reply is prose rather than a
+yes. Two reasons rather than one so the interface can say which is being waited on without
+looking at the events before it — and because a turn stopped on a question is not one the
+person can settle by clicking *allow*.
 """
 
 
@@ -128,6 +135,47 @@ class PermissionDecided(BaseModel):
     visibly different from **Allow once** afterwards, or nobody can tell whether it stuck."""
 
 
+class AnswerRequired(BaseModel):
+    """She asked the person something. The turn stops here until they reply.
+
+    The second thing that can suspend a turn, and deliberately the *same* mechanism as the
+    first: the turn closes, the events are persisted, and replying starts a new turn that
+    resumes the same message. ``docs/tooling.md`` § 4 argued for generalising the permission
+    path rather than building a second suspension beside it, and this is that — the only new
+    machinery is a reply field instead of two buttons.
+
+    The reply becomes the ``tool_result`` for ``call_id``, which is what lets her carry on
+    reading it as an ordinary answer to an ordinary call. Nothing about the model's side of the
+    loop knows a person was involved.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    type: Literal["answer_required"] = "answer_required"
+    call_id: str
+    tool: str
+    question: str
+    kind: str = ""
+    """Her stance while asking, from the same open vocabulary ``hera__emotion`` draws on (ADR
+    3). Free text, and an unknown one renders generically — *unsure* and *blocked* are
+    different questions and the card is allowed to say which."""
+
+
+class AnswerGiven(BaseModel):
+    """A person replied to an :class:`AnswerRequired`.
+
+    Recorded for the reason :class:`PermissionDecided` is: a reloaded turn has to show a
+    settled card rather than a live reply field. Inferring it from whether a ``tool_result``
+    turned up later would be a rule about event ordering living in the browser.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    type: Literal["answer_given"] = "answer_given"
+    call_id: str
+    text: str
+
+
 class TurnClosed(BaseModel):
     """The turn is over. Exactly one, always last."""
 
@@ -153,6 +201,8 @@ ChatEvent = Annotated[
     | ToolResultEvent
     | PermissionRequired
     | PermissionDecided
+    | AnswerRequired
+    | AnswerGiven
     | TurnClosed,
     Field(discriminator="type"),
 ]

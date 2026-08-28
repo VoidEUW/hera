@@ -25,10 +25,11 @@ would be a turn that dies with the tab.
 from __future__ import annotations
 
 import asyncio
-from collections.abc import AsyncGenerator, AsyncIterator, Sequence
+from collections.abc import AsyncGenerator, AsyncIterator, Mapping, Sequence
 from dataclasses import dataclass, field
 
 from hera_chats.events import (
+    AnswerRequired,
     ChatEvent,
     CloseReason,
     PermissionRequired,
@@ -112,6 +113,15 @@ class TurnContext:
     denied: Sequence[str] = ()
     """Call ids a person has just refused. Refused calls still get a result — the model is
     told it was not allowed, which is what lets it try something else instead of hanging."""
+
+    answers: Mapping[str, str] = field(default_factory=dict)
+    """Replies to questions she asked, by call id.
+
+    The other half of :attr:`confirmed`. A confirmed call is *run* and its result comes from a
+    tool; an answered one is not run at all and its result is what the person typed. Both
+    arrive the same way — on a resumed turn, keyed by the call they settle — so the loop below
+    handles them in one place.
+    """
 
     attachments: Sequence[Attachment] = ()
     """Files sent with this message. Composed into the user turn by :func:`content_of`, which
@@ -255,6 +265,29 @@ class Turn:
                     )
                 yield self._close(
                     "awaiting_permission", usage=total if reported else None, iterations=iteration
+                )
+                return
+
+            # A question is checked after permission and before dispatch. After, because a
+            # deployment that made `ask` itself confirmable should still get its card; before,
+            # because the whole point is that it is never dispatched.
+            asked = self._asked(round_.calls)
+            if asked:
+                for call in asked:
+                    yield self._record(
+                        AnswerRequired(
+                            call_id=call.id,
+                            tool=call.name,
+                            question=_text_argument(call, "question"),
+                            kind=_text_argument(call, "kind"),
+                        )
+                    )
+                # The calls beside it are dropped rather than run. She asked a question and
+                # stopped; running the rest would act on the assumption the question was about.
+                # They are never sent to the model either, because the resumed turn rebuilds
+                # history from the event list and there is no result for them in it.
+                yield self._close(
+                    "awaiting_answer", usage=total if reported else None, iterations=iteration
                 )
                 return
 
@@ -406,16 +439,36 @@ class Turn:
                 blocked.append((call, outcome.reason))
         return blocked
 
+    def _asked(self, calls: Sequence[ToolCallReady]) -> list[ToolCallReady]:
+        """Calls that are questions for a person rather than work for a tool.
+
+        Recognised by name, from :attr:`ChatsSettings.asking_tools`, which the application
+        fills in — this package does not know that ``hera__ask`` exists. A call already
+        answered is not asked again, which is what stops a resumed turn from re-posing the
+        question it was resumed to settle.
+        """
+        if not self._settings.asking_tools:
+            return []
+        answered = set(self.context.answers)
+        wanted = set(self._settings.asking_tools)
+        return [call for call in calls if call.name in wanted and call.id not in answered]
+
     async def _answer(self, calls: Sequence[ToolCallReady]) -> AsyncIterator[ChatEvent]:
         """Run a batch of calls in parallel and record what came back.
 
         Parallel because the model emits parallel calls and a turn's worth of emotions is the
         everyday case (ADR 3). Running them one after another turns one round-trip into four.
+
+        A call a person *answered* is not run at all: their words become its result, so the
+        model reads a reply to its question in exactly the place a tool's output would have
+        been. That is the whole trick — nothing on the model's side of the loop learns that a
+        human was in it.
         """
         refused = set(self.context.denied)
+        replied = self.context.answers
         results = []
 
-        runnable = [call for call in calls if call.id not in refused]
+        runnable = [call for call in calls if call.id not in refused and call.id not in replied]
         if runnable and self._registry is not None:
             results = await self._registry.dispatch_all(
                 [
@@ -428,6 +481,9 @@ class Turn:
 
         by_id = {result.call_id: result for result in results}
         for call in calls:
+            if call.id in replied:
+                yield self._record(_answered(call, replied[call.id]))
+                continue
             result = by_id.get(call.id)
             if result is None:
                 yield self._record(_refused(call, configured=self._registry is not None))
@@ -446,8 +502,14 @@ class Turn:
             )
 
     def _resumed_calls(self) -> list[ToolCallReady]:
-        """Calls from the paused turn that a person has now answered."""
-        answered = {*self.context.confirmed, *self.context.denied}
+        """Calls from the paused turn that a person has now settled.
+
+        Three ways to settle one, and they arrive on the same footing: allowed, refused, or
+        replied to. The first two are dispatched, the third is not — :meth:`_answer` decides
+        which — but all three have to be picked back out of the paused half of the message
+        before anything else happens, or the model is asked again with the question still open.
+        """
+        answered = {*self.context.confirmed, *self.context.denied, *self.context.answers}
         settled = {
             event.call_id for event in self.context.resume if isinstance(event, ToolResultEvent)
         }
@@ -533,6 +595,37 @@ def _split_frame(messages: Sequence[FrameMessage]) -> tuple[list[ChatMessage], l
         target = tail if role is Role.USER else head
         target.append(ChatMessage(role=role, content=message.content))
     return head, tail
+
+
+def _text_argument(call: ToolCallReady, name: str) -> str:
+    """One string argument off a call, or ``""``.
+
+    Tolerant on purpose. These arguments are written by a model and reach the *card* rather
+    than a tool, so there is nothing downstream to validate them: a missing ``question`` is a
+    card with no question on it, which reads as a bug, and a card is a worse place to raise
+    than anywhere else in the turn. The caller has already recorded the call, so what the model
+    actually sent is on screen either way.
+    """
+    value = call.arguments.get(name)
+    return value.strip() if isinstance(value, str) else ""
+
+
+def _answered(call: ToolCallReady, text: str) -> ToolResultEvent:
+    """A person's reply, shaped as the result of the call that asked for it.
+
+    ``ok=True``: they answered, and that is a success even when the answer is *no* or *I do not
+    know*. Failing the call for an unwelcome answer would tell the model its question was
+    broken rather than that it now has one.
+    """
+    said = text.strip()
+    return ToolResultEvent(
+        call_id=call.id,
+        tool=call.name,
+        ok=True,
+        # Attributed, because it lands in the same slot a tool's output would and the model
+        # should not have to infer which of the two it is reading.
+        text=said or "they replied with nothing — take it as no answer and carry on",
+    )
 
 
 def _refused(call: ToolCallReady, *, configured: bool) -> ToolResultEvent:

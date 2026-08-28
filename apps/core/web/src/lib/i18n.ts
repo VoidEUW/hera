@@ -122,6 +122,14 @@ export const t = {
 		denied: 'Denied'
 	},
 
+	question: {
+		asked: 'asked you',
+		nothing: 'She asked something, and it arrived empty.',
+		placeholder: 'Answer…',
+		noReply: 'You answered with nothing.',
+		send: 'Reply'
+	},
+
 	message: {
 		copy: 'Copy',
 		copied: 'Copied',
@@ -138,7 +146,8 @@ export const t = {
 		cancelled: 'Interrupted',
 		failed: 'This turn failed',
 		max_iterations: 'She stopped after using tools too many times',
-		awaiting_permission: 'Waiting for you'
+		awaiting_permission: 'Waiting for you',
+		awaiting_answer: 'Waiting for your answer'
 	},
 
 	emotions: {

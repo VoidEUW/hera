@@ -16,6 +16,7 @@ import threading
 import time
 from collections.abc import Iterator
 from pathlib import Path
+from typing import Any
 
 import pytest
 import uvicorn
@@ -73,8 +74,17 @@ def built_interface() -> Path:
 
 
 @pytest.fixture
+def script() -> list[Any]:
+    """What the model says, turn by turn. Overridden by a test that needs a different one."""
+    return SCRIPT
+
+
+@pytest.fixture
 def server(
-    built_interface: Path, tmp_path_factory: pytest.TempPathFactory, monkeypatch: pytest.MonkeyPatch
+    built_interface: Path,
+    tmp_path_factory: pytest.TempPathFactory,
+    monkeypatch: pytest.MonkeyPatch,
+    script: list[Any],
 ) -> Iterator[str]:
     """A real server on a free port, with its own data directory.
 
@@ -100,7 +110,7 @@ def server(
     monkeypatch.setenv("HERA_STORAGE_URL", f"sqlite:///{home / 'hera.sqlite3'}")
 
     settings = CoreSettings()
-    services = build_services(settings, provider=FakeProvider(SCRIPT), registry=None)
+    services = build_services(settings, provider=FakeProvider(script), registry=None)
     prepare(services.database, services.mind, owner_id=settings.owner_id)
 
     port = free_port()

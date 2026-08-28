@@ -11,6 +11,7 @@
 import {
 	api,
 	answerPermission,
+	answerQuestion,
 	redoMessage,
 	sendMessage,
 	type Chat,
@@ -49,6 +50,21 @@ export class ChatSession {
 
 	get busy() {
 		return this.streaming || this.pending !== null;
+	}
+
+	/** Whether the composer may take a new message.
+	 *
+	 * Not the same as `busy`, and the difference is load-bearing: a card is open *because* the
+	 * turn stopped, so its own buttons and reply field must stay live while the composer does
+	 * not. Passing `busy` to both would disable the very control the turn is waiting on.
+	 *
+	 * Blocking here is a correctness fix rather than a nicety. Sending a new message writes a
+	 * fresh assistant row, and the resume routes work from `latest_assistant` — so a message
+	 * typed past an open card orphans the suspended turn, and the question or the permission it
+	 * stopped on can never be answered again.
+	 */
+	get blocked() {
+		return this.busy || this.awaiting.length > 0;
 	}
 
 	async open(id: string) {
@@ -132,6 +148,15 @@ export class ChatSession {
 		if (!this.chat || this.streaming) return;
 		await this.#consume(() =>
 			answerPermission(this.chat!.id, { call_ids: callIds, allow, remember }, this.#begin())
+		);
+	}
+
+	/** Reply to a question she asked. The same resume as a permission answer, through the same
+	 * `#consume`, because it is the same suspension with a different card on it. */
+	async reply(callId: string, text: string) {
+		if (!this.chat || this.streaming) return;
+		await this.#consume(() =>
+			answerQuestion(this.chat!.id, { call_id: callId, text }, this.#begin())
 		);
 	}
 

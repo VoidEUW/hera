@@ -142,6 +142,39 @@ those two it is.
 
 ---
 
+## 4. `hera__emotion` should be able to ask — ✅ done
+
+**Built, as `hera__ask` rather than as a flag**, and it did generalise the permission path rather
+than sitting beside it — which is what the rest of this section argued for and is the part worth
+keeping. What was decided, against the open questions below:
+
+- **A separate tool, not an argument.** `hera__ask(question, kind)`. The reasoning below holds:
+  descriptions are prompt text and one clear sentence beats a conditional.
+- **Asking ends the turn**, exactly as a permission card does. `AnswerRequired` closes the turn
+  with `awaiting_answer`, the events persist, and `POST /chats/{id}/answers` resumes the *same*
+  assistant message. The reply becomes the `tool_result` for that call — so nothing on the
+  model's side of the loop learns a person was in it.
+- **Nothing new suspends a turn.** `hera_chats` does not know `hera__ask` exists: it takes
+  `ChatsSettings.asking_tools`, and the application fills it in from `hera_mcp.ASK_TOOL`. A
+  deployment that configures nothing runs the tool normally, and the server refuses it.
+- **Nobody answering is the permission path's answer.** The turn is closed and resumable; there
+  are no timeouts.
+- **What it costs when overused** is answered in the mind rather than in code — the `uncertainty`
+  region says when a question is worth asking, and it is evolvable, so the useful version is
+  learned from conversations that went badly.
+- **Laurel, not brass.** Brass is authority: *this needs a decision*. A question is her turning
+  towards you, which is the emotion card's register.
+
+**One thing this uncovered.** Both this section and `docs/status.md` said the composer "already
+blocks while `awaiting` is non-empty". It did not — nothing read that field. Sending past an open
+card writes a fresh assistant row, and the resume routes work from `latest_assistant`, so the
+suspended turn was orphaned and its card could never be answered. Fixed with the feature, and
+`busy` and `blocked` are now separate: a suspended turn is not a running one, and offering
+**Stop** for something that already stopped is a lie about what is happening.
+
+<details>
+<summary>The original argument, kept for the reasoning</summary>
+
 ## 4. `hera__emotion` should be able to ask
 
 Today `emotion` is a statement: she shows a stance, the card renders, the tool returns `"shown"`
@@ -175,6 +208,8 @@ What has to be decided:
   same shape as a permission card.
 - **What does it cost when she overuses it?** `emotion` is described as something to call often.
   An asking version described the same way turns every answer into an interview.
+
+</details>
 
 ---
 
@@ -238,7 +273,7 @@ mojibake problem again in a new coat. It should say what it could not read.
    cannot read it, which is a worse place to stop than either end.
 2. **PDFs**, because it is scoped for v0.1.0 and is a day's work in the browser.
 3. **The scratchpad**, which unblocks artifacts by answering where a document lives.
-4. **Asking emotions**, once someone has decided whether it generalises the permission path or
-   sits beside it. It should generalise it.
+4. ~~**Asking emotions**~~ — done, as `hera__ask`. It generalised the permission path, which is
+   what § 4 said it should.
 5. **Artifacts**, which needs a design document of its own before it needs a branch.
 6. **`hera_code_mcp` and `hera_sandbox`**, which are v0.2 and should not be started early.

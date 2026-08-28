@@ -20,7 +20,7 @@
  */
 
 import type { AnyEvent, ChatEvent, ToolCallReady, ToolResultEvent } from './api/events';
-import { isEmotion } from './api/events';
+import { isAsk, isEmotion } from './api/events';
 
 /** A row in the activity gutter: something she did before or between speaking. */
 export interface Activity {
@@ -41,7 +41,7 @@ export interface Activity {
 
 /** Something that renders in the flow of the answer, where she put it. */
 export interface Inline {
-	kind: 'prose' | 'emotion' | 'permission';
+	kind: 'prose' | 'emotion' | 'permission' | 'question';
 	key: string;
 	text?: string;
 	event?: AnyEvent;
@@ -52,8 +52,14 @@ export interface Turn {
 	inline: Inline[];
 	/** The one terminator. `null` while the turn is still running. */
 	closed: Extract<ChatEvent, { type: 'turn_closed' }> | null;
-	/** Calls waiting on a person. The composer is blocked while this is non-empty. */
-	awaiting: Extract<ChatEvent, { type: 'permission_required' }>[];
+	/** Calls waiting on a person. The composer is blocked while this is non-empty.
+	 *
+	 * Both kinds of waiting, because the composer's question is *may I type?* and the answer is
+	 * the same either way. Which card is open is read off the variant. */
+	awaiting: Array<
+		| Extract<ChatEvent, { type: 'permission_required' }>
+		| Extract<ChatEvent, { type: 'answer_required' }>
+	>;
 	/** Everything she reasoned across the whole turn, blocks and all. The gutter shows it in
 	 * pieces; this is the one string, for anything that wants the lot. */
 	thinking: string;
@@ -62,10 +68,11 @@ export interface Turn {
 export function reduce(events: AnyEvent[]): Turn {
 	const activity: Activity[] = [];
 	const inline: Inline[] = [];
-	const awaiting: Extract<ChatEvent, { type: 'permission_required' }>[] = [];
+	const awaiting: Turn['awaiting'] = [];
 	const byCall = new Map<string, Activity>();
 	const decided = new Set<string>();
 	const emotions = new Set<string>();
+	const asked = new Set<string>();
 
 	let closed: Turn['closed'] = null;
 	let thinking = '';
@@ -148,6 +155,12 @@ export function reduce(events: AnyEvent[]): Turn {
 					emotions.add(call.id);
 					break;
 				}
+				if (isAsk(call)) {
+					// The question card is built from `answer_required`, which arrives right
+					// after this. Letting the call land in the gutter too would draw the same
+					// question twice, once as machinery and once as the thing she said.
+					break;
+				}
 				const row: Activity = { kind: 'tool', key, event: call };
 				activity.push(row);
 				byCall.set(call.id, row);
@@ -159,6 +172,9 @@ export function reduce(events: AnyEvent[]): Turn {
 				const row = byCall.get(result.call_id);
 				if (row) {
 					row.result = result;
+				} else if (asked.has(result.call_id)) {
+					// The person's reply, shaped as this call's result so the model reads it as
+					// one. On screen it is already on the card they typed it into.
 				} else if (emotions.has(result.call_id)) {
 					// The card *is* the record of an emotion, so a gutter row beside it would
 					// draw the same thing twice. A failed one is different: an emotion she
@@ -187,6 +203,20 @@ export function reduce(events: AnyEvent[]): Turn {
 			}
 
 			case 'permission_decided':
+				decided.add((event as { call_id: string }).call_id);
+				break;
+
+			case 'answer_required': {
+				const card = event as Extract<ChatEvent, { type: 'answer_required' }>;
+				settle();
+				flush();
+				inline.push({ kind: 'question', key, event: card });
+				awaiting.push(card);
+				asked.add(card.call_id);
+				break;
+			}
+
+			case 'answer_given':
 				decided.add((event as { call_id: string }).call_id);
 				break;
 
@@ -219,10 +249,24 @@ export function reduce(events: AnyEvent[]): Turn {
 	};
 }
 
-/** Whether a card is still open, for a message rendered from the persisted list. */
+/** Whether a card is still open, for a message rendered from the persisted list.
+ *
+ * Both kinds settle the same way — a `permission_decided` or an `answer_given` for that call —
+ * because both exist precisely so a reloaded turn shows a settled card rather than live
+ * controls. Inferring it from whether a result turned up later would be a rule about event
+ * ordering living in the browser. */
 export function isAnswered(events: AnyEvent[], callId: string): boolean {
 	return events.some(
 		(event) =>
-			event.type === 'permission_decided' && (event as { call_id: string }).call_id === callId
+			(event.type === 'permission_decided' || event.type === 'answer_given') &&
+			(event as { call_id: string }).call_id === callId
 	);
+}
+
+/** What a person typed into a question card, for a message rendered from the persisted list. */
+export function replyTo(events: AnyEvent[], callId: string): string {
+	const given = events.find(
+		(event) => event.type === 'answer_given' && (event as { call_id: string }).call_id === callId
+	);
+	return given ? ((given as { text: string }).text ?? '') : '';
 }

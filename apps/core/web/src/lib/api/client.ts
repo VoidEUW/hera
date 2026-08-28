@@ -312,6 +312,24 @@ export function redoMessage(
 	});
 }
 
+/** Reply to a question she asked. Resumes the same assistant message, so it streams too.
+ *
+ * One call, not a list, which is where this differs from `answerPermission`: several
+ * permissions settle with one click because the answer is the same word, and two questions
+ * cannot — each wants its own sentence. */
+export function answerQuestion(
+	chatId: string,
+	body: { call_id: string; text: string },
+	signal?: AbortSignal
+): Promise<Response> {
+	return fetch(`${API}/chats/${chatId}/answers`, {
+		method: 'POST',
+		headers: { 'content-type': 'application/json' },
+		body: JSON.stringify(body),
+		signal
+	});
+}
+
 /** Answer a permission card. Resumes the same assistant message, so it streams too. */
 export function answerPermission(
 	chatId: string,

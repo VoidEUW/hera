@@ -61,6 +61,10 @@
 	function answer(callId: string, allow: boolean, remember: boolean) {
 		void session.answer([callId], allow, remember);
 	}
+
+	function reply(callId: string, text: string) {
+		void session.reply(callId, text);
+	}
 </script>
 
 <header class="top">
@@ -81,6 +85,7 @@
 				events={message.events}
 				busy={session.busy}
 				onanswer={answer}
+				onreply={reply}
 				onredo={(text) => session.redo(message.id, text)}
 			/>
 		{/each}
@@ -96,6 +101,7 @@
 				streaming={session.streaming}
 				busy={session.busy}
 				onanswer={answer}
+				onreply={reply}
 			/>
 		{/if}
 
@@ -111,6 +117,7 @@
 			autofocus
 			placeholder={t.composer.reply}
 			busy={session.busy}
+			blocked={session.blocked}
 			profiles={workspace.profiles}
 			profileId={session.chat?.profile_id ?? null}
 			providers={workspace.providers}

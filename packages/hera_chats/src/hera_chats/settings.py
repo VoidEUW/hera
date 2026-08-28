@@ -29,3 +29,17 @@ class ChatsSettings(BaseSettings):
 
     title_length: int = 60
     """How much of the first message becomes the chat's title in the sidebar."""
+
+    asking_tools: tuple[str, ...] = ()
+    """Qualified names of tools that are answered by a *person* rather than run.
+
+    A call to one of these suspends the turn: the question is recorded, the turn closes with
+    ``awaiting_answer``, and replying resumes the same message with the reply as that call's
+    result. Empty by default, which means nothing suspends — this package does not know which
+    tools exist and emphatically does not know which of them are hers.
+
+    Configured by the application, from ``hera_mcp.ASK_TOOL``. A setting rather than a hardcoded
+    ``"hera__ask"`` for the reason the layering rule exists: ``hera_chats`` naming a tool on her
+    own server would be this package learning what Hera *is*, and the next such tool would be a
+    second string in a second place.
+    """

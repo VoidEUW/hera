@@ -102,7 +102,10 @@ def ask_policy() -> Policy:
 
 @pytest.fixture
 def settings() -> ChatsSettings:
-    return ChatsSettings(model="fake-model", max_iterations=4)
+    # `asking_tools` names a tool on a server this package cannot see, which is the point of
+    # the setting: the application fills it in from `hera_mcp.ASK_TOOL`. A made-up name here
+    # would be just as valid — what is under test is that the *name* suspends the turn.
+    return ChatsSettings(model="fake-model", max_iterations=4, asking_tools=("hera__ask",))
 
 
 @pytest.fixture

@@ -40,10 +40,15 @@ class TestTheMind:
         regions = (await client.get(f"{API}/mind")).json()
         by_id = {region["id"]: region for region in regions}
 
-        assert len(regions) == 12
+        assert len(regions) == 14
         assert by_id["character"]["text"].strip()
         assert by_id["safety"]["tier"] == "owner_fixed"
         assert by_id["character"]["tier"] == "evolvable"
+        # The two the model asked for: nothing said what to do when it is unsure, and nothing
+        # said what to do when it notices it is on the wrong track. Both evolvable, because the
+        # useful version of either is learned from conversations that went badly.
+        assert by_id["uncertainty"]["tier"] == "evolvable"
+        assert by_id["correction"]["tier"] == "evolvable"
 
     async def test_the_generation_is_a_commit_count(self, client: AsyncClient) -> None:
         """A property of the history rather than a counter somebody has to increment."""

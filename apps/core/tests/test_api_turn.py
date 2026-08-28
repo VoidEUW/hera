@@ -228,6 +228,7 @@ class TestARealMcpServer:
         offered = {spec.name for spec in provider.requests[0].tools}
         assert offered == {
             "hera__emotion",
+            "hera__ask",
             "hera__remember",
             "hera__note",
             "hera__skill",
@@ -516,6 +517,102 @@ class TestThePermissionCard:
             response = await client.post(
                 f"{API}/chats/{chat_id}/permissions",
                 json={"call_ids": ["nope"], "allow": True},
+            )
+
+        assert response.status_code == 404
+
+
+class TestTheQuestionCard:
+    """`hera__ask` over the whole application: the turn suspends, the events persist, and a
+    reply resumes the same assistant message with the words as the call's result."""
+
+    async def test_a_question_suspends_the_turn_and_survives_a_reload(
+        self, make_services: Any
+    ) -> None:
+        provider = FakeProvider(
+            [tool_turn(tool_call("hera__ask", {"question": "Which deck?", "kind": "unsure"}))]
+        )
+        services = make_services(provider, StubTools())
+        async with _client(services) as client:
+            chat_id = await open_chat(client)
+            frames = await talk(client, chat_id, "summarise it")
+            detail = (await client.get(f"{API}/chats/{chat_id}")).json()
+
+        assert names(frames) == [
+            "tool_call_ready",
+            "answer_required",
+            "turn_closed",
+            "done",
+        ]
+        card = payload(frames, "answer_required")
+        assert card["question"] == "Which deck?"
+        assert card["kind"] == "unsure"
+        assert payload(frames, "turn_closed")["reason"] == "awaiting_answer"
+
+        # Persisted, so the card is still there after a reload rather than being a live-only
+        # artefact of the stream that stopped.
+        stored = [event["type"] for event in detail["messages"][1]["events"]]
+        assert "answer_required" in stored
+
+    async def test_replying_resumes_the_same_message(self, make_services: Any) -> None:
+        provider = FakeProvider(
+            [
+                tool_turn(tool_call("hera__ask", {"question": "Which deck?"})),
+                text_turn("The 2024 one, then."),
+            ]
+        )
+        services = make_services(provider, StubTools())
+        async with _client(services) as client:
+            chat_id = await open_chat(client)
+            await talk(client, chat_id, "summarise it")
+
+            frames = sse(
+                await client.post(
+                    f"{API}/chats/{chat_id}/answers",
+                    json={"call_id": "call_hera__ask", "text": "The 2024 one."},
+                )
+            )
+            detail = (await client.get(f"{API}/chats/{chat_id}")).json()
+
+        assert names(frames) == [
+            "answer_given",
+            "tool_result",
+            "text_delta",
+            "turn_closed",
+            "done",
+        ]
+        # One assistant message, not two: she asked, waited, and carried on.
+        assert [m["role"] for m in detail["messages"]] == ["user", "assistant"]
+        assert detail["messages"][1]["content"] == "The 2024 one, then."
+
+        # And the reply reached the model as the result of its own call.
+        sent = provider.requests[1].messages
+        assert any("The 2024 one." in str(message.content) for message in sent)
+
+    async def test_an_unasked_call_id_is_a_404(self, make_services: Any) -> None:
+        """Otherwise a resumed turn carries a tool result for a call that was never made, and
+        the model is handed an answer to a question it did not ask."""
+        provider = FakeProvider([tool_turn(tool_call("hera__ask", {"question": "Which?"}))])
+        services = make_services(provider, StubTools())
+        async with _client(services) as client:
+            chat_id = await open_chat(client)
+            await talk(client, chat_id, "go")
+
+            response = await client.post(
+                f"{API}/chats/{chat_id}/answers",
+                json={"call_id": "call_something_else", "text": "hello"},
+            )
+
+        assert response.status_code == 404
+
+    async def test_replying_to_a_chat_that_never_asked_is_a_404(self, make_services: Any) -> None:
+        services = make_services(FakeProvider([text_turn("nothing to ask")]), StubTools())
+        async with _client(services) as client:
+            chat_id = await open_chat(client)
+
+            response = await client.post(
+                f"{API}/chats/{chat_id}/answers",
+                json={"call_id": "call_hera__ask", "text": "hello"},
             )
 
         assert response.status_code == 404

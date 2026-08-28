@@ -22,7 +22,13 @@ from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import StreamingResponse
-from hera_chats.events import ChatEvent, PermissionDecided, PermissionRequired
+from hera_chats.events import (
+    AnswerGiven,
+    AnswerRequired,
+    ChatEvent,
+    PermissionDecided,
+    PermissionRequired,
+)
 from sqlmodel import Session
 
 from hera_chats import (
@@ -50,6 +56,7 @@ from hera_core.schemas import (
     MessageIn,
     MessageOut,
     PermissionAnswer,
+    QuestionAnswer,
     RedoIn,
 )
 from hera_core.sse import HEADERS, MEDIA_TYPE, event_frame, frame
@@ -265,6 +272,45 @@ def answer_permission(
         resume=[*recorded, *decisions],
         confirmed=payload.call_ids if payload.allow else [],
         denied=[] if payload.allow else payload.call_ids,
+    )
+
+
+@router.post("/chats/{chat_id}/answers")
+def answer_question(
+    chat_id: UUID, payload: QuestionAnswer, owner: Owner, db: Db, container: Container
+) -> StreamingResponse:
+    """Reply to a question she asked, and resume the turn it stopped.
+
+    The same route the permission card has, doing the same thing to the same machinery — which
+    is the point of `docs/tooling.md` § 4's argument for generalising the suspension rather than
+    building a second one. The only difference is what settles the call: a decision there, a
+    sentence here, and the sentence becomes the call's result so the model reads a reply to its
+    own question where a tool's output would have been.
+    """
+    chat = _require_chat(db, chat_id, owner)
+    assistant = MessageRepository(db).latest_assistant(chat.id)
+    if assistant is None:
+        raise not_found("turn to resume")
+
+    recorded = events_of(assistant)
+    # Checked against the paused turn rather than trusted: a call id that was never asked about
+    # would otherwise resume a turn with an answer to nothing in it, and the model would be
+    # handed a tool result for a call it never made.
+    asked = {event.call_id for event in recorded if isinstance(event, AnswerRequired)}
+    if payload.call_id not in asked:
+        raise not_found("question to answer")
+
+    given = AnswerGiven(call_id=payload.call_id, text=payload.text)
+
+    return _stream(
+        container,
+        db,
+        chat,
+        assistant,
+        text="",
+        lead=[given],
+        resume=[*recorded, given],
+        answers={payload.call_id: payload.text},
     )
 
 

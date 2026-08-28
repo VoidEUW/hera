@@ -15,6 +15,8 @@ from chat_support import StubTools, WriteSkill, drain, kinds
 from hera_providers.events import TurnEnd
 
 from hera_chats import (
+    AnswerRequired,
+    ChatsSettings,
     PermissionRequired,
     SkillSelected,
     ToolResultEvent,
@@ -478,6 +480,126 @@ class TestPermissions:
         events = await drain(resumed.stream())
 
         assert len([e for e in events if isinstance(e, SkillSelected)]) == 0
+
+
+class TestAskingBack:
+    """`hera__ask` suspends the turn the way a permission card does — deliberately the same
+    mechanism, per ``docs/tooling.md`` § 4, rather than a second one beside it."""
+
+    async def test_a_question_stops_the_turn(self, make_orchestrator: Make) -> None:
+        tools = StubTools()
+        provider = FakeProvider(
+            [tool_turn(tool_call("hera__ask", {"question": "Which slide deck?", "kind": "unsure"}))]
+        )
+
+        events = await drain(
+            make_orchestrator(provider, tools).begin(TurnContext(text="go")).stream()
+        )
+
+        assert kinds(events) == ["tool_call_ready", "answer_required", "turn_closed"]
+        card = events[1]
+        assert isinstance(card, AnswerRequired)
+        assert card.question == "Which slide deck?"
+        assert card.kind == "unsure"
+        assert isinstance(events[-1], TurnClosed)
+        assert events[-1].reason == "awaiting_answer"
+
+    async def test_the_question_is_never_dispatched(self, make_orchestrator: Make) -> None:
+        """It is not work for a tool. The server has a body for it that refuses, which is what
+        a caller outside a turn gets; inside one it never reaches the registry at all."""
+        tools = StubTools()
+        provider = FakeProvider([tool_turn(tool_call("hera__ask", {"question": "Which?"}))])
+
+        await drain(make_orchestrator(provider, tools).begin(TurnContext(text="go")).stream())
+
+        assert tools.dispatched == []
+
+    async def test_a_reply_becomes_the_calls_result(self, make_orchestrator: Make) -> None:
+        """The trick, stated as a test: nothing on the model's side of the loop learns that a
+        person was in it. The words arrive where a tool's output would have."""
+        tools = StubTools()
+        paused = await drain(
+            make_orchestrator(
+                FakeProvider([tool_turn(tool_call("hera__ask", {"question": "Which?"}))]), tools
+            )
+            .begin(TurnContext(text="go"))
+            .stream()
+        )
+
+        resumed = make_orchestrator(
+            FakeProvider([text_turn("The second one, then.")]), tools
+        ).begin(TurnContext(text="", resume=paused, answers={"call_hera__ask": "The 2024 one."}))
+        events = await drain(resumed.stream())
+
+        assert kinds(events) == ["tool_result", "text_delta", "turn_closed"]
+        result = events[0]
+        assert isinstance(result, ToolResultEvent)
+        assert result.ok
+        assert "The 2024 one." in result.text
+        # Still never dispatched, on the way back through either.
+        assert tools.dispatched == []
+
+    async def test_an_empty_reply_is_an_answer_rather_than_a_failure(
+        self, make_orchestrator: Make
+    ) -> None:
+        """Saying nothing is a thing a person may do. Failing the call would tell her the
+        question was broken instead of that it went unanswered."""
+        tools = StubTools()
+        paused = await drain(
+            make_orchestrator(
+                FakeProvider([tool_turn(tool_call("hera__ask", {"question": "Which?"}))]), tools
+            )
+            .begin(TurnContext(text="go"))
+            .stream()
+        )
+
+        resumed = make_orchestrator(FakeProvider([text_turn("Carrying on.")]), tools).begin(
+            TurnContext(text="", resume=paused, answers={"call_hera__ask": "   "})
+        )
+        events = await drain(resumed.stream())
+
+        result = events[0]
+        assert isinstance(result, ToolResultEvent)
+        assert result.ok
+        assert "no answer" in result.text
+
+    async def test_the_question_is_not_asked_twice(self, make_orchestrator: Make) -> None:
+        """A resumed turn must not re-pose the question it was resumed to settle — which is
+        what would happen if the call were only matched on its name."""
+        tools = StubTools()
+        paused = await drain(
+            make_orchestrator(
+                FakeProvider([tool_turn(tool_call("hera__ask", {"question": "Which?"}))]), tools
+            )
+            .begin(TurnContext(text="go"))
+            .stream()
+        )
+
+        resumed = make_orchestrator(FakeProvider([text_turn("Right.")]), tools).begin(
+            TurnContext(text="", resume=paused, answers={"call_hera__ask": "That one."})
+        )
+        events = await drain(resumed.stream())
+
+        assert "answer_required" not in kinds(events)
+
+    async def test_nothing_suspends_when_no_tool_is_named(
+        self, builder: object, router: object
+    ) -> None:
+        """The default is an empty `asking_tools`, and a deployment that has not configured it
+        runs `hera__ask` as an ordinary call — which the server itself then refuses."""
+        tools = StubTools()
+        orchestrator = TurnOrchestrator(
+            provider=FakeProvider([tool_turn(tool_call("hera__ask", {"question": "Which?"}))]),
+            builder=builder,  # type: ignore[arg-type]
+            router=router,  # type: ignore[arg-type]
+            registry=tools,
+            settings=ChatsSettings(model="fake-model", max_iterations=2),
+        )
+
+        events = await drain(orchestrator.begin(TurnContext(text="go")).stream())
+
+        assert "answer_required" not in kinds(events)
+        assert tools.dispatched != []
 
 
 class TestWhenThingsGoWrong:

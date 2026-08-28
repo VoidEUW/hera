@@ -9,7 +9,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { AnyEvent } from './api/events';
-import { reduce } from './turn';
+import { isAnswered, reduce, replyTo } from './turn';
 
 const text = (t: string): AnyEvent => ({ type: 'text_delta', text: t });
 const closed = (reason = 'completed'): AnyEvent => ({
@@ -237,6 +237,68 @@ describe('permission cards', () => {
 
 		expect(turn.awaiting).toHaveLength(0);
 		expect(turn.activity[0].result).toBeDefined();
+	});
+});
+
+describe('question cards', () => {
+	const asked: AnyEvent = {
+		type: 'answer_required',
+		call_id: 'q1',
+		tool: 'hera__ask',
+		question: 'Which deck?',
+		kind: 'unsure'
+	};
+
+	it('renders inline, where she asked it', () => {
+		const turn = reduce([
+			text('Before I start — '),
+			call('q1', 'hera__ask'),
+			asked,
+			closed('awaiting_answer')
+		]);
+
+		expect(turn.inline.map((item) => item.kind)).toEqual(['prose', 'question']);
+	});
+
+	it('blocks the composer while unanswered', () => {
+		const turn = reduce([call('q1', 'hera__ask'), asked, closed('awaiting_answer')]);
+		expect(turn.awaiting).toHaveLength(1);
+	});
+
+	it('draws the question once, not three times', () => {
+		// The call, the card and the synthesised result are all about the same question. Only
+		// the card is a thing a person is meant to read.
+		const turn = reduce([
+			call('q1', 'hera__ask'),
+			asked,
+			{ type: 'answer_given', call_id: 'q1', text: 'The 2024 one.' },
+			result('q1', 'hera__ask', { text: 'The 2024 one.' }),
+			text('Right.'),
+			closed()
+		]);
+
+		expect(turn.activity).toHaveLength(0);
+		expect(turn.inline.filter((item) => item.kind === 'question')).toHaveLength(1);
+	});
+
+	it('stops blocking once it has been replied to', () => {
+		const events = [
+			call('q1', 'hera__ask'),
+			asked,
+			{ type: 'answer_given', call_id: 'q1', text: 'The 2024 one.' } as AnyEvent,
+			result('q1', 'hera__ask'),
+			closed()
+		];
+
+		expect(reduce(events).awaiting).toHaveLength(0);
+		expect(isAnswered(events, 'q1')).toBe(true);
+		expect(replyTo(events, 'q1')).toBe('The 2024 one.');
+	});
+
+	it('leaves an unanswered question with no reply to show', () => {
+		const events = [call('q1', 'hera__ask'), asked, closed('awaiting_answer')];
+		expect(isAnswered(events, 'q1')).toBe(false);
+		expect(replyTo(events, 'q1')).toBe('');
 	});
 });
 

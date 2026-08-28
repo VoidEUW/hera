@@ -27,6 +27,7 @@ from hera_core.app import create_app
 from hera_core.models import ALL_TABLES  # noqa: F401
 from hera_core.settings import CoreSettings
 from hera_core.wiring import Services
+from hera_mcp import ASK_TOOL, BUILTIN_SERVER_NAME
 from hera_permissions import Decision, PermissionSet, Policy, Rule
 from hera_profiles import MindRepository, ProfileRepository, PromptBuilder
 from hera_providers import FakeProvider
@@ -135,7 +136,14 @@ def make_services(tmp_path: Path, skills_path: Path) -> Iterator[object]:
                 builder=builder,
                 router=router,
                 registry=registry,
-                settings=ChatsSettings(model="fake-model", max_iterations=4),
+                # Named the way `build_services` names it, so the asking path is exercised
+                # here rather than only in `hera_chats`' own suite. `test_wiring.py` holds
+                # this container's shape against the real one.
+                settings=ChatsSettings(
+                    model="fake-model",
+                    max_iterations=4,
+                    asking_tools=(f"{BUILTIN_SERVER_NAME}__{ASK_TOOL}",),
+                ),
             ),
         )
         built.append(container)
