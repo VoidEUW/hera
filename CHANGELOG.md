@@ -115,10 +115,17 @@ section fills in as milestones land.
 - **Artifacts** — a diagram, a document, a workflow chart as an object with an identity and
   versions, not prose in a code fence. A tool call like everything else (ADR 11 forbids the browser
   discovering one), rendered as Mermaid, Markdown, code or sandboxed HTML.
+- **A scratchpad, per conversation.** Somewhere to put a plan, an intermediate result, a list of
+  what has been checked so far — hers to write and hers to read back, so a long chat stops
+  surviving by re-reading itself. `hera__note` stops being used for something it never described.
 - **Skill resources become readable.** `hera_skillsets` already tells the model a skill has files
   beside it; `hera__read_resource` makes that sentence true, which is what Anthropic's
-  reference-heavy skills need. Script-running skills report honestly instead — running code is
-  `hera_sandbox`, and it is not this version.
+  reference-heavy skills need.
+- **Somewhere to actually run code**, as `hera-sandbox-mcp` — a separate server with its own
+  namespace, so a deployment that does not want it does not mount it. Moved forward out of *not in
+  this version*: deferring it was a demand for a decision record about which claim it makes, and
+  that record now exists. The script-running skills — `pptx`, `docx`, `xlsx` — work, and the file
+  they produce becomes an artifact without its bytes passing through the model.
 - **`hera_memories`.** Retrieval with per-tier caps, write-dedup, hit counts. `hera__remember` stops
   answering "not available in this deployment", and the embedder seam v0.1 left open closes.
 - **`hera_promptevo`.** Dreaming, proposing to evolvable mind regions and to memory. Every proposal

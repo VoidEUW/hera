@@ -31,7 +31,36 @@ not a correct diff: a branch still based on the pre-squash tip proposes to *undo
 only in the squash. Checking `git diff --name-status origin/main HEAD` for deletions before each
 merge is what caught `.gitkeep` going missing, and it is worth doing every time.
 
-M2 (artifacts and skill resources) is next, and starts from `main`.
+**M2 is next, and it is three branches rather than one.** It grew: the sandbox moved forward out of
+*not in v0.2* and into it, so the milestone is now **scratchpad → artifacts → sandbox**, in that
+order and for a reason worth keeping — the intuition is *sandbox first, it sounds like the hard
+part*, and the dependencies run the other way. No artifact kind needs code execution; what the
+sandbox needs is somewhere to put what it produces, and that is the artifact store. Under both sits
+the question [tooling.md](tooling.md) § 5 already flagged, that artifacts and the scratchpad want
+the same storage and answering them separately produces two.
+
+| | |
+|---|---|
+| **M2a** | The scratchpad, and a tool call that knows which chat it is in — [ADR 12](adr/0012-a-chat-has-a-scratchpad.md) |
+| **M2b** | Artifacts and skill resources — [ADR 13](adr/0013-artifacts-are-tool-calls-with-versions.md), [ADR 14](adr/0014-skill-resources-are-readable.md) |
+| **M2c** | `hera-sandbox-mcp` — [ADR 15](adr/0015-running-code-in-a-container.md) |
+
+**The thing that blocks all three, and was not obvious:** no tool can know which chat it is in. Her
+server is built once at startup with its ports bound, and `ManagedServer` runs every call as a
+child of a worker task created at *connect* time — so a `contextvars.ContextVar` set around the
+turn reads back empty in the tool, silently. It travels in MCP's `_meta` instead:
+`ToolRegistry.dispatch` takes an opaque `context` mapping, `hera_mcp`'s tools take a `ctx: Context`
+the SDK keeps out of the input schema, and the key travels through `ChatsSettings.chat_meta_key`
+the way `hera__ask`'s name travels through `asking_tools`. Verified against the SDK before any of
+it was designed around. `hera__remember(scope="chat")` has been missing exactly this since v0.1.
+
+**Deferring the sandbox was never about difficulty.** `tooling.md` § 3 said it should not be built
+"until somebody has written down which of those two it is" — *a small sandbox for testing* or
+*safe*. That is a demand for a decision record, and ADR 15 is it: the first, built carefully, and
+explicitly not the second, with what would upgrade the claim named. Docker becomes a requirement
+for one tool and is absent rather than broken without it.
+
+M2a starts from `main`, on `feat/chat-scratchpad`.
 
 ---
 
