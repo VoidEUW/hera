@@ -210,9 +210,19 @@ def test_a_skill_is_switched_on_for_one_chat(page: Any) -> None:
 
     page.locator("button.context").click()
     page.wait_for_selector("[role=dialog]", timeout=10_000)
-    page.locator(".entry", has_text="tdd").click()
-    page.keyboard.press("Escape")
 
+    # Wait for the write itself, not for the pill. `ChatStore.pinSkills` is deliberately
+    # optimistic — a tick that waits for a round trip reads as a click that did not land — so the
+    # pill says "1 skill" while the PATCH is still in flight, and `reload` cancels what is still
+    # in flight. Asserting the response is what makes the reload below a test of persistence
+    # rather than a race the runner wins when it is fast and loses when it is loaded.
+    with page.expect_response(
+        lambda response: response.request.method == "PATCH" and "/chats/" in response.url
+    ) as patched:
+        page.locator(".entry", has_text="tdd").click()
+    assert patched.value.ok
+
+    page.keyboard.press("Escape")
     page.wait_for_selector("button.context:has-text('1 skill')", timeout=10_000)
 
     page.reload(wait_until="networkidle")
