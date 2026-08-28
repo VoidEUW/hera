@@ -25,6 +25,7 @@ would be a turn that dies with the tab.
 from __future__ import annotations
 
 import asyncio
+from collections import Counter
 from collections.abc import AsyncGenerator, AsyncIterator, Mapping, Sequence
 from dataclasses import dataclass, field
 
@@ -192,6 +193,11 @@ class Turn:
         # skills and the permission card twice.
         self._inherited = len(self._recorded)
         self._closed = False
+        # How often each identical call has run in this turn, and what it said. Keyed on the
+        # tool and its arguments, so `search("a")` and `search("b")` are different calls and
+        # `search("a")` twice is the same one.
+        self._ran: Counter[tuple[str, str]] = Counter()
+        self._said: dict[tuple[str, str], str] = {}
         self.prompt_fingerprint = ""
         self.skill_ids: list[str] = []
         self.cleaned_text = context.text
@@ -305,6 +311,18 @@ class Turn:
             async for event in self._answer(round_.calls):
                 yield event
             messages = [*messages, *turn_to_messages(self._recorded)]
+
+        # The budget is spent. Rather than stopping here — which left the turn ending on a
+        # half-sentence about what she was *about* to look up, with the last round's results
+        # never shown to the model at all — she gets one more round with the tools withheld.
+        # An empty tool list is the only thing that reliably stops a model asking for more:
+        # telling it in prose to stop is advice, and this is arithmetic.
+        final = _Round()
+        async for event in self._ask([*messages, _wrap_up()], [], final):
+            yield event
+        if final.usage is not None:
+            reported = True
+            total = _add(total, final.usage)
 
         yield self._close(
             "max_iterations",
@@ -480,7 +498,23 @@ class Turn:
         replied = self.context.answers
         results = []
 
-        runnable = [call for call in calls if call.id not in refused and call.id not in replied]
+        # A call that has already run its allowance in this turn is answered without running.
+        # Counted before dispatch so the parallel duplicates the model likes to emit — the same
+        # two searches side by side, round after round — are caught in the same pass.
+        looping: dict[str, str] = {}
+        runnable: list[ToolCallReady] = []
+        fingerprints: dict[str, tuple[str, str]] = {}
+        for call in calls:
+            if call.id in refused or call.id in replied:
+                continue
+            fingerprint = _fingerprint(call)
+            if self._ran[fingerprint] >= self._settings.repeat_limit:
+                looping[call.id] = self._said.get(fingerprint, "")
+                continue
+            self._ran[fingerprint] += 1
+            fingerprints[call.id] = fingerprint
+            runnable.append(call)
+
         if runnable and self._registry is not None:
             results = await self._registry.dispatch_all(
                 [
@@ -491,8 +525,17 @@ class Turn:
                 confirmed=self.context.confirmed,
             )
 
+        for ran in results:
+            # Kept so that refusing a third identical call can quote what the first two said.
+            seen = fingerprints.get(ran.call_id)
+            if seen is not None:
+                self._said[seen] = ran.text
+
         by_id = {result.call_id: result for result in results}
         for call in calls:
+            if call.id in looping:
+                yield self._record(_looping(call, looping[call.id]))
+                continue
             if call.id in replied:
                 yield self._record(_answered(call, replied[call.id]))
                 continue
@@ -607,6 +650,69 @@ def _split_frame(messages: Sequence[FrameMessage]) -> tuple[list[ChatMessage], l
         target = tail if role is Role.USER else head
         target.append(ChatMessage(role=role, content=message.content))
     return head, tail
+
+
+REPEAT_QUOTE = 400
+"""How much of a repeated call's earlier answer is quoted back when it is refused.
+
+Enough to recognise, not enough to pay for twice. The whole point of refusing is to stop
+spending the context window on the same page of results.
+"""
+
+
+def _fingerprint(call: ToolCallReady) -> tuple[str, str]:
+    """What makes two calls *the same call*.
+
+    The arguments are sorted before they are compared, because a model does not emit its keys
+    in a stable order and two calls that differ only in that are the same request. Values are
+    rendered with ``repr`` rather than JSON-dumped: this never leaves the process, so what it
+    has to be is total over anything a model can put in an argument, and ``json.dumps`` is not
+    — one unserialisable value would raise inside the tool loop.
+    """
+    arguments = ", ".join(f"{key}={call.arguments[key]!r}" for key in sorted(call.arguments))
+    return call.name, arguments
+
+
+def _looping(call: ToolCallReady, earlier: str) -> ToolResultEvent:
+    """The answer to a call that has already had its turn.
+
+    ``ok=False``, because from the model's side this call did not run. Written to say the one
+    thing that actually helps — *these words have been tried, try different ones or answer with
+    what you have* — since the failure it addresses is a model that keeps searching because
+    nothing told it the searching was not working.
+    """
+    quoted = earlier.strip()[:REPEAT_QUOTE]
+    tail = f" It returned:\n{quoted}" if quoted else ""
+    return ToolResultEvent(
+        call_id=call.id,
+        tool=call.name,
+        ok=False,
+        failure="repeated",
+        text=(
+            "not run — you have already made this exact call in this turn, and running it "
+            "again returns the same thing." + tail + "\n\nThe words you used did not find it. "
+            "Ask a different question, or answer with what you have and say what you could not "
+            "establish."
+        ),
+    )
+
+
+def _wrap_up() -> ChatMessage:
+    """The nudge on the final round, when the tool budget is spent.
+
+    Sent as a user-role message rather than folded into the system prompt: it is true of this
+    moment and not of this deployment, and a system prompt that changed shape on the last round
+    would be a second prompt to reason about. The tools are withheld on the same call, which is
+    what actually stops her asking for more — this only explains why.
+    """
+    return ChatMessage(
+        role=Role.USER,
+        content=(
+            "You have used all the tool calls available for this turn. Answer now with what you "
+            "already have: give what you did establish, say plainly what you could not, and do "
+            "not promise to look anything else up."
+        ),
+    )
 
 
 def _text_argument(call: ToolCallReady, name: str) -> str:

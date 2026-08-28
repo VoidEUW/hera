@@ -8,7 +8,7 @@ permission card that never closes the stream, a cancellation that loses the half
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncIterator, Callable, Sequence
 
 import pytest
 from chat_support import StubTools, WriteSkill, drain, kinds
@@ -27,6 +27,8 @@ from hera_chats import (
 from hera_permissions import Decision, PermissionSet, Policy, Rule
 from hera_profiles import Profile
 from hera_providers import (
+    ChatRequest,
+    Event,
     FakeProvider,
     ProviderError,
     Role,
@@ -293,6 +295,98 @@ class TestTheToolLoop:
         assert isinstance(events[-1], TurnClosed)
         assert events[-1].reason == "max_iterations"
         assert events[-1].iterations == 4
+
+
+class TestWhenSheKeepsAskingTheSameThing:
+    """The observed failure: asked for a figure it could not find, the model ran the *same*
+    search four times, spent its whole budget on it, and was cut off mid-sentence. Every call
+    succeeded — they simply did not contain the answer, so nothing in the loop noticed."""
+
+    async def test_a_third_identical_call_is_not_run(
+        self, make_orchestrator: Make, tools: StubTools
+    ) -> None:
+        provider = FakeProvider(lambda request: tool_turn(tool_call("fs__read_file", {"p": "a"})))
+
+        await drain(make_orchestrator(provider, tools).begin(TurnContext(text="go")).stream())
+
+        # Twice, not once: the turn cannot know which tools are idempotent, and reading a file
+        # after writing it is the same call with a legitimately different answer.
+        assert len(tools.dispatched) == 2
+
+    async def test_the_refusal_says_the_words_did_not_work(
+        self, make_orchestrator: Make, tools: StubTools
+    ) -> None:
+        """The whole point. A model that is told nothing keeps searching; one that is told the
+        query has been tried can change it or give up honestly."""
+        provider = FakeProvider(lambda request: tool_turn(tool_call("fs__read_file", {"p": "a"})))
+
+        events = await drain(
+            make_orchestrator(provider, tools).begin(TurnContext(text="go")).stream()
+        )
+
+        refusals = [
+            event
+            for event in events
+            if isinstance(event, ToolResultEvent) and event.failure == "repeated"
+        ]
+        assert refusals
+        assert "already made this exact call" in refusals[0].text
+        assert not refusals[0].ok
+
+    async def test_a_different_argument_is_a_different_call(
+        self, make_orchestrator: Make, tools: StubTools
+    ) -> None:
+        """Otherwise the guard would stop real research on its third search."""
+        queries = iter(["a", "b", "c", "d"])
+        provider = FakeProvider(
+            lambda request: tool_turn(tool_call("fs__read_file", {"p": next(queries, "z")}))
+        )
+
+        await drain(make_orchestrator(provider, tools).begin(TurnContext(text="go")).stream())
+
+        assert len(tools.dispatched) >= 4
+
+    async def test_key_order_does_not_make_a_new_call(
+        self, make_orchestrator: Make, tools: StubTools
+    ) -> None:
+        """A model does not emit its keys in a stable order, and two calls that differ only in
+        that are the same request."""
+        orders = iter([{"a": 1, "b": 2}, {"b": 2, "a": 1}, {"a": 1, "b": 2}])
+        provider = FakeProvider(
+            lambda request: tool_turn(tool_call("fs__read_file", next(orders, {"a": 1, "b": 2})))
+        )
+
+        await drain(make_orchestrator(provider, tools).begin(TurnContext(text="go")).stream())
+
+        assert len(tools.dispatched) == 2
+
+    async def test_the_budget_ending_still_produces_an_answer(
+        self, make_orchestrator: Make, tools: StubTools
+    ) -> None:
+        """It used to end on whatever half-sentence preceded the last batch of calls, with
+        those results never shown to the model at all. Now the tools are withheld for one final
+        round, which is the only thing that reliably stops a model asking for more."""
+        rounds = 0
+
+        def script(request: ChatRequest) -> Sequence[Event]:
+            # Keyed on whether the request carried any tools, which is what the final round
+            # withholds. Asserting on the *arithmetic* rather than on a round number, since the
+            # ceiling is a setting and this behaviour is not.
+            nonlocal rounds
+            rounds += 1
+            if request.tools:
+                return tool_turn(tool_call("fs__read_file", {"p": str(rounds)}))
+            return text_turn("Here is what I found, and what I could not.")
+
+        provider = FakeProvider(script)
+        events = await drain(
+            make_orchestrator(provider, tools).begin(TurnContext(text="go")).stream()
+        )
+
+        assert isinstance(events[-1], TurnClosed)
+        assert events[-1].reason == "max_iterations"
+        text = "".join(e.text for e in events if isinstance(e, TextDelta))
+        assert "what I could not" in text
 
     async def test_usage_is_added_up_across_round_trips(
         self, make_orchestrator: Make, tools: StubTools

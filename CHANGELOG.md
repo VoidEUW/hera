@@ -84,6 +84,19 @@ section fills in as milestones land.
   names the file it actually looked at, and gives both commands. It refuses rather than repairs:
   stamping the database back leaves columns a later upgrade then fails to add, and downgrading it
   drops data because a shell was in the wrong directory.
+- **She spent a whole turn re-running the same search.** Asked for a figure that was not in the
+  results, the model ran one identical query four times, exhausted its budget and was cut off
+  mid-sentence — every call succeeded, so nothing in the loop noticed. An identical call, same
+  tool and same arguments, now runs at most twice in a turn; the third comes back as a result
+  saying the words have been tried, quoting what they returned, and to ask differently or answer
+  with what it has. Twice rather than once, because the turn cannot know which tools are
+  idempotent and reading a file after writing it is the same call with a different answer.
+- **Running out of tool calls ends with an answer, not a half-sentence.** The loop used to stop
+  the moment the budget was spent, which meant the last batch of results was never shown to the
+  model at all — the turn ended on whatever it had said *before* going to look. It now gets one
+  final round with the tools withheld, which is the only thing that reliably stops a model asking
+  for more. The ceiling rose from 8 rounds to 12, which is affordable now that the budget is not
+  being wasted on repeats.
 - **A turn could not be read downwards.** Every gutter row was drawn first and all the prose
   after, which is correct only for a turn that does its thinking up front — the moment she
   speaks, thinks again and speaks again, the second thought appeared *above* the sentence that

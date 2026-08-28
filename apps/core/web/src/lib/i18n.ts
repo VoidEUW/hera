@@ -145,7 +145,7 @@ export const t = {
 	turn: {
 		cancelled: 'Interrupted',
 		failed: 'This turn failed',
-		max_iterations: 'She stopped after using tools too many times',
+		max_iterations: 'She ran out of tool calls and answered with what she had',
 		awaiting_permission: 'Waiting for you',
 		awaiting_answer: 'Waiting for your answer'
 	},

@@ -14,13 +14,34 @@ class ChatsSettings(BaseSettings):
     """The one model (ADR 2). A name rather than a choice: what varies between deployments is
     what the local server calls it, not which family it belongs to."""
 
-    max_iterations: int = 8
-    """How many times the model may be called in one turn before the loop is cut.
+    max_iterations: int = 12
+    """How many rounds of tool calls one turn may take before the budget is spent.
 
-    A turn goes round once per batch of tool calls. Eight is generous for real work and low
-    enough that a model stuck calling the same tool costs seconds rather than a rate limit.
-    Hitting it closes the turn with ``max_iterations``, which is visible in the interface —
-    silently stopping would look like she simply gave a short answer.
+    A turn goes round once per batch. Twelve rather than the original eight because real
+    research legitimately takes more than eight searches — and because a model that was
+    *wasting* its budget on repeats now cannot: see :attr:`repeat_limit`, which is the fix for
+    the loop this number used to be the only guard against.
+
+    Spending it no longer ends the turn mid-thought. The model gets one last round with the
+    tools withheld, so it answers with what it has; the turn still closes with
+    ``max_iterations``, because "she stopped looking and summarised" is a different thing from
+    "she finished" and the interface should say so.
+    """
+
+    repeat_limit: int = 2
+    """How many times one identical call — same tool, same arguments — may run in a turn.
+
+    The observed failure this exists for: asked for a figure it could not find, the model ran
+    the *same* search four times, spent its whole budget on it, and was cut off mid-sentence.
+    Nothing in the loop noticed, because each call succeeded — they simply did not contain the
+    answer.
+
+    Two rather than one, because the turn cannot know which tools are idempotent. Reading a
+    file after writing it is the same call with a legitimately different result, and refusing
+    the second would break it; a *third* identical call inside one turn is a loop in every case
+    worth designing for. Refused calls come back as a result the model can read, quoting what
+    the call returned last time — so it is told the words did not work rather than left to
+    wonder why nothing changed.
     """
 
     temperature: float | None = None
