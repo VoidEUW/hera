@@ -13,6 +13,7 @@ from hera_providers import (
     TextDelta,
     ThinkingDelta,
     ToolCallReady,
+    ToolCallStarted,
     TurnEnd,
 )
 
@@ -291,3 +292,107 @@ def test_a_tool_call_fragment_that_is_not_a_mapping_is_skipped() -> None:
 
     call = next(e for e in events if isinstance(e, ToolCallReady))
     assert (call.id, call.name) == ("a", "x")
+
+
+# -- announcing a call before it has finished arriving ------------------------------------
+
+
+def started(events: list[Event]) -> list[tuple[str, str]]:
+    return [(e.id, e.name) for e in events if isinstance(e, ToolCallStarted)]
+
+
+def test_a_call_is_announced_from_the_fragment_that_names_it() -> None:
+    """The point of the variant: the name is in the first fragment and the arguments can be
+    minutes behind it. Announcing on the name is the difference between a screen that looks
+    busy and one that looks stopped."""
+    adapter = QwenAdapter()
+
+    first = list(
+        adapter.feed(
+            chunk(
+                tool_calls=[
+                    {"index": 0, "id": "c0", "function": {"name": "hera__note", "arguments": ""}}
+                ]
+            )
+        )
+    )
+
+    assert first == [ToolCallStarted(id="c0", name="hera__note")]
+
+
+def test_it_is_announced_once_however_many_fragments_follow() -> None:
+    events = drain(
+        [
+            chunk(
+                tool_calls=[
+                    {"index": 0, "id": "c0", "function": {"name": "hera__note", "arguments": "{"}}
+                ]
+            ),
+            chunk(tool_calls=[{"index": 0, "function": {"arguments": '"text":'}}]),
+            chunk(tool_calls=[{"index": 0, "function": {"arguments": '"ok"}'}}]),
+            chunk(finish="tool_calls"),
+        ]
+    )
+
+    assert started(events) == [("c0", "hera__note")]
+
+
+def test_each_parallel_call_is_announced_as_it_is_named() -> None:
+    events = drain(
+        [
+            chunk(
+                tool_calls=[
+                    {"index": 0, "id": "c0", "function": {"name": "hera__emotion"}},
+                    {"index": 1, "id": "c1", "function": {"name": "hera__note"}},
+                ]
+            ),
+            chunk(finish="tool_calls"),
+        ]
+    )
+
+    assert started(events) == [("c0", "hera__emotion"), ("c1", "hera__note")]
+
+
+def test_the_announced_id_is_the_one_the_call_is_dispatched_under() -> None:
+    """The browser pairs the two on this, so a row it can never settle is what a mismatch
+    looks like. Both read the same expression, including the derived-from-index fallback."""
+    events = drain(
+        [
+            chunk(tool_calls=[{"index": 3, "function": {"name": "x", "arguments": "{}"}}]),
+            chunk(finish="tool_calls"),
+        ]
+    )
+
+    announced = next(e for e in events if isinstance(e, ToolCallStarted))
+    ready = next(e for e in events if isinstance(e, ToolCallReady))
+    assert announced.id == ready.id == "call_3"
+
+
+def test_a_call_that_never_finishes_is_still_announced() -> None:
+    """A stream that breaks mid-arguments. The announcement already went out, which is the
+    honest record of what was on screen -- and nothing above persists it, so the stored turn
+    correctly contains no call at all."""
+    adapter = QwenAdapter()
+    events = list(
+        adapter.feed(
+            chunk(
+                tool_calls=[
+                    {"index": 0, "id": "c0", "function": {"name": "hera__note", "arguments": "{"}}
+                ]
+            )
+        )
+    )
+
+    assert started(events) == [("c0", "hera__note")]
+
+
+def test_a_fragment_with_no_name_yet_announces_nothing() -> None:
+    """Some servers open with the id alone. "She is calling something" is worth no more than
+    the running indicator already on screen, so nothing is said until there is a name."""
+    adapter = QwenAdapter()
+
+    assert list(adapter.feed(chunk(tool_calls=[{"index": 0, "id": "c0"}]))) == []
+
+
+def test_nothing_is_announced_for_a_turn_with_no_calls() -> None:
+    assert started(drain([chunk(content="hello"), chunk(finish="stop")])) == []

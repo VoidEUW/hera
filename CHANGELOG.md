@@ -69,6 +69,12 @@ section fills in as milestones land.
   thing being replayed through the context window. `hera__note` keeps the description it has and
   stops being reached for as working memory, which is what it was actually being used as. Deleting
   a chat deletes the directory, because a cache that outlives what it belongs to is litter.
+- **You can see what she is calling while she is still writing it.** A tool call used to reach the
+  browser only once the whole thing had arrived, so a turn spent the entire time it took to write a
+  long argument showing nothing at all — and the model's name for the call is in the *first* stream
+  fragment. The gutter now draws the row as soon as she names it and fills in what she called it
+  with when the arguments land. Streamed and never stored: a call the stream broke off mid-argument
+  never ran, and the stored list is the record of what happened.
 - **A tool call knows which conversation it is in.** Nothing could, before: her server is built
   once at startup and every call runs in a worker task created when the server connected, so the
   obvious `contextvars` answer reads back *empty* rather than failing. It travels in MCP's `_meta`
@@ -85,6 +91,17 @@ section fills in as milestones land.
   arrows walk it, Home and End jump, Escape closes and hands focus back.
 
 ### Fixed
+
+- **A long answer could end with “did not answer in time”.** The read timeout was three minutes and
+  is now ten, and it is editable on Settings → Models rather than only by hand in `config.toml`. It
+  never was a limit on how long an answer may take — it is measured between one piece of the
+  response and the next, so what it bounds is *silence*: loading the weights, and working through a
+  prompt that has grown a skill body and six rounds of history. Three minutes was not enough for a
+  local 35B asked to write a whole page, and what that looked like was a failure under an answer
+  that had been going fine.
+- **Her own tool names were clipped in the activity gutter.** `scratch write` and `scratch read`
+  both came out as `scratch …`, so the two rows a reader most needs to tell apart were the two the
+  column made identical.
 
 - **`PATCH /projects/{id}` could not clear a default profile.** The route tested
   `default_profile_id is not None`, which is right for every other field on that body and wrong for
@@ -131,11 +148,6 @@ section fills in as milestones land.
 - **Skill resources become readable.** `hera_skillsets` already tells the model a skill has files
   beside it; `hera__read_resource` makes that sentence true, which is what Anthropic's
   reference-heavy skills need.
-- **Somewhere to actually run code**, as `hera-sandbox-mcp` — a separate server with its own
-  namespace, so a deployment that does not want it does not mount it. Moved forward out of *not in
-  this version*: deferring it was a demand for a decision record about which claim it makes, and
-  that record now exists. The script-running skills — `pptx`, `docx`, `xlsx` — work, and the file
-  they produce becomes an artifact without its bytes passing through the model.
 - **`hera_memories`.** Retrieval with per-tier caps, write-dedup, hit counts. `hera__remember` stops
   answering "not available in this deployment", and the embedder seam v0.1 left open closes.
 - **`hera_promptevo`.** Dreaming, proposing to evolvable mind regions and to memory. Every proposal

@@ -31,21 +31,25 @@ not a correct diff: a branch still based on the pre-squash tip proposes to *undo
 only in the squash. Checking `git diff --name-status origin/main HEAD` for deletions before each
 merge is what caught `.gitkeep` going missing, and it is worth doing every time.
 
-**M2 is next, and it is three branches rather than one.** It grew: the sandbox moved forward out of
-*not in v0.2* and into it, so the milestone is now **scratchpad → artifacts → sandbox**, in that
-order and for a reason worth keeping — the intuition is *sandbox first, it sounds like the hard
-part*, and the dependencies run the other way. No artifact kind needs code execution; what the
-sandbox needs is somewhere to put what it produces, and that is the artifact store. Under both sits
-the question [tooling.md](tooling.md) § 5 already flagged, that artifacts and the scratchpad want
-the same storage and answering them separately produces two.
+**M2 is next, and it is two branches rather than one**, split where
+[tooling.md](tooling.md) § 5 said it had to be: artifacts and the scratchpad want the same storage,
+and answering them separately produces two.
 
 | | |
 |---|---|
 | **M2a** | The scratchpad, and a tool call that knows which chat it is in — [ADR 12](adr/0012-a-chat-has-a-scratchpad.md) |
 | **M2b** | Artifacts and skill resources — [ADR 13](adr/0013-artifacts-are-tool-calls-with-versions.md), [ADR 14](adr/0014-skill-resources-are-readable.md) |
-| **M2c** | `hera-sandbox-mcp` — [ADR 15](adr/0015-running-code-in-a-container.md) |
 
-**The thing that blocks all three, and was not obvious:** no tool can know which chat it is in. Her
+**A third stage was planned and dropped, and the reason is worth keeping because the mistake is
+easy to make twice.** The sandbox was pulled forward from *not in v0.2* on the assumption that
+artifacts needed somewhere to run code. They do not: `markdown`, `code`, `mermaid`, `html` and
+`svg` are content, and an HTML artifact is a sandboxed `iframe` in the browser rather than a
+container on the host. Running code is load-bearing only for the *script-running* half of
+Anthropic's skills, which is a smaller prize than a Docker dependency and a security claim to keep
+true. [ADR 15](adr/0015-running-code-in-a-container.md) is written and stands — it answers the
+question § 3 refused to let the work start without — and it is scheduled for **v0.3**.
+
+**The thing that blocked both, and was not obvious:** no tool can know which chat it is in. Her
 server is built once at startup with its ports bound, and `ManagedServer` runs every call as a
 child of a worker task created at *connect* time — so a `contextvars.ContextVar` set around the
 turn reads back empty in the tool, silently. It travels in MCP's `_meta` instead:
@@ -53,12 +57,6 @@ turn reads back empty in the tool, silently. It travels in MCP's `_meta` instead
 the SDK keeps out of the input schema, and the key travels through `ChatsSettings.chat_meta_key`
 the way `hera__ask`'s name travels through `asking_tools`. Verified against the SDK before any of
 it was designed around. `hera__remember(scope="chat")` has been missing exactly this since v0.1.
-
-**Deferring the sandbox was never about difficulty.** `tooling.md` § 3 said it should not be built
-"until somebody has written down which of those two it is" — *a small sandbox for testing* or
-*safe*. That is a demand for a decision record, and ADR 15 is it: the first, built carefully, and
-explicitly not the second, with what would upgrade the claim named. Docker becomes a requirement
-for one tool and is absent rather than broken without it.
 
 **M2a is built**, on `feat/chat-scratchpad` off `main`. What it turned up:
 
@@ -87,7 +85,28 @@ for one tool and is absent rather than broken without it.
   literals — spelled out, that test fails every time a tool is added and the fix is always to
   paste the name in.
 
-1031 tests at 98 % coverage, plus 86 vitest and 12 Playwright. M2b starts from here.
+**Three things came off the back of driving it against a real endpoint**, and all three are on the
+same branch:
+
+- **A tool call is announced before it is finished.** `tool_call_started` is a new
+  `hera_providers` variant carrying the id and the name, emitted from the stream fragment that
+  *names* the call rather than from the one that completes it. Until this, a turn spent the whole
+  of a long argument with nothing on screen — and an artifact whose content is a 40 KB document is
+  exactly that case, so this is a prerequisite for M2b rather than a nicety. It is **streamed and
+  never persisted**, which makes the reducer's contract explicit: a reload has strictly fewer
+  events and has to draw the same rows, and it does, because the started row and the ready row are
+  one row keyed on the call id.
+- **The gutter's verb column was too narrow for her own tool names.** `scratch write` and
+  `scratch read` both clipped to `scratch …`, so the two rows a reader most needs to tell apart
+  were the two it made identical. The column comment had predicted this exact failure; 8em now.
+- **The read timeout was three minutes and is ten**, and it is editable on Settings → Models rather
+  than only in `config.toml`. It is not a limit on how long an answer may take: httpx measures it
+  between one piece of the response and the next, so what it bounds is *silence* — loading the
+  weights, and prefilling a prompt that has grown a skill body and six rounds of history. A local
+  35B asked for a whole HTML page fell off the end of three minutes, and what a person saw was
+  `did not answer in time` under an answer that had been going fine.
+
+1042 tests at 98 % coverage, plus 94 vitest and 12 Playwright. M2b starts from here.
 
 ---
 

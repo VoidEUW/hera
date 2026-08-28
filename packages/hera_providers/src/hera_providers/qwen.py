@@ -8,7 +8,9 @@ jobs, and the first two are the reason the file exists:
   and its chat template -- inline in ``content`` wrapped in ``<think>`` tags. Both are lifted
   into :class:`ThinkingDelta`, so no layer above ever sees a tag.
 * **Tool calls.** They arrive as fragments indexed by position, with the arguments streamed as
-  partial JSON. They are accumulated here and emitted whole.
+  partial JSON. They are accumulated here and emitted whole -- preceded by one
+  :class:`ToolCallStarted` as soon as the *name* is known, because the whole call can be
+  minutes away and a person watching an empty screen cannot tell working from stopped.
 * **Finish.** One :class:`TurnEnd` at the end, always, with the reason normalised.
 
 This class is pure: no I/O, no httpx, nothing async. That is what makes the awkward part --
@@ -28,6 +30,7 @@ from hera_providers.events import (
     TextDelta,
     ThinkingDelta,
     ToolCallReady,
+    ToolCallStarted,
     TurnEnd,
     Usage,
 )
@@ -77,7 +80,7 @@ class QwenAdapter:
             yield from _as_events(self._splitter.feed(content))
 
         for raw in delta.get("tool_calls") or []:
-            self._accumulate(raw)
+            yield from self._accumulate(raw)
 
         finish = choice.get("finish_reason")
         if isinstance(finish, str) and finish:
@@ -100,7 +103,15 @@ class QwenAdapter:
             reason = "tool_calls"
         yield TurnEnd(reason=reason, usage=self._usage)
 
-    def _accumulate(self, raw: object) -> None:
+    def _accumulate(self, raw: object) -> Iterator[Event]:
+        """Fold one fragment into the call it belongs to, announcing the call once.
+
+        The announcement is deliberately at the *end*: ``id`` and ``function.name`` arrive in
+        the same fragment, and reading the whole of it before saying anything is what makes the
+        announced id the one :meth:`_PartialCall.build` will use. Saying it earlier would risk
+        naming a call ``call_0`` and then dispatching it as something else, which is worse than
+        saying nothing.
+        """
         if not isinstance(raw, Mapping):
             return
         index = raw.get("index")
@@ -122,6 +133,13 @@ class QwenAdapter:
         if isinstance(arguments, str):
             call.arguments += arguments
 
+        if call.name and not call.announced:
+            # Once per call, and only once there is a name to announce -- a row that says
+            # "she is calling something" is worth no more than the running indicator already
+            # on screen. Arguments are not looked at: half a JSON object is not a name.
+            call.announced = True
+            yield ToolCallStarted(id=call.call_id, name=call.name)
+
 
 @dataclass
 class _PartialCall:
@@ -131,9 +149,22 @@ class _PartialCall:
     id: str = ""
     name: str = ""
     arguments: str = ""
+    announced: bool = False
+    """Whether a :class:`ToolCallStarted` has already gone out for this call. A call arrives in
+    many fragments and is announced on the first one that names it."""
+
+    @property
+    def call_id(self) -> str:
+        """The identity this call will be dispatched under.
+
+        One expression, read by both the announcement and the finished call, so the two cannot
+        drift apart and leave the browser with a row it can never pair up. The fallback exists
+        because a few servers omit ``id`` entirely on a single-call turn.
+        """
+        return self.id or f"call_{self.index}"
 
     def build(self) -> ToolCallReady:
-        call_id = self.id or f"call_{self.index}"
+        call_id = self.call_id
         raw = self.arguments
         if not raw.strip():
             # A tool that takes no arguments; servers send "", "{}" or nothing at all.

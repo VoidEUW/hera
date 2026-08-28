@@ -95,13 +95,24 @@
 		}
 	}
 
-	function edit(name: string, field: string, value: string) {
+	function edit(name: string, field: string, value: string | number) {
 		drafts = { ...drafts, [name]: { ...drafts[name], [field]: value } };
 	}
 
 	function current(entry: Provider, field: 'base_url' | 'model' | 'embedding_model'): string {
 		const draft = drafts[entry.name]?.[field];
 		return draft !== undefined ? String(draft) : entry[field];
+	}
+
+	/** The silence budget, in seconds, as the field shows it.
+	 *
+	 * Kept as a number all the way to the request rather than sent as a string: the API validates
+	 * it as one, and a `""` from an emptied field would be a 422 saying "input should be a valid
+	 * number" under a box the person had merely cleared to retype. An unparseable value falls
+	 * back to what is stored, so clearing the field and clicking away changes nothing. */
+	function seconds(entry: Provider): number {
+		const draft = drafts[entry.name]?.timeout_s;
+		return typeof draft === 'number' ? draft : entry.timeout_s;
 	}
 
 	function say(cause: unknown): string {
@@ -167,6 +178,21 @@
 				oninput={(e) => edit(entry.name, 'embedding_model', e.currentTarget.value)}
 			/>
 			<small>{t.models.embeddingHint}</small>
+		</label>
+
+		<label>
+			<span>{t.models.timeout}</span>
+			<input
+				type="number"
+				min="1"
+				step="10"
+				value={seconds(entry)}
+				oninput={(e) => {
+					const parsed = Number(e.currentTarget.value);
+					if (Number.isFinite(parsed) && parsed > 0) edit(entry.name, 'timeout_s', parsed);
+				}}
+			/>
+			<small>{t.models.timeoutHint}</small>
 		</label>
 
 		<div class="actions">

@@ -23,7 +23,13 @@
  * below it rather than more text appended to a row above it.
  */
 
-import type { AnyEvent, ChatEvent, ToolCallReady, ToolResultEvent } from './api/events';
+import type {
+	AnyEvent,
+	ChatEvent,
+	ToolCallReady,
+	ToolCallStarted,
+	ToolResultEvent
+} from './api/events';
 import { isAsk, isEmotion } from './api/events';
 
 /** A row in the activity gutter: something she did before or between speaking. */
@@ -181,8 +187,32 @@ export function reduce(events: AnyEvent[]): Turn {
 				row({ kind: 'skill', key, event });
 				break;
 
+			case 'tool_call_started': {
+				// She has begun a call and named it, and the arguments are still arriving — which
+				// on a real endpoint is where a turn spends minutes with nothing on screen. The
+				// row is drawn now and *filled in* when the whole call lands, rather than being
+				// drawn twice: it is keyed on the call id for exactly that reason.
+				//
+				// This event is never persisted, so a reloaded turn has only the `ready` below.
+				// Both paths therefore have to produce the same row, and they do — this branch
+				// creates the row early and the next one reuses it if it is already there.
+				const begun = event as ToolCallStarted;
+				if (isEmotion(begun) || isAsk(begun)) break;
+				settle();
+				byCall.set(begun.id, row({ kind: 'tool', key: `call-${begun.id}`, event: begun }));
+				break;
+			}
+
 			case 'tool_call_ready': {
 				const call = event as ToolCallReady;
+				const begun = byCall.get(call.id);
+				if (begun) {
+					// The same row, now that there is something to say about what she called it
+					// with. Its key does not change, so Svelte keeps the component — and with it
+					// anything the reader had already opened.
+					begun.event = call;
+					break;
+				}
 				settle();
 				if (isEmotion(call)) {
 					// An emotion renders where she called it, between paragraphs, because that
@@ -199,7 +229,7 @@ export function reduce(events: AnyEvent[]): Turn {
 					// question twice, once as machinery and once as the thing she said.
 					break;
 				}
-				byCall.set(call.id, row({ kind: 'tool', key, event: call }));
+				byCall.set(call.id, row({ kind: 'tool', key: `call-${call.id}`, event: call }));
 				break;
 			}
 

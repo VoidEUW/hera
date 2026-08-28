@@ -63,7 +63,13 @@ class ProviderEntry(BaseModel):
     embedding_model: str = ""
     """Empty means embeddings are off and retrieval falls back to keyword overlap (ADR 5)."""
 
-    timeout_s: float = 180.0
+    timeout_s: float = 600.0
+    """How long this endpoint may be **silent** before the turn gives up — not how long a turn
+    may take. See :attr:`hera_providers.ProviderSettings.timeout_s`: on a streamed answer it is
+    measured between one piece of the response and the next, so what it really bounds is loading
+    the weights and prefilling the prompt. Editable on Settings → Models, because the right value
+    is a fact about the machine the model is on and nobody else can know it."""
+
     connect_timeout_s: float = 5.0
 
     @field_validator("name")

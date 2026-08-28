@@ -21,6 +21,12 @@ export interface ThinkingDelta {
 	text: string;
 }
 
+export interface ToolCallStarted {
+	type: 'tool_call_started';
+	id: string;
+	name: string;
+}
+
 export interface ToolCallReady {
 	type: 'tool_call_ready';
 	id: string;
@@ -101,6 +107,7 @@ export interface TurnClosed {
 export type ChatEvent =
 	| TextDelta
 	| ThinkingDelta
+	| ToolCallStarted
 	| ToolCallReady
 	| SkillSelected
 	| ToolResultEvent
@@ -125,6 +132,7 @@ export type AnyEvent = ChatEvent | UnknownEvent;
 const KNOWN = new Set([
 	'text_delta',
 	'thinking_delta',
+	'tool_call_started',
 	'tool_call_ready',
 	'skill_selected',
 	'tool_result',
@@ -154,15 +162,25 @@ export const SKILL_TOOL = 'hera__skill';
 /** Her own namespace, which is the only one this interface is allowed to recognise. */
 export const HERA = 'hera__';
 
+/** The name on either kind of call event, or `''` for anything else.
+ *
+ * Both `tool_call_started` and `tool_call_ready` are about the same call and carry the same
+ * `name`, so every question of the form *is this call an X* has to accept both — otherwise the
+ * emotion she announced draws a gutter row for a second and then turns into a card. */
+function callName(event: AnyEvent): string {
+	if (event.type !== 'tool_call_started' && event.type !== 'tool_call_ready') return '';
+	return (event as { name?: string }).name ?? '';
+}
+
 export function isEmotion(event: AnyEvent): boolean {
-	// A plain predicate rather than a type guard: the caller already knows it holds a
-	// ToolCallReady, and a guard would narrow the *negative* branch to `never`.
-	return event.type === 'tool_call_ready' && (event as ToolCallReady).name === EMOTION_TOOL;
+	// A plain predicate rather than a type guard: the caller already knows it holds a call
+	// event, and a guard would narrow the *negative* branch to `never`.
+	return callName(event) === EMOTION_TOOL;
 }
 
 /** Whether this call is her asking the person something. */
 export function isAsk(event: AnyEvent): boolean {
-	return event.type === 'tool_call_ready' && (event as ToolCallReady).name === ASK_TOOL;
+	return callName(event) === ASK_TOOL;
 }
 
 /** Whether this tool row is about a skill, by call or by result.
@@ -172,7 +190,6 @@ export function isAsk(event: AnyEvent): boolean {
  * draws one of them as a card. What it must not do is learn somebody else's server — that is
  * what makes an unfamiliar tool look broken next to a familiar one. */
 export function isSkillTool(event: AnyEvent): boolean {
-	if (event.type === 'tool_call_ready') return (event as ToolCallReady).name === SKILL_TOOL;
 	if (event.type === 'tool_result') return (event as { tool?: string }).tool === SKILL_TOOL;
-	return false;
+	return callName(event) === SKILL_TOOL;
 }

@@ -16,7 +16,7 @@
  * `hera__*` and refuses to know anything else.
  */
 
-import { HERA, type AnyEvent, type ToolCallReady } from './api/events';
+import { HERA, type AnyEvent } from './api/events';
 
 /** Which mark a row draws in the gutter. */
 export type Mark = 'thinking' | 'skill' | 'search' | 'note' | 'memory' | 'tool';
@@ -60,9 +60,15 @@ export function mark(qualified: string): Mark {
 	}
 }
 
-/** The mark for a gutter row, from whichever event it was built out of. */
+/** The mark for a gutter row, from whichever event it was built out of.
+ *
+ * A row starts life as a `tool_call_started` and becomes a `tool_call_ready` in place, so both
+ * have to answer this the same way — otherwise the mark beside a running call changes shape the
+ * moment its arguments finish arriving. */
 export function markOf(event: AnyEvent): Mark {
-	if (event.type === 'tool_call_ready') return mark((event as ToolCallReady).name);
+	if (event.type === 'tool_call_started' || event.type === 'tool_call_ready') {
+		return mark((event as { name?: string }).name ?? '');
+	}
 	if (event.type === 'tool_result') return mark((event as { tool?: string }).tool ?? '');
 	return 'tool';
 }

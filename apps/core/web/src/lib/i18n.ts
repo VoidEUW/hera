@@ -236,6 +236,11 @@ export const t = {
 		model: 'Model',
 		embeddingModel: 'Embedding model',
 		embeddingHint: 'Optional. Empty means retrieval falls back to keyword overlap.',
+		timeout: 'Silence before giving up',
+		timeoutHint:
+			'Seconds this endpoint may go quiet — loading the model, or working through a long ' +
+			'prompt. Not a limit on how long an answer may take. Raise it if a turn ends with ' +
+			'“did not answer in time”.',
 		apiKey: 'API key',
 		keyStored: 'A key is stored. Leave this empty to keep it.',
 		keyBlank: 'No key — the usual case for a local server.',

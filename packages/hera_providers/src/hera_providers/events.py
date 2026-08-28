@@ -59,6 +59,32 @@ class ThinkingDelta(BaseModel):
     text: str
 
 
+class ToolCallStarted(BaseModel):
+    """The model has begun a tool call and said which one. **Progress, not a record.**
+
+    The protocol streams a call's ``arguments`` as JSON fragments, and the name arrives in the
+    first of them — so this can be emitted seconds or minutes before :class:`ToolCallReady`,
+    which cannot be emitted until the whole call has landed. Without it, a turn that spends two
+    minutes writing a long argument shows *nothing at all* on screen for two minutes, and a
+    person watching cannot tell a model that is working from one that has stopped.
+
+    It carries the name and nothing else it could be wrong about. Reading a *partial* JSON
+    object to guess at the arguments would be a second parser over model output, which is the
+    one thing this union exists to avoid — the arguments arrive, whole, in ``ToolCallReady``.
+
+    ``id`` matches the eventual ``ToolCallReady.id``, so a reader can pair them. Everything
+    downstream treats this as something to *draw* rather than something to keep: it is streamed
+    to the browser and never persisted, because a call that never finished arriving never ran,
+    and the stored event list is the record of what happened.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    type: Literal["tool_call_started"] = "tool_call_started"
+    id: str
+    name: str
+
+
 class ToolCallReady(BaseModel):
     """One complete tool call, ready for a permission check and dispatch.
 
@@ -95,7 +121,7 @@ class TurnEnd(BaseModel):
 
 
 Event = Annotated[
-    TextDelta | ThinkingDelta | ToolCallReady | TurnEnd,
+    TextDelta | ThinkingDelta | ToolCallStarted | ToolCallReady | TurnEnd,
     Field(discriminator="type"),
 ]
 """The union itself. Annotate with this; match on the concrete classes."""

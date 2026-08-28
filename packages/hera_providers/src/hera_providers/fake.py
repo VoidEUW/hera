@@ -34,6 +34,7 @@ from hera_providers.events import (
     TextDelta,
     ThinkingDelta,
     ToolCallReady,
+    ToolCallStarted,
     TurnEnd,
     Usage,
 )
@@ -141,9 +142,18 @@ def thinking_turn(thinking: str, *chunks: str) -> list[Event]:
     return [ThinkingDelta(text=thinking), *text_turn(*chunks)]
 
 
-def tool_turn(*calls: ToolCallReady, text: str = "") -> list[Event]:
-    """A turn that asks for tools. Several calls at once is the normal case, not the corner."""
+def tool_turn(*calls: ToolCallReady, text: str = "", announce: bool = True) -> list[Event]:
+    """A turn that asks for tools. Several calls at once is the normal case, not the corner.
+
+    ``announce`` puts a :class:`ToolCallStarted` in front of each call, which is what a real
+    stream does — the name arrives in the first fragment and the whole call much later. On by
+    default so that a test written against this fake exercises the same event sequence the
+    browser will actually see; a test about what is *persisted* can turn it off, though it does
+    not need to, because the turn never records one.
+    """
     events: list[Event] = [TextDelta(text=text)] if text else []
+    if announce:
+        events.extend(ToolCallStarted(id=call.id, name=call.name) for call in calls)
     events.extend(calls)
     events.append(TurnEnd(reason="tool_calls"))
     return events

@@ -23,6 +23,7 @@ from hera_providers.events import (
     TextDelta,
     ThinkingDelta,
     ToolCallReady,
+    ToolCallStarted,
     TurnEnd,
     Usage,
 )
@@ -77,6 +78,7 @@ __all__ = [
     "ThinkingDelta",
     "ToolCall",
     "ToolCallReady",
+    "ToolCallStarted",
     "ToolSpec",
     "TurnEnd",
     "Usage",

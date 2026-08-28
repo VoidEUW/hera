@@ -576,8 +576,8 @@ class ProviderIn(BaseModel):
     model: str = Field(min_length=1)
     api_key: str = ""
     embedding_model: str = ""
-    timeout_s: float = 180.0
-    connect_timeout_s: float = 5.0
+    timeout_s: float = Field(default=600.0, gt=0)
+    connect_timeout_s: float = Field(default=5.0, gt=0)
 
     @field_validator("name")
     @classmethod
@@ -597,8 +597,8 @@ class ProviderPatch(BaseModel):
     model: str | None = Field(default=None, min_length=1)
     api_key: str | None = None
     embedding_model: str | None = None
-    timeout_s: float | None = None
-    connect_timeout_s: float | None = None
+    timeout_s: float | None = Field(default=None, gt=0)
+    connect_timeout_s: float | None = Field(default=None, gt=0)
 
 
 class ProbeOut(BaseModel):

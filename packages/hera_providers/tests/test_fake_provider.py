@@ -21,6 +21,7 @@ from hera_providers import (
     TextDelta,
     ThinkingDelta,
     ToolCallReady,
+    ToolCallStarted,
     TurnEnd,
     Usage,
     pseudo_embedding,
@@ -99,7 +100,9 @@ async def test_a_callable_script_can_answer_the_request_it_is_given() -> None:
     provider = FakeProvider(respond)
 
     first = await collect(provider, ask())
-    assert isinstance(first[0], ToolCallReady)
+    # `tool_turn` announces each call before it, the way a real stream does.
+    assert isinstance(first[0], ToolCallStarted)
+    assert isinstance(first[1], ToolCallReady)
     assert first[-1] == TurnEnd(reason="tool_calls")
 
     with_result = ChatRequest(

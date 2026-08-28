@@ -207,7 +207,16 @@ class TestTheToolLoop:
         turn = make_orchestrator(provider, tools).begin(TurnContext(text="read a"))
         events = await drain(turn.stream())
 
-        assert kinds(events) == ["tool_call_ready", "tool_result", "text_delta", "turn_closed"]
+        assert kinds(events) == [
+            # `tool_call_started` is streamed and never recorded -- it says *she has begun
+            # calling this* while the arguments are still arriving. Asserted here rather than
+            # filtered out, because the sequence a person sees is what this test is about.
+            "tool_call_started",
+            "tool_call_ready",
+            "tool_result",
+            "text_delta",
+            "turn_closed",
+        ]
         assert isinstance(events[-1], TurnClosed)
         assert events[-1].iterations == 2
 
@@ -431,8 +440,13 @@ class TestPermissions:
         turn = make_orchestrator(provider, tools).begin(TurnContext(text="go"))
         events = await drain(turn.stream())
 
-        assert kinds(events) == ["tool_call_ready", "permission_required", "turn_closed"]
-        card = events[1]
+        assert kinds(events) == [
+            "tool_call_started",
+            "tool_call_ready",
+            "permission_required",
+            "turn_closed",
+        ]
+        card = events[2]
         assert isinstance(card, PermissionRequired)
         assert card.tool == "fs__read_file"
         assert card.arguments == {"path": "a"}
@@ -493,16 +507,17 @@ class TestPermissions:
         self, make_orchestrator: Make, ask_policy: Policy
     ) -> None:
         tools = StubTools(policy=ask_policy)
-        paused = await drain(
-            make_orchestrator(
-                FakeProvider([tool_turn(tool_call("fs__read_file"), text="Looking. ")]), tools
-            )
-            .begin(TurnContext(text="go"))
-            .stream()
-        )
+        first = make_orchestrator(
+            FakeProvider([tool_turn(tool_call("fs__read_file"), text="Looking. ")]), tools
+        ).begin(TurnContext(text="go"))
+        await drain(first.stream())
 
+        # `recorded` and not the drained stream: the application resumes from what was
+        # *persisted*, and the two now differ by the `tool_call_started` that is streamed and
+        # never stored. Resuming from the stream would feed the turn an event it can never
+        # receive in production.
         resumed = make_orchestrator(FakeProvider([text_turn("Done.")]), tools).begin(
-            TurnContext(text="", resume=paused, confirmed=["call_fs__read_file"])
+            TurnContext(text="", resume=first.recorded, confirmed=["call_fs__read_file"])
         )
         await drain(resumed.stream())
 
@@ -590,8 +605,13 @@ class TestAskingBack:
             make_orchestrator(provider, tools).begin(TurnContext(text="go")).stream()
         )
 
-        assert kinds(events) == ["tool_call_ready", "answer_required", "turn_closed"]
-        card = events[1]
+        assert kinds(events) == [
+            "tool_call_started",
+            "tool_call_ready",
+            "answer_required",
+            "turn_closed",
+        ]
+        card = events[2]
         assert isinstance(card, AnswerRequired)
         assert card.question == "Which slide deck?"
         assert card.kind == "unsure"
@@ -812,6 +832,62 @@ async def test_an_empty_message_sends_no_user_turn(make_orchestrator: Make, text
     await drain(make_orchestrator(provider).begin(TurnContext(text=text)).stream())
 
     assert all(m.text.strip() for m in provider.requests[0].messages)
+
+
+class TestAnnouncingACall:
+    """`tool_call_started` is streamed and never recorded.
+
+    It exists because the name of a call arrives in the first stream fragment and the whole
+    call only after the last, which on a real endpoint can be minutes later when the arguments
+    are a document. What that means here is that the live event list and the persisted one are
+    no longer the same list — so the two properties below are the contract the browser's
+    reducer is written against, and both are asserted rather than assumed.
+    """
+
+    async def test_it_reaches_the_stream(self, make_orchestrator: Make, tools: StubTools) -> None:
+        provider = FakeProvider([tool_turn(tool_call("fs__read_file")), text_turn("done")])
+
+        events = await drain(
+            make_orchestrator(provider, tools).begin(TurnContext(text="go")).stream()
+        )
+
+        assert kinds(events)[0] == "tool_call_started"
+
+    async def test_it_is_not_recorded(self, make_orchestrator: Make, tools: StubTools) -> None:
+        """The stored list is the record of what *happened*; this is progress. A call the
+        stream broke off mid-argument never ran, and history already says so."""
+        provider = FakeProvider([tool_turn(tool_call("fs__read_file")), text_turn("done")])
+        turn = make_orchestrator(provider, tools).begin(TurnContext(text="go"))
+
+        await drain(turn.stream())
+
+        assert "tool_call_started" not in kinds(turn.recorded)
+
+    async def test_it_carries_the_id_the_call_is_dispatched_under(
+        self, make_orchestrator: Make, tools: StubTools
+    ) -> None:
+        """What the browser pairs the two rows on. A mismatch is a row that stays *running*
+        for ever beside the finished one."""
+        provider = FakeProvider([tool_turn(tool_call("fs__read_file")), text_turn("done")])
+
+        events = await drain(
+            make_orchestrator(provider, tools).begin(TurnContext(text="go")).stream()
+        )
+
+        announced = next(e for e in events if e.type == "tool_call_started")
+        ready = next(e for e in events if e.type == "tool_call_ready")
+        assert announced.id == ready.id
+
+    async def test_a_turn_with_no_calls_announces_nothing(
+        self, make_orchestrator: Make, tools: StubTools
+    ) -> None:
+        events = await drain(
+            make_orchestrator(FakeProvider([text_turn("hello")]), tools)
+            .begin(TurnContext(text="hi"))
+            .stream()
+        )
+
+        assert "tool_call_started" not in kinds(events)
 
 
 class TestWhatACallIsToldAboutTheTurn:

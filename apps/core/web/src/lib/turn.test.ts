@@ -27,6 +27,7 @@ const call = (id: string, name: string, args: Record<string, unknown> = {}): Any
 	raw_arguments: '',
 	parse_error: null
 });
+const started = (id: string, name: string): AnyEvent => ({ type: 'tool_call_started', id, name });
 const result = (callId: string, tool: string, over: Record<string, unknown> = {}): AnyEvent => ({
 	type: 'tool_result',
 	call_id: callId,
@@ -491,5 +492,121 @@ describe('a block still being written', () => {
 		// the second claim, and a reloaded turn must not preview anything.
 		const turn = reduce([{ type: 'thinking_delta', text: 'done' }, closed()]);
 		expect(turn.activity[0].live).toBe(true);
+	});
+});
+
+describe('a call she has begun but not finished writing', () => {
+	// `tool_call_started` carries the name and nothing else, and arrives as soon as the model
+	// has named the call — which on a real endpoint is minutes before the arguments finish when
+	// the arguments are a document. It is never persisted, so these tests are also the contract
+	// that a reload draws the same rows from strictly fewer events.
+
+	it('draws a running row as soon as she names it', () => {
+		const turn = reduce([started('c1', 'hera__scratch_write')]);
+
+		expect(turn.activity.map((row) => [row.kind, row.event.type])).toEqual([
+			['tool', 'tool_call_started']
+		]);
+		expect(turn.activity[0].result).toBeUndefined();
+	});
+
+	it('fills the same row in rather than drawing a second one', () => {
+		const turn = reduce([
+			started('c1', 'hera__scratch_write'),
+			call('c1', 'hera__scratch_write', { name: 'plan.md' }),
+			closed()
+		]);
+
+		expect(turn.activity).toHaveLength(1);
+		expect(turn.activity[0].event.type).toBe('tool_call_ready');
+	});
+
+	it('keeps the row key stable across the two, so nothing is rebuilt mid-turn', () => {
+		const begun = reduce([started('c1', 'fs__read_file')]);
+		const done = reduce([started('c1', 'fs__read_file'), call('c1', 'fs__read_file'), closed()]);
+
+		expect(begun.activity[0].key).toBe(done.activity[0].key);
+	});
+
+	it('still pairs the result with it', () => {
+		const turn = reduce([
+			started('c1', 'fs__read_file'),
+			call('c1', 'fs__read_file'),
+			result('c1', 'fs__read_file'),
+			closed()
+		]);
+
+		expect(turn.activity).toHaveLength(1);
+		expect(turn.activity[0].result?.call_id).toBe('c1');
+	});
+
+	it('reduces to the same rows as the persisted list, which has no started event', () => {
+		// The property the whole design rests on. A reload has strictly fewer events and has to
+		// draw the same turn; if it did not, the answer would visibly change at `done`.
+		const live = reduce([
+			text('Let me look. '),
+			started('c1', 'fs__read_file'),
+			call('c1', 'fs__read_file', { path: 'a' }),
+			result('c1', 'fs__read_file'),
+			text('It says so.'),
+			closed()
+		]);
+		const stored = reduce([
+			text('Let me look. '),
+			call('c1', 'fs__read_file', { path: 'a' }),
+			result('c1', 'fs__read_file'),
+			text('It says so.'),
+			closed()
+		]);
+
+		// Kinds and content, which is the guarantee this file has always made — not keys. Those
+		// already differ between the two lists because the server coalesces text, and a prose
+		// block being rebuilt at `done` is invisible. What must not differ is how many rows
+		// there are and what they say.
+		expect(live.blocks.map((b) => b.kind)).toEqual(stored.blocks.map((b) => b.kind));
+		expect(live.inline.map((i) => [i.kind, i.text])).toEqual(
+			stored.inline.map((i) => [i.kind, i.text])
+		);
+		expect(live.activity.map((r) => r.event)).toEqual(stored.activity.map((r) => r.event));
+	});
+
+	it('draws no gutter row for an emotion she has begun', () => {
+		// The card is built from the finished call. A row here would draw the stance twice —
+		// once as machinery for a second, then as the thing she said.
+		const turn = reduce([
+			started('e1', 'hera__emotion'),
+			call('e1', 'hera__emotion', { kind: 'curious' }),
+			closed()
+		]);
+
+		expect(turn.activity).toHaveLength(0);
+		expect(turn.inline.map((i) => i.kind)).toEqual(['emotion']);
+	});
+
+	it('draws no gutter row for a question she has begun', () => {
+		const turn = reduce([
+			started('a1', 'hera__ask'),
+			call('a1', 'hera__ask', { question: 'Which deck?' }),
+			{
+				type: 'answer_required',
+				call_id: 'a1',
+				tool: 'hera__ask',
+				question: 'Which deck?',
+				kind: ''
+			},
+			closed('awaiting_answer')
+		]);
+
+		expect(turn.activity).toHaveLength(0);
+		expect(turn.inline.map((i) => i.kind)).toEqual(['question']);
+	});
+
+	it('leaves a call that never finished arriving as a running row', () => {
+		// What the reader sees when the endpoint stops answering mid-argument. Nothing is
+		// persisted for it, which is correct: the call never ran.
+		const turn = reduce([started('c1', 'hera__scratch_write'), closed('failed')]);
+
+		expect(turn.activity[0].result).toBeUndefined();
+		expect(turn.closed?.reason).toBe('failed');
 	});
 });

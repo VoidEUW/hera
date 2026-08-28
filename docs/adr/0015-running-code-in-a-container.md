@@ -1,7 +1,21 @@
 # 15. Running code happens in a container, and here is which claim that makes
 
-- Status: accepted
+- Status: **deferred to v0.3** — the shape below stands, the schedule does not
 - Date: 2026-08-28
+
+> **Why this is not in v0.2.** It was pulled forward on the assumption that artifacts needed
+> somewhere to run code. They do not: `markdown`, `code`, `mermaid`, `html` and `svg` are
+> content, and the browser draws them — an HTML artifact is a sandboxed `iframe`, not a
+> container. The only thing the sandbox is load-bearing for is the *script-running* half of
+> Anthropic's skills, `pptx` and its siblings, and that is a smaller prize than a Docker
+> dependency and a security claim to maintain.
+>
+> Nothing below is withdrawn. The question [`tooling.md`](../tooling.md) § 3 refused to let this
+> start without — *a small sandbox for testing, or safe?* — is answered here, and that answer
+> does not expire. When v0.3 picks it up, this is the record it picks up from.
+>
+> The one thing that shipped early and stays: `hera_tools` mounting more than one in-process
+> server is **not** built, and does not need to be until there is a second server to mount.
 
 ## Context
 

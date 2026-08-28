@@ -16,6 +16,15 @@ interface has to work out which one was the last. The orchestrator consumes them
 usage, and closes the turn once with :class:`TurnClosed`. One terminator, no arithmetic in the
 client.
 
+**``ToolCallStarted`` is here and is never persisted**, which is the other half of the same
+distinction. It is in the union because it goes to the browser and everything that does is
+serialised through here; it is not in :attr:`Turn.recorded` because it is *progress*, and the
+stored list is the record of what happened. A call the stream broke off mid-argument never ran,
+and history already says a call with no result never ran. The consequence to keep in mind: a
+reloaded turn has strictly fewer events than the live one had, and the reducer has to produce
+the same rows from both — which it does, because the started row and the ready row are the same
+row, keyed on the call id.
+
 Everything downstream keys off ``type`` and nothing parses text. A new kind of thing a turn can
 contain is one new variant here, one branch where it is rendered, and nothing else.
 """
@@ -27,7 +36,7 @@ from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
 
-from hera_providers import TextDelta, ThinkingDelta, ToolCallReady, Usage
+from hera_providers import TextDelta, ThinkingDelta, ToolCallReady, ToolCallStarted, Usage
 
 CloseReason = Literal[
     "completed",
@@ -196,6 +205,7 @@ class TurnClosed(BaseModel):
 ChatEvent = Annotated[
     TextDelta
     | ThinkingDelta
+    | ToolCallStarted
     | ToolCallReady
     | SkillSelected
     | ToolResultEvent

@@ -25,7 +25,12 @@
 	 * `tool_error` are the system behaving correctly, and alarming a person about those teaches
 	 * them to ignore the colour that matters.
 	 */
-	import { type SkillSelected, type ToolCallReady, type ToolResultEvent } from '$lib/api/events';
+	import {
+		type SkillSelected,
+		type ToolCallReady,
+		type ToolCallStarted,
+		type ToolResultEvent
+	} from '$lib/api/events';
 	import { duration, t } from '$lib/i18n';
 	import { markOf, subject, toolName } from '$lib/tools';
 	import type { Activity } from '$lib/turn';
@@ -52,6 +57,12 @@
 
 	const skill = $derived(row.kind === 'skill' ? (row.event as SkillSelected) : null);
 	const call = $derived(row.event.type === 'tool_call_ready' ? (row.event as ToolCallReady) : null);
+	/** A call she has named and not finished writing. The row is drawn from this until the
+	 * arguments land, which on a real endpoint is where a turn spends most of its time — see
+	 * `ToolCallStarted`. It becomes the `call` above, in place, in `$lib/turn`. */
+	const begun = $derived(
+		row.event.type === 'tool_call_started' ? (row.event as ToolCallStarted) : null
+	);
 	const result = $derived(
 		row.result ?? (row.event.type === 'tool_result' ? (row.event as ToolResultEvent) : undefined)
 	);
@@ -60,7 +71,7 @@
 	);
 
 	const running = $derived(row.kind === 'tool' && !result);
-	const named = $derived(toolName(call?.name ?? result?.tool ?? ''));
+	const named = $derived(toolName(call?.name ?? begun?.name ?? result?.tool ?? ''));
 	/** Which mark this row draws. A `skill_selected` event carries no tool name -- the router
 	 * chose it and nothing was called -- but it is the same picture as reaching for one. */
 	const shape = $derived(row.kind === 'skill' ? 'skill' : markOf(row.event));
@@ -157,7 +168,11 @@
 		{:else if row.kind === 'unknown'}
 			<span class="verb">{row.event.type}</span>
 			<span class="trail">{t.activity.unknown}</span>
-		{:else if mine && did}
+		{:else if mine && (did || begun)}
+			<!-- Her own tool reads with its own name as the verb. `begun` keeps it that way while
+			     the arguments are still arriving, so the row does not say *called scratch write*
+			     for a minute and then change its mind to *scratch write design-plan.md*: the
+			     wording settles once and only the target fills in. -->
 			<span class="verb">{named.action}</span>
 			<span class="target" title={named.qualified}>{did}</span>
 			<span class="trail">{trail}</span>
@@ -311,9 +326,15 @@
 
 	   Clipped as well as fixed, because for her own tools the verb *is* the tool's name and the
 	   longest one is not knowable here: a tool added to `hera_mcp` with a long name would
-	   otherwise push its own row's target out of the column and be the only row that does. */
+	   otherwise push its own row's target out of the column and be the only row that does.
+
+	   Widened from 5.2em when the scratchpad landed, which is the case the paragraph above
+	   predicted: `scratch write` and `scratch read` both clipped to `scratch w…` and `scratch
+	   r…`, so the two rows a person most needs to tell apart were the two the column made
+	   identical. 8em fits her longest name with room, and the target still has the reading
+	   column to itself. */
 	.verb {
-		width: 5.2em;
+		width: 8em;
 		flex: none;
 		overflow: hidden;
 		text-overflow: ellipsis;

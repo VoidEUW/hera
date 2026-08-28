@@ -67,6 +67,7 @@ from hera_providers import (
     TextDelta,
     ThinkingDelta,
     ToolCallReady,
+    ToolCallStarted,
     ToolSpec,
     TurnEnd,
     Usage,
@@ -437,6 +438,13 @@ class Turn:
                 # and a turn with tools in it has several. See hera_chats.events.
                 round_.usage = event.usage
                 round_.reason = event.reason
+                continue
+            if isinstance(event, ToolCallStarted):
+                # Streamed, not recorded. It says *she has begun calling this* minutes before
+                # the arguments finish arriving, which is the difference between a screen that
+                # looks busy and one that looks stopped -- but it is progress rather than
+                # something that happened, and `recorded` is the record. See hera_chats.events.
+                yield event
                 continue
             if isinstance(event, ToolCallReady):
                 round_.calls.append(event)

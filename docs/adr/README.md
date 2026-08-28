@@ -21,4 +21,4 @@ later.
 | [12](0012-a-chat-has-a-scratchpad.md) | A chat has a scratchpad, and a tool call carries the chat it is in | accepted |
 | [13](0013-artifacts-are-tool-calls-with-versions.md) | An artifact is a tool call with an identity and versions | accepted |
 | [14](0014-skill-resources-are-readable.md) | Skill resources are readable | accepted |
-| [15](0015-running-code-in-a-container.md) | Running code happens in a container, and here is which claim that makes | accepted |
+| [15](0015-running-code-in-a-container.md) | Running code happens in a container, and here is which claim that makes | **deferred to v0.3** |

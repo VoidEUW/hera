@@ -32,6 +32,7 @@ from hera_providers import (
     TextPart,
     ToolCall,
     ToolCallReady,
+    ToolCallStarted,
     ToolSpec,
     TurnEnd,
     build_client,
@@ -505,10 +506,15 @@ async def test_a_tool_calling_turn_arrives_as_complete_calls() -> None:
 
     events = await collect(make_provider(handler), request())
 
-    assert events[0] == ToolCallReady(
+    # The announcement comes out of the *first* frame, where the name is, and the complete call
+    # only after the second, where the arguments finish. That gap is the whole reason the first
+    # event exists: on a real endpoint the two frames are minutes apart when the arguments are
+    # a document, and until this the browser had nothing to draw for the whole of it.
+    assert events[0] == ToolCallStarted(id="c1", name="hera__emotion")
+    assert events[1] == ToolCallReady(
         id="c1",
         name="hera__emotion",
         arguments={"kind": "joke"},
         raw_arguments='{"kind":"joke"}',
     )
-    assert events[1] == TurnEnd(reason="tool_calls")
+    assert events[2] == TurnEnd(reason="tool_calls")

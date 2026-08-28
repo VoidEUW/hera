@@ -158,6 +158,10 @@ class TestSkillsAndTools:
             frames = await talk(client, await open_chat(client), "read a")
 
         assert names(frames) == [
+            # `tool_call_started` reaches the browser and is never stored: the name is in the
+            # first stream fragment and the whole call only after the last, which on a real
+            # endpoint is minutes apart when the arguments are a document.
+            "tool_call_started",
             "tool_call_ready",
             "tool_result",
             "text_delta",
@@ -490,6 +494,7 @@ class TestThePermissionCard:
             frames = await talk(client, await open_chat(client), "read a")
 
         assert names(frames) == [
+            "tool_call_started",
             "tool_call_ready",
             "permission_required",
             "turn_closed",
@@ -616,6 +621,7 @@ class TestTheQuestionCard:
             detail = (await client.get(f"{API}/chats/{chat_id}")).json()
 
         assert names(frames) == [
+            "tool_call_started",
             "tool_call_ready",
             "answer_required",
             "turn_closed",
