@@ -251,6 +251,10 @@ export const t = {
 	},
 
 	profileMenu: {
+		timezone: 'Time zone',
+		timezoneHint: 'What she is told the date and time are. She is always told UTC as well.',
+		timezoneUtc: 'UTC only',
+		timezoneDetect: (zone: string) => `Use this machine’s (${zone})`,
 		open: 'You and this machine',
 		appearance: 'Appearance',
 		profiles: 'Answering as',

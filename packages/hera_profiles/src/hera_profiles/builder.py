@@ -47,6 +47,13 @@ SLOT_MEMORIES = "memories"
 SLOT_PROJECT = "project"
 """The instructions of the project this chat lives in, if it lives in one."""
 
+SLOT_NOW = "now"
+"""What the date and time are, rendered by the application.
+
+A slot rather than a mind region: it is a *fact about this moment*, not a behaviour somebody
+should be able to edit. A region saying "it is Tuesday" would be wrong by Wednesday.
+"""
+
 SLOT_EMOTIONS = "emotions"
 """Her stance vocabulary, rendered by whoever owns it.
 
@@ -56,7 +63,7 @@ region it was a paragraph that the browser would have needed a second copy of.
 """
 
 SLOTS: frozenset[str] = frozenset(
-    {SLOT_TOOLS, SLOT_SKILLS, SLOT_MEMORIES, SLOT_PROJECT, SLOT_EMOTIONS}
+    {SLOT_TOOLS, SLOT_SKILLS, SLOT_MEMORIES, SLOT_PROJECT, SLOT_EMOTIONS, SLOT_NOW}
 )
 """Every slot the skeleton offers.
 
@@ -184,6 +191,10 @@ LAYOUT: tuple[Node, ...] = (
         title="Context",
         priority=70,
         children=(
+            # First in the group and low-priority on purpose: it is one line, and a model that
+            # does not know the date answers "what is current" from its training data — a whole
+            # class of confidently stale answers for thirty tokens.
+            Node(key="context.now", title="Right now", priority=68, slot=SLOT_NOW),
             Node(key="context.project", title="This project", priority=70, slot=SLOT_PROJECT),
             Node(key="context.user", title="About this person", priority=71, region="user_prefs"),
         ),

@@ -47,6 +47,7 @@ from hera_profiles import (
     BEHAVIOUR_TRAITS,
     SLOT_EMOTIONS,
     SLOT_MEMORIES,
+    SLOT_NOW,
     SLOT_PROJECT,
     SLOT_SKILLS,
     SLOT_TOOLS,
@@ -130,6 +131,16 @@ class TurnContext:
 
     memories: str = ""
     """Pre-rendered recall for the ``memories`` slot. Empty until v0.2."""
+
+    now: str = ""
+    """Pre-rendered date and time for the ``now`` slot.
+
+    Pre-rendered like the rest, and for a reason beyond consistency: the *person's* timezone is
+    a setting in ``config.toml``, and this package has no business reading it. Empty leaves the
+    section out — a deployment that tells her nothing about the time is one where she does not
+    claim to know it, which is better than one where she quietly assumes the server's clock is
+    the person's.
+    """
 
     emotions: str = ""
     """Pre-rendered stance vocabulary for the ``emotions`` slot.
@@ -335,6 +346,7 @@ class Turn:
             SLOT_PROJECT: context.project.instructions if context.project is not None else "",
             SLOT_TOOLS: catalogue_text,
             SLOT_EMOTIONS: context.emotions,
+            SLOT_NOW: context.now,
         }
         frame = prompt.render(
             bindings={key: value for key, value in bindings.items() if value},

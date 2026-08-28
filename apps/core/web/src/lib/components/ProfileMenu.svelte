@@ -10,9 +10,10 @@
 	 * a sheet over the conversation to change the theme would be a heavier gesture than the
 	 * thing deserves.
 	 */
-	import { api, type Health, type Profile } from '$lib/api/client';
+	import { api, type Health, type Preferences, type Profile } from '$lib/api/client';
 	import { t } from '$lib/i18n';
 	import { theme, type Appearance } from '$lib/theme.svelte';
+	import Select from './Select.svelte';
 
 	interface Props {
 		profiles: Profile[];
@@ -29,13 +30,51 @@
 	];
 
 	let health = $state<Health | null>(null);
+	let preferences = $state<Preferences | null>(null);
 
 	$effect(() => {
 		void api
 			.health()
 			.then((found) => (health = found))
 			.catch(() => undefined);
+		void api
+			.preferences()
+			.then((found) => (preferences = found))
+			.catch(() => undefined);
 	});
+
+	/** This machine's own zone, offered first — it is right almost every time, and typing
+	 * `Europe/Berlin` from memory is not something anybody should have to do. */
+	const detected = (() => {
+		try {
+			return Intl.DateTimeFormat().resolvedOptions().timeZone ?? '';
+		} catch {
+			return '';
+		}
+	})();
+
+	/** Every zone the browser knows, so the list is the real one rather than a table here that
+	 * would go stale the next time a country changed its mind. Older browsers without
+	 * `supportedValuesOf` get UTC plus the detected zone, which covers the useful case. */
+	const zones = (() => {
+		const all =
+			typeof Intl.supportedValuesOf === 'function'
+				? Intl.supportedValuesOf('timeZone')
+				: [detected].filter(Boolean);
+		return [
+			{ value: '', label: t.profileMenu.timezoneUtc },
+			...(detected ? [{ value: detected, label: t.profileMenu.timezoneDetect(detected) }] : []),
+			...all.filter((zone) => zone !== detected).map((zone) => ({ value: zone, label: zone }))
+		];
+	})();
+
+	async function setZone(timezone: string) {
+		try {
+			preferences = await api.setTimezone(timezone);
+		} catch {
+			/* the note under the control still shows what is actually stored */
+		}
+	}
 
 	async function makeDefault(profile: Profile) {
 		try {
@@ -97,6 +136,24 @@
 			{/each}
 		</section>
 	{/if}
+
+	<!-- What she is told the date and time are. Here rather than in Settings because it is a
+	     fact about *you* — where you are — not about how she works. The line underneath is the
+	     server's own rendering, so what is on screen is literally what she reads. -->
+	<section>
+		<p class="heading">{t.profileMenu.timezone}</p>
+		<Select
+			choices={zones}
+			value={preferences?.timezone ?? ''}
+			label={t.profileMenu.timezone}
+			onchange={setZone}
+		/>
+		{#if preferences}
+			<p class="note">{preferences.now}</p>
+		{:else}
+			<p class="note">{t.profileMenu.checking}</p>
+		{/if}
+	</section>
 
 	<section>
 		<p class="heading">{t.profileMenu.language}</p>

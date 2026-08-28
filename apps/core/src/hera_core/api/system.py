@@ -12,6 +12,10 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException, status
 
 from hera_core import __version__, emotions, trust
+from hera_core.clock import is_known
+from hera_core.clock import render as render_now
+from hera_core.config import load as load_config
+from hera_core.config import save as save_config
 from hera_core.deps import Container, Db, Owner
 from hera_core.schemas import (
     BrokenSkillOut,
@@ -20,6 +24,8 @@ from hera_core.schemas import (
     EmotionsOut,
     HealthOut,
     PermissionsOut,
+    PreferencesOut,
+    PreferencesPatch,
     RuleOut,
     ServerOut,
     SkillIn,
@@ -185,6 +191,35 @@ def read_permissions(container: Container) -> PermissionsOut:
         fallback=policy.fallback.value,
         rules=sorted(rules, key=lambda item: (item.pattern, item.profile or "")),
     )
+
+
+@router.get("/preferences", response_model=PreferencesOut)
+def read_preferences() -> PreferencesOut:
+    return _preferences()
+
+
+@router.patch("/preferences", response_model=PreferencesOut)
+def write_preferences(payload: PreferencesPatch) -> PreferencesOut:
+    """Change what is about *you* rather than about how she works.
+
+    A bad zone is refused here rather than degraded, which is the opposite of what
+    :func:`hera_core.clock.render` does with the same value — deliberately. A person typing into
+    a settings screen should be told immediately; a turn that has already started should not
+    fail over something somebody edited into a file last week.
+    """
+    if payload.timezone is not None:
+        if not is_known(payload.timezone):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"{payload.timezone!r} is not a time zone this system knows about",
+            )
+        save_config(load_config().with_timezone(payload.timezone))
+    return _preferences()
+
+
+def _preferences() -> PreferencesOut:
+    config = load_config()
+    return PreferencesOut(timezone=config.timezone, now=render_now(config.timezone))
 
 
 @router.get("/health", response_model=HealthOut)

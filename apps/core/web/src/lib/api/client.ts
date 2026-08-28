@@ -180,6 +180,15 @@ export interface Probe {
 	error: string;
 }
 
+export interface Preferences {
+	/** IANA name, or empty for UTC alone. */
+	timezone: string;
+	/** The sentence she is actually given this turn. Rendered by the server rather than
+	 * reconstructed here — the interface formatting a date the same way the prompt does, in a
+	 * second place, is two things to keep in step across a daylight-saving change. */
+	now: string;
+}
+
 export interface Health {
 	ok: boolean;
 	version: string;
@@ -277,6 +286,13 @@ export const api = {
 	writeEmotions: (emotions: Emotion[]) =>
 		request<Emotions>('/emotions', { method: 'PUT', body: JSON.stringify({ emotions }) }),
 	resetEmotions: () => request<Emotions>('/emotions/reset', { method: 'POST' }),
+	preferences: () => request<Preferences>('/preferences'),
+	setTimezone: (timezone: string) =>
+		request<Preferences>('/preferences', {
+			method: 'PATCH',
+			body: JSON.stringify({ timezone })
+		}),
+
 	servers: () => request<Server[]>('/servers'),
 	permissions: () => request<{ fallback: string; rules: Rule[] }>('/permissions')
 };

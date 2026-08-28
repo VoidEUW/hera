@@ -55,6 +55,13 @@ section fills in as milestones land.
   Evolvable, because the useful version of *when should I ask?* is learned from conversations that
   went badly. `uncertainty` and `hera__ask` shipped together: telling her to ask, with no way to,
   produces a model that announces its confusion and guesses anyway.
+- **She knows what day it is.** The date and time go into every prompt — UTC always, plus the
+  person's local time when a zone is set on the profile menu. A model that does not know the date
+  answers "what is current" from its training data, confidently and a year late, and nothing on
+  screen tells that apart from an answer that is merely wrong. Implicit rather than a tool: a
+  `what_time_is_it` call would spend a round trip to learn something free, and would only be made
+  by a model that already suspected it needed to. An IANA name rather than an offset, because an
+  offset is wrong twice a year.
 - **One selector, and one popup.** `Select.svelte` replaces every dropdown in the application. The
   trigger is the composer's pill — the shape that was already right — and the popup is the *skill
   picker's*: raised surface, hairline, large radius, the same shadow, a brass check on the chosen

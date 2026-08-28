@@ -616,6 +616,29 @@ class ProbeOut(BaseModel):
     error: str
 
 
+class PreferencesOut(BaseModel):
+    """You and this machine, as the profile menu sees it."""
+
+    model_config = ConfigDict(frozen=True)
+
+    timezone: str
+    """IANA name, or empty for UTC alone."""
+
+    now: str
+    """The sentence she is actually given this turn.
+
+    Returned rather than left for the screen to reconstruct: the interface would have to format
+    a date the same way the prompt does, in a second place, and the first daylight-saving change
+    would find out whether the two agreed. Showing the real line also makes the setting
+    checkable — you pick a zone and read what she will read.
+    """
+
+
+class PreferencesPatch(BaseModel):
+    timezone: str | None = Field(default=None, max_length=64)
+    """``None`` leaves it; ``""`` clears it back to UTC alone."""
+
+
 class HealthOut(BaseModel):
     model_config = ConfigDict(frozen=True)
 

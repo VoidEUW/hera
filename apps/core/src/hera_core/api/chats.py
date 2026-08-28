@@ -45,6 +45,9 @@ from hera_chats import (
     events_of,
     title_from,
 )
+from hera_core.clock import render as render_now
+from hera_core.config import ConfigError
+from hera_core.config import load as load_config
 from hera_core.deps import Container, Db, Owner, not_found
 from hera_core.emotions import EmotionsError
 from hera_core.emotions import load as load_emotions
@@ -416,8 +419,28 @@ def _context(session: Session, chat: Chat, *, text: str, **extra: object) -> Tur
         profile=profile,
         history=history,
         emotions=_emotion_vocabulary(),
+        now=_now(),
         **extra,  # type: ignore[arg-type]  # resume/confirmed/denied, forwarded to the dataclass
     )
+
+
+def _now() -> str:
+    """The date and time, for the ``now`` slot.
+
+    Read per turn and per request, like the emotion vocabulary above and for the same reason: a
+    timezone changed on screen has to apply to the next turn rather than the next restart. It is
+    also the only honest place to compute *now* — a value captured at boot would be a day stale
+    by the second day the process was up.
+
+    A `config.toml` that will not parse falls back to UTC rather than propagating: the Models
+    screen is where a broken file gets explained, and losing the date over it would trade a
+    visible problem for a silent one.
+    """
+    try:
+        timezone = load_config().timezone
+    except ConfigError:
+        timezone = ""
+    return render_now(timezone)
 
 
 def _emotion_vocabulary() -> str:

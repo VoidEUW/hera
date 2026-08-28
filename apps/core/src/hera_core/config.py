@@ -102,6 +102,16 @@ class HeraConfig(BaseModel):
     providers: list[ProviderEntry] = Field(default_factory=list)
     active_provider: str = ""
 
+    timezone: str = ""
+    """Where the person is, as an IANA name — ``Europe/Berlin``, not an offset.
+
+    A name rather than ``+02:00`` because an offset is wrong twice a year, and the turn that
+    happens on the last Sunday in October should not be an hour out. Empty means the prompt
+    carries UTC alone, which is the honest default for a deployment nobody has told where it
+    is: the *server's* zone and the *person's* are different questions, and a self-hosted Hera
+    may well be on a box in another country.
+    """
+
     def active(self) -> ProviderEntry | None:
         """The endpoint she is pointed at, or the first one, or nothing.
 
@@ -124,17 +134,24 @@ class HeraConfig(BaseModel):
         if all(existing.name != entry.name for existing in self.providers):
             replaced = [*self.providers, entry]
         active = self.active_provider or entry.name
-        return HeraConfig(providers=replaced, active_provider=active)
+        return HeraConfig(providers=replaced, active_provider=active, timezone=self.timezone)
 
     def without(self, name: str) -> HeraConfig:
         remaining = [entry for entry in self.providers if entry.name != name]
         active = self.active_provider
         if active == name:
             active = remaining[0].name if remaining else ""
-        return HeraConfig(providers=remaining, active_provider=active)
+        return HeraConfig(providers=remaining, active_provider=active, timezone=self.timezone)
+
+    def with_timezone(self, timezone: str) -> HeraConfig:
+        return HeraConfig(
+            providers=list(self.providers), active_provider=self.active_provider, timezone=timezone
+        )
 
     def activated(self, name: str) -> HeraConfig:
-        return HeraConfig(providers=list(self.providers), active_provider=name)
+        return HeraConfig(
+            providers=list(self.providers), active_provider=name, timezone=self.timezone
+        )
 
 
 def load(path: Path | None = None) -> HeraConfig:
@@ -159,7 +176,11 @@ def load(path: Path | None = None) -> HeraConfig:
         raise ConfigError(f"{path} is not a valid Hera configuration: {exc}") from exc
 
     if not config.providers:
-        return HeraConfig(providers=[_from_environment()], active_provider="local")
+        # Seeded, but the rest of the file is kept: a person who deleted every endpoint by hand
+        # should not also lose the timezone they set on the screen above it.
+        return HeraConfig(
+            providers=[_from_environment()], active_provider="local", timezone=config.timezone
+        )
     return config
 
 
