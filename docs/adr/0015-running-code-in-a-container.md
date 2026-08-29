@@ -104,7 +104,7 @@ error naming the reason.
 ## Consequences
 
 - **`pptx`, `docx` and `xlsx` work**, and the file they produce becomes an artifact through
-  `from_scratch` ([ADR 13](0013-an-artifact-is-a-kept-scratchpad-file.md)) without its bytes ever
+  `from_scratch` ([ADR 13](0013-artifacts-are-tool-calls-with-versions.md)) without its bytes ever
   passing through the model. That path is the reason artifacts had to land first.
 - **Hera now has a hard dependency it can do without.** Docker is required for one tool and for
   nothing else. That is a defensible place to put it and it does move the answer to *what do I

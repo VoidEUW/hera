@@ -254,24 +254,22 @@ What has to be decided:
 
 ---
 
-## 5. Artifacts — ✅ decided, as [ADR 13](adr/0013-an-artifact-is-a-kept-scratchpad-file.md)
+## 5. Artifacts — ✅ decided, as [ADR 13](adr/0013-artifacts-are-tool-calls-with-versions.md)
 
-Most of this held: a tool call rather than a rendering trick, an event like everything else, a home
-in `hera_mcp`, and the last paragraph's warning about storage was the important sentence on the
-page. What the record changed is the answer to *what is an artifact*:
+Everything below held. A tool call, an event like everything else, a home in `hera_mcp`, and the
+identity-and-versions part as the reason it is worth building at all. Three things the record adds:
 
-- **It is a scratchpad file she marked as one.** § 2's directory is the store, `kept.json` beside
-  it is the bit, and there is no package, no table and no `~/.hera/artifacts/`. The paragraph below
-  is right that answering the two separately produces two stores — the first draft of ADR 13 did
-  exactly that anyway, a day after § 2 shipped.
-- **Versions are not in it**, and *"the interesting part is revision"* is where this section was
-  wrong. Old copies are not what makes revision cheap; an edit tool is, and that is deferred with a
-  reason. Writing the same name twice replaces the file, which is what a file does.
-- **A chart is an artifact too, and it renders inline.** A `.svg` or a `.mmd` she made in the
-  middle of an answer is drawn where she made it rather than filed in a drawer — from the event,
-  not from her prose, so the rule below is intact.
+- **The storage question the last paragraph insists on is answered first**, in § 2, and answering
+  it is what let this one stay small. The content lives at `~/.hera/artifacts/<id>/v<N>.<ext>` with
+  the row as an index — flat by id, so moving a chat between projects does not move files.
+- **`from_scratch`**, which is create-and-update taking a filename in the chat's scratchpad instead
+  of inline content. It exists because a `.pptx` a script produced cannot come back through a text
+  tool result, and it is the concrete reason artifacts land before the sandbox rather than after.
+- **A `file` kind**, for exactly that case: a name, a size and a download, rather than pretending
+  to render a zip.
 
-*"Do not build the executor first"* was right, and is still right.
+*"Do not build the executor first"* was right, and is still right — [ADR 15](adr/0015-running-code-in-a-container.md)
+runs a command over a directory and knows nothing about a workflow.
 
 <details>
 <summary>The original argument, kept for the reasoning</summary>
@@ -344,7 +342,7 @@ prerequisite turned out to be a separate feature with its own schedule.
 2. ~~**The scratchpad**~~ — decided, [ADR 12](adr/0012-a-chat-has-a-scratchpad.md), and it is v0.2
    M2a. It unblocks the two below by answering where a document lives, and by making a tool call
    able to know which chat it is in at all.
-3. **Artifacts** — decided, [ADR 13](adr/0013-an-artifact-is-a-kept-scratchpad-file.md), plus
+3. **Artifacts** — decided, [ADR 13](adr/0013-artifacts-are-tool-calls-with-versions.md), plus
    skill resources ([ADR 14](adr/0014-skill-resources-are-readable.md)). M2b.
 4. **Fetch**, which is the other half of search — she can find a page and cannot read it, which is
    a worse place to stop than either end. Wants the same *turn this document into text* seam as
