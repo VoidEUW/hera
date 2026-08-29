@@ -19,6 +19,6 @@ later.
 | [10](0010-chat-events-wrap-the-provider-union.md) | The persisted stream wraps the provider union rather than extending it | accepted |
 | [11](0011-markdown-and-tex-in-the-browser.md) | Her prose is typeset in the browser, as Markdown and TeX | accepted |
 | [12](0012-a-chat-has-a-scratchpad.md) | A chat has a scratchpad, and a tool call carries the chat it is in | accepted |
-| [13](0013-artifacts-are-tool-calls-with-versions.md) | An artifact is a tool call with an identity and versions | accepted |
+| [13](0013-an-artifact-is-a-file-she-publishes.md) | An artifact is a file she publishes | accepted |
 | [14](0014-skill-resources-are-readable.md) | Skill resources are readable | accepted |
 | [15](0015-running-code-in-a-container.md) | Running code happens in a container, and here is which claim that makes | **deferred to v0.3** |

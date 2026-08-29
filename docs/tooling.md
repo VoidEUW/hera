@@ -254,22 +254,25 @@ What has to be decided:
 
 ---
 
-## 5. Artifacts — ✅ decided, as [ADR 13](adr/0013-artifacts-are-tool-calls-with-versions.md)
+## 5. Artifacts — ✅ decided, as [ADR 13](adr/0013-an-artifact-is-a-file-she-publishes.md)
 
-Everything below held. A tool call, an event like everything else, a home in `hera_mcp`, and the
-identity-and-versions part as the reason it is worth building at all. Three things the record adds:
+Most of this held: **an artifact is a tool call**, not something the interface discovers in her
+prose, and the last paragraph's warning about storage was the most important sentence on the page.
+Three things the record settles differently:
 
-- **The storage question the last paragraph insists on is answered first**, in § 2, and answering
-  it is what let this one stay small. The content lives at `~/.hera/artifacts/<id>/v<N>.<ext>` with
-  the row as an index — flat by id, so moving a chat between projects does not move files.
-- **`from_scratch`**, which is create-and-update taking a filename in the chat's scratchpad instead
-  of inline content. It exists because a `.pptx` a script produced cannot come back through a text
-  tool result, and it is the concrete reason artifacts land before the sandbox rather than after.
-- **A `file` kind**, for exactly that case: a name, a size and a download, rather than pretending
-  to render a zip.
+- **It is a file in `~/.hera/chats/<chat id>/artifacts/`**, a directory of its own beside § 2's
+  scratchpad. Not the same directory with a flag: the scratchpad is somewhere she can think out
+  loud *unread*, and a directory a person browses for the deliverable is one she has a reason to
+  be tidy in.
+- **The interesting part is not revision, it is `edit`.** This section said *"the value is in
+  'change the third step' not re-emitting the whole thing"* and then asked for versions, which do
+  not deliver that. A find-and-replace does, and re-emitting a 40 KB page turned out to be the
+  thing actually failing against a real endpoint. Nothing is versioned; the same name replaces.
+- **A chart is an artifact too, and it renders inline.** `inline=True` draws it where she made it,
+  which is what a flow chart explaining the paragraph above it needs. From the event, never from
+  her prose, so ADR 11 is intact.
 
-*"Do not build the executor first"* was right, and is still right — [ADR 15](adr/0015-running-code-in-a-container.md)
-runs a command over a directory and knows nothing about a workflow.
+*"Do not build the executor first"* was right, and is still right.
 
 <details>
 <summary>The original argument, kept for the reasoning</summary>
@@ -342,7 +345,7 @@ prerequisite turned out to be a separate feature with its own schedule.
 2. ~~**The scratchpad**~~ — decided, [ADR 12](adr/0012-a-chat-has-a-scratchpad.md), and it is v0.2
    M2a. It unblocks the two below by answering where a document lives, and by making a tool call
    able to know which chat it is in at all.
-3. **Artifacts** — decided, [ADR 13](adr/0013-artifacts-are-tool-calls-with-versions.md), plus
+3. **Artifacts** — decided, [ADR 13](adr/0013-an-artifact-is-a-file-she-publishes.md), plus
    skill resources ([ADR 14](adr/0014-skill-resources-are-readable.md)). M2b.
 4. **Fetch**, which is the other half of search — she can find a page and cannot read it, which is
    a worse place to stop than either end. Wants the same *turn this document into text* seam as

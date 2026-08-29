@@ -38,7 +38,23 @@ and answering them separately produces two.
 | | |
 |---|---|
 | **M2a** | The scratchpad, and a tool call that knows which chat it is in — [ADR 12](adr/0012-a-chat-has-a-scratchpad.md) |
-| **M2b** | Artifacts and skill resources — [ADR 13](adr/0013-artifacts-are-tool-calls-with-versions.md), [ADR 14](adr/0014-skill-resources-are-readable.md) |
+| **M2b** | Artifacts and skill resources — [ADR 13](adr/0013-an-artifact-is-a-file-she-publishes.md), [ADR 14](adr/0014-skill-resources-are-readable.md) |
+
+**ADR 13 took three drafts and none of the first two were built on**, which is the cheapest place
+for that to happen. Draft one made an artifact a versioned object with its own package and tables —
+a second store, a day after ADR 12 built the first, which `tooling.md` § 5 had explicitly warned
+about. Draft two made it a scratchpad file with a bit set on it, which is cheaper and wrong about
+what the scratchpad is for: a notes directory a person browses is one she has a reason to be tidy
+in. Both answered *where do the bytes go* and let *what a person sees* fall out of it, and it does
+not fall out.
+
+What shipped as the decision: **an artifact is a file she publishes**, in
+`chats/<id>/artifacts/` beside the scratchpad. The filename is the identity, the extension is the
+kind, and three tools — `create`, `edit`, `read` — make it. `edit` is a find-and-replace that must
+match exactly once, and it is the load-bearing one: re-emitting a 40 KB page to change a colour is
+minutes of generation and is what has actually been failing against the real endpoint. `inline`
+decides whether it is drawn in the conversation (a flow chart) or opened in the drawer (a page).
+No index, no tables, no versions.
 
 **A third stage was planned and dropped, and the reason is worth keeping because the mistake is
 easy to make twice.** The sandbox was pulled forward from *not in v0.2* on the assumption that

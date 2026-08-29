@@ -103,9 +103,11 @@ error naming the reason.
 
 ## Consequences
 
-- **`pptx`, `docx` and `xlsx` work**, and the file they produce becomes an artifact through
-  `from_scratch` ([ADR 13](0013-artifacts-are-tool-calls-with-versions.md)) without its bytes ever
-  passing through the model. That path is the reason artifacts had to land first.
+- **`pptx`, `docx` and `xlsx` work**, and the file they produce lands in the chat's directory
+  ([ADR 12](0012-a-chat-has-a-scratchpad.md)) without its bytes passing through the model. Whether
+  publishing it is then a move into `artifacts/` or a fourth tool is a question for whoever picks
+  this up; [ADR 13](0013-an-artifact-is-a-file-she-publishes.md) does not answer it, because
+  nothing in v0.2 needs it answered.
 - **Hera now has a hard dependency it can do without.** Docker is required for one tool and for
   nothing else. That is a defensible place to put it and it does move the answer to *what do I
   need to run Hera* — which is worth stating in the README rather than discovering.
