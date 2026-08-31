@@ -9,12 +9,14 @@ as real artifacts, and speaks with **emotion cards** next to her prose. Her tool
 servers** and her know-how from **`SKILL.md` skills**, so both are portable to and from the rest of
 the ecosystem.
 
-> Status: **v0.2 is in progress and everything below except dreaming is built.** v0.1 made the
-> spine run end to end — a message typed into the browser reaches a model through the skill router,
-> the mind and the turn orchestrator, and comes back as events the interface renders. v0.2 makes it
-> *accumulate*: projects, a scratchpad, artifacts, and memory. **Dreaming and experience training
-> moved to v0.3** so the four under them can be stabilised first
-> ([docs/versions/v0.3.0.md](docs/versions/v0.3.0.md)).
+> Status: **v0.2.0.** v0.1 made the spine run end to end — a message typed into the browser reaches
+> a model through the skill router, the mind and the turn orchestrator, and comes back as events the
+> interface renders. v0.2 makes it *accumulate*: projects to file work under, a scratchpad she
+> thinks on, artifacts she publishes, and memory that survives a conversation.
+>
+> **Dreaming and experience training are v0.3**, and the interface polish — the `⌘K` palette,
+> hotkeys, the mobile sheet, and reading a skill's bundled files — is **v0.2.1**. Both are planned
+> in [docs/versions/](docs/versions/) rather than left to be inferred from what is missing.
 >
 > [CHANGELOG.md](CHANGELOG.md) for what is in it and what is deliberately not,
 > [ARCHITECTURE.md](ARCHITECTURE.md) for the shape, [docs/adr/](docs/adr/) for why.

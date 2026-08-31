@@ -3,18 +3,26 @@
 Where the rebuild stands and what is settled, so a new session can pick up without re-reading
 the history. Updated as milestones land — this file is a snapshot, not a changelog.
 
-**Last updated:** 2026-08-31 · **Version:** v0.2 in progress · **Strategy:** thin spine first, then deepen
+**Last updated:** 2026-08-31 · **Version:** v0.2.0 tagged · **Strategy:** thin spine first, then deepen
 
-**v0.2 is planned in [versions/v0.2.0.md](versions/v0.2.0.md)** — now **four** milestones, in the
-order *organise → produce → make room → remember*.
+**v0.2.0 shipped** ([versions/v0.2.0.md](versions/v0.2.0.md)) — *organise → produce → remember*:
+projects, the scratchpad, artifacts, memory. Three of the five planned milestones; the other two
+moved before the tag and both are written down rather than dropped.
 
-**Dreaming moved to [v0.3.0](versions/v0.3.0.md)**, mid-version and on purpose. The four milestones
-under it want to be stable before anything starts proposing changes to them, and this is the release
-Hera has to be usable daily for. It is also the only one of the five that costs nothing to defer:
-every dependency arrow points *into* dreaming and none point out, so there is no half-built seam
-left behind — `hera_profiles.propose()` and the `evolvable` tier already exist and already guard
-what it would touch. Settings → Dreaming stays a listed, disabled tab, because a feature you can see
-coming is a promise and one you cannot is a surprise.
+**Dreaming moved to [v0.3.0](versions/v0.3.0.md)**, mid-version and on purpose. The milestones under
+it want to be stable before anything starts proposing changes to them, and this is the release Hera
+has to be usable daily for. It is also the only one of the five that costs nothing to defer: every
+dependency arrow points *into* dreaming and none point out, so there is no half-built seam left
+behind — `hera_profiles.propose()` and the `evolvable` tier already exist and already guard what it
+would touch. Settings → Dreaming stays a listed, disabled tab, because a feature you can see coming
+is a promise and one you cannot is a surprise.
+
+**The redesign pass moved to [v0.2.1](versions/v0.2.1.md)**, with the `⌘K` palette, hotkeys and
+`hera__read_resource`. The one part of M3 anything depended on — the drawer — was built early with
+artifacts, and memory reuses that frame rather than bringing its own, which was the milestone's
+load-bearing claim. What is left is polish, and it gets a better argument against a build that has
+every capability in it. **The milestone numbers stay as they are**: M4 still means memory, because
+renumbering would make every commit message and entry in this file that says M4 wrong.
 
 v0.3.0.md also holds the first note on **`hera-code`**: a coding CLI built on this workspace's
 packages, with its own built-in MCP server, that Hera reaches as an ordinary `mcp.json` entry. The

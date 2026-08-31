@@ -11,23 +11,27 @@ without pinning Hera. `release.yml` refuses a tag whose version disagrees with t
 so the number in this file, on the tag, and in the interface cannot drift apart. See
 [CONTRIBUTING.md](CONTRIBUTING.md) and [ADR 8](docs/adr/0008-github-flow-and-required-checks.md).
 
-## [0.2.0] — unreleased
+## [0.2.0] — 2026-08-31
 
-**The deepening pass: what makes her accumulate.** v0.1.0 runs a turn end to end and forgets it
-happened. This version adds the three things that change: projects you can actually make, artifacts
-she can produce and revise, and memory across conversations.
+**The deepening pass: what makes her accumulate.** v0.1.0 ran a turn end to end and forgot it
+happened. This version adds the four things that change: projects you can file work under, a
+scratchpad she thinks on between turns, artifacts she publishes as real files, and memory that
+survives a conversation.
 
-The order is **organise → produce → make room → remember**, and it is not aesthetic: artifacts and
-memory both want a panel beside the conversation, so the interface pass sits between them.
+The order was **organise → produce → remember**, and it was not aesthetic: projects were nearly
+built already and everything else gets filed under them; artifacts needed somewhere to put the bytes
+before memory could reuse the panel beside them.
 
-**Dreaming was the fifth and is now v0.3.0.** She re-reads her own chats and proposes changes you
-accept or reject — deferred deliberately, so the four milestones under it can be stabilised first,
-and because it is the only one of the five that costs nothing to defer: every dependency points
-into it and none point out. Settings → Dreaming stays a listed, disabled tab that says so.
-[docs/versions/v0.3.0.md](docs/versions/v0.3.0.md).
+**Two of the five planned milestones moved before the tag**, both deliberately and both written
+down rather than dropped. *Dreaming and experience training* are now
+[v0.3.0](docs/versions/v0.3.0.md) — the four under it want to be stable before anything proposes
+changes to them, and it is the only one that costs nothing to defer, because every dependency points
+into it and none point out. *The redesign pass* is now [v0.2.1](docs/versions/v0.2.1.md) with the
+`⌘K` palette, hotkeys and `hera__read_resource`: the one part of it anything depended on — the
+drawer — was built early with artifacts, and what is left is polish, which is what a patch release
+is for.
 
-Planned, in [docs/versions/v0.2.0.md](docs/versions/v0.2.0.md) — the reasoning lives there, and this
-section fills in as milestones land.
+Planned in [docs/versions/v0.2.0.md](docs/versions/v0.2.0.md); the reasoning lives there.
 
 ### Added
 
@@ -197,15 +201,27 @@ section fills in as milestones land.
   card's own controls must stay live while the composer does not — and because offering **Stop**
   for a turn that already stopped is a lie about what is happening.
 
-### Still to come in this version
+### Known gaps
 
-- **Skill resources become readable.** `hera_skillsets` already tells the model a skill has files
-  beside it; `hera__read_resource` makes that sentence true, which is what Anthropic's
-  reference-heavy skills need.
-- **An interface pass** — one drawer the panels share (built early, with artifacts), the `⌘K`
-  command palette, and the rail and transcript rework the new features need.
+Listed so a missing feature and a forgotten one do not look alike:
 
-## [0.1.0] — unreleased
+- **A skill's bundled files are still unreadable**, and the prompt says otherwise. Every selected
+  skill with files beside it arrives with *"read one if this skill tells you to"*, and there is no
+  tool that can. `hera__read_resource` is written as a decision
+  ([ADR 14](docs/adr/0014-skill-resources-are-readable.md)) and is first in
+  [v0.2.1](docs/versions/v0.2.1.md), because it is a sentence in the prompt that is not true.
+- **`⌘K` opens Settings** rather than a command palette, and there are no other keyboard shortcuts.
+  v0.2.1.
+- **The interface is desktop-shaped.** It installs as a PWA and there is no mobile sheet. v0.2.1.
+- **Mermaid diagrams are not drawn.** `.mmd` is recognised and says so plainly; an `.svg` artifact
+  is a drawn chart today.
+- **No dreaming, no sandbox, no agents.** v0.3 — see
+  [docs/versions/v0.3.0.md](docs/versions/v0.3.0.md). Settings → Dreaming is listed and disabled,
+  because a feature you can see coming is a promise and one you cannot is a surprise.
+- **`hera__fetch` and PDFs.** She can find a page and not read it; the composer refuses a PDF.
+  Both have their reasoning in [docs/tooling.md](docs/tooling.md).
+
+## [0.1.0] — 2026-08-27
 
 **The first release: the spine runs end to end.** A message typed into the browser reaches a
 model through the skill router, the mind and the turn orchestrator, and comes back as

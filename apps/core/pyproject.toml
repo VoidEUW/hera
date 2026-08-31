@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "hera-core"
-version = "0.1.0"
+version = "0.2.0"
 description = "Hera's application: a FastAPI JSON and SSE API, and the SvelteKit interface it serves."
 readme = "README.md"
 requires-python = ">=3.12"
