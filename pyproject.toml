@@ -25,6 +25,7 @@ hera-chats = { workspace = true }
 hera-core = { workspace = true }
 hera-home = { workspace = true }
 hera-mcp = { workspace = true }
+hera-memories = { workspace = true }
 hera-permissions = { workspace = true }
 hera-profiles = { workspace = true }
 hera-prompts = { workspace = true }
@@ -114,6 +115,8 @@ files = [
     "packages/hera_home/tests",
     "packages/hera_mcp/src",
     "packages/hera_mcp/tests",
+    "packages/hera_memories/src",
+    "packages/hera_memories/tests",
     "packages/hera_permissions/src",
     "packages/hera_permissions/tests",
     "packages/hera_profiles/src",

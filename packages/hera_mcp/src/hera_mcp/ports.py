@@ -57,16 +57,41 @@ class Searcher(Protocol):
 
 
 @runtime_checkable
-class MemoryWriter(Protocol):
-    """Somewhere lasting facts go. Implemented by ``hera_memories`` in v0.2."""
+class Memories(Protocol):
+    """Somewhere lasting facts go. Implemented by ``hera_memories`` (ADR 16).
 
-    async def remember(self, text: str, *, scope: str) -> str:
+    **Two methods, and what is missing from them is the design.** There is no way to *list*
+    memories, because every enabled one is already in her prompt — a tool that read them back
+    would spend the context window on what is already in it, which is the reasoning that left
+    ``artifact_list`` out one milestone earlier. And there is no way to *delete* one: what
+    ``forget`` does is switch a memory off and keep the file, so nothing a person told her is
+    discarded without a person present.
+    """
+
+    async def remember(
+        self,
+        key: str,
+        text: str,
+        *,
+        description: str = "",
+        why: str = "",
+        scope: str = "global",
+        chat_id: str = "",
+    ) -> str:
         """Store one fact and return a short confirmation for the model.
 
-        ``scope`` is ``"chat"`` for something true of this conversation and ``"global"`` for
-        something true of the person. Deduplication is the implementation's business: the
-        model will offer the same fact twice and should not be punished for it.
+        ``key`` is the identity, so writing the same one twice is a correction rather than a
+        second copy of a fact that changed. ``scope`` is ``"chat"`` for something true of this
+        conversation and ``"global"`` for something true of the person; ``chat_id`` arrives
+        from the call's ``_meta`` and never from an argument (ADR 12).
+
+        Raise when it will not fit. The message reaches the model, so it says what is taking the
+        space — a refusal it cannot act on is a refusal it will repeat.
         """
+        ...
+
+    async def forget(self, key: str) -> str:
+        """Stop carrying one memory, keeping the file. Returns a confirmation for the model."""
         ...
 
 

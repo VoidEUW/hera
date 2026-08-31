@@ -23,7 +23,7 @@ from hera_mcp.emotions import DEFAULT_EMOTIONS, Emotion, Tone, render_emotions
 from hera_mcp.ports import (
     Artifacts,
     Hit,
-    MemoryWriter,
+    Memories,
     NoteWriter,
     ScratchFile,
     Scratchpad,
@@ -53,7 +53,7 @@ __all__ = [
     "Artifacts",
     "Emotion",
     "Hit",
-    "MemoryWriter",
+    "Memories",
     "NoteWriter",
     "ScratchFile",
     "Scratchpad",

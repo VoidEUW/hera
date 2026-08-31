@@ -52,6 +52,7 @@ describe('mark', () => {
 		expect(mark('hera__search')).toBe('search');
 		expect(mark('hera__note')).toBe('note');
 		expect(mark('hera__remember')).toBe('memory');
+		expect(mark('hera__forget')).toBe('memory');
 	});
 
 	it('refuses to recognise anybody elses server', () => {
@@ -82,9 +83,15 @@ describe('subject', () => {
 		expect(subject('hera__search', { query: 'llama.cpp tool grammar' })).toBe(
 			'llama.cpp tool grammar'
 		);
-		expect(subject('hera__remember', { text: 'Void prefers short answers' })).toBe(
-			'Void prefers short answers'
-		);
+		// The key, not the text: a memory is a paragraph and the row is one line — and the key
+		// is what you would go looking for on Settings → Memory afterwards.
+		expect(
+			subject('hera__remember', {
+				key: 'prefers-short-answers',
+				text: 'They want two sentences, not five.'
+			})
+		).toBe('prefers-short-answers');
+		expect(subject('hera__forget', { key: 'prefers-short-answers' })).toBe('prefers-short-answers');
 	});
 
 	it('falls past an argument that is there and empty', () => {

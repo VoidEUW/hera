@@ -1,0 +1,25 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "hera-memories"
+version = "0.1.0"
+description = "What Hera remembers about you: one markdown file per memory, injected whole under a budget."
+readme = "README.md"
+requires-python = ">=3.12"
+authors = [{ name = "Void" }]
+license = { text = "MIT" }
+keywords = ["memory", "markdown", "prompt"]
+classifiers = [
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Typing :: Typed",
+]
+dependencies = ["hera-home", "pydantic-settings>=2.5", "pyyaml>=6.0"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/hera_memories"]
+
+# Linting, typing, testing and coverage are configured once in the workspace root. This package
+# deliberately declares none of it, so there is only ever one answer to "which config applies".

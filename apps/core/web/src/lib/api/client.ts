@@ -82,6 +82,37 @@ export interface ArtifactContent {
 	text: string;
 }
 
+export interface MemoryItem {
+	/** The filename without its extension, and the identity. Writing it again is a correction,
+	 * not a second copy of a fact that changed. */
+	key: string;
+	text: string;
+	/** The one line this screen shows. Deliberately *not* in her prompt — this list is the only
+	 * reason it is worth storing, which is why it is worth showing properly. */
+	description: string;
+	/** What made it worth writing down. Provenance, also not injected. */
+	why: string;
+	created: string | null;
+	scope: 'global' | 'chat';
+	chat_id: string;
+	source: 'auto' | 'manual';
+	enabled: boolean;
+	/** What carrying this one costs, counted on the server. The same arithmetic the bar totals,
+	 * so a row and the bar above it cannot disagree. */
+	tokens: number;
+	/** Anything odd about the file, reported rather than raised. */
+	problems: string[];
+}
+
+export interface MemoryBudget {
+	used: number;
+	/** Sent rather than known here: it is a deployment setting, and a bar drawn against a number
+	 * the browser guessed would be wrong on exactly the installs that changed it. */
+	limit: number;
+	count: number;
+	disabled: number;
+}
+
 export interface AttachmentSummary {
 	name: string;
 	bytes: number;
@@ -305,6 +336,29 @@ export const api = {
 		request<{ skills: Skill[]; broken: BrokenSkill[]; trust_problem: string }>('/skills'),
 	createSkill: (body: { id: string; description?: string; body?: string }) =>
 		request<Skill>('/skills', { method: 'POST', body: JSON.stringify(body) }),
+
+	/** Everything she has written down (ADR 16). Switched-off ones included — the switch is
+	 * about what a turn costs, and a list that hid them would leave you unable to switch one
+	 * back on. */
+	memories: () => request<MemoryItem[]>('/memories'),
+	memoryBudget: () => request<MemoryBudget>('/memories/budget'),
+	/** Edit one, or switch it on or off. A field left out is left alone.
+	 *
+	 * One call for both because they are one act from the store's side and one row on screen —
+	 * this is the door a *person* has. Growing a memory past the ceiling, or switching one back
+	 * on when there is no room, comes back a 409 naming what is taking the space. */
+	updateMemory: (
+		key: string,
+		patch: { enabled?: boolean; text?: string; description?: string; why?: string }
+	) =>
+		request<MemoryItem>(`/memories/${encodeURIComponent(key)}`, {
+			method: 'PATCH',
+			body: JSON.stringify(patch)
+		}),
+	/** The only thing anywhere that unlinks a memory. Her own `forget` switches one off and
+	 * keeps the file — nothing a person told her is discarded without a person present. */
+	deleteMemory: (key: string) =>
+		request<void>(`/memories/${encodeURIComponent(key)}`, { method: 'DELETE' }),
 
 	emotions: () => request<Emotions>('/emotions'),
 	writeEmotions: (emotions: Emotion[]) =>

@@ -365,7 +365,8 @@ the right, search at the top. The nav is ordered by what you reach for:
 | **Servers** | MCP, with the failure reason when there is one |
 | **Permissions** | allow · deny · ask, with rules from a card marked as such |
 | **Mind** | The twelve regions, each with its tier and its revision count |
-| **Dreaming** | Listed and disabled. A v0.2 feature you can see coming is a promise; one you cannot is a surprise |
+| **Dreaming** | Listed and disabled. A v0.3 feature you can see coming is a promise; one you cannot is a surprise |
+| **Memory** | What she knows about you, with a **space-left bar**: every enabled memory is in the prompt, so the ceiling is a thing a person steers by rather than a limit they hit. Disabling one keeps it and gives the space back |
 
 The profile menu is a popover rather than a second modal — four controls do not deserve a sheet
 over the conversation.

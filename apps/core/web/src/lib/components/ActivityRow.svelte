@@ -35,8 +35,8 @@
 	import { duration, t } from '$lib/i18n';
 	import { markOf, subject, toolName } from '$lib/tools';
 	import type { Activity } from '$lib/turn';
+	import Brain from './Brain.svelte';
 	import Globe from './Globe.svelte';
-	import Knot from './Knot.svelte';
 	import Ocellus from './Ocellus.svelte';
 	import Prose from './Prose.svelte';
 	import Quill from './Quill.svelte';
@@ -143,7 +143,7 @@
 		{:else if shape === 'note'}
 			<Quill size={13} alive={running} muted={!running && !loud} />
 		{:else if shape === 'memory'}
-			<Knot size={13} alive={running} muted={!running && !loud} />
+			<Brain size={13} alive={running} muted={!running && !loud} />
 		{:else if shape === 'artifact'}
 			<Stele size={13} alive={running} muted={!running && !loud} />
 		{:else}

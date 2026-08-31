@@ -169,6 +169,46 @@ export const t = {
 		reset: 'Reset to hers'
 	},
 
+	memory: {
+		blurb:
+			'What she has written down about you. Every one of these that is switched on is in her prompt, whole — there is nothing to search and nothing that can quietly fail to arrive. That takes space, so the space is here to see.',
+		/** The number that matters, said first. *Left* is what a person is steering by; *used of*
+		 * is the detail underneath it. */
+		left: (n: number) => `${n.toLocaleString()} tokens left`,
+		used: (used: number, limit: number) =>
+			`${used.toLocaleString()} of ${limit.toLocaleString()} used`,
+		spaceLabel: 'Space her memories take',
+		carried: (n: number) => `${n} ${n === 1 ? 'memory' : 'memories'}`,
+		off: (n: number) => `${n} switched off`,
+		tokens: (n: number) => `${n} tokens`,
+		/** On the switch. Not "Enabled": what it does is decide whether she carries this one, and
+		 * the whole point of the control is that switching it off is not throwing it away. */
+		on: 'In use',
+		offOne: 'Kept, not used',
+		useIt: (key: string) => `Use ${key}`,
+		hereOnly: 'this chat only',
+		hers: 'she wrote it',
+		yours: 'you wrote it',
+		because: (why: string) => `because ${why}`,
+		edit: 'Edit',
+		save: 'Save',
+		// The three fields a person may change. The key is not one of them: the filename is the
+		// identity, so renaming would make a different memory with the same words in it.
+		description: 'Summary',
+		text: 'What she knows',
+		why: 'Why it was kept',
+		whyHint: 'Optional',
+		editNote:
+			'Only what she knows goes into her prompt. The summary and the reason are for this screen.',
+		delete: 'Delete',
+		// The only delete in the system that actually removes a memory. Her own `forget` keeps
+		// the file, so this sentence has to be the one that says the difference out loud.
+		deleteAsk: 'Delete this memory? It is not kept anywhere else.',
+		cancel: 'Cancel',
+		export: 'Export MEMORY.md',
+		none: 'Nothing yet. She writes these as she learns things worth keeping, and you can drop a markdown file into your memories directory yourself.'
+	},
+
 	skills: {
 		title: 'Skills for this chat',
 		blurb:
@@ -187,14 +227,15 @@ export const t = {
 		noMatch: 'Nothing here matches that.',
 		models: 'Models',
 		mind: 'Mind',
+		memory: 'Memory',
 		skills: 'Skills',
 		servers: 'Servers',
 		permissions: 'Permissions',
 		emotions: 'Emotions',
 		dreaming: 'Dreaming',
-		soon: 'v0.2',
+		soon: 'v0.3',
 		dreamingSoon:
-			'Dreaming and experience training arrive in v0.2, together with memory. She will propose changes to her own evolvable mind regions, and nothing is written without you accepting it.',
+			'Dreaming and experience training arrive in v0.3. She will propose changes to her own evolvable mind regions, and nothing is written without you accepting it. Memory comes first, in v0.2 — she has to have something to reflect on.',
 		appearance: 'Appearance',
 		system: 'System',
 		light: 'Light',

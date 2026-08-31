@@ -21,6 +21,7 @@ DEFAULT_HOME = Path("~/.hera")
 
 MIND_DIRNAME = "mind"
 SKILLS_DIRNAME = "skills"
+MEMORIES_DIRNAME = "memories"
 CHATS_DIRNAME = "chats"
 SCRATCH_DIRNAME = "scratch"
 ARTIFACTS_DIRNAME = "artifacts"
@@ -36,6 +37,7 @@ __all__ = [
     "DEFAULT_HOME",
     "HOME_ENV",
     "MCP_FILENAME",
+    "MEMORIES_DIRNAME",
     "MIND_DIRNAME",
     "SCRATCH_DIRNAME",
     "SKILLS_DIRNAME",
@@ -46,6 +48,7 @@ __all__ = [
     "database_path",
     "home",
     "mcp_path",
+    "memories_dir",
     "mind_dir",
     "scratch_dir",
     "skills_dir",
@@ -70,6 +73,16 @@ def mind_dir() -> Path:
 def skills_dir() -> Path:
     """The directory holding one ``SKILL.md`` package per subdirectory."""
     return home() / SKILLS_DIRNAME
+
+
+def memories_dir() -> Path:
+    """One markdown file per memory — what she knows about you, across every conversation.
+
+    A directory of files rather than a table, and the reason is the one thing here a person may
+    want somewhere else: a chat is Hera-shaped and a memory is not. Files can be read, edited,
+    diffed, backed up and handed to another tool without Hera being involved (ADR 16).
+    """
+    return home() / MEMORIES_DIRNAME
 
 
 def chats_dir() -> Path:

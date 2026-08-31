@@ -14,13 +14,17 @@ so the number in this file, on the tag, and in the interface cannot drift apart.
 ## [0.2.0] — unreleased
 
 **The deepening pass: what makes her accumulate.** v0.1.0 runs a turn end to end and forgets it
-happened. This version adds the four things that change: projects you can actually make, artifacts
-she can produce and revise, memory across conversations, and dreaming — she re-reads her own chats
-and proposes changes you accept or reject.
+happened. This version adds the three things that change: projects you can actually make, artifacts
+she can produce and revise, and memory across conversations.
 
-The order is **organise → produce → make room → remember → reflect**, and it is not aesthetic:
-artifacts and memory both want a panel beside the conversation, so the interface pass sits between
-them; dreaming reads memories and proposes to the mind, so it cannot come earlier.
+The order is **organise → produce → make room → remember**, and it is not aesthetic: artifacts and
+memory both want a panel beside the conversation, so the interface pass sits between them.
+
+**Dreaming was the fifth and is now v0.3.0.** She re-reads her own chats and proposes changes you
+accept or reject — deferred deliberately, so the four milestones under it can be stabilised first,
+and because it is the only one of the five that costs nothing to defer: every dependency points
+into it and none point out. Settings → Dreaming stays a listed, disabled tab that says so.
+[docs/versions/v0.3.0.md](docs/versions/v0.3.0.md).
 
 Planned, in [docs/versions/v0.2.0.md](docs/versions/v0.2.0.md) — the reasoning lives there, and this
 section fills in as milestones land.
@@ -91,6 +95,21 @@ section fills in as milestones land.
   document at Hera's own origin. It can still reach the network, which is written down rather than
   discovered: `sandbox` does not stop a frame loading a font, and a page without one looks broken
   in a way that reads as Hera being broken.
+- **She remembers you, and you can read what she remembers.** `hera__remember` stops answering
+  "not available in this deployment": what she writes down is one markdown file per memory in
+  `~/.hera/memories/`, front matter and prose, the filename as the key — files you can open, edit,
+  back up and take somewhere that is not Hera. **Every one that is switched on is in her prompt,
+  whole.** There is no retrieval and no ranking, because a memory that was stored and did not
+  arrive looks exactly like one that was never stored, and nobody on either side can tell which
+  happened. Settings → Memory shows the lot with a **space-left bar**, since injecting everything
+  costs room and the ceiling should be something you steer by rather than hit. Switching a memory
+  **off keeps the file and gives the space back** — the middle option between having something and
+  deleting it. When there is no room she is asked to fold two memories into one rather than
+  anything being dropped, and **`hera__forget` does not delete**: it switches a memory off. The
+  only thing in Hera that removes one is you, on that screen — where you can also **correct the
+  wording** of anything she wrote down, since a memory that is nearly right is more common than
+  one that is wrong. **Export MEMORY.md** hands you every memory verbatim, so it can be split
+  back into the files it came from.
 - **A long argument stops being resent for the rest of the conversation.** A tool call's arguments
   are replayed into every later prompt, so a published page — or a megabyte written to the
   scratchpad — sat underneath every question that followed it, forever. Anything past
@@ -180,18 +199,11 @@ section fills in as milestones land.
 
 ### Still to come in this version
 
-- **Artifacts** — a diagram, a document, a workflow chart as an object with an identity and
-  versions, not prose in a code fence. A tool call like everything else (ADR 11 forbids the browser
-  discovering one), rendered as Mermaid, Markdown, code or sandboxed HTML.
 - **Skill resources become readable.** `hera_skillsets` already tells the model a skill has files
   beside it; `hera__read_resource` makes that sentence true, which is what Anthropic's
   reference-heavy skills need.
-- **`hera_memories`.** Retrieval with per-tier caps, write-dedup, hit counts. `hera__remember` stops
-  answering "not available in this deployment", and the embedder seam v0.1 left open closes.
-- **`hera_promptevo`.** Dreaming, proposing to evolvable mind regions and to memory. Every proposal
-  is a card; nothing is applied automatically, and a rejection comes back as a counter-example.
-- **An interface pass** — one drawer the three new panels share, the `⌘K` command palette, and the
-  rail and transcript rework the new features need.
+- **An interface pass** — one drawer the panels share (built early, with artifacts), the `⌘K`
+  command palette, and the rail and transcript rework the new features need.
 
 ## [0.1.0] — unreleased
 

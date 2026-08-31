@@ -15,6 +15,7 @@ from hera_home import (
     database_path,
     home,
     mcp_path,
+    memories_dir,
     mind_dir,
     scratch_dir,
     skills_dir,
@@ -59,6 +60,7 @@ def test_every_well_known_path_sits_under_the_home(
     assert database_path() == tmp_path / "hera.sqlite3"
     assert mcp_path() == tmp_path / "mcp.json"
     assert config_path() == tmp_path / "config.toml"
+    assert memories_dir() == tmp_path / "memories"
     assert chats_dir() == tmp_path / "chats"
     assert chat_dir("c-1") == tmp_path / "chats" / "c-1"
     assert scratch_dir("c-1") == tmp_path / "chats" / "c-1" / "scratch"

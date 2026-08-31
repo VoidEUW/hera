@@ -7,10 +7,15 @@ same permission policy. ADR 4 asked for that on the grounds that a special case 
 have to be unpicked in v0.3, when this server is exposed to other agents -- at which point the
 only change should be which transport it is served over.
 
-``remember`` and ``note`` are **unwired in v0.1**, and deliberately so: the first waits for
-``hera_memories`` and the second for somewhere to write notes. Both still appear in the
-catalogue and answer "not available in this deployment", because a model that cannot see
-``remember`` concludes it cannot remember and tells the person so.
+``note`` is **unwired**, and deliberately so: it waits for somewhere to write notes. It still
+appears in the catalogue and answers "not available in this deployment", because a model that
+cannot see a tool concludes it cannot do the thing and tells the person so.
+
+``remember`` and ``forget`` are the memory pair, and what is *missing* beside them is the design
+(ADR 16). There is no tool that lists memories, because every enabled one is already in her
+prompt — reading them back would spend the context window on what is already in it. And
+``forget`` does not delete: it switches a memory off and keeps the file, so nothing a person
+told her is discarded without a person present.
 
 ``search`` is the one tool here that leaves the machine, and the only one whose absence changes
 what she *says* rather than what she can do: a model with no way to look something up does not
@@ -41,7 +46,7 @@ from mcp.types import CallToolResult, TextContent
 from hera_mcp.ports import (
     Artifacts,
     Hit,
-    MemoryWriter,
+    Memories,
     NoteWriter,
     Scratchpad,
     Searcher,
@@ -92,6 +97,7 @@ TOOL_NAMES = (
     "artifact_create",
     "artifact_edit",
     "artifact_read",
+    "forget",
 )
 """What this server offers, in the order they were added. Qualified, that is ``hera__emotion``
 and its siblings — the ones a catalogue reports for the ``hera`` server, which is the question
@@ -119,7 +125,7 @@ once in the context window and once in how hard its own answer is to find afterw
 
 def build_builtin_server(
     *,
-    memories: MemoryWriter | None = None,
+    memories: Memories | None = None,
     notes: NoteWriter | None = None,
     skills: SkillLibrary | None = None,
     searcher: Searcher | None = None,
@@ -189,16 +195,56 @@ def build_builtin_server(
         name="remember",
         title="Remember a fact",
         description=(
-            "Store something worth knowing in the future: a preference, a decision, a fact "
-            "about the person or the project. Use `scope='global'` for what stays true beyond "
-            "this conversation and `scope='chat'` for what only holds here. Do not store "
-            "guesses, or what is already in the conversation you can see."
+            "Write something down so it is in front of you in every conversation from now on: "
+            "a preference, a decision, a fact about the person or their work — what you would "
+            "want to know next week. `key` is its name and its identity, in the shape "
+            "`prefers-short-answers`; writing the same key again replaces what is there, which "
+            "is how you correct yourself. `description` is one line, for the list they read. "
+            "Use `scope='chat'` for something that only holds in this conversation. Everything "
+            "you have remembered is already in your prompt, so there is nothing to search and "
+            "no reason to store what is in the conversation you can see. The space is limited: "
+            "if there is none left you will be told what is taking it, and nothing is thrown "
+            "away to make room."
         ),
     )
-    async def remember(text: str, scope: Literal["global", "chat"] = "global") -> str:
+    async def remember(
+        key: str,
+        text: str,
+        description: str,
+        ctx: Context,
+        why: str = "",
+        scope: Literal["global", "chat"] = "global",
+    ) -> str:
         if memories is None:
             raise ToolError("memory is not available in this deployment")
-        return await memories.remember(text, scope=scope)
+        # Only asked for when it is needed. A global memory is the ordinary case and has no
+        # business failing because this server happens to be driven outside a turn.
+        chat_id = _chat_of(ctx, "a memory kept for one conversation") if scope == "chat" else ""
+        with _readable("remember that"):
+            return await memories.remember(
+                key.strip(),
+                text,
+                description=description,
+                why=why,
+                scope=scope,
+                chat_id=chat_id,
+            )
+
+    @server.tool(
+        name="forget",
+        title="Stop carrying a memory",
+        description=(
+            "Stop carrying one of your memories, freeing the space it took. **The file is "
+            "kept** and a person can switch it back on — this is not a delete, and you cannot "
+            "delete one. Use it when something you wrote down has stopped being true, or after "
+            "folding two memories into one to make room."
+        ),
+    )
+    async def forget(key: str) -> str:
+        if memories is None:
+            raise ToolError("memory is not available in this deployment")
+        with _readable("forget that"):
+            return await memories.forget(key.strip())
 
     @server.tool(
         name="note",

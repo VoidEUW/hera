@@ -3,10 +3,24 @@
 Where the rebuild stands and what is settled, so a new session can pick up without re-reading
 the history. Updated as milestones land — this file is a snapshot, not a changelog.
 
-**Last updated:** 2026-08-30 · **Version:** v0.2 in progress · **Strategy:** thin spine first, then deepen
+**Last updated:** 2026-08-31 · **Version:** v0.2 in progress · **Strategy:** thin spine first, then deepen
 
-**v0.2 is planned in [versions/v0.2.0.md](versions/v0.2.0.md)** — five milestones, in the order
-*organise → produce → make room → remember → reflect*.
+**v0.2 is planned in [versions/v0.2.0.md](versions/v0.2.0.md)** — now **four** milestones, in the
+order *organise → produce → make room → remember*.
+
+**Dreaming moved to [v0.3.0](versions/v0.3.0.md)**, mid-version and on purpose. The four milestones
+under it want to be stable before anything starts proposing changes to them, and this is the release
+Hera has to be usable daily for. It is also the only one of the five that costs nothing to defer:
+every dependency arrow points *into* dreaming and none point out, so there is no half-built seam
+left behind — `hera_profiles.propose()` and the `evolvable` tier already exist and already guard
+what it would touch. Settings → Dreaming stays a listed, disabled tab, because a feature you can see
+coming is a promise and one you cannot is a surprise.
+
+v0.3.0.md also holds the first note on **`hera-code`**: a coding CLI built on this workspace's
+packages, with its own built-in MCP server, that Hera reaches as an ordinary `mcp.json` entry. The
+part worth knowing before starting anything is that it may need **no new mechanism in Hera at all**,
+and that it is the first thing that can *test* rather than assert CLAUDE.md's claim that
+`hera_storage` and `hera_prompts` stay liftable into an unrelated project.
 
 **M1 and three fixes are on `main`**, merged bottom-up as #10 → #11 → #12 → #13:
 
@@ -205,6 +219,54 @@ saving was the second thing anybody did with an artifact and it meant opening th
 the link.
 
 1115 tests at 98 % coverage, plus 117 vitest and 23 Playwright.
+
+**M4 is built** — memory, on `feat/memories` off `feat/chat-artifacts`, stacked for the same
+reason everything since M1 has been. The shape changed before the work started and
+[ADR 16](adr/0016-a-memory-is-a-file-and-all-of-them-are-in-the-prompt.md) is the record:
+**a memory is a markdown file and every enabled one is in the prompt.** One file per memory under
+`~/.hera/memories/<key>.md`, front matter in `SKILL.md`'s shape, the filename as the key, and no
+retrieval anywhere — because a memory that was stored and did not arrive looks exactly like one
+that was never stored, and neither the person nor the model can tell which happened. The cost is
+space, so the space is the feature: a ceiling in tokens, a bar on Settings → Memory, and switching
+one off keeps the file and gives the space back.
+
+What it turned up:
+
+- **A mind region had been telling her the opposite for a version.** `memory_instr` shipped with
+  *"What you were given from memory is what you happened to recall, not the whole of what you
+  know."* True of a design that ranked and capped, false of this one, and left in it would have
+  her hedge about facts she is looking at. Found by reading the prompt rather than by a test —
+  prose and code can disagree for a long time without anything failing.
+- **What is *missing* from the tool surface is the design, twice.** There is no tool that lists
+  memories, because every enabled one is already in her prompt and reading them back would spend
+  the context window on what is in it — the same reasoning that left `artifact_list` out in M2b.
+  And `hera__forget` does not delete: it switches a memory off and keeps the file, so **the only
+  thing in the system that unlinks one is a person on the settings screen**. Both have a test
+  asserting the absence, because an absence nobody pinned is an absence somebody adds back.
+- **`hera_memories` needed less than the layering table had already given it.** Its allow-list said
+  `hera_storage`, written when it was going to own a table; it owns a directory, so it is
+  `hera_home` now.
+- **The token count is an approximation and is named as one.** `ceil(len(text) / 4)`. A real count
+  needs the endpoint's own tokenizer, which changes when the model does, is not installed, and
+  would make the number on screen depend on which model is selected. The question the bar answers
+  — *how close am I* — survives being 15 % out, which is why the ceiling is not also a promise
+  about the context window.
+- **A nearly-empty bar has to still look like a bar.** At 15 of 4000 the fill is 0.4 % wide, and
+  the track had no outline — so the control read as a stray brass mark rather than as plenty of
+  room. Only findable by looking at it.
+- **The mark is a brain, and it had to be drawn wrong to look right.** It began as a knot in a
+  handkerchief; a knot is a promise to remember *later*, and what this marks is already in her
+  prompt. But a brain's defining feature is fine convolution, which is what dies at 13 px — two
+  drafts rasterised into a coin with a line across it. The shipped one exaggerates the scallops,
+  picked by rendering five candidates at 13, 15, 26 and 64 px side by side.
+- **Renaming what a gutter row shows broke a test that never mentions the gutter.** `remember`'s
+  subject moved from the text to the key, which put the key into the transcript — and the settings
+  suite was waiting on `text=runs-models-locally`, which then matched the conversation *behind* the
+  open modal and returned before the panel had loaded. Same shape as a second one: the transcript
+  has an **Edit** on every message, so a page-wide `get_by_role` reached through the modal. Every
+  assertion on that screen is scoped through the panel now.
+
+1208 tests at 98 % coverage, plus 117 vitest and 27 Playwright.
 
 ---
 
@@ -716,7 +778,7 @@ wrote.
   already where beginning a conversation is designed to happen. A project's own **＋** carries
   the project through the store, the same way the first message does.
 - **Two doors, two questions.** Settings is *how she works* — Models, Skills, Servers,
-  Permissions, Mind, and Dreaming listed as v0.2. The profile card at the bottom of the rail is
+  Permissions, Mind, and Dreaming listed as coming (v0.3). The profile card at the bottom of the rail is
   *you and this machine* — appearance, which of her answers, where your data is. Mixing them is
   how a person scrolls past six model fields to find a light-mode toggle.
 - **Attachments are a field, not text.** The `＋` on the composer bar reads a file in the
@@ -863,9 +925,11 @@ whole path runs.
 scanned invoice are ordinary things to put in front of her, and the composer currently refuses
 all three. Where the extraction happens is open; see [tooling.md](tooling.md) § 6.
 
-**v0.2 — what makes her Hera.** `hera_memories` (embeddings, retrieval, caps, dedup, hits),
-trace compaction and the context meter, `hera_promptevo` (dreaming and experience training).
-Retrieval and the embedder land together, which is why the seam is left rather than filled.
+**v0.2 — what makes her Hera.** `hera_memories`, trace compaction and the context meter. The shape
+of memory changed before the work started and [versions/v0.2.0.md](versions/v0.2.0.md) § M4 is
+authoritative: markdown files a person can take elsewhere, injected whole under a visible token
+budget, rather than rows ranked by cosine. `hera_promptevo` (dreaming and experience training) is
+**v0.3** now, deferred on purpose.
 
 **The application is one package now.** `hera-core` at `apps/core/` holds the API and, under
 `web/`, the SvelteKit interface — not two directories under `apps/`. See
@@ -875,8 +939,12 @@ directory means *a library another project can consume*, and `tests/test_layerin
 and demands an allow-list per member. The application is the one thing that legitimately imports
 everything.
 
-**v0.3 — reach.** Hera as an MCP server so Claude Code can read her memory and skills, scheduled
-dreaming, agent personas branching the mind repository, a coding agent profile.
+**v0.3 — reach**, now planned in [versions/v0.3.0.md](versions/v0.3.0.md): dreaming and experience
+training, a sandbox, scheduled dreaming, agent personas branching the mind repository — and
+**`hera-code`**, which is what *a coding agent profile* on this list turned into. Not a profile but
+a second application: a CLI on this workspace's packages, carrying its own built-in MCP server, that
+Hera drives as an ordinary entry in `mcp.json`. The direction of *Hera as an MCP server so Claude
+Code can read her memory* reverses — she is the one reaching out.
 
 ## Working on this
 

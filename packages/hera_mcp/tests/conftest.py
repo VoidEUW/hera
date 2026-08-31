@@ -80,6 +80,26 @@ def wired(
 
 
 @pytest.fixture
+def wired_full(
+    notes: FakeNotes,
+    skills: FakeSkills,
+    searcher: FakeSearch,
+    scratchpad: FakeScratchpad,
+    artifacts: FakeArtifacts,
+) -> MCPServer:
+    """A deployment whose memory has no room left, which is the one refusal with a next move
+    written into it."""
+    return build_builtin_server(
+        memories=FakeMemories(full=True),
+        notes=notes,
+        skills=skills,
+        searcher=searcher,
+        scratchpad=scratchpad,
+        artifacts=artifacts,
+    )
+
+
+@pytest.fixture
 def bare() -> MCPServer:
     """Nothing wired, which is what v0.1 looks like."""
     return build_builtin_server()

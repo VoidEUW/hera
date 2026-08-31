@@ -11,8 +11,8 @@ OpenAI-compatible endpoint.
 ## Read first
 
 - `docs/status.md` — where the rebuild stands, what is settled, what is next. Start here
-- `docs/versions/` — what the version in progress is for and in what order it lands. v0.2 is
-  five milestones; read the one you are working on before touching its packages
+- `docs/versions/` — what the version in progress is for and in what order it lands. v0.2 is four
+  milestones (dreaming moved to v0.3); read the one you are working on before touching its packages
 - `ARCHITECTURE.md` — the packages, the layering rule, the shape of a turn
 - `docs/adr/` — why the structure looks like this; read 2 (Qwen only), 3 (emotions as tool
   calls) and 5 (deterministic skill routing) before changing model-facing behaviour
@@ -43,8 +43,9 @@ endpoint; it never runs in CI.
 domain concept at all and must stay liftable into an unrelated project.
 
 **Two MCP packages, and the difference matters.** `hera_mcp` is the server she *is* —
-`hera__emotion`, `hera__ask`, `hera__remember`, `hera__note`, `hera__skill`, `hera__search`, the
-three `hera__scratch_*`, the three `hera__artifact_*`, and the ports they take. `hera__ask` is the one that is never *run*:
+`hera__emotion`, `hera__ask`, `hera__remember`, `hera__forget`, `hera__note`, `hera__skill`,
+`hera__search`, the three `hera__scratch_*`, the three `hera__artifact_*`, and the ports they
+take. `hera__ask` is the one that is never *run*:
 `hera_chats` recognises it by name (`ChatsSettings.asking_tools`, filled in by the application)
 and suspends the turn the way a permission card does, so a person's reply becomes that call's
 result. `hera_tools` is the client she *has*, and it does not know the other exists: it mounts
@@ -92,6 +93,7 @@ columns, never `ForeignKey`; migrations live in `apps/core`.
 |---|---|
 | `hera.sqlite3` | everything relational |
 | `mind/` | a real git repository, one file per mind region |
+| `memories/<key>.md` | what she knows about you, one markdown file each. The filename is the key; every enabled one is in the prompt, under a token ceiling ([ADR 16](docs/adr/0016-a-memory-is-a-file-and-all-of-them-are-in-the-prompt.md)) |
 | `skills/<name>/SKILL.md` | skill packages |
 | `chats/<id>/scratch/` | her working files for one conversation. A cache, not something you keep — deleting the chat deletes it |
 | `chats/<id>/artifacts/` | what she publishes there: the filename is the identity, the extension is the kind. Goes with the chat too ([ADR 13](docs/adr/0013-an-artifact-is-a-file-she-publishes.md)) |
@@ -114,6 +116,14 @@ may import the other. Three verdicts: **verified**, **modified** — listed but 
 changed since, which is worth saying loudly — and **unknown**, which is the ordinary state and
 not a complaint. No file means nothing is verified; the signed registry this is a seam for does
 not exist yet.
+
+**Every memory is in the prompt, and that is the decision** — [ADR 16](docs/adr/0016-a-memory-is-a-file-and-all-of-them-are-in-the-prompt.md).
+There is no retrieval and no ranking, because a memory that was stored and did not arrive looks
+exactly like one that was never stored, and nobody on either side can tell which happened. The cost
+is space, so the space is the feature: a ceiling in tokens, a bar on Settings → Memory, and
+switching one off keeps the file and gives the space back. Two tools, and what is missing from them
+is the design — nothing lists memories (they are already in her prompt) and `hera__forget` does not
+delete (**the only thing that unlinks one is a person on the settings screen**).
 
 **Her vocabulary is data, her behaviour is prose.** The stances she can show live in
 `emotions.json` (`hera_mcp.DEFAULT_EMOTIONS` until something is changed), edited on

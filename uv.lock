@@ -14,6 +14,7 @@ members = [
     "hera-core",
     "hera-home",
     "hera-mcp",
+    "hera-memories",
     "hera-permissions",
     "hera-profiles",
     "hera-prompts",
@@ -665,6 +666,23 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [{ name = "mcp", specifier = ">=2.1" }]
+
+[[package]]
+name = "hera-memories"
+version = "0.1.0"
+source = { editable = "packages/hera_memories" }
+dependencies = [
+    { name = "hera-home" },
+    { name = "pydantic-settings" },
+    { name = "pyyaml" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "hera-home", editable = "packages/hera_home" },
+    { name = "pydantic-settings", specifier = ">=2.5" },
+    { name = "pyyaml", specifier = ">=6.0" },
+]
 
 [[package]]
 name = "hera-permissions"

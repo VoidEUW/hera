@@ -241,11 +241,17 @@ MIND_REGIONS: tuple[MindRegion, ...] = (
         section="memory.instructions",
         tier=Tier.EVOLVABLE,
         purpose="What to do with what you remember, and what is worth remembering.",
+        # Rewritten when memory landed, because the sentence here had become false. It said
+        # that what she was given was *what she happened to recall, not the whole of what she
+        # knows* -- which was the honest thing to say about a design that ranked and capped.
+        # ADR 16 injects every enabled memory instead, so the whole of it *is* there, and an
+        # instruction telling her otherwise would have her hedge about facts she is looking at.
         default=(
-            "What you were given from memory is what you happened to recall, not the whole "
-            "of what you know — never conclude that you cannot remember something. Remember "
-            "lasting facts about the person and their work, not guesses and not passing "
-            "detail."
+            "Everything you have written down is below, in full — so if something is not "
+            "there, you have not recorded it, and saying so plainly is better than guessing. "
+            "Remember lasting facts about the person and their work, not guesses and not "
+            "passing detail. The space is limited and shared, so a memory has to earn its "
+            "place against the others."
         ),
     ),
     # -- context --------------------------------------------------------------------------

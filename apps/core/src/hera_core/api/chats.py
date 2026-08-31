@@ -361,6 +361,11 @@ def _stream(
         chat,
         text=text,
         history_limit=container.orchestrator.settings.max_history_argument_chars,
+        # Read per turn, like the vocabulary and the date, and for the same reason: a memory
+        # switched off on the settings screen has to stop arriving on the next turn rather than
+        # after a restart. It is every enabled memory, whole -- there is no retrieval here, and
+        # the ceiling is what keeps that affordable (ADR 16).
+        memories=container.memories.recall(chat_id=str(chat.id)),
         **extra,
     )
     owner_id, chat_id, message_id = chat.owner_id, chat.id, assistant.id

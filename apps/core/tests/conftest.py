@@ -28,6 +28,7 @@ from hera_core.models import ALL_TABLES  # noqa: F401
 from hera_core.settings import CoreSettings
 from hera_core.wiring import Services
 from hera_mcp import ASK_TOOL, BUILTIN_SERVER_NAME, CHAT_ID_META
+from hera_memories import MemoryStore
 from hera_permissions import Decision, PermissionSet, Policy, Rule
 from hera_profiles import MindRepository, ProfileRepository, PromptBuilder
 from hera_providers import FakeProvider
@@ -116,6 +117,9 @@ def make_services(tmp_path: Path, skills_path: Path) -> Iterator[object]:
         library = SkillLibrary(skills_path)
         builder = PromptBuilder(mind)
         router = SkillRouter(library)
+        # Its own directory per container, so a test that remembers something cannot be read
+        # by the next one -- and so nothing here ever touches a real ~/.hera/memories.
+        memories = MemoryStore(tmp_path / f"memories-{made}")
         settings = CoreSettings()
         used = provider if provider is not None else FakeProvider()
 
@@ -129,6 +133,7 @@ def make_services(tmp_path: Path, skills_path: Path) -> Iterator[object]:
             builder=builder,
             library=library,
             router=router,
+            memories=memories,
             registry=registry,  # type: ignore[arg-type]  # StubTools satisfies the Tools port
             provider=used,
             orchestrator=TurnOrchestrator(

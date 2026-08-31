@@ -647,3 +647,118 @@ class TestADrawingKeepsItsShape:
         panel = page.locator("aside[aria-label='Artifacts'] .drawing").bounding_box()
         assert panel is not None
         assert box["height"] > panel["height"]
+
+
+MEMORY_SCRIPT: list[Any] = [
+    [
+        TextDelta(text="Noted.\n\n"),
+        tool_call(
+            "hera__remember",
+            {
+                "key": "runs-models-locally",
+                "text": "They run local models through LM Studio on an M-series Mac.",
+                "description": "Runs local models on Apple silicon",
+                "why": "Corrected me after I suggested CUDA flags",
+            },
+        ),
+        TurnEnd(reason="tool_calls"),
+    ],
+    text_turn("I will not suggest CUDA flags again."),
+]
+"""One thing worth keeping, written down the way she writes one."""
+
+
+class TestWhatSheRemembers:
+    """ADR 16 in a real browser, against the real store — her own MCP server is mounted and the
+    file really lands in the temporary `HERA_HOME`.
+
+    What is worth driving a browser for is the *bar*, because it is the only part of this
+    feature that cannot be checked anywhere else: the number comes from the server, the row
+    beside it comes from the server, and the whole point of showing them together is that a
+    person can compare them.
+    """
+
+    @pytest.fixture
+    def script(self) -> list[Any]:
+        return MEMORY_SCRIPT
+
+    def _remember(self, page: Any) -> None:
+        composer = page.locator("textarea:not([disabled])").first
+        composer.fill("I run models on a Mac")
+        composer.press("Enter")
+        page.wait_for_url("**/chat/**", timeout=15_000)
+        page.wait_for_selector("text=I will not suggest CUDA flags again.", timeout=30_000)
+
+    def _open_memory(self, page: Any) -> Any:
+        """The panel, once it has its list.
+
+        Everything below is scoped through what this returns, and that is not fussiness. The
+        transcript behind the modal has an **Edit** on every message and now carries the memory's
+        key in its gutter row, so a page-wide `get_by_role` or `text=` reaches through the open
+        modal and matches the conversation — as a stale assertion, or as a click the modal's own
+        panel then intercepts.
+        """
+        page.get_by_role("button", name="Settings").first.click()
+        page.get_by_role("button", name="Memory", exact=True).click()
+        panel = page.locator("section.memory")
+        panel.locator("li.item").first.wait_for(timeout=15_000)
+        return panel
+
+    def test_what_she_wrote_down_is_on_the_screen_with_what_it_costs(self, page: Any) -> None:
+        self._remember(page)
+        panel = self._open_memory(page)
+
+        assert panel.get_by_text("runs-models-locally").count() == 1
+        # The description and the `why` are never injected, so this screen is the only place
+        # either of them is ever seen — which is the whole reason they are worth storing.
+        assert panel.get_by_text("Runs local models on Apple silicon").count() == 1
+        assert panel.get_by_text("because Corrected me after I suggested CUDA flags").count() == 1
+
+        # And the bar, which is what makes the ceiling something to steer by rather than hit.
+        meter = panel.locator("[role='meter']")
+        assert meter.count() == 1
+        assert meter.get_attribute("aria-valuemax") == "4000"
+        assert int(meter.get_attribute("aria-valuenow") or "0") > 0
+
+    def test_switching_one_off_gives_the_space_back_without_losing_it(self, page: Any) -> None:
+        """The middle option between having something and deleting it, and the thing the bar
+        exists to make legible. The row stays, greyed rather than gone — hiding it is how a
+        person loses the ability to switch it back on."""
+        self._remember(page)
+        panel = self._open_memory(page)
+
+        before = int(panel.locator("[role='meter']").get_attribute("aria-valuenow") or "0")
+        panel.get_by_role("checkbox", name="Use runs-models-locally").click()
+
+        panel.get_by_text("Kept, not used").wait_for(timeout=15_000)
+        # Waited for rather than read: the row moves optimistically and the bar is re-read from
+        # the server, on purpose. What a memory costs and what the bar totals are one piece of
+        # arithmetic, and doing it a second time in the browser is how the two come to disagree.
+        panel.locator("[role='meter'][aria-valuenow='0']").wait_for(timeout=15_000)
+        assert before > 0
+        assert panel.get_by_text("runs-models-locally").count() == 1
+        assert panel.locator("li.item.off").count() == 1
+
+    def test_a_person_can_correct_what_she_wrote_down(self, page: Any) -> None:
+        """Behind a Save rather than on blur, unlike Settings → Emotions: the body is a paragraph,
+        and a blur that commits is a blur that can commit half a sentence."""
+        self._remember(page)
+        panel = self._open_memory(page)
+
+        panel.get_by_role("button", name="Edit").click()
+        panel.locator("li.item textarea").fill("They run local models on an M4 Pro, not a Studio.")
+        panel.get_by_role("button", name="Save").click()
+
+        panel.get_by_text("an M4 Pro, not a Studio").wait_for(timeout=15_000)
+        # The badge says who *started* it, not who touched it last.
+        assert panel.get_by_text("she wrote it").count() == 1
+
+    def test_it_can_be_taken_somewhere_that_is_not_hera(self, page: Any) -> None:
+        """A plain `<a download>` at the export route. The document is partly text a model
+        wrote, so it arrives as an attachment rather than as a page at Hera's own origin."""
+        self._remember(page)
+        panel = self._open_memory(page)
+
+        export = panel.get_by_role("link", name="Export MEMORY.md")
+        assert export.count() == 1
+        assert export.get_attribute("download") == "MEMORY.md"

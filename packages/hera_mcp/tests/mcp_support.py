@@ -18,14 +18,36 @@ from hera_mcp import CHAT_ID_META, Hit, ScratchFile
 
 
 class FakeMemories:
-    """A :class:`~hera_mcp.ports.MemoryWriter` that keeps what it was told."""
+    """A :class:`~hera_mcp.ports.Memories` that keeps what it was told.
 
-    def __init__(self) -> None:
-        self.written: list[tuple[str, str]] = []
+    Keyed the way the real one is, so that *writing the same key twice replaces* is a property
+    this fake shares rather than one only the store has — a fake that appended would let a test
+    pass while the tool description said something untrue.
+    """
 
-    async def remember(self, text: str, *, scope: str) -> str:
-        self.written.append((text, scope))
-        return f"remembered ({scope})"
+    def __init__(self, *, full: bool = False) -> None:
+        self.written: dict[str, tuple[str, str, str, str]] = {}
+        self.forgotten: list[str] = []
+        self.full = full
+
+    async def remember(
+        self,
+        key: str,
+        text: str,
+        *,
+        description: str = "",
+        why: str = "",
+        scope: str = "global",
+        chat_id: str = "",
+    ) -> str:
+        if self.full:
+            raise ValueError("there is no room: fold two of these into one")
+        self.written[key] = (text, description, scope, chat_id)
+        return f"remembered {key} ({scope})"
+
+    async def forget(self, key: str) -> str:
+        self.forgotten.append(key)
+        return f"{key} is switched off; the file is kept"
 
 
 class FakeNotes:

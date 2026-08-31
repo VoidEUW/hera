@@ -22,3 +22,4 @@ later.
 | [13](0013-an-artifact-is-a-file-she-publishes.md) | An artifact is a file she publishes | accepted |
 | [14](0014-skill-resources-are-readable.md) | Skill resources are readable | accepted |
 | [15](0015-running-code-in-a-container.md) | Running code happens in a container, and here is which claim that makes | **deferred to v0.3** |
+| [16](0016-a-memory-is-a-file-and-all-of-them-are-in-the-prompt.md) | A memory is a file, and every enabled one is in the prompt | accepted |

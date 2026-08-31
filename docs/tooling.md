@@ -29,7 +29,7 @@ guesses fluently.
 **Where it goes was the first question, and it was not obvious.** Two readings:
 
 - **In `hera_mcp`.** Search is part of what Hera *is*, the way `remember` is. It gets the same
-  port treatment: `hera_mcp` declares a `Searcher` protocol next to `MemoryWriter`, and the
+  port treatment: `hera_mcp` declares a `Searcher` protocol next to `Memories`, and the
   application injects whatever this deployment has. `hera_mcp` still imports no `hera_*` package
   and still knows nothing about a provider or an API key.
 - **As somebody else's MCP server** in `~/.hera/mcp.json`. Zero code, works today, and it is the

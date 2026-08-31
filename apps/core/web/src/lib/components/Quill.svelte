@@ -8,7 +8,7 @@
 	 *
 	 * Brass rather than laurel, because it belongs with the scroll: reading her instructions and
 	 * writing her working out are two halves of the same thing, and the colour says so before the
-	 * shape does. `remember` is deliberately *not* this — see `Knot.svelte`.
+	 * shape does. `remember` is deliberately *not* this — see `Brain.svelte`.
 	 */
 	interface Props {
 		size?: number;

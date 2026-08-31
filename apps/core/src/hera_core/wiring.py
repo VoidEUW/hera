@@ -30,8 +30,9 @@ from hera_core.chat_files import FileArtifacts, FileScratchpad
 from hera_core.config import load as load_config
 from hera_core.search import DuckDuckGo
 from hera_core.settings import CoreSettings
-from hera_home import mind_dir, skills_dir
+from hera_home import memories_dir, mind_dir, skills_dir
 from hera_mcp import ASK_TOOL, BUILTIN_SERVER_NAME, CHAT_ID_META, build_builtin_server
+from hera_memories import MemoriesSettings, MemoryPort, MemoryStore
 from hera_permissions import Decision, PermissionSet, Policy, Rule
 from hera_profiles import MindRepository, PromptBuilder
 from hera_providers import OpenAICompatibleProvider, Provider, ProviderSettings
@@ -85,6 +86,7 @@ class Services:
     builder: PromptBuilder
     library: SkillLibrary
     router: SkillRouter
+    memories: MemoryStore
     registry: ToolRegistry | None
     provider: Provider
     orchestrator: TurnOrchestrator
@@ -167,6 +169,12 @@ def build_services(
     # fallback, so retrieval works; it just ranks worse than it eventually will.
     router = SkillRouter(library)
 
+    # Memories are files rather than rows, so there is nothing to open and nothing to close --
+    # the store is a directory and a ceiling (ADR 16). Held on the container because two
+    # different callers need it: her `remember` tool, through the port below, and the settings
+    # screen, which lists what is there and shows what it costs.
+    memories = MemoryStore(memories_dir(), MemoriesSettings())
+
     if registry is None:
         registry = ToolRegistry.open(
             policy=policy if policy is not None else DEFAULT_POLICY,
@@ -174,12 +182,16 @@ def build_services(
             # hera_mcp imports no hera_* package at all, so the library arrives as a port, and
             # so does the search engine -- which one a person's questions are sent to is a
             # decision about this deployment and not about the server she is.
-            # Memories and notes stay unwired until v0.2; the tools still appear in the
-            # catalogue and answer "not available in this deployment", because a model that
-            # cannot see `remember` concludes it cannot remember and says so to the person.
+            # Notes stay unwired; the tool still appears in the catalogue and answers "not
+            # available in this deployment", because a model that cannot see a tool concludes
+            # it cannot do the thing and says so to the person.
             builtin=build_builtin_server(
                 skills=SkillLibraryPort(library),
                 searcher=DuckDuckGo(),
+                # Two tools and no way to list or delete, which is the design rather than an
+                # omission: every enabled memory is already in her prompt, and `forget`
+                # switches one off keeping the file (ADR 16).
+                memories=MemoryPort(memories),
                 # Which conversation a write belongs to arrives per call, in `_meta` -- see
                 # ChatsSettings.chat_meta_key below. These objects are singletons and know
                 # nothing about any one chat, which is the whole reason that mechanism exists.
@@ -201,6 +213,7 @@ def build_services(
         builder=builder,
         library=library,
         router=router,
+        memories=memories,
         registry=registry,
         provider=provider,
         owns_provider=not injected,

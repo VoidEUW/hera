@@ -18,7 +18,7 @@ to keep in step with the union.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 from uuid import UUID
 
@@ -28,6 +28,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from hera_chats import Chat, Message, Project
 from hera_core.config import validate_provider_name
 from hera_mcp import Emotion
+from hera_memories import MAX_DESCRIPTION, MAX_TEXT
 from hera_profiles import MindRegion, Profile
 from hera_skillsets import BrokenSkill, Skill, SkillUsage
 
@@ -669,6 +670,66 @@ class PreferencesOut(BaseModel):
 class PreferencesPatch(BaseModel):
     timezone: str | None = Field(default=None, max_length=64)
     """``None`` leaves it; ``""`` clears it back to UTC alone."""
+
+
+class MemoryOut(BaseModel):
+    """One memory, as the settings screen lists it (ADR 16).
+
+    Everything the file carries, including what a turn never sees: ``description`` is the line
+    a person scans and ``why`` is the provenance, and neither reaches the prompt — so this is
+    the only place either of them is ever shown, which is what makes them worth storing.
+
+    ``tokens`` is on the row rather than computed in the browser. What one memory costs and what
+    the bar totals have to be the same arithmetic, and two implementations of a rounding rule is
+    how a bar ends up disagreeing with the rows above it.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    key: str
+    text: str
+    description: str
+    why: str
+    created: date | None
+    scope: str
+    chat_id: str
+    source: str
+    enabled: bool
+    tokens: int
+    problems: list[str]
+    """Anything odd about the file, reported rather than raised -- a memory somebody edited
+    badly is listed with the reason beside it, the way a broken skill is."""
+
+
+class MemoryPatch(BaseModel):
+    """What a person may change from the screen. ``None`` means "leave it", as everywhere here.
+
+    No ``key``: the filename is the identity, so renaming a memory would be a different memory
+    with the same words in it. And no ``scope``, ``source`` or ``created`` — those record how a
+    memory came to exist, and editing the wording of one she wrote does not make it one you
+    wrote.
+    """
+
+    enabled: bool | None = None
+    text: str | None = Field(default=None, max_length=MAX_TEXT)
+    description: str | None = Field(default=None, max_length=MAX_DESCRIPTION)
+    why: str | None = Field(default=None, max_length=MAX_DESCRIPTION)
+
+
+class BudgetOut(BaseModel):
+    """What the enabled memories cost, for the bar.
+
+    ``limit`` travels with ``used`` rather than being a constant the browser also knows: it is
+    a deployment setting, and a bar drawn against a number the interface guessed would be wrong
+    on exactly the installs that changed it.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    used: int
+    limit: int
+    count: int
+    disabled: int
 
 
 class HealthOut(BaseModel):

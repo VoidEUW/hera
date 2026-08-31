@@ -80,28 +80,127 @@ class TestRemember:
     ) -> None:
         async with talking_to(wired) as client:
             result = await client.call_tool(
-                "remember", {"text": "prefers dark roast", "scope": "global"}
+                "remember",
+                {
+                    "key": "prefers-dark-roast",
+                    "text": "They drink it black.",
+                    "description": "Coffee",
+                },
             )
 
         assert not result.is_error
-        assert memories.written == [("prefers dark roast", "global")]
+        assert memories.written == {
+            "prefers-dark-roast": ("They drink it black.", "Coffee", "global", "")
+        }
+
+    async def test_the_input_schema_is_what_the_model_may_fill_in(self, wired: MCPServer) -> None:
+        """No ``chat_id`` — a memory scoped to a conversation learns which one from ``_meta``
+        (ADR 12), and a field in the schema is a field the model would invent. The ``ctx``
+        parameter that carries it is kept out by the SDK, which is somebody else's behaviour
+        and therefore worth a test rather than a comment."""
+        async with talking_to(wired) as client:
+            listing = await client.list_tools()
+
+        remember = next(tool for tool in listing.tools if tool.name == "remember")
+        assert sorted(remember.input_schema.get("properties", {})) == [
+            "description",
+            "key",
+            "scope",
+            "text",
+            "why",
+        ]
+        assert sorted(remember.input_schema.get("required", [])) == ["description", "key", "text"]
 
     async def test_the_scope_defaults_to_global(
         self, wired: MCPServer, memories: FakeMemories
     ) -> None:
         async with talking_to(wired) as client:
-            await client.call_tool("remember", {"text": "x"})
+            await client.call_tool("remember", {"key": "k", "text": "x", "description": "d"})
 
-        assert memories.written == [("x", "global")]
+        assert memories.written["k"][2] == "global"
+
+    async def test_a_chat_memory_learns_its_chat_from_meta(
+        self, wired: MCPServer, memories: FakeMemories
+    ) -> None:
+        async with talking_to(wired) as client:
+            result = await client.call_tool(
+                "remember",
+                {"key": "k", "text": "x", "description": "d", "scope": "chat"},
+                meta=in_chat("chat-7"),
+            )
+
+        assert not result.is_error
+        assert memories.written["k"][3] == "chat-7"
+
+    async def test_a_chat_memory_outside_a_conversation_says_so(
+        self, wired: MCPServer, memories: FakeMemories
+    ) -> None:
+        async with talking_to(wired) as client:
+            result = await client.call_tool(
+                "remember", {"key": "k", "text": "x", "description": "d", "scope": "chat"}
+            )
+
+        assert result.is_error
+        assert "not part of one" in said(result)
+        assert memories.written == {}
+
+    async def test_a_global_memory_does_not_need_a_conversation(
+        self, wired: MCPServer, memories: FakeMemories
+    ) -> None:
+        """The ordinary case has no business failing because this server happened to be driven
+        outside a turn."""
+        async with talking_to(wired) as client:
+            result = await client.call_tool(
+                "remember", {"key": "k", "text": "x", "description": ""}
+            )
+
+        assert not result.is_error
 
     async def test_a_scope_the_schema_does_not_allow_is_refused(
         self, wired: MCPServer, memories: FakeMemories
     ) -> None:
         async with talking_to(wired) as client:
-            result = await client.call_tool("remember", {"text": "x", "scope": "planet"})
+            result = await client.call_tool(
+                "remember", {"key": "k", "text": "x", "description": "d", "scope": "planet"}
+            )
 
         assert result.is_error
-        assert memories.written == []
+        assert memories.written == {}
+
+    async def test_a_full_store_reaches_the_model_as_something_it_can_act_on(
+        self, wired_full: MCPServer
+    ) -> None:
+        """The adapter's refusal, not the SDK's "Error executing tool remember" — that sentence
+        tells her nothing, and this one tells her exactly what to do next."""
+        async with talking_to(wired_full) as client:
+            result = await client.call_tool(
+                "remember", {"key": "k", "text": "x", "description": ""}
+            )
+
+        assert result.is_error
+        assert "fold two of these into one" in said(result)
+
+
+class TestForget:
+    async def test_it_switches_one_off_through_the_port(
+        self, wired: MCPServer, memories: FakeMemories
+    ) -> None:
+        async with talking_to(wired) as client:
+            result = await client.call_tool("forget", {"key": "prefers-dark-roast"})
+
+        assert not result.is_error
+        assert memories.forgotten == ["prefers-dark-roast"]
+
+    async def test_the_description_says_the_file_is_kept(self, wired: MCPServer) -> None:
+        """It is called ``forget`` because that is the word the model reaches for, so the
+        description is the only thing stopping it meaning what the model would assume."""
+        async with talking_to(wired) as client:
+            listing = await client.list_tools()
+
+        forget = next(tool for tool in listing.tools if tool.name == "forget")
+        assert forget.description is not None
+        assert "file is" in forget.description and "kept" in forget.description
+        assert "cannot delete" in forget.description
 
 
 class TestNote:
@@ -202,8 +301,8 @@ class TestSearch:
 class TestUnwiredPorts:
     """A deployment with no memories still has to be usable, and honest about why.
 
-    This is v0.1 exactly: ``remember`` waits for `hera_memories` and ``note`` for somewhere to
-    put a document, and both are listed anyway.
+    ``note`` waits for somewhere to put a document; a deployment can also be built with no
+    memory, no scratchpad and no search, and every one of them is listed anyway.
     """
 
     async def test_the_tools_are_still_listed(self, bare: MCPServer) -> None:
@@ -216,7 +315,8 @@ class TestUnwiredPorts:
     @pytest.mark.parametrize(
         ("tool", "arguments"),
         [
-            ("remember", {"text": "x"}),
+            ("remember", {"key": "k", "text": "x", "description": "d"}),
+            ("forget", {"key": "k"}),
             ("note", {"text": "x"}),
             ("skill", {"name": "writing"}),
             ("search", {"query": "kerberos"}),

@@ -60,6 +60,7 @@ export function mark(qualified: string): Mark {
 		case 'scratch_list':
 			return 'note';
 		case 'remember':
+		case 'forget':
 			return 'memory';
 		case 'artifact_create':
 		case 'artifact_edit':
@@ -102,7 +103,11 @@ const SUBJECT: Record<string, readonly string[]> = {
 	skill: ['name'],
 	search: ['query'],
 	note: ['title', 'text'],
-	remember: ['text'],
+	// The key, never the text: a memory is a paragraph and the gutter row is one line — the same
+	// reasoning `artifact_create` needs, and here it doubles as the thing you would go looking
+	// for on Settings → Memory afterwards.
+	remember: ['key'],
+	forget: ['key'],
 	emotion: ['kind'],
 	// The filename, never the body: a scratchpad write is a whole document, and the gutter row is
 	// one line. `scratch_list` takes no arguments and falls through to nothing, which is right —

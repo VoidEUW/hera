@@ -18,6 +18,7 @@
 	import { api, type Region, type Rule, type Server } from '$lib/api/client';
 	import { t } from '$lib/i18n';
 	import Emotions from './settings/Emotions.svelte';
+	import Memory from './settings/Memory.svelte';
 	import Models from './settings/Models.svelte';
 	import Skills from './settings/Skills.svelte';
 
@@ -27,13 +28,15 @@
 
 	let { onclose }: Props = $props();
 
-	type Tab = 'models' | 'skills' | 'servers' | 'permissions' | 'emotions' | 'mind' | 'dreaming';
+	type Tab =
+		'models' | 'skills' | 'servers' | 'permissions' | 'memory' | 'emotions' | 'mind' | 'dreaming';
 
 	const TABS: Array<{ id: Tab; label: string; soon?: boolean }> = [
 		{ id: 'models', label: t.settings.models },
 		{ id: 'skills', label: t.settings.skills },
 		{ id: 'servers', label: t.settings.servers },
 		{ id: 'permissions', label: t.settings.permissions },
+		{ id: 'memory', label: t.settings.memory },
 		{ id: 'emotions', label: t.settings.emotions },
 		{ id: 'mind', label: t.settings.mind },
 		{ id: 'dreaming', label: t.settings.dreaming, soon: true }
@@ -152,6 +155,8 @@
 
 			{#if tab === 'models'}
 				<Models {filter} />
+			{:else if tab === 'memory'}
+				<Memory {filter} />
 			{:else if tab === 'dreaming'}
 				<p class="empty">{t.settings.dreamingSoon}</p>
 			{:else if tab === 'mind'}

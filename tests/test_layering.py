@@ -40,7 +40,7 @@ ALLOWED: dict[str, frozenset[str]] = {
     # know that hera_mcp exists; the application is what puts the two together.
     "hera_tools": frozenset({"hera_home", "hera_permissions"}),
     "hera_skillsets": frozenset({"hera_home", "hera_storage"}),
-    "hera_memories": frozenset({"hera_storage"}),
+    "hera_memories": frozenset({"hera_home"}),
     # Assembly layer.
     "hera_profiles": frozenset({"hera_home", "hera_storage", "hera_prompts"}),
     # Orchestration.

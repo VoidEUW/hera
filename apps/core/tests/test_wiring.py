@@ -18,6 +18,7 @@ from collections.abc import AsyncIterator
 import pytest
 
 from hera_core.wiring import Services, build_services
+from hera_home import memories_dir
 from hera_mcp import ARTIFACT_META, ASK_TOOL, BUILTIN_SERVER_NAME, CHAT_ID_META
 from hera_providers import FakeProvider
 from hera_tools import ToolInvocation
@@ -89,3 +90,74 @@ async def test_the_artifacts_port_is_wired_and_answers_with_a_card(services: Ser
 
     assert result.ok, result.text
     assert result.structured == {ARTIFACT_META: {"name": "page.html", "inline": False, "bytes": 11}}
+
+
+async def test_the_memory_port_is_wired_and_really_writes_a_file(services: Services) -> None:
+    """The same guard again, and it is worth having a third time because the failure has the
+    same shape every time: a `memories=` argument can be present and be `None`, and then the one
+    tool a person most notices missing answers *not available in this deployment* in the middle
+    of a working deployment.
+
+    Driven through the real registry, and asserted against the **file**, because a memory that
+    is written anywhere other than `~/.hera/memories/` is a memory nobody can export or edit —
+    which is most of what ADR 16 is for.
+    """
+    assert services.registry is not None
+    result = await services.registry.dispatch(
+        ToolInvocation(
+            call_id="c3",
+            tool=f"{BUILTIN_SERVER_NAME}__remember",
+            arguments={
+                "key": "prefers-short-answers",
+                "text": "They want two sentences, not five.",
+                "description": "Short answers",
+            },
+        ),
+        context={},
+    )
+
+    assert result.ok, result.text
+    written = memories_dir() / "prefers-short-answers.md"
+    assert written.is_file()
+    assert "They want two sentences, not five." in written.read_text(encoding="utf-8")
+
+
+async def test_a_memory_she_writes_is_in_the_next_turn_s_prompt(services: Services) -> None:
+    """The half that would otherwise pass every test and do nothing: the tool can be wired
+    perfectly and the slot still never filled, and then she writes memories down and never sees
+    one again.
+
+    `recall` is what the streaming route puts on `TurnContext.memories`, so this asserts the
+    same call that route makes.
+    """
+    assert services.registry is not None
+    await services.registry.dispatch(
+        ToolInvocation(
+            call_id="c4",
+            tool=f"{BUILTIN_SERVER_NAME}__remember",
+            arguments={"key": "drinks-tea", "text": "They drink tea.", "description": "Tea"},
+        ),
+        context={},
+    )
+
+    assert "They drink tea." in services.memories.recall()
+
+
+async def test_forgetting_keeps_the_file(services: Services) -> None:
+    """`nothing a person told her is discarded without a person present`, asserted where it can
+    actually be checked — on disk, after her own tool has run."""
+    assert services.registry is not None
+    for call_id, tool, arguments in (
+        ("c5", "remember", {"key": "a-fact", "text": "Something.", "description": "A fact"}),
+        ("c6", "forget", {"key": "a-fact"}),
+    ):
+        result = await services.registry.dispatch(
+            ToolInvocation(
+                call_id=call_id, tool=f"{BUILTIN_SERVER_NAME}__{tool}", arguments=arguments
+            ),
+            context={},
+        )
+        assert result.ok, result.text
+
+    assert (memories_dir() / "a-fact.md").is_file()
+    assert services.memories.recall() == ""
