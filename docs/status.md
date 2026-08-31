@@ -3,7 +3,7 @@
 Where the rebuild stands and what is settled, so a new session can pick up without re-reading
 the history. Updated as milestones land — this file is a snapshot, not a changelog.
 
-**Last updated:** 2026-08-28 · **Version:** v0.2 in progress · **Strategy:** thin spine first, then deepen
+**Last updated:** 2026-08-30 · **Version:** v0.2 in progress · **Strategy:** thin spine first, then deepen
 
 **v0.2 is planned in [versions/v0.2.0.md](versions/v0.2.0.md)** — five milestones, in the order
 *organise → produce → make room → remember → reflect*.
@@ -31,14 +31,14 @@ not a correct diff: a branch still based on the pre-squash tip proposes to *undo
 only in the squash. Checking `git diff --name-status origin/main HEAD` for deletions before each
 merge is what caught `.gitkeep` going missing, and it is worth doing every time.
 
-**M2 is next, and it is two branches rather than one**, split where
+**M2 is built, and it was two branches rather than one**, split where
 [tooling.md](tooling.md) § 5 said it had to be: artifacts and the scratchpad want the same storage,
-and answering them separately produces two.
+and answering them separately produces two. Skill resources are a third, stacked on top.
 
 | | |
 |---|---|
-| **M2a** | The scratchpad, and a tool call that knows which chat it is in — [ADR 12](adr/0012-a-chat-has-a-scratchpad.md) |
-| **M2b** | Artifacts and skill resources — [ADR 13](adr/0013-an-artifact-is-a-file-she-publishes.md), [ADR 14](adr/0014-skill-resources-are-readable.md) |
+| **M2a** | ✅ The scratchpad, and a tool call that knows which chat it is in — [ADR 12](adr/0012-a-chat-has-a-scratchpad.md) |
+| **M2b** | ✅ Artifacts — [ADR 13](adr/0013-an-artifact-is-a-file-she-publishes.md) · then skill resources — [ADR 14](adr/0014-skill-resources-are-readable.md), on a branch of their own |
 
 **ADR 13 took three drafts and none of the first two were built on**, which is the cheapest place
 for that to happen. Draft one made an artifact a versioned object with its own package and tables —
@@ -139,7 +139,72 @@ same branch:
   connection that breaks half way through close a turn differently, and only the first was
   scriptable before.
 
-1042 tests at 98 % coverage, plus 94 vitest and 12 Playwright. M2b starts from here.
+**M2b's first half is built**, on `feat/chat-artifacts` off `feat/chat-scratchpad` — stacked for
+the reason above, since a `~/.hera` used to review it is stamped by the same migration. What is on
+it is **artifacts**; [ADR 14](adr/0014-skill-resources-are-readable.md)'s `hera__read_resource` is
+a branch of its own on top, because the two share nothing but the name guard and reviewing them
+together would put two unrelated features in one diff.
+
+`hera__artifact_create`, `hera__artifact_edit` and `hera__artifact_read` over
+`~/.hera/chats/<id>/artifacts/`, a card in the transcript, and the drawer beside it. What it turned
+up:
+
+- **The card needs no new event variant, and that was verified before it was designed around** —
+  the same discipline `_meta` got in M2a. A tool body may return `CallToolResult` carrying
+  *readable text for the model* and *`structured_content` for the interface* in one result, with no
+  output schema published, and `hera_tools` → `hera_chats` already carry it into
+  `ToolResultEvent.structured`. `test_wiring.py` asserts it survives the whole path, because if it
+  were dropped anywhere every artifact would still be written correctly and none would appear.
+- **`edit` deliberately returns no card**, and the SDK's behaviour is why the interface keys on the
+  *presence of the artifact key* rather than on structure at all: a tool returning a plain string
+  gets `{"result": …}` derived for it, so "has no structured content" is not a state a tool can be
+  in.
+- **A call's *arguments* are replayed under every later question**, which ADR 13 missed while
+  keeping content out of the *result* for exactly that reason. A 40 KB page published in turn four
+  was in the prompt of every turn after it, forever — and `scratch_write` has had the same shape at
+  up to a megabyte since M2a. `build_history` now shortens a string argument past
+  `ChatsSettings.max_history_argument_chars`; `turn_to_messages` does not, because the turn in
+  progress is still working on what it just wrote. A rule about **size**, not about tool names:
+  `hera_chats` may not learn which tools are hers.
+- **`effect_update_depth_exceeded` for the third time, in a new shape.** A store method that bumps
+  a counter *reads* that counter, so calling it from an `$effect` makes the effect depend on what
+  it writes — Svelte gives up rendering the page mid-turn with nothing on screen to say why. Found
+  by driving a real browser: the card appeared, the rest of the turn never did. `untrack` at the
+  call site, and a plain (non-reactive) `Set` in the store so the same result is only ever noticed
+  once.
+- **An inline artifact grows after the scroll has already happened.** Its content is fetched by
+  name, so a chart is 300 px tall a moment after the event announcing it — by which time the
+  follow-the-answer effect has run and the sentence underneath has been pushed out of sight. A
+  `ResizeObserver` on the transcript column covers that, and everything later with the same shape.
+- **The API never serves an artifact as a document.** Content comes back as JSON and a download as
+  an attachment with `application/octet-stream` and `nosniff`; the browser builds the frame with
+  `srcdoc`, where it has an opaque origin. Serving what a *model* wrote as `text/html` from Hera's
+  own origin would undo the sandbox in one header, and it would be undone in a different file from
+  the one that looks like it owns the decision.
+- **`hera_core.scratch` is `hera_core.chat_files`**, holding both adapters and one `_resolve`.
+  ADR 13 asked for that explicitly: two copies of the check that makes both tools safe to allow
+  without a permission card is one copy too many, and the traversal test class is parametrised over
+  both rather than duplicated.
+- **A drawing is a replaced element, and a flex box squashes one.** An `<svg>` with `height: auto`
+  is a flex item whose cross size is `auto`, so `align-items: stretch` sets its height from the
+  *box* — and with a `max-height` above it, a 400 × 1400 flow chart was compressed to the panel's
+  height and then shrunk by `preserveAspectRatio` to a thumbnail in an acre of white. The container
+  is a plain block now, and the scroll it already had is what handles a chart taller than the
+  panel. Worth the entry because of how it presents: it looks like an artifact that came out
+  broken, not like a layout that is wrong, and there is nothing below a browser that can see it.
+  The e2e test asserts the *proportions* rather than the CSS.
+- **Mermaid stays out**, decided rather than forgotten: `.mmd` renders as a source figure that says
+  so. It is a 2–3 MB browser dependency and a second sanitising path, and an `.svg` is a drawn
+  chart today.
+
+And two things that came from using it rather than from building it: **the drawer opens by itself**
+when she publishes something that is not `inline`, only while the turn is streaming — a page is a
+thing you look at, and a reload should leave you where you left off rather than reopening a panel
+over the transcript you came back to read. And **the card carries its own save control**, because
+saving was the second thing anybody did with an artifact and it meant opening the drawer to reach
+the link.
+
+1115 tests at 98 % coverage, plus 117 vitest and 23 Playwright.
 
 ---
 
@@ -186,7 +251,8 @@ packages/hera_storage/    vendored, unchanged in behaviour
 packages/hera_prompts/    vendored, unchanged in behaviour
 packages/hera_providers/  the model boundary: event union, Qwen adapter, transport, FakeProvider
 packages/hera_permissions/ allow · deny · ask, resolved by pattern and profile
-packages/hera_mcp/        the MCP server she *is*: emotion, ask, remember, note, skill, search, and their ports
+packages/hera_mcp/        the MCP server she *is*: emotion, ask, remember, note, skill, search,
+                          the scratchpad, the artifacts, and the ports they take
 packages/hera_tools/      the MCP client: server lifecycle, the namespaced catalogue, dispatch
 packages/hera_profiles/   the git-backed mind, behaviour traits, profiles, the PromptBuilder
 packages/hera_skillsets/  SKILL.md packages, the router, usage counts
@@ -788,10 +854,10 @@ whole path runs.
    the mobile sheet, and the embedder seam. ~~Project instructions in the interface~~ landed with
    v0.2's M1 — the rail makes and renames projects, and `/project/<id>` edits one.
 5. **The rest of the tool surface.** `hera__search` now exists — see below — but `fetch` does
-   not, so she can find a page and not read it. That and the rest of what using the build argued
-   for (a per-chat scratchpad, an emotion that can ask a question back, artifacts, and the
-   eventual split into `hera_code_mcp` and `hera_sandbox`) are written up in
-   [tooling.md](tooling.md). Notes rather than decisions: nothing there has an ADR yet.
+   not, so she can find a page and not read it. The per-chat scratchpad, the emotion that can ask
+   a question back and artifacts have all landed since that list was written; what is left in
+   [tooling.md](tooling.md) is `fetch`, PDFs and the eventual split into `hera_code_mcp` and
+   `hera_sandbox`, and each section says whether it became a decision or is still a note.
 
 **PDFs are in v0.1.0.** Reading them is scoped in rather than deferred — a paper, a spec and a
 scanned invoice are ordinary things to put in front of her, and the composer currently refuses

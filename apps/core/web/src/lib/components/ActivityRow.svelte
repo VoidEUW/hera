@@ -12,7 +12,8 @@
 	 * reached for it with `hera__skill` mid-task, because those are the same thing to a reader,
 	 * and letting the plumbing decide the picture is how a category stops looking like one. Her
 	 * own capabilities get their own: a **globe** when she looked outside the machine, a **quill**
-	 * when she wrote something down, a **knot** when she kept a fact about you. Everything else
+	 * when she wrote something down, a **knot** when she kept a fact about you, a **stele** when
+	 * she published something for you to read. Everything else
 	 * — every foreign server, and anything of hers this build has never heard of — gets a
 	 * **wrench**, the shape everybody already reads as "a tool ran". `$lib/tools` holds that
 	 * mapping and says why it is allowed to know her names and no others.
@@ -40,6 +41,7 @@
 	import Prose from './Prose.svelte';
 	import Quill from './Quill.svelte';
 	import Scroll from './Scroll.svelte';
+	import Stele from './Stele.svelte';
 	import Wrench from './Wrench.svelte';
 
 	interface Props {
@@ -142,6 +144,8 @@
 			<Quill size={13} alive={running} muted={!running && !loud} />
 		{:else if shape === 'memory'}
 			<Knot size={13} alive={running} muted={!running && !loud} />
+		{:else if shape === 'artifact'}
+			<Stele size={13} alive={running} muted={!running && !loud} />
 		{:else}
 			<Wrench size={13} alive={running} muted={!running && !loud} />
 		{/if}
@@ -285,7 +289,8 @@
 	.gutter :global(.scroll),
 	.gutter :global(.globe),
 	.gutter :global(.quill),
-	.gutter :global(.knot) {
+	.gutter :global(.knot),
+	.gutter :global(.stele) {
 		position: relative;
 		background: var(--ground);
 		padding: 3px 0;

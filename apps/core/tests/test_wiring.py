@@ -18,7 +18,7 @@ from collections.abc import AsyncIterator
 import pytest
 
 from hera_core.wiring import Services, build_services
-from hera_mcp import ASK_TOOL, BUILTIN_SERVER_NAME, CHAT_ID_META
+from hera_mcp import ARTIFACT_META, ASK_TOOL, BUILTIN_SERVER_NAME, CHAT_ID_META
 from hera_providers import FakeProvider
 from hera_tools import ToolInvocation
 
@@ -67,3 +67,25 @@ async def test_the_scratchpad_port_is_wired(services: Services) -> None:
     )
 
     assert result.ok, result.text
+
+
+async def test_the_artifacts_port_is_wired_and_answers_with_a_card(services: Services) -> None:
+    """The same guard for ADR 13, and it asserts one thing more: that the structured content the
+    card is drawn from survives the whole path — her server, the client, the registry.
+
+    That is the part with somebody else's behaviour in it. The tool returns text *and* JSON in
+    one result; if the SDK or `hera_tools` dropped the second, every artifact would still be
+    written correctly and none of them would ever appear on screen.
+    """
+    assert services.registry is not None
+    result = await services.registry.dispatch(
+        ToolInvocation(
+            call_id="c2",
+            tool=f"{BUILTIN_SERVER_NAME}__artifact_create",
+            arguments={"name": "page.html", "content": "<h1>Hi</h1>", "inline": False},
+        ),
+        context={CHAT_ID_META: "0f9c1c2e-1111-4222-8333-444444444444"},
+    )
+
+    assert result.ok, result.text
+    assert result.structured == {ARTIFACT_META: {"name": "page.html", "inline": False, "bytes": 11}}

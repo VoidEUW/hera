@@ -120,6 +120,50 @@ class Scratchpad(Protocol):
 
 
 @runtime_checkable
+class Artifacts(Protocol):
+    """What she publishes for one conversation (ADR 13).
+
+    The other side of the scratchpad above, and the difference is the whole record: a scratchpad
+    is hers and nobody reads it, an artifact is the deliverable — named, rendered beside the
+    conversation, and downloadable. Two ports rather than one with a flag, because a notes
+    directory a person browses for the deliverable is one she has a reason to be tidy in.
+
+    Three methods, matching the three tools. There is deliberately **no listing**: what a person
+    sees is a directory the application reads directly, and a tool that enumerated her own output
+    back into the context window would spend it on filenames she already knows.
+
+    The implementation decides what a usable name is and enforces :meth:`edit`'s *exactly once*
+    rule, because it is the one holding the bytes. Its refusals are read by the model, so they
+    say what was wrong and what to do instead.
+    """
+
+    async def create(self, chat_id: str, name: str, content: str) -> int:
+        """Write one artifact whole, replacing any file of that name. Returns its size in bytes.
+
+        Replacing rather than versioning is the decision ADR 13 took and the cost it accepted:
+        there is no undo, and :meth:`edit` is what makes that bearable.
+        """
+        ...
+
+    async def edit(self, chat_id: str, name: str, find: str, replace: str) -> int:
+        """Replace one passage of one artifact. Returns its new size in bytes.
+
+        ``find`` must match **exactly once**. Zero matches and several are both refusals, because
+        a replacement that hit the wrong one of three is a silent corruption and the model cannot
+        see the file to notice.
+        """
+        ...
+
+    async def read(self, chat_id: str, name: str) -> str | None:
+        """The current content of one artifact, or ``None`` if there is no such file.
+
+        ``None`` rather than an exception for the reason :meth:`Scratchpad.read` uses it: having
+        looked and found nothing is an ordinary answer.
+        """
+        ...
+
+
+@runtime_checkable
 class SkillLibrary(Protocol):
     """The ``SKILL.md`` packages on disk. Implemented by ``hera_skillsets``.
 

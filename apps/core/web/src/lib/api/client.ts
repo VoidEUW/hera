@@ -67,6 +67,21 @@ export interface Chat {
 	last_message_at: string | null;
 }
 
+export interface ArtifactSummary {
+	name: string;
+	bytes: number;
+	modified_at: string;
+}
+
+export interface ArtifactContent {
+	name: string;
+	bytes: number;
+	/** The file as text. HTML never travels as HTML: a page the model wrote goes into a
+	 * sandboxed frame through `srcdoc`, where it has an opaque origin and cannot reach Hera's
+	 * storage. Serving it as a document from this origin would undo that in one header. */
+	text: string;
+}
+
 export interface AttachmentSummary {
 	name: string;
 	bytes: number;
@@ -266,6 +281,15 @@ export const api = {
 	moveChat: (id: string, project_id: string | null) =>
 		request<Chat>(`/chats/${id}`, { method: 'PATCH', body: JSON.stringify({ project_id }) }),
 	deleteChat: (id: string) => request<void>(`/chats/${id}`, { method: 'DELETE' }),
+
+	/** Everything published in one conversation (ADR 13). The file bar, and the count in the
+	 * header that says there is something to open. */
+	artifacts: (chatId: string) => request<ArtifactSummary[]>(`/chats/${chatId}/artifacts`),
+	/** One artifact's *current* content. Fetched by name rather than carried in the event, so a
+	 * 40 KB page never bloats a stored message — and so an edit in a later turn changes what an
+	 * earlier card draws, which ADR 13 makes deliberate. */
+	artifact: (chatId: string, name: string) =>
+		request<ArtifactContent>(`/chats/${chatId}/artifacts/${encodeURIComponent(name)}`),
 
 	providers: () => request<Providers>('/providers'),
 	addProvider: (body: Partial<Provider> & { name: string; api_key?: string }) =>

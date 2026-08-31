@@ -159,6 +159,43 @@ export const ASK_TOOL = 'hera__ask';
  * same thing to a reader, so they are drawn the same way — see `Scroll.svelte`. */
 export const SKILL_TOOL = 'hera__skill';
 
+/** The tool that publishes an artifact (ADR 13). Its *result* carries the card.
+ *
+ * Only `create` is named here, and that is the design rather than an omission: publishing is the
+ * act that produces a thing, and an edit changes a file that is already on screen — an artifact
+ * has one current state everywhere it appears, so a second card would draw the same file twice.
+ */
+export const ARTIFACT_CREATE_TOOL = 'hera__artifact_create';
+
+/** Where the server puts what a card is drawn from, mirroring `hera_mcp.ARTIFACT_META`. */
+export const ARTIFACT_KEY = 'artifact';
+
+/** What one artifact's tool result says about it. */
+export interface Artifact {
+	name: string;
+	inline: boolean;
+	bytes: number;
+}
+
+/** The artifact a tool result published, or `null` for every other result.
+ *
+ * **This reads a field, it does not parse anything.** `structured` is JSON the *server* built
+ * (`ToolResultEvent.structured`, typed `Any` since v0.1) rather than text a model wrote, so the
+ * rule ADR 11 draws is not in play: nothing here recovers meaning from prose. The tool name is
+ * checked as well as the key, because `hera__*` is her namespace and a foreign server is free to
+ * use the word "artifact" for something else entirely.
+ */
+export function artifactOf(event: AnyEvent): Artifact | null {
+	if (event.type !== 'tool_result') return null;
+	const result = event as ToolResultEvent;
+	if (result.tool !== ARTIFACT_CREATE_TOOL || !result.ok) return null;
+	const carried = (result.structured as Record<string, unknown> | null)?.[ARTIFACT_KEY];
+	if (!carried || typeof carried !== 'object') return null;
+	const { name, inline, bytes } = carried as Partial<Artifact>;
+	if (typeof name !== 'string' || !name) return null;
+	return { name, inline: inline === true, bytes: typeof bytes === 'number' ? bytes : 0 };
+}
+
 /** Her own namespace, which is the only one this interface is allowed to recognise. */
 export const HERA = 'hera__';
 

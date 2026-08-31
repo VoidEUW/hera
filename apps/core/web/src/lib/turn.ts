@@ -25,12 +25,13 @@
 
 import type {
 	AnyEvent,
+	Artifact,
 	ChatEvent,
 	ToolCallReady,
 	ToolCallStarted,
 	ToolResultEvent
 } from './api/events';
-import { isAsk, isEmotion } from './api/events';
+import { artifactOf, isAsk, isEmotion } from './api/events';
 
 /** A row in the activity gutter: something she did before or between speaking. */
 export interface Activity {
@@ -55,10 +56,13 @@ export interface Activity {
 
 /** Something that renders in the flow of the answer, where she put it. */
 export interface Inline {
-	kind: 'prose' | 'emotion' | 'permission' | 'question';
+	kind: 'prose' | 'emotion' | 'permission' | 'question' | 'artifact';
 	key: string;
 	text?: string;
 	event?: AnyEvent;
+	/** What she published, for an `artifact` block (ADR 13). Read off the result's `structured`
+	 * — JSON the server built — rather than out of anything she wrote. */
+	artifact?: Artifact;
 }
 
 /** One run of consecutive gutter rows, drawn as a single bordered block. */
@@ -236,6 +240,20 @@ export function reduce(events: AnyEvent[]): Turn {
 			case 'tool_result': {
 				const result = event as ToolResultEvent;
 				const waiting = byCall.get(result.call_id);
+				const published = artifactOf(result);
+				if (published) {
+					// The thing she made, drawn where she made it (ADR 13). The gutter row for the
+					// call **stays**: the row is the act and how long it took, and while 40 KB of
+					// arguments are still arriving it is the only thing on screen. The card is the
+					// result, and the two say different things.
+					if (waiting) waiting.result = result;
+					// A card is something a person can see, so a block of reasoning either side of
+					// it is two thoughts rather than one — the same rule an emotion follows.
+					settle();
+					flush();
+					ordered.push({ kind: 'artifact', key, event: result, artifact: published });
+					break;
+				}
 				if (waiting) {
 					waiting.result = result;
 				} else if (asked.has(result.call_id)) {
@@ -340,7 +358,7 @@ function isActivity(item: Activity | Inline): item is Activity {
 	return !INLINE_KINDS.has(item.kind);
 }
 
-const INLINE_KINDS = new Set<string>(['prose', 'emotion', 'permission', 'question']);
+const INLINE_KINDS = new Set<string>(['prose', 'emotion', 'permission', 'question', 'artifact']);
 
 /** Whether a card is still open, for a message rendered from the persisted list.
  *

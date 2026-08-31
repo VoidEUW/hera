@@ -243,6 +243,38 @@ class ChatDetail(BaseModel):
     messages: list[MessageOut]
 
 
+class ArtifactOut(BaseModel):
+    """One published artifact, as the file bar beside the conversation lists it (ADR 13).
+
+    No id and no title: the filename is the identity and the card's heading is that name
+    humanised, by the same transformation ``$lib/tools`` already applies to a tool name. There is
+    no ``inline`` here either — that is a property of the *call* that published it, and it rides
+    in the persisted event rather than in a listing of a directory.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    name: str
+    bytes: int
+    modified_at: datetime
+
+
+class ArtifactContent(BaseModel):
+    """One artifact's current content, for the panel that draws it.
+
+    Text rather than bytes, and JSON rather than the file itself, which is a security decision
+    and not a style one: serving an artifact as ``text/html`` from Hera's own origin would give a
+    page the model wrote the run of Hera's storage and cookies. The browser builds a sandboxed
+    frame from this string instead, so the frame keeps an opaque origin (ADR 13).
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    name: str
+    bytes: int
+    text: str
+
+
 MAX_TEXT_CHARS = 4 * 1024 * 1024
 """A text attachment's ceiling. The browser stops far below this; the number here exists so a
 request built by hand cannot put an arbitrary amount of memory into a JSON column."""

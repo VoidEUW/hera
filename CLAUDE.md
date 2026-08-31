@@ -44,12 +44,17 @@ domain concept at all and must stay liftable into an unrelated project.
 
 **Two MCP packages, and the difference matters.** `hera_mcp` is the server she *is* —
 `hera__emotion`, `hera__ask`, `hera__remember`, `hera__note`, `hera__skill`, `hera__search`, the
-three `hera__scratch_*`, and the ports they take. `hera__ask` is the one that is never *run*:
+three `hera__scratch_*`, the three `hera__artifact_*`, and the ports they take. `hera__ask` is the one that is never *run*:
 `hera_chats` recognises it by name (`ChatsSettings.asking_tools`, filled in by the application)
 and suspends the turn the way a permission card does, so a person's reply becomes that call's
 result. `hera_tools` is the client she *has*, and it does not know the other exists: it mounts
 whatever in-process server the application hands it, under that server's own name. Her tool
 descriptions are prompt text; edit them in `hera_mcp` and her behaviour changes.
+
+**Two directories per chat, and they are not one directory with a flag.** `scratch/` is hers and
+nobody reads it, which is what lets her think out loud in it; `artifacts/` is what she publishes,
+and a person browses it. Same guard, same cleanup, opposite promises — `hera_core.chat_files` owns
+both adapters so the name check exists once.
 
 **A tool learns which chat it is in from `_meta`, never from an argument** — [ADR 12](docs/adr/0012-a-chat-has-a-scratchpad.md).
 The model chooses arguments, so a `chat_id` field is one it would invent; a `ctx: Context`
@@ -89,6 +94,7 @@ columns, never `ForeignKey`; migrations live in `apps/core`.
 | `mind/` | a real git repository, one file per mind region |
 | `skills/<name>/SKILL.md` | skill packages |
 | `chats/<id>/scratch/` | her working files for one conversation. A cache, not something you keep — deleting the chat deletes it |
+| `chats/<id>/artifacts/` | what she publishes there: the filename is the identity, the extension is the kind. Goes with the chat too ([ADR 13](docs/adr/0013-an-artifact-is-a-file-she-publishes.md)) |
 | `mcp.json` | MCP servers, in the Claude-Desktop `mcpServers` shape |
 | `config.toml` | registered model endpoints, written by the interface |
 | `trusted.json` | **where trusted skills are recorded** — optional |

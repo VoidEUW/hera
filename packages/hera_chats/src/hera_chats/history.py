@@ -17,11 +17,19 @@ above it hands over attachments and everything below it moves whatever shape it 
 
 **Thinking never comes back.** The reasoning channel is not the answer, and replaying it as one
 teaches her that deliberating out loud is what an assistant message looks like.
+
+**A very long argument does not come back in full either.** A call's arguments are persisted and
+replayed on every later turn, so a tool whose argument *is* a document — a published page, a
+scratchpad file — would otherwise sit in the prompt for the rest of the conversation, growing it
+by the size of everything she has ever written. Past :data:`MAX_ARGUMENT_CHARS` a string argument
+is cut and says so. Nothing here knows which tools those are and it does not need to: the rule is
+about size, and a model that needs the rest can read the file back.
 """
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
@@ -39,6 +47,7 @@ from hera_providers import (
 )
 
 __all__ = [
+    "MAX_ARGUMENT_CHARS",
     "Attachment",
     "build_history",
     "compose",
@@ -81,6 +90,23 @@ class Attachment(BaseModel):
 
 
 FENCE = "```"
+
+MAX_ARGUMENT_CHARS = 4_000
+"""How much of one string argument survives into a *later* turn's history.
+
+Not a limit on what she may send: the call went out whole, the event stores it whole, and the
+interface shows it whole. This is only about the copy that is replayed underneath every
+subsequent question, and without it the conversation grows by the size of every document she has
+ever written — a 40 KB page published in turn four is 40 KB of every prompt after it, forever.
+
+Generous enough that an ordinary call is untouched, which is what keeps this invisible: a search
+query, a filename, a paragraph of a note all fit. What does not fit is a document, and a document
+is exactly the thing she can read back on purpose when she needs it.
+
+The default rather than a setting alone, because a deployment that forgets to configure it should
+get the safe behaviour — ``ChatsSettings.max_history_argument_chars`` overrides it, and ``0``
+turns it off.
+"""
 
 
 def compose(text: str, attachments: Sequence[Attachment]) -> str:
@@ -150,8 +176,17 @@ def events_of(message: Message) -> list[ChatEvent]:
     return LIST_ADAPTER.validate_python(message.events)
 
 
-def build_history(messages: Iterable[Message]) -> list[ChatMessage]:
-    """Every stored message as the wire messages that reproduce the conversation."""
+def build_history(
+    messages: Iterable[Message], *, max_argument_chars: int = MAX_ARGUMENT_CHARS
+) -> list[ChatMessage]:
+    """Every stored message as the wire messages that reproduce the conversation.
+
+    ``max_argument_chars`` cuts a string argument that is really a document — see
+    :data:`MAX_ARGUMENT_CHARS`. It applies *here* and not in :func:`turn_to_messages`, which is
+    the distinction that matters: the turn in progress replays its own calls in full, because
+    what she just wrote is what she is still working on, and only the turns behind it are
+    shortened.
+    """
     wire: list[ChatMessage] = []
     for message in messages:
         if message.role == "user":
@@ -159,16 +194,22 @@ def build_history(messages: Iterable[Message]) -> list[ChatMessage]:
             if says_something(content):
                 wire.append(ChatMessage(role=Role.USER, content=content))
             continue
-        wire.extend(turn_to_messages(events_of(message)))
+        wire.extend(turn_to_messages(events_of(message), max_argument_chars=max_argument_chars))
     return wire
 
 
-def turn_to_messages(events: Sequence[ChatEvent]) -> list[ChatMessage]:
+def turn_to_messages(
+    events: Sequence[ChatEvent], *, max_argument_chars: int = 0
+) -> list[ChatMessage]:
     """One assistant turn's events as the wire messages it is made of.
 
     Also used mid-turn, to feed a round of tool results back before asking again — so the
     reconstruction the model sees on a reload is the same code path it saw while the turn was
     running, rather than a second implementation that can drift from it.
+
+    ``max_argument_chars`` therefore defaults to **off**: the caller that means the turn in
+    progress passes nothing, and :func:`build_history` — the one replaying what is already
+    behind her — passes the limit.
     """
     wire: list[ChatMessage] = []
     text: list[str] = []
@@ -210,12 +251,45 @@ def turn_to_messages(events: Sequence[ChatEvent]) -> list[ChatMessage]:
                 flush()
             text.append(event.text)
         elif isinstance(event, ToolCallReady):
-            calls.append(ToolCall(id=event.id, name=event.name, arguments=event.arguments))
+            calls.append(
+                ToolCall(
+                    id=event.id,
+                    name=event.name,
+                    arguments=_shortened(event.arguments, max_argument_chars),
+                )
+            )
         elif isinstance(event, ToolResultEvent):
             results[event.call_id] = event
 
     flush()
     return wire
+
+
+def _shortened(arguments: Mapping[str, Any], limit: int) -> dict[str, Any]:
+    """One call's arguments, with any string long enough to be a document cut short.
+
+    Deliberately a rule about **size** and not about tool names: this package does not know what
+    a Hera tool is and must not learn, and the shape it is guarding against — an argument that is
+    itself a file — is one any server's tool can have.
+
+    The cut says how much is missing and what to do about it, because the model reads this as its
+    own previous message and an argument that silently ends mid-tag is one it will conclude it
+    wrote badly. It is not told *which* tool to read it back with: it can see the name of the
+    call it is looking at.
+    """
+    if limit <= 0:
+        return dict(arguments)
+    cut: dict[str, Any] = {}
+    for key, value in arguments.items():
+        if isinstance(value, str) and len(value) > limit:
+            missing = len(value) - limit
+            cut[key] = (
+                f"{value[:limit]}\n… [{missing} more characters, not repeated here — "
+                "read it back if you need it]"
+            )
+        else:
+            cut[key] = value
+    return cut
 
 
 def _unanswered() -> str:

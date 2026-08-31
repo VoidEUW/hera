@@ -23,11 +23,13 @@ MIND_DIRNAME = "mind"
 SKILLS_DIRNAME = "skills"
 CHATS_DIRNAME = "chats"
 SCRATCH_DIRNAME = "scratch"
+ARTIFACTS_DIRNAME = "artifacts"
 DATABASE_FILENAME = "hera.sqlite3"
 MCP_FILENAME = "mcp.json"
 CONFIG_FILENAME = "config.toml"
 
 __all__ = [
+    "ARTIFACTS_DIRNAME",
     "CHATS_DIRNAME",
     "CONFIG_FILENAME",
     "DATABASE_FILENAME",
@@ -37,6 +39,7 @@ __all__ = [
     "MIND_DIRNAME",
     "SCRATCH_DIRNAME",
     "SKILLS_DIRNAME",
+    "artifacts_dir",
     "chat_dir",
     "chats_dir",
     "config_path",
@@ -90,6 +93,16 @@ def chat_dir(chat_id: str) -> Path:
 def scratch_dir(chat_id: str) -> Path:
     """One conversation's scratchpad — hers to write, and gone when the chat is (ADR 12)."""
     return chat_dir(chat_id) / SCRATCH_DIRNAME
+
+
+def artifacts_dir(chat_id: str) -> Path:
+    """One conversation's artifacts — what she publishes, and a person opens (ADR 13).
+
+    A directory of its own beside the scratchpad rather than a flag in it, and the reason belongs
+    to the *scratchpad*: it was built to be somewhere she can think out loud unread, and a
+    directory a person browses for the deliverable is one she has a reason to be tidy in.
+    """
+    return chat_dir(chat_id) / ARTIFACTS_DIRNAME
 
 
 def database_path() -> Path:

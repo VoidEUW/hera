@@ -11,6 +11,7 @@ import pytest
 from mcp.server.mcpserver import MCPServer
 from mcp_support import (
     AngryScratchpad,
+    FakeArtifacts,
     FakeMemories,
     FakeNotes,
     FakeScratchpad,
@@ -22,6 +23,7 @@ from mcp_support import (
 )
 
 from hera_mcp import (
+    ARTIFACT_META,
     BUILTIN_SERVER_NAME,
     SCRATCH_LISTING_LIMIT,
     SEARCH_LIMIT,
@@ -221,6 +223,9 @@ class TestUnwiredPorts:
             ("scratch_write", {"name": "plan.md", "text": "x"}),
             ("scratch_read", {"name": "plan.md"}),
             ("scratch_list", {}),
+            ("artifact_create", {"name": "page.html", "content": "<p>x</p>"}),
+            ("artifact_edit", {"name": "page.html", "find": "x", "replace": "y"}),
+            ("artifact_read", {"name": "page.html"}),
         ],
     )
     async def test_they_answer_that_they_are_unavailable(
@@ -386,3 +391,188 @@ class TestTheScratchpad:
         # choice between them becomes arbitrary.
         assert "note" in write.description
         assert "remember" in write.description
+
+
+class TestArtifacts:
+    """ADR 13. Three tools over one directory, and the card is drawn from what `create`
+    returns rather than from a new event variant."""
+
+    async def test_a_create_publishes_into_the_chat_the_call_names(
+        self, wired: MCPServer, artifacts: FakeArtifacts
+    ) -> None:
+        async with talking_to(wired) as client:
+            result = await client.call_tool(
+                "artifact_create",
+                {"name": "page.html", "content": "<h1>Hi</h1>"},
+                meta=in_chat("c-1"),
+            )
+
+        assert not result.is_error
+        assert artifacts.chats == {"c-1": {"page.html": "<h1>Hi</h1>"}}
+
+    async def test_it_answers_with_text_for_her_and_structure_for_the_card(
+        self, wired: MCPServer
+    ) -> None:
+        """The mechanism the whole feature rests on, and it is the SDK's behaviour rather than
+        ours: one result carries the sentence the model reads *and* the JSON the interface draws
+        a card from, so ``ToolResultEvent.structured`` needs no new event variant (ADR 13)."""
+        async with talking_to(wired) as client:
+            result = await client.call_tool(
+                "artifact_create",
+                {"name": "flow.svg", "content": "<svg/>", "inline": True},
+                meta=in_chat("c-1"),
+            )
+
+        assert said(result) == "published flow.svg (6 bytes)"
+        assert result.structured_content == {
+            ARTIFACT_META: {"name": "flow.svg", "inline": True, "bytes": 6}
+        }
+
+    async def test_inline_defaults_to_a_card_rather_than_to_the_flow(
+        self, wired: MCPServer
+    ) -> None:
+        """A page drawn in the middle of an answer is the wrong default: it is the larger of the
+        two things and the one a person goes and opens."""
+        async with talking_to(wired) as client:
+            result = await client.call_tool(
+                "artifact_create", {"name": "report.md", "content": "# Report"}, meta=in_chat("c-1")
+            )
+
+        assert result.structured_content is not None
+        assert result.structured_content[ARTIFACT_META]["inline"] is False
+
+    async def test_two_conversations_do_not_share_them(
+        self, wired: MCPServer, artifacts: FakeArtifacts
+    ) -> None:
+        async with talking_to(wired) as client:
+            await client.call_tool(
+                "artifact_create", {"name": "page.html", "content": "mine"}, meta=in_chat("c-1")
+            )
+            result = await client.call_tool(
+                "artifact_read", {"name": "page.html"}, meta=in_chat("c-2")
+            )
+
+        assert result.is_error
+        assert "page.html" in said(result)
+
+    async def test_the_chat_id_is_not_in_any_of_the_schemas(self, wired: MCPServer) -> None:
+        """The same assertion the scratchpad earned, for the same reason: a ``Context``
+        parameter is excluded by the SDK, and a field in the schema is one the model can see and
+        will fill in with a guess."""
+        async with talking_to(wired) as client:
+            listing = await client.list_tools()
+
+        create = next(t for t in listing.tools if t.name == "artifact_create")
+        assert sorted(create.input_schema.get("properties", {})) == ["content", "inline", "name"]
+        for name in ("artifact_create", "artifact_edit", "artifact_read"):
+            tool = next(t for t in listing.tools if t.name == name)
+            properties = tool.input_schema.get("properties", {})
+            assert "ctx" not in properties
+            assert not any("chat" in key.lower() for key in properties)
+
+    async def test_a_call_outside_a_conversation_says_which_thing_it_meant(
+        self, wired: MCPServer
+    ) -> None:
+        """*The scratchpad is not part of a conversation* is a confusing thing to be told after
+        asking to publish a page, so the sentence names what was asked for."""
+        async with talking_to(wired) as client:
+            result = await client.call_tool(
+                "artifact_create", {"name": "page.html", "content": "x"}
+            )
+
+        assert result.is_error
+        assert "an artifact belongs to a conversation" in said(result)
+
+    async def test_an_edit_changes_the_passage_and_nothing_else(
+        self, wired: MCPServer, artifacts: FakeArtifacts
+    ) -> None:
+        """The point of the tool: re-emitting a long page to change one colour is minutes of
+        generation, and it is what has actually been failing against the target endpoint."""
+        artifacts.chats["c-1"] = {"page.html": "<body bg='red'>a long page</body>"}
+        async with talking_to(wired) as client:
+            result = await client.call_tool(
+                "artifact_edit",
+                {"name": "page.html", "find": "red", "replace": "brass"},
+                meta=in_chat("c-1"),
+            )
+
+        assert not result.is_error
+        assert artifacts.chats["c-1"]["page.html"] == "<body bg='brass'>a long page</body>"
+
+    async def test_an_edit_draws_no_second_card(self, wired: MCPServer) -> None:
+        """An artifact has one current state everywhere it appears, so the card made when it was
+        published already shows this change (ADR 13). A second card would draw one file twice."""
+        async with talking_to(wired) as client:
+            await client.call_tool(
+                "artifact_create", {"name": "page.html", "content": "red"}, meta=in_chat("c-1")
+            )
+            result = await client.call_tool(
+                "artifact_edit",
+                {"name": "page.html", "find": "red", "replace": "brass"},
+                meta=in_chat("c-1"),
+            )
+
+        # The SDK derives `{"result": …}` for any tool that returns a plain string, so what the
+        # interface keys on is the *presence of the artifact key* rather than structure at all.
+        assert result.structured_content == {"result": "edited page.html (5 bytes)"}
+        assert ARTIFACT_META not in (result.structured_content or {})
+
+    async def test_an_ambiguous_find_is_refused_in_words_she_can_act_on(
+        self, wired: MCPServer, artifacts: FakeArtifacts
+    ) -> None:
+        """Zero and several are both refusals, because a replacement that hit the wrong one of
+        three is a silent corruption and she cannot see the file to notice."""
+        artifacts.chats["c-1"] = {"page.html": "red red red"}
+        async with talking_to(wired) as client:
+            result = await client.call_tool(
+                "artifact_edit",
+                {"name": "page.html", "find": "red", "replace": "brass"},
+                meta=in_chat("c-1"),
+            )
+
+        assert result.is_error
+        assert "matches 3 times" in said(result)
+
+    async def test_reading_something_that_was_never_published_says_so(
+        self, wired: MCPServer
+    ) -> None:
+        async with talking_to(wired) as client:
+            result = await client.call_tool(
+                "artifact_read", {"name": "gone.md"}, meta=in_chat("c-1")
+            )
+
+        assert result.is_error
+        assert "gone.md" in said(result)
+
+    async def test_reading_gives_back_the_current_content(self, wired: MCPServer) -> None:
+        """``read`` exists because ``edit`` is useless without it: in a later turn the content is
+        not in the conversation, only the card is, so there is nothing to build a `find` from."""
+        async with talking_to(wired) as client:
+            await client.call_tool(
+                "artifact_create", {"name": "report.md", "content": "# Report"}, meta=in_chat("c-1")
+            )
+            result = await client.call_tool(
+                "artifact_read", {"name": "report.md"}, meta=in_chat("c-1")
+            )
+
+        assert said(result) == "# Report"
+
+    async def test_the_descriptions_separate_it_from_the_scratchpad(self, wired: MCPServer) -> None:
+        """Tool descriptions are prompt text, and these two tools write a file each. A model
+        choosing between two overlapping descriptions chooses at random, so `create` has to say
+        which one is the deliverable and which one is hers."""
+        async with talking_to(wired) as client:
+            listing = await client.list_tools()
+
+        create = next(t for t in listing.tools if t.name == "artifact_create")
+        assert create.description is not None
+        assert "scratch_write" in create.description
+        # The extension is the kind (ADR 13), so the model has to be told that its choice of
+        # filename is a choice about how the thing is drawn.
+        assert ".svg" in create.description
+        assert "inline" in create.description
+
+        edit = next(t for t in listing.tools if t.name == "artifact_edit")
+        assert edit.description is not None
+        assert "exactly once" in edit.description
+        assert "artifact_read" in edit.description

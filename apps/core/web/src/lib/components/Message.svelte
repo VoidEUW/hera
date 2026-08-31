@@ -18,6 +18,7 @@
 	import type {
 		AnswerRequired,
 		AnyEvent,
+		Artifact,
 		PermissionRequired,
 		ToolCallReady
 	} from '$lib/api/events';
@@ -25,6 +26,7 @@
 	import { t } from '$lib/i18n';
 	import { isAnswered, reduce, replyTo } from '$lib/turn';
 	import ActivityRow from './ActivityRow.svelte';
+	import ArtifactCard from './ArtifactCard.svelte';
 	import EmotionCard from './EmotionCard.svelte';
 	import Ocellus from './Ocellus.svelte';
 	import PermissionCard from './PermissionCard.svelte';
@@ -40,6 +42,10 @@
 		 * for one turn and became a chip on reload would be the interface contradicting itself. */
 		attachments?: Array<{ name: string; bytes: number; media_type?: string }>;
 		events?: AnyEvent[];
+		/** Which conversation this message is in, so an artifact card can open the drawer on the
+		 * right chat. Absent on a message rendered outside one — the card then draws without its
+		 * Open rather than guessing. */
+		chatId?: string | null;
 		/** Whether this message is the turn currently arriving. */
 		streaming?: boolean;
 		busy?: boolean;
@@ -55,6 +61,7 @@
 		content = '',
 		attachments = [],
 		events = [],
+		chatId = null,
 		streaming = false,
 		busy = false,
 		onanswer,
@@ -218,6 +225,11 @@
 				<Prose text={item.text ?? ''} />
 			{:else if item.kind === 'emotion'}
 				<EmotionCard call={item.event as ToolCallReady} />
+			{:else if item.kind === 'artifact'}
+				<!-- What she published, drawn where she published it. `inline` decides whether that
+				     is the thing itself or a card to go and open it (ADR 13) — the model chose when
+				     it made the file, because it is the only thing that knew which it meant. -->
+				<ArtifactCard {chatId} artifact={item.artifact as Artifact} />
 			{:else if item.kind === 'permission'}
 				{@const card = item.event as PermissionRequired}
 				<PermissionCard

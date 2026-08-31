@@ -36,8 +36,17 @@ from typing import Literal
 
 from mcp.server.mcpserver import Context, MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
+from mcp.types import CallToolResult, TextContent
 
-from hera_mcp.ports import Hit, MemoryWriter, NoteWriter, Scratchpad, Searcher, SkillLibrary
+from hera_mcp.ports import (
+    Artifacts,
+    Hit,
+    MemoryWriter,
+    NoteWriter,
+    Scratchpad,
+    Searcher,
+    SkillLibrary,
+)
 
 BUILTIN_SERVER_NAME = "hera"
 """Her tools are namespaced ``hera__emotion``, ``hera__remember`` and so on.
@@ -80,10 +89,22 @@ TOOL_NAMES = (
     "scratch_write",
     "scratch_read",
     "scratch_list",
+    "artifact_create",
+    "artifact_edit",
+    "artifact_read",
 )
 """What this server offers, in the order they were added. Qualified, that is ``hera__emotion``
 and its siblings — the ones a catalogue reports for the ``hera`` server, which is the question
 a settings screen showing "5 tools" leaves a person asking."""
+
+ARTIFACT_META = "artifact"
+"""The key her artifact tools put their structured answer under (ADR 13).
+
+``artifact_create`` returns text for the model *and* ``structured_content`` for the interface,
+which is what lets a card be drawn without a new event variant: ``ToolResultEvent.structured`` is
+already ``Any`` and already persisted. Named here for the reason :data:`ASK_TOOL` is — the browser
+reads this key, and a string agreed on in two places is one that can disagree.
+"""
 
 SCRATCH_LISTING_LIMIT = 100
 """How many files one ``scratch_list`` reports. A ceiling for the same reason
@@ -103,6 +124,7 @@ def build_builtin_server(
     skills: SkillLibrary | None = None,
     searcher: Searcher | None = None,
     scratchpad: Scratchpad | None = None,
+    artifacts: Artifacts | None = None,
     version: str = "0.1.0",
 ) -> MCPServer:
     """Assemble the in-process server, wired to whichever ports this deployment has.
@@ -313,6 +335,94 @@ def build_builtin_server(
             lines.append(f"… and {len(found) - len(listed)} more")
         return "\n".join(lines)
 
+    # Artifacts, ADR 13. The other side of the scratchpad: that one is hers and nobody reads it,
+    # these are what she publishes. Three tools, and each of them is load-bearing -- drop `read`
+    # and `edit` cannot be used, drop `edit` and every change is a full rewrite, drop `create`
+    # and there is nothing to edit.
+    #
+    # There is no `artifact_list`. What is in the directory is on the screen already, and a tool
+    # that read her own filenames back into the context window would spend it on something she
+    # can see.
+
+    @server.tool(
+        name="artifact_create",
+        title="Publish an artifact",
+        description=(
+            "Publish a file the person can open: a page, a document, a diagram, a small program. "
+            "This is the thing you were asked for, and it appears beside your answer with its "
+            "name on it, ready to read and download -- so put the work here rather than into a "
+            "very long answer, and then say what you made in a sentence or two. `name` is a "
+            "plain filename and its extension decides how it is drawn: `.html` renders as a "
+            "page, `.svg` draws, `.md` is typeset, anything else is shown as code. Publishing "
+            "the same name again replaces what was there, so use `artifact_edit` for a change. "
+            "Set `inline=true` for a figure that belongs in the middle of what you are saying -- "
+            "a diagram or a chart explaining the paragraph above it -- and leave it false for a "
+            "page or a document, which the person opens beside the conversation. For working "
+            "notes only you read, use `scratch_write` instead."
+        ),
+    )
+    async def artifact_create(
+        name: str, content: str, ctx: Context, inline: bool = False
+    ) -> CallToolResult:
+        if artifacts is None:
+            raise ToolError("publishing is not available in this deployment")
+        cleaned = name.strip()
+        with _readable("publish that"):
+            written = await artifacts.create(_chat_of(ctx, "an artifact"), cleaned, content)
+        # Text for the model, structured content for the interface, in one result. The card is
+        # drawn from the second (ADR 13) and needs no event variant of its own: this is typed
+        # JSON the *server* produced, not something read back out of what a model wrote.
+        return CallToolResult(
+            content=[TextContent(type="text", text=f"published {cleaned} ({written} bytes)")],
+            structured_content={
+                ARTIFACT_META: {"name": cleaned, "inline": inline, "bytes": written}
+            },
+        )
+
+    @server.tool(
+        name="artifact_edit",
+        title="Change part of an artifact",
+        description=(
+            "Change one passage of an artifact you have already published, without writing the "
+            "whole thing out again. `find` is the exact text to replace and it must appear "
+            "**exactly once** -- include enough of the surrounding lines to be certain of that "
+            "-- and `replace` is what goes in its place. Prefer this to publishing the file "
+            "again whenever the change is smaller than the file: re-emitting a long page takes "
+            "minutes and risks losing more than it fixes. If you no longer have the current "
+            "content in front of you, read it back with `artifact_read` first."
+        ),
+    )
+    async def artifact_edit(name: str, find: str, replace: str, ctx: Context) -> str:
+        if artifacts is None:
+            raise ToolError("publishing is not available in this deployment")
+        cleaned = name.strip()
+        with _readable(f"edit {cleaned}"):
+            written = await artifacts.edit(_chat_of(ctx, "an artifact"), cleaned, find, replace)
+        # No structured content, and that is the decision rather than an omission: an artifact has
+        # one current state everywhere it appears, so the card made when it was published already
+        # shows this change. A second card would draw the same file twice.
+        return f"edited {cleaned} ({written} bytes)"
+
+    @server.tool(
+        name="artifact_read",
+        title="Read an artifact back",
+        description=(
+            "Read back an artifact you published in this conversation. Its content is not in the "
+            "conversation -- only the card is -- so call this in a later turn when you need the "
+            "current text, in particular before `artifact_edit`, to build a `find` out of "
+            "something that is really in the file."
+        ),
+    )
+    async def artifact_read(name: str, ctx: Context) -> str:
+        if artifacts is None:
+            raise ToolError("publishing is not available in this deployment")
+        cleaned = name.strip()
+        with _readable(f"read {cleaned}"):
+            body = await artifacts.read(_chat_of(ctx, "an artifact"), cleaned)
+        if body is None:
+            raise ToolError(f"nothing named {name!r} has been published in this conversation")
+        return body
+
     return server
 
 
@@ -337,19 +447,21 @@ def _readable(what: str) -> Iterator[None]:
         raise ToolError(f"could not {what}: {cause}") from cause
 
 
-def _chat_of(ctx: Context) -> str:
+def _chat_of(ctx: Context, what: str = "the scratchpad") -> str:
     """Which conversation this call is part of, from the request's ``_meta`` (ADR 12).
 
     Reached only by the tools that are meaningless outside one. Missing means this server is
     being driven directly -- over the transport v0.3 exposes, or by a test -- and saying so
     plainly beats inventing a directory and writing into it, which nobody would find.
+
+    ``what`` is in the sentence rather than fixed, because two different things now belong to a
+    conversation and *the scratchpad is not part of one* is a confusing thing to be told after
+    asking to publish a page.
     """
     meta = getattr(ctx.request_context, "meta", None) or {}
     chat_id = meta.get(CHAT_ID_META)
     if not isinstance(chat_id, str) or not chat_id:
-        raise ToolError(
-            "the scratchpad belongs to a conversation, and this call is not part of one"
-        )
+        raise ToolError(f"{what} belongs to a conversation, and this call is not part of one")
     return chat_id
 
 

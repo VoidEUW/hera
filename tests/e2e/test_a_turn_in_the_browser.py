@@ -414,3 +414,236 @@ class TestATurnThatFailed:
 
         page.locator(".hers").last.hover()
         assert page.locator(".hers").last.get_by_role("button", name="Copy").count() == 0
+
+
+ARTIFACT_SCRIPT: list[Any] = [
+    # Each *round trip* is one entry, and a turn with tools in it takes two: the calls, and then
+    # the answer written with their results in hand. So three questions are six entries here.
+    #
+    # A page, published rather than dumped into the answer as a code fence. `inline=false`, so
+    # what lands in the transcript is a card with an **Open** on it.
+    [
+        TextDelta(text="Here is the page.\n\n"),
+        tool_call(
+            "hera__artifact_create",
+            {
+                "name": "theme-workshop.html",
+                "content": "<h1>Theme workshop</h1><p id='swatch'>brass</p>",
+                "inline": False,
+            },
+        ),
+        TurnEnd(reason="tool_calls"),
+    ],
+    text_turn("Open it and tell me what you think."),
+    # A figure, published with `inline=true`, so it is drawn in the middle of the explanation
+    # rather than filed away — which is the case ADR 13 exists to distinguish.
+    [
+        tool_call(
+            "hera__artifact_create",
+            {
+                "name": "flow.svg",
+                "content": (
+                    "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 20'>"
+                    "<circle cx='10' cy='10' r='6'/></svg>"
+                ),
+                "inline": True,
+            },
+        ),
+        TurnEnd(reason="tool_calls"),
+    ],
+    text_turn("The middle step is the slow one."),
+    # One colour changed without re-emitting the file, which is the whole point of `edit`.
+    [
+        tool_call(
+            "hera__artifact_edit",
+            {"name": "theme-workshop.html", "find": "brass", "replace": "laurel"},
+        ),
+        TurnEnd(reason="tool_calls"),
+    ],
+    text_turn("Changed."),
+]
+"""Its own script, because every test starts a fresh provider at turn zero."""
+
+
+class TestWhatShePublishes:
+    """ADR 13 in a real browser, against the real registry — her own MCP server is mounted and
+    the files really land in the temporary `HERA_HOME`, so what is asserted here is the whole
+    path: tool call, structured result, event, reducer, card, drawer.
+    """
+
+    @pytest.fixture
+    def script(self) -> list[Any]:
+        return ARTIFACT_SCRIPT
+
+    def _ask(self, page: Any, text: str) -> None:
+        composer = page.locator("textarea:not([disabled])").first
+        composer.fill(text)
+        composer.press("Enter")
+
+    def _publish(self, page: Any) -> None:
+        self._ask(page, "Build me a page")
+        page.wait_for_url("**/chat/**", timeout=15_000)
+        page.wait_for_selector("text=Open it and tell me what you think.", timeout=30_000)
+
+    def _drawer(self, page: Any) -> Any:
+        return page.locator("aside[aria-label='Artifacts']")
+
+    def test_a_page_opens_beside_the_conversation_as_she_publishes_it(self, page: Any) -> None:
+        """Nothing is clicked here, and that is the assertion. A page is something you look at,
+        so the drawer follows her — hunting for the **Open** on a card that is still arriving is
+        a step with nothing behind it."""
+        self._publish(page)
+
+        # The page itself, in a frame with an opaque origin: `allow-scripts` and deliberately
+        # not `allow-same-origin`, so what she wrote cannot reach Hera's storage.
+        frame = page.locator("iframe[title='theme-workshop.html']")
+        frame.wait_for(timeout=15_000)
+        sandbox = frame.get_attribute("sandbox") or ""
+        assert "allow-scripts" in sandbox
+        assert "allow-same-origin" not in sandbox
+        assert "Theme workshop" in (frame.get_attribute("srcdoc") or "")
+
+        # And the file bar, which is what makes it reachable once the turn has scrolled away.
+        assert page.locator("nav[aria-label='Everything published here']").count() == 1
+
+    def test_the_card_opens_it_again_after_it_is_closed(self, page: Any) -> None:
+        """The drawer opening by itself is a convenience and the card is the door. Closing it
+        has to mean closed — an **Open** that re-opens what is already open would be a control
+        that does nothing."""
+        self._publish(page)
+        page.get_by_role("button", name="Close").click()
+        assert self._drawer(page).count() == 0
+
+        # The heading is the filename humanised — there is no title field anywhere for it to
+        # disagree with, which is the decision this assertion pins.
+        assert page.get_by_text("Theme workshop", exact=True).count() == 1
+        page.get_by_role("button", name="Open").first.click()
+        page.locator("iframe[title='theme-workshop.html']").wait_for(timeout=15_000)
+
+    def test_the_card_carries_a_way_to_save_it(self, page: Any) -> None:
+        """Saving is the other thing anybody does with a published file, and until the card had
+        this it meant opening the drawer to reach the link. A plain `<a download>`, because the
+        browser knows how to save a file and the response says `attachment`."""
+        self._publish(page)
+        page.get_by_role("button", name="Close").click()
+
+        save = page.get_by_role("link", name="Download theme-workshop.html")
+        assert save.count() == 1
+        assert save.get_attribute("download") == "theme-workshop.html"
+        assert "/artifacts/theme-workshop.html/download" in (save.get_attribute("href") or "")
+
+    def test_the_card_survives_a_reload(self, page: Any) -> None:
+        """The server render is authoritative: the persisted list has no `tool_call_started` in
+        it, and it has to draw the same card the live stream did.
+
+        The drawer is deliberately *not* part of that. Opening one is something she does while
+        publishing, not a property of the conversation — coming back to it leaves you where you
+        left off rather than reopening a panel over the transcript you came to read."""
+        self._publish(page)
+
+        page.reload(wait_until="networkidle")
+
+        page.wait_for_selector("text=Theme workshop", timeout=15_000)
+        assert page.get_by_role("button", name="Open").count() >= 1
+        assert self._drawer(page).count() == 0
+
+    def test_a_figure_is_drawn_where_she_drew_it(self, page: Any) -> None:
+        """`inline` is the whole distinction ADR 13 exists to make, and the drawer is where it
+        shows: a page takes the panel, a figure never does. Taking half the width away from the
+        sentence a diagram explains is the opposite of what `inline` asked for."""
+        self._publish(page)
+        page.get_by_role("button", name="Close").click()
+
+        self._ask(page, "Now show me the flow")
+        page.wait_for_selector("text=The middle step is the slow one.", timeout=30_000)
+
+        # Drawn in the transcript rather than behind a card: the drawing is in the message, and
+        # the panel stayed shut.
+        page.locator(".hers .drawing svg").first.wait_for(timeout=15_000)
+        assert self._drawer(page).count() == 0
+
+    def test_throwing_the_chat_away_says_what_goes_with_it(self, page: Any) -> None:
+        """*A chat is a thing you throw away* and *the page I made last week* have to be
+        reconciled by a sentence rather than by a surprise (ADR 13). The count is fetched when
+        the confirmation opens rather than carried on every row in the rail."""
+        self._publish(page)
+
+        page.locator(".item .more").first.click()
+        page.get_by_role("menuitem", name="Delete").click()
+
+        page.wait_for_selector("text=The artifact in it goes too.", timeout=15_000)
+
+    def test_an_edit_says_so_in_the_gutter_and_draws_no_second_card(self, page: Any) -> None:
+        """An artifact has one current state everywhere it appears, so the card that published
+        it already shows the change — a second card would be one file drawn twice."""
+        self._publish(page)
+        # Closed, so the count below is counting cards. The drawer names what it is showing, and
+        # it is showing this same file.
+        page.get_by_role("button", name="Close").click()
+        self._ask(page, "Now show me the flow")
+        page.wait_for_selector("text=The middle step is the slow one.", timeout=30_000)
+
+        self._ask(page, "Make the swatch laurel")
+        page.wait_for_selector("text=Changed.", timeout=30_000)
+
+        # The row says what she did: `artifact edit` is the verb and the filename is the target.
+        assert page.locator("text=artifact edit").count() >= 1
+        assert page.get_by_text("Theme workshop", exact=True).count() == 1
+
+
+TALL_SCRIPT: list[Any] = [
+    [
+        TextDelta(text="Top to bottom.\n\n"),
+        tool_call(
+            "hera__artifact_create",
+            {
+                "name": "ladder.svg",
+                "content": (
+                    "<svg xmlns='http://www.w3.org/2000/svg' width='400' height='1400' "
+                    "viewBox='0 0 400 1400'><circle cx='200' cy='200' r='120'/></svg>"
+                ),
+                "inline": False,
+            },
+        ),
+        TurnEnd(reason="tool_calls"),
+    ],
+    text_turn("The bottom step is the last one."),
+]
+"""A drawing far taller than the panel it opens in — the shape that broke."""
+
+
+class TestADrawingKeepsItsShape:
+    """A layout bug worth a browser, because nothing below the browser can see it.
+
+    An `<svg>` is a replaced element with an aspect ratio of its own, and it was being drawn in
+    a flex box: `align-items: stretch` takes a flex item whose height is `auto` and sets that
+    height from the *box*, so the panel's `max-height` squashed a 400 x 1400 chart to the height
+    of the screen and `preserveAspectRatio` then shrank the drawing to a thumbnail in an acre of
+    white. It reads as an artifact that came out broken rather than as a layout that is wrong,
+    which is exactly the failure ADR 13 does not want a person to have to diagnose.
+
+    Asserting on the *shape* rather than on the CSS: whatever the box does, the drawing has to
+    come out of it with the proportions she gave it.
+    """
+
+    @pytest.fixture
+    def script(self) -> list[Any]:
+        return TALL_SCRIPT
+
+    def test_a_tall_drawing_is_not_squashed_into_the_panel(self, page: Any) -> None:
+        composer = page.locator("textarea:not([disabled])").first
+        composer.fill("Draw me a ladder")
+        composer.press("Enter")
+        page.wait_for_url("**/chat/**", timeout=15_000)
+        page.wait_for_selector("text=The bottom step is the last one.", timeout=30_000)
+
+        drawing = page.locator("aside[aria-label='Artifacts'] .drawing svg")
+        drawing.wait_for(timeout=15_000)
+        box = drawing.bounding_box()
+
+        # 400 x 1400, so 3.5 — and it is the panel that scrolls, not the picture that shrinks.
+        assert box is not None
+        assert abs(box["height"] / box["width"] - 3.5) < 0.05
+        panel = page.locator("aside[aria-label='Artifacts'] .drawing").bounding_box()
+        assert panel is not None
+        assert box["height"] > panel["height"]

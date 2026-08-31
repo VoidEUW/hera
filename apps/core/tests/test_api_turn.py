@@ -16,9 +16,9 @@ from core_support import API, StubTools, WriteSkill, names, payload, sse
 from httpx import ASGITransport, AsyncClient
 
 from hera_core.app import create_app
-from hera_core.scratch import FileScratchpad
+from hera_core.chat_files import FileArtifacts, FileScratchpad
 from hera_core.wiring import Services
-from hera_home import scratch_dir
+from hera_home import artifacts_dir, scratch_dir
 from hera_mcp import BUILTIN_SERVER_NAME, TOOL_NAMES, build_builtin_server
 from hera_permissions import PermissionSet, Policy
 from hera_providers import FakeProvider, text_turn, thinking_turn, tool_call, tool_turn
@@ -235,6 +235,73 @@ class TestARealMcpServer:
         schema = next(spec for spec in written if spec.name == "hera__scratch_write").parameters
         assert set(schema.get("properties", {})) == {"name", "text", "append"}
 
+    async def test_publishing_lands_in_this_conversation_and_carries_its_card(
+        self, make_services: Any, mcp_registry: ToolRegistry
+    ) -> None:
+        """ADR 13 end to end, with nothing stubbed between the model and the disk.
+
+        Two things are being proved and only one of them is the file. The other is that the
+        `structured` payload the card is drawn from survives her server, the client, the
+        registry, the turn and the SSE frame — because if it were dropped anywhere along that
+        path every artifact would still be written correctly and none would ever appear.
+        """
+        provider = FakeProvider(
+            [
+                tool_turn(
+                    tool_call(
+                        "hera__artifact_create",
+                        {"name": "page.html", "content": "<h1>Hi</h1>", "inline": False},
+                    )
+                ),
+                text_turn("Published."),
+            ]
+        )
+        services = make_services(provider, mcp_registry)
+        async with _client(services) as client:
+            chat_id = await open_chat(client)
+            frames = await talk(client, chat_id, "build me a page")
+
+        result = payload(frames, "tool_result")
+        assert result["ok"], result["text"]
+        assert (artifacts_dir(chat_id) / "page.html").read_text() == "<h1>Hi</h1>"
+        assert result["structured"] == {
+            "artifact": {"name": "page.html", "inline": False, "bytes": 11}
+        }
+
+    async def test_an_edit_changes_the_file_without_republishing_it(
+        self, make_services: Any, mcp_registry: ToolRegistry
+    ) -> None:
+        """The tool the whole record is built around: re-emitting a long page to change one
+        colour is minutes of generation, and it is what has been failing on the real endpoint."""
+        provider = FakeProvider(
+            [
+                tool_turn(
+                    tool_call(
+                        "hera__artifact_create",
+                        {"name": "page.html", "content": "<body bg='red'>a long page</body>"},
+                    )
+                ),
+                text_turn("Published."),
+                tool_turn(
+                    tool_call(
+                        "hera__artifact_edit",
+                        {"name": "page.html", "find": "red", "replace": "brass"},
+                    )
+                ),
+                text_turn("Changed."),
+            ]
+        )
+        services = make_services(provider, mcp_registry)
+        async with _client(services) as client:
+            chat_id = await open_chat(client)
+            await talk(client, chat_id, "build me a page")
+            frames = await talk(client, chat_id, "make it brass")
+
+        assert payload(frames, "tool_result")["ok"]
+        assert (
+            artifacts_dir(chat_id) / "page.html"
+        ).read_text() == "<body bg='brass'>a long page</body>"
+
     async def test_she_reads_back_what_an_earlier_turn_wrote(
         self, make_services: Any, mcp_registry: ToolRegistry
     ) -> None:
@@ -339,6 +406,7 @@ async def mcp_registry(skills_path: Any) -> AsyncIterator[ToolRegistry]:
         builtin=build_builtin_server(
             skills=SkillLibraryPort(SkillLibrary(skills_path)),
             scratchpad=FileScratchpad(),
+            artifacts=FileArtifacts(),
         ),
     )
     try:

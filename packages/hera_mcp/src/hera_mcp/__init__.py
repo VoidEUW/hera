@@ -1,7 +1,7 @@
 """The MCP server Hera **is**, as opposed to the ones she can reach.
 
-Her own tools — ``emotion``, ``ask``, ``remember``, ``note``, ``skill``, ``search`` and the
-scratchpad — on a real
+Her own tools — ``emotion``, ``ask``, ``remember``, ``note``, ``skill``, ``search``, the
+scratchpad she thinks on and the artifacts she publishes — on a real
 :class:`~mcp.server.mcpserver.MCPServer`. The application mounts it in-process through
 ``hera_tools``, which reaches it with the same client it reaches a filesystem server with, lists
 it in the same catalogue and checks it with the same policy (ADR 4).
@@ -21,6 +21,7 @@ from __future__ import annotations
 
 from hera_mcp.emotions import DEFAULT_EMOTIONS, Emotion, Tone, render_emotions
 from hera_mcp.ports import (
+    Artifacts,
     Hit,
     MemoryWriter,
     NoteWriter,
@@ -30,6 +31,7 @@ from hera_mcp.ports import (
     SkillLibrary,
 )
 from hera_mcp.server import (
+    ARTIFACT_META,
     ASK_TOOL,
     BUILTIN_SERVER_NAME,
     CHAT_ID_META,
@@ -40,6 +42,7 @@ from hera_mcp.server import (
 )
 
 __all__ = [
+    "ARTIFACT_META",
     "ASK_TOOL",
     "BUILTIN_SERVER_NAME",
     "CHAT_ID_META",
@@ -47,6 +50,7 @@ __all__ = [
     "SCRATCH_LISTING_LIMIT",
     "SEARCH_LIMIT",
     "TOOL_NAMES",
+    "Artifacts",
     "Emotion",
     "Hit",
     "MemoryWriter",

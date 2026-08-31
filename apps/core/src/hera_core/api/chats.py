@@ -45,10 +45,11 @@ from hera_chats import (
     events_of,
     title_from,
 )
+from hera_core.chat_files import forget_chat
 from hera_core.clock import render as render_now
 from hera_core.config import ConfigError
 from hera_core.config import load as load_config
-from hera_core.deps import Container, Db, Owner, not_found
+from hera_core.deps import Container, Db, Owner, not_found, require_chat
 from hera_core.emotions import EmotionsError
 from hera_core.emotions import load as load_emotions
 from hera_core.schemas import (
@@ -62,7 +63,6 @@ from hera_core.schemas import (
     QuestionAnswer,
     RedoIn,
 )
-from hera_core.scratch import forget_chat
 from hera_core.sse import HEADERS, MEDIA_TYPE, event_frame, frame
 from hera_mcp import DEFAULT_EMOTIONS, render_emotions
 from hera_permissions import Decision, Rule
@@ -109,7 +109,7 @@ def create_chat(payload: ChatIn, owner: Owner, db: Db) -> ChatOut:
 @router.get("/chats/{chat_id}", response_model=ChatDetail)
 def read_chat(chat_id: UUID, owner: Owner, db: Db) -> ChatDetail:
     """A chat and every message in it — what a reload renders from."""
-    chat = _require_chat(db, chat_id, owner)
+    chat = require_chat(db, chat_id, owner)
     return ChatDetail(
         chat=ChatOut.of(chat),
         messages=[MessageOut.of(m) for m in MessageRepository(db).for_chat(chat.id)],
@@ -132,7 +132,7 @@ def update_chat(chat_id: UUID, payload: ChatPatch, owner: Owner, db: Db) -> Chat
     *next* turn carries and nothing about the turns already taken, which is the honest
     behaviour: a conversation is a record of what was said under the conditions of the time.
     """
-    chat = _require_chat(db, chat_id, owner)
+    chat = require_chat(db, chat_id, owner)
     chats = ChatRepository(db)
     if payload.title is not None:
         chat.title = payload.title.strip()
@@ -153,7 +153,7 @@ def update_chat(chat_id: UUID, payload: ChatPatch, owner: Owner, db: Db) -> Chat
 
 @router.delete("/chats/{chat_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_chat(chat_id: UUID, owner: Owner, db: Db) -> None:
-    chat = _require_chat(db, chat_id, owner)
+    chat = require_chat(db, chat_id, owner)
     MessageRepository(db).delete_for_chat(chat.id)
     ChatRepository(db).revoke(chat.id)
     # ADR 12 is explicit that the scratchpad is a cache rather than something a person keeps, so
@@ -173,7 +173,7 @@ def send_message(
     The empty row is what a resumed turn appends to and what a cancelled turn lands in; a row
     created only on success would leave a half-written answer with nowhere to live.
     """
-    chat = _require_chat(db, chat_id, owner)
+    chat = require_chat(db, chat_id, owner)
     messages = MessageRepository(db)
 
     attachments = [Attachment(**item.model_dump()) for item in payload.attachments]
@@ -207,7 +207,7 @@ def redo_message(
     wording is not an answer to the new one, and the model reads history from the message list.
     Which is also why this streams like any other turn — from here on it *is* one.
     """
-    chat = _require_chat(db, chat_id, owner)
+    chat = require_chat(db, chat_id, owner)
     messages = MessageRepository(db)
     history = messages.for_chat(chat.id)
 
@@ -256,7 +256,7 @@ def answer_permission(
     Resumes the *same* assistant message rather than starting a new one, so the conversation
     reads as one answer that paused rather than as two.
     """
-    chat = _require_chat(db, chat_id, owner)
+    chat = require_chat(db, chat_id, owner)
     assistant = MessageRepository(db).latest_assistant(chat.id)
     if assistant is None:
         raise not_found("turn to resume")
@@ -296,7 +296,7 @@ def answer_question(
     sentence here, and the sentence becomes the call's result so the model reads a reply to its
     own question where a tool's output would have been.
     """
-    chat = _require_chat(db, chat_id, owner)
+    chat = require_chat(db, chat_id, owner)
     assistant = MessageRepository(db).latest_assistant(chat.id)
     if assistant is None:
         raise not_found("turn to resume")
@@ -356,7 +356,13 @@ def _stream(
     """
     db.commit()
 
-    context = _context(db, chat, text=text, **extra)
+    context = _context(
+        db,
+        chat,
+        text=text,
+        history_limit=container.orchestrator.settings.max_history_argument_chars,
+        **extra,
+    )
     owner_id, chat_id, message_id = chat.owner_id, chat.id, assistant.id
     db.expunge_all()
 
@@ -411,13 +417,23 @@ def _record(
 # -- assembling one turn ------------------------------------------------------------------
 
 
-def _context(session: Session, chat: Chat, *, text: str, **extra: object) -> TurnContext:
-    """Gather the profile, the project, the history and the vocabulary for one turn."""
+def _context(
+    session: Session, chat: Chat, *, text: str, history_limit: int, **extra: object
+) -> TurnContext:
+    """Gather the profile, the project, the history and the vocabulary for one turn.
+
+    ``history_limit`` is passed rather than left to the default so the setting is a setting: a
+    value a deployment can change that quietly does not apply is worse than one that is not
+    offered. It shortens a string argument that is really a document — a page published in turn
+    four is otherwise in the prompt of every turn after it.
+    """
     profile = _profile_of(session, chat)
     project = None
     if chat.project_id is not None:
         project = ProjectRepository(session).get(chat.project_id)
-    history = build_history(MessageRepository(session).for_chat(chat.id))
+    history = build_history(
+        MessageRepository(session).for_chat(chat.id), max_argument_chars=history_limit
+    )
     return TurnContext(
         text=text,
         chat=chat,
@@ -508,13 +524,6 @@ def _remember(
     container.orchestrator.registry = container.registry
 
 
-def _require_chat(session: Session, chat_id: UUID, owner: UUID) -> Chat:
-    chat = ChatRepository(session).get(chat_id)
-    if chat is None or chat.owner_id != owner:
-        raise not_found("chat")
-    return chat
-
-
 def _require_project(session: Session, project_id: UUID, owner: UUID) -> Project:
     """A project this owner has, or a 404.
 
@@ -522,7 +531,10 @@ def _require_project(session: Session, project_id: UUID, owner: UUID) -> Project
     is the first as far as this owner is concerned, and a 403 would confirm the row exists.
     ``hera_core.api.projects`` has the same helper for the same reason; they are not shared
     because a route module importing another route module for one function is how a request
-    layer grows a private API.
+    layer grows a private API. The *chat* one had a second caller when the artifacts beside a
+    conversation got their own router, and moved to ``hera_core.deps`` rather than being copied a
+    third time — which is the line: duplication between two routes is a convention, between three
+    it is a bug waiting for one of them to drift.
     """
     project = ProjectRepository(session).get(project_id)
     if project is None or project.owner_id != owner:

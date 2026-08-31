@@ -55,6 +55,11 @@ export const t = {
 		rename: 'Rename',
 		delete: 'Delete',
 		deleteAsk: 'Delete this chat?',
+		/** What else goes with it. A chat owns what she published in it, and *a chat is a thing
+		 * you throw away* has to be reconciled with *the page I made last week* by a sentence
+		 * rather than by a surprise (ADR 13). */
+		deleteTakes: (n: number) =>
+			n === 1 ? 'The artifact in it goes too.' : `The ${n} artifacts in it go too.`,
 		cancel: 'Cancel',
 		open: 'Open',
 		archive: 'Archive',
@@ -285,6 +290,29 @@ export const t = {
 			`${name} is ${type || 'a kind of image'}, which she cannot be shown — PNG, JPEG, WebP and GIF work.`,
 		image: 'image',
 		note: 'Attached files are sent as part of your message.'
+	},
+
+	artifact: {
+		/** The card's button. Not "View": what happens is a panel opening beside the
+		 * conversation, and it is the same verb whether the thing is a page or a document. */
+		open: 'Open',
+		/** The same button under something already drawn in the flow, where *Open* would read as
+		 * an offer to show what is plainly already there. */
+		openFull: 'Full size',
+		download: 'Download',
+		/** The card's save control is a glyph, so its accessible name says *which* file — a turn
+		 * that published four of them otherwise offers four identical buttons. */
+		downloadOne: (name: string) => `Download ${name}`,
+		close: 'Close',
+		panel: 'Artifacts',
+		files: 'Everything published here',
+		none: 'Nothing chosen yet.',
+		loading: 'Fetching it…',
+		count: (n: number) => (n === 1 ? '1 artifact' : `${n} artifacts`),
+		/** A `.mmd` file is still a file she made, and its source is worth reading. Showing
+		 * nothing at all is what makes a renderer this build does not have look like an artifact
+		 * that came out broken. */
+		noMermaid: 'Mermaid diagrams are not drawn in this version — the source is below.'
 	},
 
 	empty: {

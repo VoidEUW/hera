@@ -16,7 +16,7 @@
 	 * are the same question, and answering it with two parallel sets of fields is how a project
 	 * ends up being renamed by the chat handler.
 	 */
-	import type { Chat, Profile, Project } from '$lib/api/client';
+	import { api, type Chat, type Profile, type Project } from '$lib/api/client';
 	import { t } from '$lib/i18n';
 	import { colourOf } from '$lib/projects';
 	import Ocellus from './Ocellus.svelte';
@@ -70,6 +70,10 @@
 	 * submenu that opens sideways: the rail is 264px wide and there is nowhere sideways to go. */
 	let moving = $state<string | null>(null);
 	let draft = $state('');
+	/** How many artifacts the chat being confirmed for deletion would take with it (ADR 13).
+	 * Asked for when the confirmation opens rather than counted for every row: one request at
+	 * the moment it matters, instead of a directory listing per chat in the rail. */
+	let publishedHere = $state(0);
 	/** Naming a new project happens in the list, in the place the project will appear, rather
 	 * than in a dialog — the same reasoning as renaming in place. */
 	let creating = $state(false);
@@ -88,6 +92,26 @@
 		menuFor = null;
 		confirming = null;
 		moving = null;
+		publishedHere = 0;
+	}
+
+	/** Open the confirmation, and go and find out what else goes with it.
+	 *
+	 * The count arrives a moment after the question, which is the right way round: the sentence
+	 * that stops you is *delete this chat?*, and *and the two things she made in it* is the
+	 * detail that changes your mind. A confirmation that waited for a request before appearing
+	 * would be a menu that changes shape under the pointer. */
+	function confirmChat(id: string) {
+		confirming = { kind: 'chat', id };
+		publishedHere = 0;
+		api
+			.artifacts(id)
+			.then((found) => {
+				if (is(confirming, 'chat', id)) publishedHere = found.length;
+			})
+			.catch(() => {
+				/* a count that could not be read is not worth blocking a delete over */
+			});
 	}
 
 	function startRename(kind: Kind, id: string, current: string) {
@@ -196,6 +220,14 @@
 			<div class="menu" role="menu">
 				{#if is(confirming, 'chat', chat.id)}
 					<p class="ask caption">{t.rail.deleteAsk}</p>
+					{#if publishedHere}
+						<!-- ADR 13: deleting a chat takes what she published in it. *A chat is a
+						     thing you throw away* and *the page I made last week* have to be
+						     reconciled by a sentence rather than by a surprise. Asked for when the
+						     confirmation opens rather than carried on every row — one request at
+						     the moment it matters beats a directory listing per chat in the rail. -->
+						<p class="ask caption warn">{t.rail.deleteTakes(publishedHere)}</p>
+					{/if}
 					<button
 						class="option danger"
 						type="button"
@@ -253,7 +285,7 @@
 						class="option danger"
 						type="button"
 						role="menuitem"
-						onclick={() => (confirming = { kind: 'chat', id: chat.id })}
+						onclick={() => confirmChat(chat.id)}
 					>
 						{t.rail.delete}
 					</button>
@@ -729,6 +761,16 @@
 	.ask {
 		margin: 4px 8px 6px;
 		color: var(--text-muted);
+	}
+
+	/* The consequence, under the question. Quieter than the question rather than louder: it is a
+	   fact about what you are about to lose, not a second alarm. */
+	.ask + .ask {
+		margin-top: -2px;
+	}
+
+	.warn {
+		color: var(--text-faint);
 	}
 
 	.chevron {

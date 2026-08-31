@@ -16,6 +16,7 @@ from uuid import UUID
 from fastapi import Depends, HTTPException, Request, status
 from sqlmodel import Session
 
+from hera_chats import Chat, ChatRepository
 from hera_core.wiring import Services
 from hera_storage import Database
 
@@ -52,3 +53,17 @@ def not_found(what: str) -> HTTPException:
     ever teach. One message for both, from one place, so no route can be the exception.
     """
     return HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"no such {what}")
+
+
+def require_chat(session: Session, chat_id: UUID, owner: UUID) -> Chat:
+    """A chat this owner has, or a 404 that says nothing about which of the two it was.
+
+    Here rather than in a route module because two of them need it now — the transcript and the
+    artifacts beside it — and a route importing another route for one function is how a request
+    layer grows a private API. ``api.projects`` and ``api.chats`` still keep their own
+    ``_require_project`` for that reason; what moved is the one with a second caller.
+    """
+    chat = ChatRepository(session).get(chat_id)
+    if chat is None or chat.owner_id != owner:
+        raise not_found("chat")
+    return chat

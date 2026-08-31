@@ -130,3 +130,34 @@ describe('the scratchpad in the gutter', () => {
 		expect(subject('hera__scratch_list', {})).toBe('');
 	});
 });
+
+describe('artifacts in the gutter', () => {
+	it('draws all three of its calls with the stele', () => {
+		// The same reasoning as the scratchpad above, and the distinction between the two marks
+		// is the one ADR 12 and ADR 13 are built on: the quill is where she thinks, unread, and
+		// the stele is what she puts up for you to read.
+		expect(mark('hera__artifact_create')).toBe('artifact');
+		expect(mark('hera__artifact_edit')).toBe('artifact');
+		expect(mark('hera__artifact_read')).toBe('artifact');
+	});
+
+	it('is not the same mark as the scratchpad', () => {
+		expect(mark('hera__artifact_create')).not.toBe(mark('hera__scratch_write'));
+	});
+
+	it('does not recognise a foreign server that names a tool the same way', () => {
+		expect(mark('notion__artifact_create')).toBe('tool');
+	});
+
+	it('names the file, never the page', () => {
+		// The one that matters: `content` is 40 KB of HTML, and the fallback of *first string
+		// argument* would put all of it through a row that ends in an ellipsis.
+		expect(
+			subject('hera__artifact_create', { name: 'page.html', content: '<h1>'.repeat(4000) })
+		).toBe('page.html');
+		expect(
+			subject('hera__artifact_edit', { name: 'page.html', find: 'red', replace: 'brass' })
+		).toBe('page.html');
+		expect(subject('hera__artifact_read', { name: 'page.html' })).toBe('page.html');
+	});
+});

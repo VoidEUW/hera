@@ -69,6 +69,34 @@ section fills in as milestones land.
   thing being replayed through the context window. `hera__note` keeps the description it has and
   stops being reached for as working memory, which is what it was actually being used as. Deleting
   a chat deletes the directory, because a cache that outlives what it belongs to is litter.
+- **She can make you a thing.** `hera__artifact_create`, `hera__artifact_edit` and
+  `hera__artifact_read` over `~/.hera/chats/<chat id>/artifacts/` — a page, a document, a chart,
+  a small program, published as a file rather than left in a code fence for you to copy out. The
+  filename is the identity and the extension is the kind, so `.html` renders in a sandboxed frame,
+  `.svg` draws, `.md` is typeset and anything else is a source figure with a download. `inline`
+  decides where it lands: a card with an **Open** for a page you go and look at, or the thing
+  itself drawn in the middle of the paragraph it explains, which is what a flow chart is for.
+  Nothing is versioned — the same name replaces — and that is bearable because **`edit` is a
+  find-and-replace** that must match exactly once: re-emitting a 40 KB page to change one colour
+  is minutes of generation, and it is what has actually been failing against a real endpoint.
+- **A panel beside the conversation.** A page she publishes opens it as she finishes writing —
+  a page is a thing you look at, and a figure she drew `inline` never opens it, because that one
+  is already on screen where she put it. The drawer holds the artifact full size, a **Download**,
+  and a bar listing everything published in that chat; the header says how many there are, and
+  every card carries its own save control, so something made nine turns ago is reachable without
+  scrolling back to the card that made it. An HTML artifact renders in an `iframe` with
+  `allow-scripts` and deliberately
+  **not** `allow-same-origin`, so a page she wrote has an opaque origin and cannot reach Hera's
+  storage — and the API serves an artifact as JSON and a download as an attachment, never as a
+  document at Hera's own origin. It can still reach the network, which is written down rather than
+  discovered: `sandbox` does not stop a frame loading a font, and a page without one looks broken
+  in a way that reads as Hera being broken.
+- **A long argument stops being resent for the rest of the conversation.** A tool call's arguments
+  are replayed into every later prompt, so a published page — or a megabyte written to the
+  scratchpad — sat underneath every question that followed it, forever. Anything past
+  `HERA_CHATS_MAX_HISTORY_ARGUMENT_CHARS` is now cut in the *history* only, with a line saying how
+  much is missing. The call went out whole, the event stores it whole, the interface shows it
+  whole, and she can read the file back.
 - **You can see what she is calling while she is still writing it.** A tool call used to reach the
   browser only once the whole thing had arrived, so a turn spent the entire time it took to write a
   long argument showing nothing at all — and the model's name for the call is in the *first* stream

@@ -26,8 +26,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from hera_chats import ChatsSettings, TurnOrchestrator
+from hera_core.chat_files import FileArtifacts, FileScratchpad
 from hera_core.config import load as load_config
-from hera_core.scratch import FileScratchpad
 from hera_core.search import DuckDuckGo
 from hera_core.settings import CoreSettings
 from hera_home import mind_dir, skills_dir
@@ -181,9 +181,13 @@ def build_services(
                 skills=SkillLibraryPort(library),
                 searcher=DuckDuckGo(),
                 # Which conversation a write belongs to arrives per call, in `_meta` -- see
-                # ChatsSettings.chat_meta_key below. This object is a singleton and knows
+                # ChatsSettings.chat_meta_key below. These objects are singletons and know
                 # nothing about any one chat, which is the whole reason that mechanism exists.
                 scratchpad=FileScratchpad(),
+                # Her scratchpad and what she publishes are two directories and two ports, and
+                # the reason belongs to the first: it was built to be somewhere she can think
+                # out loud unread (ADR 13).
+                artifacts=FileArtifacts(),
             ),
         )
 

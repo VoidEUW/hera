@@ -19,7 +19,7 @@
 import { HERA, type AnyEvent } from './api/events';
 
 /** Which mark a row draws in the gutter. */
-export type Mark = 'thinking' | 'skill' | 'search' | 'note' | 'memory' | 'tool';
+export type Mark = 'thinking' | 'skill' | 'search' | 'note' | 'memory' | 'artifact' | 'tool';
 
 /**
  * The marks her own tools get, and nothing else's.
@@ -39,6 +39,12 @@ export type Mark = 'thinking' | 'skill' | 'search' | 'note' | 'memory' | 'tool';
  * calls share it: writing something down and reading it back are the same fact to a reader, which
  * is *she is keeping notes on this*. Splitting them would put two marks in the gutter for one
  * habit and make the second look like a different capability.
+ *
+ * The artifacts (ADR 13) get the **stele** on the same reasoning, and the distinction from the
+ * quill is the one those two ADRs are built on: a scratchpad is where she thinks, unread, and an
+ * artifact is what she puts up for you to read. Publishing a page, changing a line of it and
+ * reading it back are one habit and share the mark — and it is what tells you she is *making
+ * something* while the arguments of a long call are still arriving.
  */
 export function mark(qualified: string): Mark {
 	if (!qualified.startsWith(HERA)) return 'tool';
@@ -55,6 +61,10 @@ export function mark(qualified: string): Mark {
 			return 'note';
 		case 'remember':
 			return 'memory';
+		case 'artifact_create':
+		case 'artifact_edit':
+		case 'artifact_read':
+			return 'artifact';
 		default:
 			return 'tool';
 	}
@@ -98,7 +108,13 @@ const SUBJECT: Record<string, readonly string[]> = {
 	// one line. `scratch_list` takes no arguments and falls through to nothing, which is right —
 	// the row already says she listed it.
 	scratch_write: ['name'],
-	scratch_read: ['name']
+	scratch_read: ['name'],
+	// The same reasoning, and here it is not a nicety: an artifact's `content` is the whole page,
+	// so the fallback of *first argument that is a string* would put 40 KB of HTML through a row
+	// that ends in an ellipsis.
+	artifact_create: ['name'],
+	artifact_edit: ['name'],
+	artifact_read: ['name']
 };
 
 /** The subject of one of her calls, or `''` when there is nothing worth showing. */
@@ -137,11 +153,17 @@ export function toolName(qualified: string): ToolName {
 
 /** `mcp-find` → `mcp find`, `read_file` → `read file`. Nothing cleverer: the tool's author
  * chose these words, and a browser second-guessing them is how `fs` becomes "Filesystem" on
- * one screen and `fs` on the next. */
-function humanise(local: string): string {
+ * one screen and `fs` on the next.
+ *
+ * Exported because an artifact's card heading is its filename put through exactly this, for
+ * exactly that reason — `$lib/artifacts` builds on it rather than writing a second one that
+ * would eventually disagree about what an underscore means. */
+export function humanise(local: string): string {
 	return local.replace(/[-_]+/g, ' ').trim() || local;
 }
 
-function capitalise(server: string): string {
+/** `docker` → `Docker`. The one liberty taken with somebody else's word, because a lowercase
+ * proper noun mid-sentence reads as a typo. */
+export function capitalise(server: string): string {
 	return server ? server[0].toUpperCase() + server.slice(1) : '';
 }

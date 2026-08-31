@@ -20,6 +20,7 @@ the shape of the system.
 | | |
 |---|---|
 | [v0.2.0](v0.2.0.md) | The deepening pass: projects, artifacts, the redesign, memory, dreaming |
+| [v0.2.1](v0.2.1.md) | What the emotion vocabulary is for — noted while building v0.2, not scheduled |
 
 v0.1.0 has no document here — it was planned in `docs/status.md` and in the eleven decision records
 before this convention existed. [`CHANGELOG.md`](../../CHANGELOG.md) is its record.

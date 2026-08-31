@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from hera_chats.history import MAX_ARGUMENT_CHARS
+
 
 class ChatsSettings(BaseSettings):
     """Boot settings for the turn orchestrator."""
@@ -42,6 +44,18 @@ class ChatsSettings(BaseSettings):
     worth designing for. Refused calls come back as a result the model can read, quoting what
     the call returned last time — so it is told the words did not work rather than left to
     wonder why nothing changed.
+    """
+
+    max_history_argument_chars: int = MAX_ARGUMENT_CHARS
+    """How much of one string argument is replayed into a later turn's history.
+
+    A tool whose argument is a whole document — a page she published, a file she wrote to her
+    scratchpad — would otherwise sit in the prompt of every question that follows it, so a
+    conversation grows by the size of everything she has ever written and the ceiling arrives
+    without anybody doing anything unusual.
+
+    Nothing is lost: the call went out whole, the event stores it whole, the interface shows it
+    whole, and she can read the file back. ``0`` turns the shortening off.
     """
 
     temperature: float | None = None

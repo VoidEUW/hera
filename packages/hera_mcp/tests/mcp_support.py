@@ -98,6 +98,38 @@ class FakeScratchpad:
         ]
 
 
+class FakeArtifacts:
+    """An :class:`~hera_mcp.ports.Artifacts` that keeps files in memory, per chat.
+
+    Per chat for the reason :class:`FakeScratchpad` is: a fake that ignored the id would pass
+    every test in this file and hide the only bug the ``_meta`` mechanism can have.
+
+    It enforces the *exactly once* rule, because that rule is the adapter's and a fake that let
+    a second match through would make the tool look correct when the check that keeps it safe
+    had been deleted.
+    """
+
+    def __init__(self) -> None:
+        self.chats: dict[str, dict[str, str]] = {}
+
+    async def create(self, chat_id: str, name: str, content: str) -> int:
+        self.chats.setdefault(chat_id, {})[name] = content
+        return len(content.encode("utf-8"))
+
+    async def edit(self, chat_id: str, name: str, find: str, replace: str) -> int:
+        current = self.chats.get(chat_id, {}).get(name)
+        if current is None:
+            raise ValueError(f"nothing named {name!r} has been published in this conversation")
+        found = current.count(find)
+        if found != 1:
+            raise ValueError(f"`find` matches {found} times in {name} and it has to match once")
+        self.chats[chat_id][name] = current.replace(find, replace, 1)
+        return len(self.chats[chat_id][name].encode("utf-8"))
+
+    async def read(self, chat_id: str, name: str) -> str | None:
+        return self.chats.get(chat_id, {}).get(name)
+
+
 class AngryScratchpad:
     """A scratchpad that refuses everything, with a sentence worth reading.
 

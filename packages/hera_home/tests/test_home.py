@@ -8,6 +8,7 @@ import pytest
 
 import hera_home
 from hera_home import (
+    artifacts_dir,
     chat_dir,
     chats_dir,
     config_path,
@@ -61,6 +62,7 @@ def test_every_well_known_path_sits_under_the_home(
     assert chats_dir() == tmp_path / "chats"
     assert chat_dir("c-1") == tmp_path / "chats" / "c-1"
     assert scratch_dir("c-1") == tmp_path / "chats" / "c-1" / "scratch"
+    assert artifacts_dir("c-1") == tmp_path / "chats" / "c-1" / "artifacts"
 
 
 def test_nothing_is_created_by_asking(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -90,5 +92,5 @@ def test_a_chat_directory_is_not_created_by_asking(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     monkeypatch.setenv(hera_home.HOME_ENV, str(tmp_path))
-    for path in (chats_dir(), chat_dir("c-1"), scratch_dir("c-1")):
+    for path in (chats_dir(), chat_dir("c-1"), scratch_dir("c-1"), artifacts_dir("c-1")):
         assert not path.exists()

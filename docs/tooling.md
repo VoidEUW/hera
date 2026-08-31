@@ -5,8 +5,8 @@ and none of it is settled — nothing below has an ADR, and several of these wan
 code is written. `docs/frontend.md` is the model: a document you argue with, until the argument
 is over and it becomes a rule somewhere else.
 
-**Last updated:** 2026-08-28 · §§ 2, 3 and 5 have decision records now — 12, 15 and 13. § 2 is
-built; § 5 is next; § 3 is written down and scheduled for v0.3
+**Last updated:** 2026-08-30 · §§ 2, 3 and 5 have decision records now — 12, 15 and 13. §§ 2 and 5
+are **built**; § 3 is written down and scheduled for v0.3
 
 The item that started this page — *she cannot look anything up* — is now done: `hera__search`
 exists and § 1 is kept as the reasoning behind its shape rather than as a request. What is left
@@ -254,7 +254,7 @@ What has to be decided:
 
 ---
 
-## 5. Artifacts — ✅ decided, as [ADR 13](adr/0013-an-artifact-is-a-file-she-publishes.md)
+## 5. Artifacts — ✅ built, as [ADR 13](adr/0013-an-artifact-is-a-file-she-publishes.md)
 
 Most of this held: **an artifact is a tool call**, not something the interface discovers in her
 prose, and the last paragraph's warning about storage was the most important sentence on the page.
@@ -273,6 +273,18 @@ Three things the record settles differently:
   her prose, so ADR 11 is intact.
 
 *"Do not build the executor first"* was right, and is still right.
+
+**Built, and two things the record did not see coming:**
+
+- **A call's arguments are replayed under every later question.** ADR 13 kept a page out of the
+  tool *result* for exactly this reason and missed the other half — a 40 KB `artifact_create` sat
+  in the prompt of every turn after it. `build_history` now shortens any string argument past a
+  ceiling, which is a rule about size rather than about tools, because `hera_chats` may not learn
+  which ones are hers. `hera__scratch_write` had the same shape at up to a megabyte.
+- **`edit` draws no card, and that is the design.** An artifact has one current state everywhere
+  it appears, so changing it in turn nine changes what the card in turn four shows. What the
+  ninth turn gets is a gutter row; what makes the file reachable from there is the count in the
+  header, which opens the drawer with its file bar.
 
 <details>
 <summary>The original argument, kept for the reasoning</summary>

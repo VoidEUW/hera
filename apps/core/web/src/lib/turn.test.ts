@@ -610,3 +610,120 @@ describe('a call she has begun but not finished writing', () => {
 		expect(turn.closed?.reason).toBe('failed');
 	});
 });
+
+describe('what she published', () => {
+	const published = (callId: string, name: string, inline = false, bytes = 11): AnyEvent =>
+		result(callId, 'hera__artifact_create', {
+			text: `published ${name} (${bytes} bytes)`,
+			structured: { artifact: { name, inline, bytes } }
+		});
+
+	it('draws a card in the flow of the answer', () => {
+		const turn = reduce([
+			text('Here it is.'),
+			call('a1', 'hera__artifact_create', { name: 'page.html', content: '<h1>Hi</h1>' }),
+			published('a1', 'page.html'),
+			closed()
+		]);
+
+		const card = turn.inline.find((item) => item.kind === 'artifact');
+		expect(card?.artifact).toEqual({ name: 'page.html', inline: false, bytes: 11 });
+	});
+
+	it('keeps the gutter row for the call as well', () => {
+		// The row is the act and how long it took; the card is the thing. While 40 KB of
+		// arguments are still arriving, the row is the only thing on screen — which is the whole
+		// reason `tool_call_started` exists.
+		const turn = reduce([
+			started('a1', 'hera__artifact_create'),
+			call('a1', 'hera__artifact_create', { name: 'page.html', content: 'x' }),
+			published('a1', 'page.html'),
+			closed()
+		]);
+
+		expect(turn.activity.map((row) => row.kind)).toEqual(['tool']);
+		expect(turn.activity[0].result).toBeDefined();
+		expect(turn.inline.filter((item) => item.kind === 'artifact')).toHaveLength(1);
+	});
+
+	it('lands after the prose that introduced it rather than above it', () => {
+		const turn = reduce([
+			text('Have a look:'),
+			call('a1', 'hera__artifact_create', { name: 'flow.svg', content: '<svg/>' }),
+			published('a1', 'flow.svg', true),
+			text('The middle step is the slow one.'),
+			closed()
+		]);
+
+		expect(turn.blocks.map((block) => block.kind)).toEqual([
+			'prose',
+			'gutter',
+			'artifact',
+			'prose'
+		]);
+	});
+
+	it('carries the inline flag the model chose', () => {
+		const turn = reduce([published('a1', 'flow.svg', true), closed()]);
+
+		expect(turn.inline.find((item) => item.kind === 'artifact')?.artifact?.inline).toBe(true);
+	});
+
+	it('draws nothing for an edit, because the card already shows the file', () => {
+		// An artifact has one current state everywhere it appears (ADR 13): editing it in turn
+		// nine changes what the card in turn four draws, so a second card would be one file
+		// drawn twice.
+		const turn = reduce([
+			call('a2', 'hera__artifact_edit', { name: 'page.html', find: 'red', replace: 'brass' }),
+			result('a2', 'hera__artifact_edit', { text: 'edited page.html (5 bytes)' }),
+			closed()
+		]);
+
+		expect(turn.inline.filter((item) => item.kind === 'artifact')).toHaveLength(0);
+		expect(turn.activity.map((row) => row.kind)).toEqual(['tool']);
+	});
+
+	it('ignores a foreign tool that happens to answer with an artifact key', () => {
+		// `hera__*` is her namespace and this is the one thing the interface is allowed to know
+		// about it. A server called `notion` using the word "artifact" for something else must
+		// not put a card in her transcript.
+		const turn = reduce([
+			result('x1', 'notion__export', { structured: { artifact: { name: 'page.html' } } }),
+			closed()
+		]);
+
+		expect(turn.inline.filter((item) => item.kind === 'artifact')).toHaveLength(0);
+	});
+
+	it('draws no card for a publish that failed', () => {
+		const turn = reduce([
+			result('a1', 'hera__artifact_create', {
+				ok: false,
+				failure: 'tool_error',
+				text: 'that filename is too long',
+				structured: null
+			}),
+			closed()
+		]);
+
+		expect(turn.inline.filter((item) => item.kind === 'artifact')).toHaveLength(0);
+		expect(turn.activity.map((row) => row.kind)).toEqual(['tool']);
+	});
+
+	it('reduces to the same blocks streamed and reloaded', () => {
+		// The persisted list has no `tool_call_started` in it, so this is the property the whole
+		// file exists for, applied to the newest variant.
+		const live = [
+			text('Here:'),
+			started('a1', 'hera__artifact_create'),
+			call('a1', 'hera__artifact_create', { name: 'page.html', content: 'x' }),
+			published('a1', 'page.html'),
+			closed()
+		];
+		const stored = live.filter((event) => event.type !== 'tool_call_started');
+
+		expect(reduce(stored).blocks.map((block) => block.kind)).toEqual(
+			reduce(live).blocks.map((block) => block.kind)
+		);
+	});
+});

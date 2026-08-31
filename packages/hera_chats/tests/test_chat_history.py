@@ -308,3 +308,62 @@ class TestAttachments:
 
         assert len(wire) == 1
         assert "a.py" in wire[0].content
+
+
+class TestALongArgument:
+    """A call's arguments are replayed under every later question, so a tool whose argument is a
+    document — a page she published, a file she wrote — would sit in the prompt for the rest of
+    the conversation and grow it by everything she has ever written."""
+
+    def page(self, size: int = 8_000) -> ToolCallReady:
+        return ToolCallReady(
+            id="c1",
+            name="hera__artifact_create",
+            arguments={"name": "page.html", "content": "x" * size, "inline": False},
+        )
+
+    def test_a_document_sized_argument_is_cut_in_a_later_turn(self) -> None:
+        history = build_history([stored(self.page(), TurnClosed())], max_argument_chars=1_000)
+
+        content = history[0].tool_calls[0].arguments["content"]
+        assert len(content) < 1_200
+        assert "more characters" in content
+
+    def test_the_short_arguments_beside_it_are_untouched(self) -> None:
+        """The rule is about size and not about which tool it is — this package does not know
+        what a Hera tool is and must not learn."""
+        history = build_history([stored(self.page(), TurnClosed())], max_argument_chars=1_000)
+
+        arguments = history[0].tool_calls[0].arguments
+        assert arguments["name"] == "page.html"
+        assert arguments["inline"] is False
+
+    def test_an_ordinary_call_is_not_touched_at_all(self) -> None:
+        """A search query, a filename, a paragraph of a note all fit under the ceiling, which is
+        what keeps this invisible in every turn that is not publishing a document."""
+        call = ToolCallReady(id="c1", name="hera__search", arguments={"query": "kerberos tgt"})
+
+        history = build_history([stored(call, TurnClosed())])
+
+        assert history[0].tool_calls[0].arguments == {"query": "kerberos tgt"}
+
+    def test_the_turn_in_progress_replays_its_own_calls_whole(self) -> None:
+        """`turn_to_messages` is also what feeds a round of results back mid-turn, and what she
+        just wrote is what she is still working on. Only the turns behind her are shortened."""
+        wire = turn_to_messages([self.page(), TurnClosed()])
+
+        assert len(wire[0].tool_calls[0].arguments["content"]) == 8_000
+
+    def test_nothing_is_lost_from_what_was_stored(self) -> None:
+        """The event keeps the whole argument, so the interface still shows what she really
+        sent. This is only about the copy underneath the next question."""
+        message = stored(self.page(), TurnClosed())
+
+        build_history([message], max_argument_chars=1_000)
+
+        assert len(message.events[0]["arguments"]["content"]) == 8_000
+
+    def test_a_limit_of_zero_turns_it_off(self) -> None:
+        history = build_history([stored(self.page(), TurnClosed())], max_argument_chars=0)
+
+        assert len(history[0].tool_calls[0].arguments["content"]) == 8_000
