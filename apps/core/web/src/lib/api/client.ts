@@ -169,21 +169,6 @@ export interface Skill {
 	trust: Trust;
 }
 
-/** One stance she can show. The list is the person's, and it is what both the prompt and the
- * card are drawn from — see `hera_mcp.emotions`. */
-export interface Emotion {
-	kind: string;
-	description: string;
-	tone: 'warm' | 'cool' | 'sharp' | 'soft';
-}
-
-export interface Emotions {
-	emotions: Emotion[];
-	/** Whether this is the person's list or the one she ships with. */
-	customised: boolean;
-	problem: string;
-}
-
 export interface BrokenSkill {
 	id: string;
 	path: string;
@@ -360,10 +345,6 @@ export const api = {
 	deleteMemory: (key: string) =>
 		request<void>(`/memories/${encodeURIComponent(key)}`, { method: 'DELETE' }),
 
-	emotions: () => request<Emotions>('/emotions'),
-	writeEmotions: (emotions: Emotion[]) =>
-		request<Emotions>('/emotions', { method: 'PUT', body: JSON.stringify({ emotions }) }),
-	resetEmotions: () => request<Emotions>('/emotions/reset', { method: 'POST' }),
 	preferences: () => request<Preferences>('/preferences'),
 	setTimezone: (timezone: string) =>
 		request<Preferences>('/preferences', {

@@ -22,7 +22,7 @@ def test_every_variant_survives_a_json_round_trip() -> None:
     originals: list[Event] = [
         TextDelta(text="hello"),
         ThinkingDelta(text="let me see"),
-        ToolCallReady(id="c1", name="hera__emotion", arguments={"kind": "curious"}),
+        ToolCallReady(id="c1", name="hera__search", arguments={"query": "qwen"}),
         TurnEnd(reason="tool_calls", usage=Usage(prompt_tokens=12, completion_tokens=3)),
     ]
 

@@ -9,8 +9,8 @@ exit.
 
 So each server gets a **worker task** that owns its client for the whole time it is connected.
 Callers hand work to a queue and wait on a future; the worker starts each call as a child task
-of its own, so parallel tool calls to one server stay parallel -- which matters, because a
-turn's worth of emotions is exactly that (ADR 3).
+of its own, so parallel tool calls to one server stay parallel -- which matters, because the
+target model emits calls in batches and a turn is routinely three or four at once.
 
 The failure behaviour is the other half. ADR 4: an unreachable server degrades to a missing
 tool and never takes a turn down. Here that means a failed connection is recorded rather than

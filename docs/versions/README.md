@@ -27,7 +27,7 @@ not to* into *we forgot*.
 | | |
 |---|---|
 | [v0.2.0](v0.2.0.md) | The deepening pass: projects, a scratchpad, artifacts, memory |
-| [v0.2.1](v0.2.1.md) | The polish pass: `read_resource`, the redesign, hotkeys, the emotion vocabulary |
+| [v0.2.1](v0.2.1.md) | The polish pass: `read_resource`, the redesign, hotkeys, and dropping the emotions |
 | [v0.3.0](v0.3.0.md) | The widening pass: dreaming, moved out of v0.2 · a sandbox · `hera-code` |
 
 v0.1.0 has no document here — it was planned in `docs/status.md` and in the eleven decision records

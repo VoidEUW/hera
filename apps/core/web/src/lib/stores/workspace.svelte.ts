@@ -8,7 +8,6 @@
 import {
 	api,
 	type Chat,
-	type Emotion,
 	type Profile,
 	type Project,
 	type ProjectPatch,
@@ -29,9 +28,6 @@ class Workspace {
 	/** Connected MCP servers, so the composer can say what she can reach without asking again
 	 * on every keystroke. Refreshed when settings closes, since that is where it changes. */
 	servers = $state<Server[]>([]);
-	/** Her stance vocabulary, so an emotion card can draw the tone the person chose and say
-	 * what the word means. The same list the prompt is built from — one place, not two. */
-	emotions = $state<Emotion[]>([]);
 	/** What version of her is running, as the server reports it.
 	 *
 	 * Here rather than fetched by whoever wants to draw it, so a second place that shows the
@@ -98,12 +94,7 @@ class Workspace {
 		// Deliberately after, and deliberately not fatal. Neither of these is needed to hold a
 		// conversation: with no endpoint the composer says so, and with no servers it shows
 		// nothing. An error here must not be what stops the rail from rendering.
-		await Promise.all([
-			this.loadProviders(),
-			this.loadServers(),
-			this.loadEmotions(),
-			this.loadVersion()
-		]);
+		await Promise.all([this.loadProviders(), this.loadServers(), this.loadVersion()]);
 	}
 
 	async loadVersion() {
@@ -121,14 +112,6 @@ class Workspace {
 			this.activeProvider = found.active;
 		} catch {
 			/* the Models screen is where this gets explained */
-		}
-	}
-
-	async loadEmotions() {
-		try {
-			this.emotions = (await api.emotions()).emotions;
-		} catch {
-			/* the card falls back to its own tones; the Emotions screen explains why */
 		}
 	}
 

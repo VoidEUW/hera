@@ -5,8 +5,8 @@ from your phone, talking to a **local** model over an OpenAI-compatible endpoint
 
 Hera is not a thin chat window. She keeps a **git-versioned mind** you can read and edit,
 **remembers** what matters about you in files you can take elsewhere, **publishes** what she makes
-as real artifacts, and speaks with **emotion cards** next to her prose. Her tools come from **MCP
-servers** and her know-how from **`SKILL.md` skills**, so both are portable to and from the rest of
+as real artifacts, and **asks** rather than guessing when being wrong would cost you real work. Her
+tools come from **MCP servers** and her know-how from **`SKILL.md` skills**, so both are portable to and from the rest of
 the ecosystem.
 
 > Status: **v0.2.0.** v0.1 made the spine run end to end — a message typed into the browser reaches
@@ -25,7 +25,7 @@ the ecosystem.
 
 | | |
 |---|---|
-| **Emotion cards** | The model calls `hera__emotion(kind, text)` and the answer carries a stance card — agreement, doubt, a joke — beside the prose. The vocabulary is a starting point, not a cage: invented kinds render too. |
+| **She asks instead of guessing** | `hera__ask` stops the turn, puts a question on screen and waits — and your reply becomes that call's result, so she carries on in the same answer rather than starting a new one. Three kinds, about the question: *unsure*, *blocked*, *choice*. |
 | **A mind you can read** | Identity, role, character, tone, safety and workflow each live as a Markdown file in a real git repository under `~/.hera/mind/`. Editing one is a commit. Nothing changes without your approval. |
 | **Memory you can take with you** | One markdown file per memory in `~/.hera/memories/`, and **every one that is switched on is in her prompt, whole** — no retrieval, so a memory that was stored cannot silently fail to arrive. The cost is space, so the space is on screen: a bar, and a switch that keeps a memory without paying for it. **Export `MEMORY.md`** and take the lot somewhere else. |
 | **Artifacts** | A page, a chart, a document, published as a *file* rather than left in a code fence for you to copy out — with a panel beside the conversation, a download, and an `edit` that changes one line instead of re-emitting 40 KB. |

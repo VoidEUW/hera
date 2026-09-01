@@ -16,7 +16,7 @@ from hera_permissions import matches, specificity
         ("fs__read", "fs__read", True),
         ("fs__read", "fs__readdir", False),
         ("fs__read?", "fs__reads", True),
-        ("hera__*", "hera__emotion", True),
+        ("hera__*", "hera__search", True),
     ],
 )
 def test_patterns_match_tool_names(pattern: str, tool: str, expected: bool) -> None:

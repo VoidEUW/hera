@@ -15,12 +15,12 @@
 	 * question got here.
 	 *
 	 * **Laurel, not brass.** Brass is authority — the colour of *this needs a decision*. A
-	 * question is her turning towards you, which is the register the emotion card is in, and
-	 * drawing it in the permission colour would make being asked feel like being stopped.
+	 * question is her turning towards you, and drawing it in the permission colour would make
+	 * being asked feel like being stopped.
 	 */
 	import type { AnswerRequired } from '$lib/api/events';
+	import { isAskKind } from '$lib/api/events';
 	import { t } from '$lib/i18n';
-	import { workspace } from '$lib/stores/workspace.svelte';
 
 	interface Props {
 		card: AnswerRequired;
@@ -36,12 +36,18 @@
 	let draft = $state('');
 	const settled = $derived(reply !== null);
 
-	// Her stance while asking, from the same open vocabulary the emotion card draws on and the
-	// same list the person edits in Settings -> Emotions. No table of tones here, for the reason
-	// `EmotionCard` gives: one that disagreed with what she was told would colour her stance
-	// wrongly and nobody could say why. An unknown kind falls through to the card's own laurel,
-	// which is the ADR 3 case that has to look deliberate rather than broken.
-	const tone = $derived(workspace.emotions.find((entry) => entry.kind === card.kind)?.tone ?? '');
+	// What sort of question it is, said in the person's words rather than the tool's (ADR 17).
+	//
+	// A small table here is the right shape *because* the set is closed: three kinds, fixed in
+	// `hera__ask`'s schema, so there is nothing for a list on a settings screen to disagree with.
+	// This used to look `card.kind` up in the stance vocabulary, which meant a question could be
+	// labelled with whatever mood she happened to reach for — and a kind the person had edited
+	// out of that list drew with no tone at all.
+	//
+	// A kind this build does not recognise renders as nothing rather than as the raw word: the
+	// only way to get one is a turn persisted before the set was closed, carrying a stance, and
+	// *doubt* on a question card in 2026 is a puzzle rather than information.
+	const label = $derived(isAskKind(card.kind) ? t.question.kinds[card.kind] : '');
 
 	function send() {
 		if (busy || settled) return;
@@ -67,8 +73,8 @@
 <aside class="card" class:settled>
 	<p class="head">
 		<span class="mark" aria-hidden="true">?</span>
-		{#if card.kind}
-			<span class="kind" data-tone={tone}>{card.kind}</span>
+		{#if label}
+			<span class="kind" data-kind={card.kind}>{label}</span>
 		{/if}
 		<span class="caption">{t.question.asked}</span>
 	</p>
@@ -124,20 +130,19 @@
 		font-family: var(--font-display);
 	}
 
-	/* The stance she asked in, coloured the way the emotion card colours one. Nothing here may
-	   be the danger colour: no question she can ask is an error. */
+	/* What sort of question it is. Nothing here may be the danger colour: no question she can
+	   ask is an error, and being asked one is not a thing going wrong.
+
+	   Only `blocked` is set apart, and only as far as brass. It is the one of the three where
+	   the turn is genuinely stopped on the reply — *unsure* and *choice* are her asking, which
+	   is the card's own laurel and needs no second colour to say it twice. */
 	.kind {
 		font-size: 12.5px;
 		letter-spacing: 0.03em;
-		color: var(--laurel);
-	}
-
-	.kind[data-tone='cool'] {
 		color: var(--text-muted);
 	}
 
-	.kind[data-tone='warm'],
-	.kind[data-tone='careful'] {
+	.kind[data-kind='blocked'] {
 		color: var(--brass);
 	}
 

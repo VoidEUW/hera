@@ -61,7 +61,7 @@ What was settled along the way, and what `fetch` still has to answer:
 - **Search is allowed, fetch probably is not.** The default policy allows `hera__*` outright, and
   `search` is the first of her tools that leaves the machine. It stays allowed because a card
   before each of the three or four lookups a real question takes would be exactly as unusable as
-  one per emotion, and a search *reads* something public and changes nothing. A fetch is a
+  one per scratchpad write, and a search *reads* something public and changes nothing. A fetch is a
   different act: `http://192.168.1.1/` is a request to a machine somebody chose. That is a rule
   about the **argument**, and it belongs in `hera_permissions` rather than in the tool.
 - **Extraction is still open.** A fetched page is HTML and she should be given prose. This wants a
@@ -183,11 +183,21 @@ The "mounted scratch directory" guessed at here is § 2's, which is the one part
 
 ---
 
-## 4. `hera__emotion` should be able to ask — ✅ done
+## 4. She should be able to ask — ✅ done, and since detached
 
 **Built, as `hera__ask` rather than as a flag**, and it did generalise the permission path rather
 than sitting beside it — which is what the rest of this section argued for and is the part worth
-keeping. What was decided, against the open questions below:
+keeping.
+
+> **The premise of the heading is gone.** This section was written as *`hera__emotion` should be
+> able to ask*, and the separate-tool decision below turned out to be worth more than the argument
+> for it knew: when
+> [ADR 17](adr/0017-a-stance-is-a-sentence-and-a-question-stands-alone.md) removed the emotion tool
+> for good, `ask` needed nothing but its `kind` uncoupling — a closed set of three about the
+> *question* — rather than a rebuild. Had this shipped as `emotion(…, ask=True)`, the feature a
+> person actually uses would have gone out with the one nobody did.
+
+What was decided, against the open questions below:
 
 - **A separate tool, not an argument.** `hera__ask(question, kind)`. The reasoning below holds:
   descriptions are prompt text and one clear sentence beats a conditional.
@@ -204,7 +214,8 @@ keeping. What was decided, against the open questions below:
   region says when a question is worth asking, and it is evolvable, so the useful version is
   learned from conversations that went badly.
 - **Laurel, not brass.** Brass is authority: *this needs a decision*. A question is her turning
-  towards you, which is the emotion card's register.
+  towards you, and drawing it in the permission colour would make being asked feel like being
+  stopped.
 
 **One thing this uncovered.** Both this section and `docs/status.md` said the composer "already
 blocks while `awaiting` is non-empty". It did not — nothing read that field. Sending past an open
@@ -353,7 +364,8 @@ in it at all: none of the artifact kinds need code execution, so the thing that 
 prerequisite turned out to be a separate feature with its own schedule.
 
 1. ~~**Search.**~~ Done. ~~**Asking emotions**~~ — done, as `hera__ask`; it generalised the
-   permission path, which is what § 4 said it should.
+   permission path, which is what § 4 said it should, and it outlived the emotions themselves
+   (ADR 17).
 2. ~~**The scratchpad**~~ — decided, [ADR 12](adr/0012-a-chat-has-a-scratchpad.md), and it is v0.2
    M2a. It unblocks the two below by answering where a document lives, and by making a tool call
    able to know which chat it is in at all.

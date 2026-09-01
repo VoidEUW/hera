@@ -55,7 +55,7 @@ class TestInProcess:
         tools = await server.tools()
 
         assert server.connected
-        assert "toy__emotion" in {tool.name for tool in tools}
+        assert "toy__echo" in {tool.name for tool in tools}
         await server.aclose()
 
     async def test_the_listing_is_cached(self, toy: MCPServer) -> None:
@@ -66,10 +66,10 @@ class TestInProcess:
         await server.aclose()
 
     async def test_parallel_calls_to_one_server(self, toy: MCPServer) -> None:
-        """A turn's worth of emotions is one round trip only if these overlap (ADR 3)."""
+        """A batch of calls to one server is one round trip only if these overlap."""
         server = ManagedServer.in_process("toy", toy)
         results = await asyncio.gather(
-            *(server.call("emotion", {"kind": "curious", "text": str(n)}) for n in range(5))
+            *(server.call("echo", {"kind": "curious", "text": str(n)}) for n in range(5))
         )
         assert [result.is_error for result in results] == [False] * 5
         await server.aclose()

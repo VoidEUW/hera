@@ -25,9 +25,9 @@ export type Mark = 'thinking' | 'skill' | 'search' | 'note' | 'memory' | 'artifa
  * The marks her own tools get, and nothing else's.
  *
  * This is the one table of tool names in the interface and it is allowed to exist because
- * `hera__*` is **her** namespace: every tool on it is shipped in this repository, the emotion
- * one is already drawn as a card rather than a row, and knowing what her own capabilities look
- * like is not the same as knowing somebody else's server. What this must never grow is an entry
+ * `hera__*` is **her** namespace: every tool on it is shipped in this repository, `ask` is
+ * already drawn as a card rather than a row, and knowing what her own capabilities look like is
+ * not the same as knowing somebody else's server. What this must never grow is an entry
  * for a name that arrives over `mcp.json` — the moment a familiar tool is drawn differently from
  * an unfamiliar one, a server you have not configured yet looks like a server that is broken.
  *
@@ -108,7 +108,6 @@ const SUBJECT: Record<string, readonly string[]> = {
 	// for on Settings → Memory afterwards.
 	remember: ['key'],
 	forget: ['key'],
-	emotion: ['kind'],
 	// The filename, never the body: a scratchpad write is a whole document, and the gutter row is
 	// one line. `scratch_list` takes no arguments and falls through to nothing, which is right —
 	// the row already says she listed it.

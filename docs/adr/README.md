@@ -9,7 +9,7 @@ later.
 |---|---|---|
 | [1](0001-uv-workspace-monorepo.md) | A uv-workspace monorepo, with two foundation libraries kept outside | accepted · layout superseded by [9](0009-one-application-package.md) |
 | [2](0002-qwen-only-target-model.md) | Qwen3.6-35B is the only target model | accepted |
-| [3](0003-emotions-as-tool-calls.md) | Emotion cards are tool calls with an open vocabulary | accepted |
+| [3](0003-emotions-as-tool-calls.md) | Emotion cards are tool calls with an open vocabulary | **superseded by [17](0017-a-stance-is-a-sentence-and-a-question-stands-alone.md)** |
 | [4](0004-mcp-as-the-tool-layer.md) | MCP is the tool layer | accepted |
 | [5](0005-deterministic-skill-routing.md) | Skills are selected by code, not by the model | accepted |
 | [6](0006-spa-over-json-sse-api.md) | A SvelteKit application over a JSON and SSE API | accepted · layout superseded by [9](0009-one-application-package.md) |
@@ -23,3 +23,4 @@ later.
 | [14](0014-skill-resources-are-readable.md) | Skill resources are readable | accepted |
 | [15](0015-running-code-in-a-container.md) | Running code happens in a container, and here is which claim that makes | **deferred to v0.3** |
 | [16](0016-a-memory-is-a-file-and-all-of-them-are-in-the-prompt.md) | A memory is a file, and every enabled one is in the prompt | accepted |
+| [17](0017-a-stance-is-a-sentence-and-a-question-stands-alone.md) | A stance is a sentence, and a question stands on its own | accepted · supersedes [3](0003-emotions-as-tool-calls.md) |

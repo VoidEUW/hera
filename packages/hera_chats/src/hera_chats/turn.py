@@ -46,7 +46,6 @@ from hera_chats.settings import ChatsSettings
 from hera_permissions import Decision
 from hera_profiles import (
     BEHAVIOUR_TRAITS,
-    SLOT_EMOTIONS,
     SLOT_MEMORIES,
     SLOT_NOW,
     SLOT_PROJECT,
@@ -143,14 +142,6 @@ class TurnContext:
     claim to know it, which is better than one where she quietly assumes the server's clock is
     the person's.
     """
-
-    emotions: str = ""
-    """Pre-rendered stance vocabulary for the ``emotions`` slot.
-
-    Pre-rendered, like everything else that arrives through a slot: this package does not know
-    what an emotion is and should not learn. The application reads the person's list and calls
-    ``hera_mcp.render_emotions``; empty leaves the section out, which is a deployment where she
-    shows no stances rather than a broken one."""
 
 
 @dataclass
@@ -364,7 +355,6 @@ class Turn:
             SLOT_MEMORIES: context.memories,
             SLOT_PROJECT: context.project.instructions if context.project is not None else "",
             SLOT_TOOLS: catalogue_text,
-            SLOT_EMOTIONS: context.emotions,
             SLOT_NOW: context.now,
         }
         frame = prompt.render(
@@ -494,8 +484,9 @@ class Turn:
     async def _answer(self, calls: Sequence[ToolCallReady]) -> AsyncIterator[ChatEvent]:
         """Run a batch of calls in parallel and record what came back.
 
-        Parallel because the model emits parallel calls and a turn's worth of emotions is the
-        everyday case (ADR 3). Running them one after another turns one round-trip into four.
+        Parallel because the model emits parallel calls and several independent lookups in one
+        round is the everyday case. Running them one after another turns one round-trip into
+        four.
 
         A call a person *answered* is not run at all: their words become its result, so the
         model reads a reply to its question in exactly the place a tool's output would have

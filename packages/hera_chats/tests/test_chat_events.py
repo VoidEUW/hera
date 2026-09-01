@@ -100,8 +100,8 @@ class TestCoalescing:
         assert merged == [ThinkingDelta(text="ab"), TextDelta(text="c")]
 
     def test_anything_between_two_fragments_stops_the_merge(self) -> None:
-        """An emotion called mid-sentence has to stay where she put it."""
-        call = ToolCallReady(id="c1", name="hera__emotion")
+        """A call made mid-sentence has to stay where she put it."""
+        call = ToolCallReady(id="c1", name="hera__search")
         merged = coalesce([TextDelta(text="a"), call, TextDelta(text="b")])
         assert merged == [TextDelta(text="a"), call, TextDelta(text="b")]
 

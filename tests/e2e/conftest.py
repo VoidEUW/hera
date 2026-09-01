@@ -2,7 +2,7 @@
 
 Real in every way except the model. The server is a real uvicorn process serving the real built
 interface, talking to a real SQLite file — and a `FakeProvider` reading from a script, so the
-whole path from a keystroke to a rendered emotion card runs in CI with no endpoint anywhere.
+whole path from a keystroke to a rendered answer runs in CI with no endpoint anywhere.
 
 Marked ``e2e`` and deselected by the fast loop. It needs `npm run build` to have run; without a
 built interface there is nothing to drive, and the fixtures say so rather than failing somewhere
@@ -36,8 +36,8 @@ STATIC = ROOT / "apps" / "core" / "src" / "hera_core" / "static"
 pytestmark = pytest.mark.e2e
 
 SCRIPT = [
-    # One turn that reasons, speaks, and shows a stance -- which is the everyday shape, and the
-    # one worth driving a browser for: three different variants landing in three different
+    # One turn that reasons, speaks, and reaches for a tool -- which is the everyday shape, and
+    # the one worth driving a browser for: three different variants landing in three different
     # places on the same message.
     [
         ThinkingDelta(text="They want the short version, not the RFC."),
@@ -48,7 +48,10 @@ SCRIPT = [
         # setext trap, and it must come out as a rule rather than promoting "Cost" to a heading.
         TextDelta(text="- the TGT is cached\n- every service ticket derives from it\n\n"),
         TextDelta(text="**Cost**\n---\nThe lifetime is \\(t_0 + \\Delta\\).\n\n"),
-        tool_call("hera__emotion", {"kind": "curious", "text": "Which part matters to you?"}),
+        # Nothing is wired in this deployment (`registry=None`), so this comes back failed --
+        # which is the point. A gutter row for a call that did not work is a thing a person has
+        # to be able to read, and it is the one rendering nothing below a browser can check.
+        tool_call("hera__search", {"query": "kerberos ticket lifetime rfc"}),
         TurnEnd(reason="tool_calls"),
     ],
     text_turn("Ask me for the detail on whichever step you need."),

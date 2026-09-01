@@ -94,8 +94,8 @@ class TestReading:
     def test_an_emptied_region_stays_empty(self, mind: MindRepository) -> None:
         """Emptying a region in the editor is a decision. Restoring the seed text would
         undo it invisibly, which is the worst way for a setting to not work."""
-        mind.write("emotion_usage", "")
-        assert mind.read("emotion_usage") == ""
+        mind.write("memory_instr", "")
+        assert mind.read("memory_instr") == ""
 
     def test_read_all_covers_every_registered_region(self, mind: MindRepository) -> None:
         texts = mind.read_all()

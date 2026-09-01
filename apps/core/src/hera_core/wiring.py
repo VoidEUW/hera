@@ -56,15 +56,15 @@ DEFAULT_POLICY = Policy(
 
 ``ask`` for everything is the right default for a *foreign* tool — a tool nobody has an opinion
 about is exactly the case a person should see once. It is the wrong default for hers.
-``hera__emotion`` is called several times in an ordinary turn (ADR 3), and a confirmation card
-for each one would make the feature unusable and teach a person to click through cards without
-reading them, which is the failure that matters.
+Her tools are called several times in an ordinary turn — a scratchpad write, a memory, two
+searches — and a confirmation card for each one would teach a person to click through cards
+without reading them, which is the failure that matters.
 
 **``hera__search`` leaves the machine, and is still allowed.** It is the first of her tools that
 does, so the old sentence here — *they reach only her own mind, memories and skills* — is no
 longer the reason. The reason is that a search **reads** something public and changes nothing:
 a card before every lookup would cost a click for each of the three or four searches a real
-question takes, which is the same unusability ``emotion`` would have had. What travels is a
+question takes, which is unusable in the same way. What travels is a
 query the model wrote, to whichever engine ``hera_core.search`` is pointed at, and a person who
 does not want that writes one rule to deny it. The tool that would deserve a card is a *fetch* —
 an arbitrary URL is a request to a machine somebody chose, and `http://192.168.1.1/` is not the

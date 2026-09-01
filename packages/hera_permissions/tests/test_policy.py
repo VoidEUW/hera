@@ -192,7 +192,7 @@ def test_a_set_can_be_built_from_the_three_lists_a_config_file_has() -> None:
     permissions = PermissionSet.of(allow=["hera__*"], ask=["fs__*"], deny=["shell__*"])
 
     policy = Policy(base=permissions)
-    assert policy.check("hera__emotion").decision is Decision.ALLOW
+    assert policy.check("hera__search").decision is Decision.ALLOW
     assert policy.check("fs__read").decision is Decision.ASK
     assert policy.check("shell__exec").decision is Decision.DENY
 

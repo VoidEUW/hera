@@ -1,4 +1,4 @@
-"""From a keystroke to a rendered emotion card.
+"""From a keystroke to a rendered answer.
 
 The one test that proves the whole thing is joined up: SvelteKit built, served by FastAPI,
 streaming Server-Sent Events out of the turn orchestrator, reduced in the browser into a
@@ -50,10 +50,11 @@ def test_a_message_streams_back_and_survives_a_reload(page: Any) -> None:
     page.wait_for_url("**/chat/**", timeout=15_000)
     page.wait_for_selector("text=ticket-granting ticket", timeout=30_000)
 
-    # An emotion renders as a card, inline, where she called it (ADR 3).
-    page.wait_for_selector("text=curious", timeout=15_000)
+    # A tool call renders as a gutter row, with its subject on it -- for a search, the query
+    # (`$lib/tools.ts`), never the whole of whatever it was handed.
+    page.wait_for_selector("text=kerberos ticket lifetime rfc", timeout=15_000)
 
-    # And now wait for the turn to actually be over. The emotion closes the *first* round trip,
+    # And now wait for the turn to actually be over. The call closes the *first* round trip,
     # not the turn: the script answers a second time after it, and everything below is written
     # about a finished turn — the tail preview being gone, and a row that stays open once it is
     # clicked. Until `done` arrives the client is still rendering optimistically and then
@@ -79,7 +80,7 @@ def test_a_message_streams_back_and_survives_a_reload(page: Any) -> None:
 
     # The server render is authoritative: the reload shows exactly what was streamed.
     page.wait_for_selector("text=ticket-granting ticket", timeout=15_000)
-    page.wait_for_selector("text=curious", timeout=15_000)
+    page.wait_for_selector("text=kerberos ticket lifetime rfc", timeout=15_000)
     assert page.url == url
 
 
@@ -330,8 +331,10 @@ class TestSheAsksAndWaits:
         page.wait_for_url("**/chat/**", timeout=15_000)
         page.wait_for_selector("text=Which deck do you mean?", timeout=30_000)
 
-        # The stance she asked in, from the same open vocabulary an emotion card draws on.
-        page.wait_for_selector("text=unsure", timeout=5_000)
+        # What sort of question it is, said in the person's words rather than the tool's
+        # (ADR 17). Three closed kinds, so this is a label the interface owns rather than a word
+        # the model reached for out of a vocabulary.
+        page.wait_for_selector("text=she is unsure", timeout=5_000)
 
         # The composer is blocked while the question is open: there is one thing to answer and
         # two places to type it would be a question about which one counts.

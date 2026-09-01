@@ -25,7 +25,7 @@ describe('toolName', () => {
 	});
 
 	it('leaves an unnamespaced tool alone', () => {
-		expect(toolName('emotion')).toEqual({ server: '', action: 'emotion', qualified: 'emotion' });
+		expect(toolName('ping')).toEqual({ server: '', action: 'ping', qualified: 'ping' });
 	});
 
 	it('treats her own tools like anybody elses', () => {

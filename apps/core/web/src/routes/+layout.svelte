@@ -73,11 +73,7 @@
 	/** The composer shows what she can reach, and settings is where that changes. */
 	async function closeSettings() {
 		workspace.settingsOpen = false;
-		await Promise.all([
-			workspace.loadProviders(),
-			workspace.loadServers(),
-			workspace.loadEmotions()
-		]);
+		await Promise.all([workspace.loadProviders(), workspace.loadServers()]);
 	}
 
 	function onkeydown(event: KeyboardEvent) {

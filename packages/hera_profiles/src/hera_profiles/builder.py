@@ -54,17 +54,7 @@ A slot rather than a mind region: it is a *fact about this moment*, not a behavi
 should be able to edit. A region saying "it is Tuesday" would be wrong by Wednesday.
 """
 
-SLOT_EMOTIONS = "emotions"
-"""Her stance vocabulary, rendered by whoever owns it.
-
-A slot rather than a region because the list is *data* the person edits on a screen — a word,
-a sentence, a tone — and the interface colours a card from the same list the model reads. As a
-region it was a paragraph that the browser would have needed a second copy of.
-"""
-
-SLOTS: frozenset[str] = frozenset(
-    {SLOT_TOOLS, SLOT_SKILLS, SLOT_MEMORIES, SLOT_PROJECT, SLOT_EMOTIONS, SLOT_NOW}
-)
+SLOTS: frozenset[str] = frozenset({SLOT_TOOLS, SLOT_SKILLS, SLOT_MEMORIES, SLOT_PROJECT, SLOT_NOW})
 """Every slot the skeleton offers.
 
 Named constants rather than string literals at the call site: a typo in a binding key is
@@ -149,22 +139,10 @@ LAYOUT: tuple[Node, ...] = (
             ),
         ),
     ),
-    Node(
-        key="emotions",
-        title="Emotions",
-        priority=45,
-        children=(
-            Node(
-                key="emotions.vocabulary",
-                title="Available kinds",
-                priority=45,
-                slot=SLOT_EMOTIONS,
-            ),
-            Node(
-                key="emotions.usage", title="When to use one", priority=46, region="emotion_usage"
-            ),
-        ),
-    ),
+    # There was an `emotions` group here, holding a vocabulary slot and a region about when to
+    # use one. ADR 17 removed both: a stance she means is a sentence she writes, and the tool
+    # that made it a separate thing is gone. Nothing took the priority band -- the numbers are
+    # ordering, not addresses, and closing the gap would only make a diff look bigger.
     Node(
         key="tools",
         title="Tools",

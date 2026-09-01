@@ -124,7 +124,7 @@ def test_a_half_written_tag_at_the_end_is_flushed_as_the_text_it_is() -> None:
 
 
 def test_parallel_tool_calls_are_assembled_and_emitted_in_index_order() -> None:
-    """One turn's worth of emotions costs one round-trip precisely because of this."""
+    """Several calls in one round cost one round-trip precisely because of this."""
     events = drain(
         [
             chunk(
@@ -132,13 +132,13 @@ def test_parallel_tool_calls_are_assembled_and_emitted_in_index_order() -> None:
                     {
                         "index": 0,
                         "id": "c0",
-                        "function": {"name": "hera__emotion", "arguments": ""},
+                        "function": {"name": "hera__search", "arguments": ""},
                     },
                     {"index": 1, "id": "c1", "function": {"name": "hera__note", "arguments": ""}},
                 ]
             ),
             chunk(tool_calls=[{"index": 1, "function": {"arguments": '{"text":'}}]),
-            chunk(tool_calls=[{"index": 0, "function": {"arguments": '{"kind":"joke"}'}}]),
+            chunk(tool_calls=[{"index": 0, "function": {"arguments": '{"query":"qwen"}'}}]),
             chunk(tool_calls=[{"index": 1, "function": {"arguments": '"ok"}'}}]),
             chunk(finish="tool_calls"),
         ]
@@ -146,7 +146,7 @@ def test_parallel_tool_calls_are_assembled_and_emitted_in_index_order() -> None:
 
     calls = [e for e in events if isinstance(e, ToolCallReady)]
     assert [(c.id, c.name, c.arguments) for c in calls] == [
-        ("c0", "hera__emotion", {"kind": "joke"}),
+        ("c0", "hera__search", {"query": "qwen"}),
         ("c1", "hera__note", {"text": "ok"}),
     ]
     assert events[-1] == TurnEnd(reason="tool_calls")
@@ -342,7 +342,7 @@ def test_each_parallel_call_is_announced_as_it_is_named() -> None:
         [
             chunk(
                 tool_calls=[
-                    {"index": 0, "id": "c0", "function": {"name": "hera__emotion"}},
+                    {"index": 0, "id": "c0", "function": {"name": "hera__search"}},
                     {"index": 1, "id": "c1", "function": {"name": "hera__note"}},
                 ]
             ),
@@ -350,7 +350,7 @@ def test_each_parallel_call_is_announced_as_it_is_named() -> None:
         ]
     )
 
-    assert started(events) == [("c0", "hera__emotion"), ("c1", "hera__note")]
+    assert started(events) == [("c0", "hera__search"), ("c1", "hera__note")]
 
 
 def test_the_announced_id_is_the_one_the_call_is_dispatched_under() -> None:

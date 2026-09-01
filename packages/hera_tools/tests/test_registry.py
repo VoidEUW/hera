@@ -24,13 +24,13 @@ from hera_permissions import Decision, PermissionSet, Policy, Rule
 from hera_tools import ToolsSettings
 
 
-def _emotion(call_id: str = "c1", kind: str = "curious") -> ToolInvocation:
-    return ToolInvocation(call_id=call_id, tool="toy__emotion", arguments={"kind": kind})
+def _echo(call_id: str = "c1", kind: str = "curious") -> ToolInvocation:
+    return ToolInvocation(call_id=call_id, tool="toy__echo", arguments={"kind": kind})
 
 
 class TestPermission:
     async def test_an_allowed_tool_runs(self, registry: ToolRegistry) -> None:
-        assert (await registry.dispatch(_emotion())).ok
+        assert (await registry.dispatch(_echo())).ok
 
     async def test_a_denied_tool_does_not(self, toy: MCPServer, settings: ToolsSettings) -> None:
         registry = ToolRegistry(
@@ -39,7 +39,7 @@ class TestPermission:
                 base=PermissionSet(
                     rules=[
                         Rule(
-                            pattern="toy__emotion",
+                            pattern="toy__echo",
                             decision=Decision.DENY,
                             reason="not in this profile",
                         )
@@ -48,7 +48,7 @@ class TestPermission:
             ),
         )
 
-        result = await registry.dispatch(_emotion())
+        result = await registry.dispatch(_echo())
 
         assert not result.ok
         assert result.failure is Failure.DENIED
@@ -61,7 +61,7 @@ class TestPermission:
         """A registry built without a policy is not an open door."""
         registry = ToolRegistry([ManagedServer.in_process("toy", toy, settings)])
 
-        result = await registry.dispatch(_emotion())
+        result = await registry.dispatch(_echo())
 
         assert result.failure is Failure.DENIED
         assert "confirmation" in result.text
@@ -71,8 +71,8 @@ class TestPermission:
         """The person said yes to this one call; the policy itself has not changed."""
         registry = ToolRegistry([ManagedServer.in_process("toy", toy, settings)])
 
-        assert (await registry.dispatch(_emotion(), confirmed=True)).ok
-        assert registry.check("toy__emotion").decision is Decision.ASK
+        assert (await registry.dispatch(_echo(), confirmed=True)).ok
+        assert registry.check("toy__echo").decision is Decision.ASK
         await registry.aclose()
 
     async def test_a_confirmation_cannot_overrule_a_deny(
@@ -83,7 +83,7 @@ class TestPermission:
             policy=Policy(base=PermissionSet.of(deny=["*"])),
         )
 
-        result = await registry.dispatch(_emotion(), confirmed=True)
+        result = await registry.dispatch(_echo(), confirmed=True)
 
         assert result.failure is Failure.DENIED
         await registry.aclose()
@@ -96,8 +96,8 @@ class TestPermission:
             policy=Policy(profiles={"coding": PermissionSet.of(allow=["toy__*"])}),
         )
 
-        assert (await registry.dispatch(_emotion(), profile="coding")).ok
-        assert not (await registry.dispatch(_emotion())).ok
+        assert (await registry.dispatch(_echo(), profile="coding")).ok
+        assert not (await registry.dispatch(_echo())).ok
         await registry.aclose()
 
     async def test_answering_a_confirmation_produces_a_registry_that_shares_the_servers(
@@ -109,7 +109,7 @@ class TestPermission:
             registry.policy.with_rule(Rule(pattern="toy__note", decision=Decision.DENY))
         )
 
-        assert (await loosened.dispatch(_emotion())).ok
+        assert (await loosened.dispatch(_echo())).ok
         assert loosened.check("toy__note").decision is Decision.DENY
         assert registry.check("toy__note").decision is Decision.ALLOW
 
@@ -122,11 +122,11 @@ class TestUnknownTools:
 
     async def test_a_near_miss_is_suggested(self, registry: ToolRegistry) -> None:
         """A model given the right name next to the wrong one corrects itself."""
-        result = await registry.dispatch(ToolInvocation(call_id="c1", tool="toy__emotions"))
-        assert "toy__emotion" in result.text
+        result = await registry.dispatch(ToolInvocation(call_id="c1", tool="toy__echos"))
+        assert "toy__echo" in result.text
 
     async def test_a_name_that_is_not_namespaced_at_all(self, registry: ToolRegistry) -> None:
-        result = await registry.dispatch(ToolInvocation(call_id="c1", tool="emotion"))
+        result = await registry.dispatch(ToolInvocation(call_id="c1", tool="echo"))
         assert result.failure is Failure.UNKNOWN_TOOL
 
 
@@ -149,7 +149,7 @@ class TestDegrading:
 
         assert len(catalogue.for_server("ghost")) == 0
         assert len(catalogue.for_server("toy")) == TOY_TOOL_COUNT
-        assert (await registry.dispatch(_emotion())).ok
+        assert (await registry.dispatch(_echo())).ok
         await registry.aclose()
 
     async def test_status_says_why(
@@ -234,7 +234,7 @@ class TestParallelDispatch:
     async def test_results_come_back_in_the_order_they_were_given(
         self, registry: ToolRegistry
     ) -> None:
-        calls = [_emotion(call_id=f"c{n}", kind=f"k{n}") for n in range(4)]
+        calls = [_echo(call_id=f"c{n}", kind=f"k{n}") for n in range(4)]
 
         results = await registry.dispatch_all(calls)
 
@@ -244,7 +244,7 @@ class TestParallelDispatch:
     async def test_one_bad_call_does_not_take_the_others_down(self, registry: ToolRegistry) -> None:
         """The same rule as ``ToolCallReady.parse_error`` in ``hera_providers``."""
         results = await registry.dispatch_all(
-            [_emotion(call_id="good"), ToolInvocation(call_id="bad", tool="toy__nope")]
+            [_echo(call_id="good"), ToolInvocation(call_id="bad", tool="toy__nope")]
         )
 
         assert [result.ok for result in results] == [True, False]
@@ -255,7 +255,7 @@ class TestParallelDispatch:
         registry = ToolRegistry([ManagedServer.in_process("toy", toy, settings)])
 
         results = await registry.dispatch_all(
-            [_emotion(call_id="yes"), _emotion(call_id="no")], confirmed=["yes"]
+            [_echo(call_id="yes"), _echo(call_id="no")], confirmed=["yes"]
         )
 
         assert [result.ok for result in results] == [True, False]
@@ -309,7 +309,7 @@ class TestBuilding:
 
         catalogue = await registry.catalogue()
         assert "spike__echo" in catalogue
-        assert "toy__emotion" in catalogue
+        assert "toy__echo" in catalogue
         await registry.aclose()
 
     async def test_closing_a_registry_that_never_connected_is_fine(

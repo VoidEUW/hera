@@ -234,12 +234,12 @@ class TestTheToolLoop:
     async def test_parallel_calls_are_dispatched_in_one_batch(
         self, make_orchestrator: Make, tools: StubTools
     ) -> None:
-        """Running them one after another turns one round-trip into four (ADR 3)."""
+        """Running them one after another turns one round-trip into four."""
         provider = FakeProvider(
             [
                 tool_turn(
-                    tool_call("hera__emotion", call_id="e1"),
-                    tool_call("hera__emotion", call_id="e2"),
+                    tool_call("hera__search", call_id="e1"),
+                    tool_call("hera__search", call_id="e2"),
                 ),
                 text_turn("done"),
             ]

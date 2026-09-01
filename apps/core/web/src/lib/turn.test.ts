@@ -102,12 +102,19 @@ describe('prose', () => {
 		]);
 	});
 
-	it('opens a new block after an emotion, which is on screen even though it is not a row', () => {
+	it('opens a new block after a card, which is on screen even though it is not a row', () => {
 		const turn = reduce([
 			{ type: 'thinking_delta', text: 'a' },
-			call('e1', 'hera__emotion', { kind: 'agree' }),
+			call('q1', 'hera__ask'),
+			{
+				type: 'answer_required',
+				call_id: 'q1',
+				tool: 'hera__ask',
+				question: 'Which deck?',
+				kind: 'choice'
+			},
 			{ type: 'thinking_delta', text: 'b' },
-			closed()
+			closed('awaiting_answer')
 		]);
 		expect(turn.activity.map((row) => row.kind)).toEqual(['thinking', 'thinking']);
 	});
@@ -188,25 +195,6 @@ describe('the activity gutter', () => {
 		// feature and a broken one look identical.
 		const turn = reduce([{ type: 'invented_later', detail: 'x' } as AnyEvent, closed()]);
 		expect(turn.activity.map((row) => row.kind)).toEqual(['unknown']);
-	});
-});
-
-describe('emotions', () => {
-	it('renders inline, where she called it', () => {
-		const turn = reduce([
-			text('Before. '),
-			call('e1', 'hera__emotion', { kind: 'doubt', text: 'Slide 14 contradicts slide 9.' }),
-			text('After.'),
-			closed()
-		]);
-
-		expect(turn.inline.map((i) => i.kind)).toEqual(['prose', 'emotion', 'prose']);
-		expect(turn.activity).toHaveLength(0);
-	});
-
-	it('never appears in the gutter', () => {
-		const turn = reduce([call('e1', 'hera__emotion', { kind: 'agree' })]);
-		expect(turn.activity).toHaveLength(0);
 	});
 });
 
@@ -447,30 +435,6 @@ describe('the live view and the reload cannot disagree', () => {
 	});
 });
 
-describe('an emotion is drawn once', () => {
-	const emotion = call('e1', 'hera__emotion', { kind: 'agree' });
-
-	it('does not also get a gutter row for its result', () => {
-		// The card *is* the record. A row beside it draws the same thing twice.
-		const turn = reduce([emotion, result('e1', 'hera__emotion'), text('ok'), closed()]);
-
-		expect(turn.inline.map((i) => i.kind)).toEqual(['emotion', 'prose']);
-		expect(turn.activity).toHaveLength(0);
-	});
-
-	it('keeps the row when the call failed', () => {
-		// An emotion she showed and the system refused is exactly what openness means you see.
-		const turn = reduce([
-			emotion,
-			result('e1', 'hera__emotion', { ok: false, failure: 'denied', text: 'not allowed' }),
-			closed()
-		]);
-
-		expect(turn.inline.map((i) => i.kind)).toEqual(['emotion']);
-		expect(turn.activity).toHaveLength(1);
-	});
-});
-
 describe('a block still being written', () => {
 	it('is marked live when the list runs out mid-thought', () => {
 		const turn = reduce([{ type: 'thinking_delta', text: 'still going' }]);
@@ -568,19 +532,6 @@ describe('a call she has begun but not finished writing', () => {
 			stored.inline.map((i) => [i.kind, i.text])
 		);
 		expect(live.activity.map((r) => r.event)).toEqual(stored.activity.map((r) => r.event));
-	});
-
-	it('draws no gutter row for an emotion she has begun', () => {
-		// The card is built from the finished call. A row here would draw the stance twice —
-		// once as machinery for a second, then as the thing she said.
-		const turn = reduce([
-			started('e1', 'hera__emotion'),
-			call('e1', 'hera__emotion', { kind: 'curious' }),
-			closed()
-		]);
-
-		expect(turn.activity).toHaveLength(0);
-		expect(turn.inline.map((i) => i.kind)).toEqual(['emotion']);
 	});
 
 	it('draws no gutter row for a question she has begun', () => {

@@ -1,7 +1,13 @@
 # 3. Emotion cards are tool calls with an open vocabulary
 
-- Status: accepted
+- Status: **superseded by [17](0017-a-stance-is-a-sentence-and-a-question-stands-alone.md)**
 - Date: 2026-08-26
+
+> Kept as written, not edited. ADR 17 removed the feature after a version of driving it against a
+> real endpoint — the vocabulary meant nothing to the model, and asking it to interrupt its own
+> prose to file a small form is not a shape it complies with honestly. What this record got right
+> is the part that outlived it: what she *did* is an event variant and never something parsed back
+> out of what she wrote. That rule stands for every card in the interface.
 
 ## Context
 

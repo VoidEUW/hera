@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "hera-mcp"
 version = "0.1.0"
-description = "Hera's own capabilities as an MCP server: emotion, remember, note, skill."
+description = "Hera's own capabilities as an MCP server: ask, remember, note, skill."
 readme = "README.md"
 requires-python = ">=3.12"
 authors = [{ name = "Void" }]

@@ -2,8 +2,9 @@
 
 The MCP server Hera **is**, as opposed to the ones she can reach.
 
-Four tools on a real `MCPServer` — `emotion`, `remember`, `note` and `skill`, namespaced
-`hera__*` once the client mounts them. `hera_tools` is the other half of the pair: it is the
+Her whole catalogue on a real `MCPServer` — `ask`, `remember`, `forget`, `note`, `skill`,
+`search`, the three `scratch_*` and the three `artifact_*`, namespaced `hera__*` once the client
+mounts them. `TOOL_NAMES` is the list in code. `hera_tools` is the other half of the pair: it is the
 **client**, and it knows nothing about what is on this server.
 
 ```python
@@ -17,17 +18,23 @@ registry = ToolRegistry.open(
 
 The server is mounted under its own `name`, so `"hera"` is written once, here.
 
-## The four
+## The one that is never run
 
-| Tool | Does | Wired in v0.1 |
-|---|---|---|
-| `hera__emotion(kind, text="")` | Shows a stance as a card beside her answer. `kind` is free text and she may invent one ([ADR 3](../../docs/adr/0003-emotions-as-tool-calls.md)) | yes — it needs nothing |
-| `hera__remember(text, scope="global")` | Stores a lasting fact through the `MemoryWriter` port | no — waits for `hera_memories` |
-| `hera__note(text, title="")` | Writes a document into the person's notes through `NoteWriter` | no — waits for somewhere to put it |
-| `hera__skill(name)` | Loads one skill's full body through `SkillLibrary` | yes |
+`hera__ask(question, kind)` is the tool a **person** answers. `hera_chats` recognises it by name
+before dispatch — through `ChatsSettings.asking_tools`, filled in from `ASK_TOOL`, because that
+package may not import this one — records the question, and closes the turn the way a permission
+card closes it. The reply becomes that call's `tool_result`, so nothing on the model's side of the
+loop learns a person was in it.
 
-`emotion` returns one word. The call *is* the record: it is persisted as an event and drawn by
-the interface, so anything more would only spend tokens on the way back in.
+The body here therefore only runs when something drives this server from *outside* a turn, and it
+refuses, saying the question was not put to anybody. Returning something that looks like an answer
+nobody gave would be worse.
+
+`kind` is a closed set of three — `unsure`, `blocked`, `choice` — in the tool's input schema, so
+there is nothing to invent
+([ADR 17](../../docs/adr/0017-a-stance-is-a-sentence-and-a-question-stands-alone.md)). It used to
+be a word from an editable vocabulary of moods, shared with a `hera__emotion` tool that ADR 17
+removed.
 
 ## Ports, and what "unwired" means
 

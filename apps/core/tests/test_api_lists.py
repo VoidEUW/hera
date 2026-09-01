@@ -40,7 +40,7 @@ class TestTheMind:
         regions = (await client.get(f"{API}/mind")).json()
         by_id = {region["id"]: region for region in regions}
 
-        assert len(regions) == 14
+        assert len(regions) == 13
         assert by_id["character"]["text"].strip()
         assert by_id["safety"]["tier"] == "owner_fixed"
         assert by_id["character"]["tier"] == "evolvable"
@@ -406,60 +406,15 @@ class TestTheSettingsLists:
         response = await client.post(f"{API}/skills", json={"id": "tdd"})
         assert response.status_code == 409
 
-    async def test_emotions_start_as_the_ones_she_ships_with(self, client: AsyncClient) -> None:
-        listed = (await client.get(f"{API}/emotions")).json()
+    async def test_there_is_no_emotions_screen_left(self, client: AsyncClient) -> None:
+        """ADR 17. The vocabulary was a screen, three routes and a file, and all three are gone.
 
-        kinds = [emotion["kind"] for emotion in listed["emotions"]]
-        assert "agree" in kinds and "doubt" in kinds
-        assert not listed["customised"]
-        assert listed["problem"] == ""
-
-    async def test_a_custom_vocabulary_is_stored_and_reset(self, client: AsyncClient) -> None:
-        """Reset deletes the file rather than rewriting it, so "reset" and "never touched" are
-        the same state and a later change to the defaults still reaches this person."""
-        mine = {"emotions": [{"kind": "smug", "description": "Called it.", "tone": "warm"}]}
-
-        saved = (await client.put(f"{API}/emotions", json=mine)).json()
-        assert [emotion["kind"] for emotion in saved["emotions"]] == ["smug"]
-        assert saved["customised"]
-
-        back = (await client.post(f"{API}/emotions/reset")).json()
-        assert len(back["emotions"]) > 1
-        assert not back["customised"]
-
-    async def test_the_vocabulary_reaches_the_next_turn(
-        self, client: AsyncClient, services: Services
-    ) -> None:
-        """The reason it is a slot rather than a tool description: edited on screen, applied on
-        the next turn, with nothing restarted in between."""
-        await client.put(
-            f"{API}/emotions",
-            json={"emotions": [{"kind": "smug", "description": "Called it.", "tone": "warm"}]},
-        )
-
-        chat = (await client.post(f"{API}/chats", json={})).json()
-        streamed = await client.post(f"{API}/chats/{chat['id']}/messages", json={"text": "hi"})
-        assert streamed.status_code == 200
-        streamed.read()
-
-        provider = services.provider
-        assert isinstance(provider, FakeProvider)
-        prompt = "\n".join(message.text for message in provider.requests[0].messages)
-        assert "smug: Called it." in prompt
-        assert "agree" not in prompt
-
-    async def test_an_unreadable_vocabulary_falls_back_and_says_so(
-        self, client: AsyncClient, tmp_path: Path
-    ) -> None:
-        home = tmp_path / "home"
-        home.mkdir(exist_ok=True)
-        home.joinpath("emotions.json").write_text("{not json", encoding="utf-8")
-
-        listed = (await client.get(f"{API}/emotions")).json()
-
-        assert len(listed["emotions"]) > 1
-        assert "emotions.json" in listed["problem"]
-        assert not listed["customised"]
+        Pinned for the reason the absent tool is: a removed feature whose API still answers is
+        one a later build quietly grows a screen for again. An ``~/.hera/emotions.json`` left
+        over from before is ignored and never deleted — nothing here removes a file somebody
+        may have edited.
+        """
+        assert (await client.get(f"{API}/emotions")).status_code == 404
 
     async def test_servers_report_their_connection(self, client: AsyncClient) -> None:
         """A direct rendering of ToolRegistry.status(). Nothing here computes whether a server

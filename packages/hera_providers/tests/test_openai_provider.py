@@ -170,7 +170,7 @@ def test_set_fields_are_sent() -> None:
 
 def test_tools_are_sent_in_the_function_envelope_with_a_choice() -> None:
     spec = ToolSpec(
-        name="hera__emotion",
+        name="hera__search",
         description="Show a stance.",
         parameters={"type": "object", "properties": {"kind": {"type": "string"}}},
     )
@@ -180,7 +180,7 @@ def test_tools_are_sent_in_the_function_envelope_with_a_choice() -> None:
         {
             "type": "function",
             "function": {
-                "name": "hera__emotion",
+                "name": "hera__search",
                 "description": "Show a stance.",
                 "parameters": spec.parameters,
             },
@@ -482,7 +482,7 @@ async def test_a_tool_calling_turn_arrives_as_complete_calls() -> None:
                                 {
                                     "index": 0,
                                     "id": "c1",
-                                    "function": {"name": "hera__emotion", "arguments": '{"kind"'},
+                                    "function": {"name": "hera__search", "arguments": '{"kind"'},
                                 }
                             ]
                         },
@@ -510,10 +510,10 @@ async def test_a_tool_calling_turn_arrives_as_complete_calls() -> None:
     # only after the second, where the arguments finish. That gap is the whole reason the first
     # event exists: on a real endpoint the two frames are minutes apart when the arguments are
     # a document, and until this the browser had nothing to draw for the whole of it.
-    assert events[0] == ToolCallStarted(id="c1", name="hera__emotion")
+    assert events[0] == ToolCallStarted(id="c1", name="hera__search")
     assert events[1] == ToolCallReady(
         id="c1",
-        name="hera__emotion",
+        name="hera__search",
         arguments={"kind": "joke"},
         raw_arguments='{"kind":"joke"}',
     )

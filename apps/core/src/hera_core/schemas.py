@@ -27,7 +27,6 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 from hera_chats import Chat, Message, Project
 from hera_core.config import validate_provider_name
-from hera_mcp import Emotion
 from hera_memories import MAX_DESCRIPTION, MAX_TEXT
 from hera_profiles import MindRegion, Profile
 from hera_skillsets import BrokenSkill, Skill, SkillUsage
@@ -377,43 +376,6 @@ class QuestionAnswer(BaseModel):
     """What they typed. May be empty: saying nothing is an answer, and she is told so rather
     than being left waiting. Capped because it becomes a tool result inside the next prompt,
     and an unbounded paste there is a context window spent without anybody choosing to."""
-
-
-class EmotionOut(BaseModel):
-    """One stance, as the Emotions screen and the emotion card see it."""
-
-    model_config = ConfigDict(frozen=True)
-
-    kind: str
-    description: str
-    tone: str
-
-    @classmethod
-    def of(cls, emotion: Emotion) -> EmotionOut:
-        return cls(kind=emotion.kind, description=emotion.description, tone=emotion.tone)
-
-
-class EmotionsOut(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
-    emotions: list[EmotionOut]
-    customised: bool
-    """Whether this is the person's list or the one she ships with. What decides whether
-    *Reset* is worth offering."""
-
-    problem: str = ""
-    """Why the stored list could not be read, when it could not — the defaults are on screen
-    and this says so, rather than a screen that fails to load."""
-
-
-class EmotionsIn(BaseModel):
-    """The whole list, in the order it should be read.
-
-    Whole rather than one at a time: the order is something a person arranges, and three
-    endpoints for add, edit and remove would each need to agree about it.
-    """
-
-    emotions: list[Emotion] = Field(min_length=1, max_length=64)
 
 
 class RegionOut(BaseModel):

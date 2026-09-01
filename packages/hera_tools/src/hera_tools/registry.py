@@ -240,9 +240,9 @@ class ToolRegistry:
     ) -> list[ToolResult]:
         """Run several calls at once, in the order they were given.
 
-        Parallel is the point. The target model emits parallel tool calls and a turn's worth of
-        emotions is the everyday case (ADR 3); running them one after another would turn one
-        round-trip into four.
+        Parallel is the point. The target model emits parallel tool calls and several
+        independent ones in a round is the everyday case; running them one after another would
+        turn one round-trip into four.
 
         ``confirmed`` lists the call ids a person has just approved. ``context`` is the same for
         every call in the batch, because it describes the turn rather than the call.

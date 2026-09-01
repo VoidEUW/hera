@@ -1,11 +1,16 @@
 """Hera's own capabilities, as an MCP server like any other.
 
-``emotion``, ``remember``, ``note`` and ``skill`` are not privileged. They are registered on a
+``ask``, ``remember``, ``note`` and ``skill`` are not privileged. They are registered on a
 real :class:`~mcp.server.mcpserver.MCPServer`, reached over an in-memory transport by the same
 client the filesystem server is reached by, listed in the same catalogue, and checked by the
 same permission policy. ADR 4 asked for that on the grounds that a special case here would
 have to be unpicked in v0.3, when this server is exposed to other agents -- at which point the
 only change should be which transport it is served over.
+
+``emotion`` used to be the first tool here and is gone -- ADR 17 supersedes ADR 3. What replaced
+it is nothing: a stance she means is a sentence she writes. ``ask`` is what survived that
+removal, and it stands on its own -- its ``kind`` is a closed set about the *question* rather
+than a word borrowed from a vocabulary of moods.
 
 ``note`` is **unwired**, and deliberately so: it waits for somewhere to write notes. It still
 appears in the catalogue and answers "not available in this deployment", because a model that
@@ -54,7 +59,7 @@ from hera_mcp.ports import (
 )
 
 BUILTIN_SERVER_NAME = "hera"
-"""Her tools are namespaced ``hera__emotion``, ``hera__remember`` and so on.
+"""Her tools are namespaced ``hera__ask``, ``hera__remember`` and so on.
 
 The name travels on the server object rather than being agreed on twice: ``hera_tools`` mounts
 whatever it is handed under ``server.name``, so this constant is the only place the word is
@@ -68,6 +73,27 @@ Named as a constant because the layer that suspends the turn has to recognise it
 layer is ``hera_chats``, which does not import this package and must not learn what her tools
 are. The application reads this and configures ``ChatsSettings.asking_tools`` with the
 qualified name, so the string is written once and travels rather than being agreed on twice.
+"""
+
+AskKind = Literal["unsure", "blocked", "choice"]
+"""What sort of question she is asking, from a closed set (ADR 17).
+
+Three occasions, and they are the three the ``uncertainty`` mind region already describes: she
+does not know something only they know (*unsure*), she cannot go on until they decide
+(*blocked*), or two readings of the request lead somewhere genuinely different (*choice*).
+
+**Closed rather than free text, which is the whole point of the change.** ``kind`` used to be a
+word from ``emotions.json`` — an open vocabulary of moods, shared with a tool that no longer
+exists — so a question was labelled with whatever stance the model happened to reach for, and
+the card coloured it by looking the word up in a list it might not be in. A ``Literal`` is in
+the tool's input schema, so there is nothing to invent and nothing to look up.
+"""
+
+ASK_KINDS: tuple[AskKind, ...] = ("unsure", "blocked", "choice")
+"""The same three as a value, for whoever has to enumerate them.
+
+Named here for the reason :data:`ASK_TOOL` is: the interface draws a tone per kind, and a set
+agreed on in two places is one that can disagree.
 """
 
 CHAT_ID_META = "hera/chatId"
@@ -85,7 +111,6 @@ because the mapping goes to every server including somebody else's.
 """
 
 TOOL_NAMES = (
-    "emotion",
     "ask",
     "remember",
     "note",
@@ -99,7 +124,7 @@ TOOL_NAMES = (
     "artifact_read",
     "forget",
 )
-"""What this server offers, in the order they were added. Qualified, that is ``hera__emotion``
+"""What this server offers, in the order they were added. Qualified, that is ``hera__ask``
 and its siblings — the ones a catalogue reports for the ``hera`` server, which is the question
 a settings screen showing "5 tools" leaves a person asking."""
 
@@ -141,34 +166,16 @@ def build_builtin_server(
     """
     server: MCPServer = MCPServer(BUILTIN_SERVER_NAME, title="Hera", version=version)
 
-    # The vocabulary is deliberately *not* enumerated here. A description is fixed when the
-    # server is built, and a list a person can edit on screen has to apply on the next turn
-    # rather than the next restart -- so it travels in the prompt, which is assembled per turn.
-    # See hera_mcp.emotions.
-    @server.tool(
-        name="emotion",
-        title="Show a stance",
-        description=(
-            "Show how you feel about what you are saying, as a small card next to your "
-            "answer. Call it alongside your prose, as often as it is honest to -- several in "
-            "one turn is normal. `kind` is a short lowercase word; the stances you can reach "
-            "for are listed in your instructions, and you may invent one when none of them is "
-            "honest. `text` is the one line that goes on the card; leave it out for a card "
-            "that is only a stance."
-        ),
-    )
-    def emotion(kind: str, text: str = "") -> str:
-        """Acknowledged and nothing more.
-
-        The tool call *is* the record: it is persisted as an event and the interface renders
-        it. Returning anything substantial would only spend tokens on the way back in.
-        """
-        return "shown"
-
     # The one tool on this server that is *not* run. `hera_chats` recognises it before dispatch,
     # records the question, and closes the turn the way a permission card closes it -- so the
     # answer that comes back is a person's words, and this body is only reached when something
     # calls it outside a turn.
+    #
+    # `kind` is a Literal rather than a string, and that is the change ADR 17 made first. It used
+    # to take a word from the emotion vocabulary -- an open list of moods, edited on a screen,
+    # looked up by the card to pick a colour -- which coupled a question to a feature that has
+    # since been removed, and meant a question could be labelled `curious` for no reason anybody
+    # could act on. Three occasions about the *question*, in the schema, nothing to invent.
     @server.tool(
         name=ASK_TOOL,
         title="Ask the person a question",
@@ -179,10 +186,12 @@ def build_builtin_server(
             "request that lead somewhere genuinely different, or something hard to undo. Do "
             "not use it to be reassured, to ask what you could look up, or to check in; and "
             "ask one question rather than a list. If you can sensibly choose and say what you "
-            "chose, do that instead."
+            "chose, do that instead. `kind` says what sort of question it is: `unsure` when "
+            "you need a fact only they have, `blocked` when you cannot go on until they "
+            "answer, `choice` when you have two sensible readings and they should pick."
         ),
     )
-    async def ask(question: str, kind: str = "unsure") -> str:
+    async def ask(question: str, kind: AskKind = "unsure") -> str:
         # Reached only when this server is driven directly -- over the transport v0.3 exposes,
         # or by a test. Inside a turn the question never gets here. Saying so plainly beats
         # returning something that looks like an answer nobody gave.
@@ -312,9 +321,9 @@ def build_builtin_server(
         return "\n\n".join(_result(index, hit) for index, hit in enumerate(hits, start=1))
 
     # The scratchpad, ADR 12. Three tools rather than two: folding the listing into `read` with
-    # an empty name would be one fewer description at the cost of a conditional in prose, and
-    # this project has already made that trade the other way once -- `ask` is a separate tool
-    # from `emotion` for exactly this reason.
+    # an empty name would be one fewer description at the cost of a conditional in prose, and a
+    # description that says "unless the name is empty, in which case" is one a model reads
+    # wrong under pressure.
     #
     # None of them says "scratchpad" without saying what it is *for*. A model given a place to
     # write and no account of when to use it either never writes or writes everything down.

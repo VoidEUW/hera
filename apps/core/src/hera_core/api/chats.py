@@ -50,8 +50,6 @@ from hera_core.clock import render as render_now
 from hera_core.config import ConfigError
 from hera_core.config import load as load_config
 from hera_core.deps import Container, Db, Owner, not_found, require_chat
-from hera_core.emotions import EmotionsError
-from hera_core.emotions import load as load_emotions
 from hera_core.schemas import (
     ChatDetail,
     ChatIn,
@@ -64,7 +62,6 @@ from hera_core.schemas import (
     RedoIn,
 )
 from hera_core.sse import HEADERS, MEDIA_TYPE, event_frame, frame
-from hera_mcp import DEFAULT_EMOTIONS, render_emotions
 from hera_permissions import Decision, Rule
 from hera_profiles import Profile, ProfileRepository
 from hera_providers import ToolCallReady
@@ -445,7 +442,6 @@ def _context(
         project=project,
         profile=profile,
         history=history,
-        emotions=_emotion_vocabulary(),
         now=_now(),
         **extra,  # type: ignore[arg-type]  # resume/confirmed/denied, forwarded to the dataclass
     )
@@ -454,10 +450,10 @@ def _context(
 def _now() -> str:
     """The date and time, for the ``now`` slot.
 
-    Read per turn and per request, like the emotion vocabulary above and for the same reason: a
-    timezone changed on screen has to apply to the next turn rather than the next restart. It is
-    also the only honest place to compute *now* — a value captured at boot would be a day stale
-    by the second day the process was up.
+    Read per turn and per request rather than at startup: a timezone changed on screen has to
+    apply to the next turn rather than the next restart. It is also the only honest place to
+    compute *now* — a value captured at boot would be a day stale by the second day the process
+    was up.
 
     A `config.toml` that will not parse falls back to UTC rather than propagating: the Models
     screen is where a broken file gets explained, and losing the date over it would trade a
@@ -468,20 +464,6 @@ def _now() -> str:
     except ConfigError:
         timezone = ""
     return render_now(timezone)
-
-
-def _emotion_vocabulary() -> str:
-    """Her stances, rendered for the prompt.
-
-    Read per turn rather than at startup: the Emotions screen writes a file, and a vocabulary
-    you can edit on screen that only applies after a restart is the trap `config.toml` already
-    taught this project once. A file that will not parse falls back to the shipped list — the
-    Emotions screen is where that gets explained, and a turn is not the place to find out.
-    """
-    try:
-        return render_emotions(load_emotions())
-    except EmotionsError:
-        return render_emotions(list(DEFAULT_EMOTIONS))
 
 
 def _profile_of(session: Session, chat: Chat) -> Profile | None:

@@ -15,19 +15,12 @@
 	 * edit itself: you can see the answer you are about to replace while you retype the
 	 * question.
 	 */
-	import type {
-		AnswerRequired,
-		AnyEvent,
-		Artifact,
-		PermissionRequired,
-		ToolCallReady
-	} from '$lib/api/events';
+	import type { AnswerRequired, AnyEvent, Artifact, PermissionRequired } from '$lib/api/events';
 	import { size } from '$lib/attachments';
 	import { t } from '$lib/i18n';
 	import { isAnswered, reduce, replyTo } from '$lib/turn';
 	import ActivityRow from './ActivityRow.svelte';
 	import ArtifactCard from './ArtifactCard.svelte';
-	import EmotionCard from './EmotionCard.svelte';
 	import Ocellus from './Ocellus.svelte';
 	import PermissionCard from './PermissionCard.svelte';
 	import QuestionCard from './QuestionCard.svelte';
@@ -223,8 +216,6 @@
 				</div>
 			{:else if item.kind === 'prose'}
 				<Prose text={item.text ?? ''} />
-			{:else if item.kind === 'emotion'}
-				<EmotionCard call={item.event as ToolCallReady} />
 			{:else if item.kind === 'artifact'}
 				<!-- What she published, drawn where she published it. `inline` decides whether that
 				     is the thing itself or a card to go and open it (ADR 13) — the model chose when

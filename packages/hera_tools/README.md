@@ -33,7 +33,7 @@ catalogue = await registry.catalogue()          # every tool every reachable ser
 request_tools = catalogue.as_function_specs()   # ready for hera_providers.ToolSpec(**spec)
 
 result = await registry.dispatch(
-    ToolInvocation(call_id="call_1", tool="hera__emotion", arguments={"kind": "doubt"})
+    ToolInvocation(call_id="call_1", tool="hera__search", arguments={"query": "qwen"})
 )
 result.ok       # True
 result.text     # what goes back to the model as the TOOL message

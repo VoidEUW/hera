@@ -91,7 +91,7 @@ class ToolCallReady(BaseModel):
     Emitted only once the whole call has arrived: the protocol streams ``arguments`` as JSON
     in fragments, and half a JSON object is not something any layer above should have to
     handle. Several of these in one turn is normal -- the target model emits parallel calls,
-    which is what makes a turn's worth of emotions cost a single round-trip.
+    which is what makes four independent lookups cost a single round-trip.
 
     ``parse_error`` is set instead of raising when the model produced arguments that are not a
     JSON object. One malformed call must not discard the calls that arrived beside it, and the

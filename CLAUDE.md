@@ -15,8 +15,9 @@ OpenAI-compatible endpoint.
   v0.2.1 is the polish pass and v0.3.0 the widening one. Read the one you are working on before
   touching its packages
 - `ARCHITECTURE.md` — the packages, the layering rule, the shape of a turn
-- `docs/adr/` — why the structure looks like this; read 2 (Qwen only), 3 (emotions as tool
-  calls) and 5 (deterministic skill routing) before changing model-facing behaviour
+- `docs/adr/` — why the structure looks like this; read 2 (Qwen only), 5 (deterministic skill
+  routing) and 17 (a stance is a sentence) before changing model-facing behaviour. 17 supersedes
+  3, and 3 is worth reading anyway for the rule that outlived it
 - `docs/tooling.md` — what she should be able to reach for and cannot. Notes, not decisions;
   read it before adding a tool, and read § 1 before concluding she has no search *on purpose*
 - `CONTRIBUTING.md` — setup, the check loop, branching
@@ -44,9 +45,9 @@ endpoint; it never runs in CI.
 domain concept at all and must stay liftable into an unrelated project.
 
 **Two MCP packages, and the difference matters.** `hera_mcp` is the server she *is* —
-`hera__emotion`, `hera__ask`, `hera__remember`, `hera__forget`, `hera__note`, `hera__skill`,
-`hera__search`, the three `hera__scratch_*`, the three `hera__artifact_*`, and the ports they
-take. `hera__ask` is the one that is never *run*:
+`hera__ask`, `hera__remember`, `hera__forget`, `hera__note`, `hera__skill`, `hera__search`, the
+three `hera__scratch_*`, the three `hera__artifact_*`, and the ports they take. `hera__ask` is the
+one that is never *run*:
 `hera_chats` recognises it by name (`ChatsSettings.asking_tools`, filled in by the application)
 and suspends the turn the way a permission card does, so a person's reply becomes that call's
 result. `hera_tools` is the client she *has*, and it does not know the other exists: it mounts
@@ -101,7 +102,6 @@ columns, never `ForeignKey`; migrations live in `apps/core`.
 | `mcp.json` | MCP servers, in the Claude-Desktop `mcpServers` shape |
 | `config.toml` | registered model endpoints, written by the interface |
 | `trusted.json` | **where trusted skills are recorded** — optional |
-| `emotions.json` | her stance vocabulary, when it has been changed — optional |
 
 `trusted.json` is the only thing that can put a *verified* mark on a skill, because a skill
 vouching for itself has vouched for nothing. It maps an identifier to the SHA-256 of the content
@@ -126,11 +126,22 @@ switching one off keeps the file and gives the space back. Two tools, and what i
 is the design — nothing lists memories (they are already in her prompt) and `hera__forget` does not
 delete (**the only thing that unlinks one is a person on the settings screen**).
 
-**Her vocabulary is data, her behaviour is prose.** The stances she can show live in
-`emotions.json` (`hera_mcp.DEFAULT_EMOTIONS` until something is changed), edited on
-Settings → Emotions, rendered into the prompt per turn *and* used to colour the card — one list,
-so the two cannot disagree. Which language she answers in is the `language` mind region, edited
-on Settings → Mind like every other behaviour.
+**A stance is a sentence, and a question stands on its own** — [ADR 17](docs/adr/0017-a-stance-is-a-sentence-and-a-question-stands-alone.md),
+which supersedes 3. `hera__emotion` and the whole stance vocabulary are **gone**: driven against a
+real endpoint she reached for a stance rarely and close to arbitrarily, because several of the
+fourteen fired on the same occasion and one of them had become a tool. What replaces it is nothing
+— *I think this is wrong, and here is why* is the same information, in the place a reader is
+already looking. `tone` and `character` are the mind regions that govern it. An
+`~/.hera/emotions.json` left over from an older install is **ignored, never deleted**.
+
+`hera__ask` was the thing coupled to it, so it was detached **first**: `kind` is now a closed
+`Literal` of `unsure · blocked · choice` — the three occasions the `uncertainty` region already
+describes — in the tool's own schema, where the model cannot invent one and the card does not have
+to look one up. `AnswerRequired.kind` stays a plain `str`, because `hera_chats` may not learn her
+tool's schema and a turn persisted before the set was closed still has to load.
+
+Which language she answers in is the `language` mind region, edited on Settings → Mind like every
+other behaviour.
 
 ## State of the build
 

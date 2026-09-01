@@ -3,7 +3,49 @@
 Where the rebuild stands and what is settled, so a new session can pick up without re-reading
 the history. Updated as milestones land — this file is a snapshot, not a changelog.
 
-**Last updated:** 2026-08-31 · **Version:** v0.2.0 tagged · **Strategy:** thin spine first, then deepen
+**Last updated:** 2026-08-31 · **Version:** v0.2.0 tagged, v0.2.1 in progress · **Strategy:** thin spine first, then deepen
+
+**v0.2.1 has started with the two changes that were waiting on each other**
+([versions/v0.2.1.md](versions/v0.2.1.md) § 4, now decided as
+[ADR 17](adr/0017-a-stance-is-a-sentence-and-a-question-stands-alone.md)): **`hera__ask` stands on
+its own**, and **the emotions are gone**. In that order, because the only thing coupling them was
+`ask`'s `kind`, which read from the stance vocabulary and picked the colour the question card was
+drawn in — shortening or removing that list first would have broken a card with nothing to do with
+stances.
+
+What it turned up:
+
+- **The observation that started it could only be made against a real model, and the fix could not
+  be tested against one.** Fourteen stances, several firing on the same occasion, chosen at random
+  from outside — none of that is visible to a test, and none of what replaces it is either, because
+  what replaces it is nothing. The suite can only pin the *absence*: `emotion` is not in
+  `TOOL_NAMES`, `GET /emotions` is a 404, and both have a test, for the reason the absent
+  `artifact_list` and the absent memory-listing tool have one.
+- **A closed set in the schema is a different promise from a closed set in the prompt.** `ask`'s
+  `kind` was a free `str` documented against an editable list; it is a `Literal` now, so the SDK
+  puts the three words in the tool's own input schema and there is nothing to invent. The prompt
+  section that used to carry the vocabulary is gone with it — which is the opposite of the reasoning
+  that put the emotion list in a slot, and correctly so: that list was *editable* and this one is
+  not.
+- **`AnswerRequired.kind` had to stay a plain `str`, and it is the same call `ToolResultEvent.failure`
+  made.** A `Literal` there would make every turn persisted before the set was closed fail to load —
+  an event list is a record of what happened, so it has to keep parsing after the tool that produced
+  it has changed. The card draws an unrecognised kind as nothing rather than as the raw word: the
+  only way to get one is an old turn carrying a stance, and *doubt* on a question card is a puzzle.
+- **`hera__ask` had no test in `hera_mcp`'s own suite at all.** It was built with the turn that
+  suspends on it, so everything asserted about it lived in `hera_chats` and `apps/core` — and the
+  one thing those cannot see is the tool standing alone, which is exactly what this change was
+  about. It has one now, including that running it outside a turn says the question was not put to
+  anybody.
+- **A tool name used as a fixture is a fact about the system to whoever greps for it.** `hera__emotion`
+  was scattered through `hera_providers`, `hera_permissions` and `hera_tools` as an arbitrary example
+  name, and the toy server in `hera_tools`' suite had an `emotion` tool on it. All renamed —
+  otherwise the first thing anybody looking for the removed tool finds is thirty hits suggesting it
+  still exists.
+- **Three documents disagreed about what `hera__ask` is *for*.** `docs/tooling.md` § 4 is still
+  headed by the argument for making it an argument to `emotion`; the separate-tool decision it
+  reached turned out to be worth more than its own reasoning knew, because the feature a person
+  actually uses survived the removal of the one nobody did. Kept as written, with a note.
 
 **v0.2.0 shipped** ([versions/v0.2.0.md](versions/v0.2.0.md)) — *organise → produce → remember*:
 projects, the scratchpad, artifacts, memory. Three of the five planned milestones; the other two
@@ -274,7 +316,9 @@ What it turned up:
   has an **Edit** on every message, so a page-wide `get_by_role` reached through the modal. Every
   assertion on that screen is scoped through the panel now.
 
-1208 tests at 98 % coverage, plus 117 vitest and 27 Playwright.
+1206 tests at 98 % coverage, plus 112 vitest and 27 Playwright. (Down five vitest and two
+pytest with the emotion card: what those tests asserted was that a stance renders inline and is
+drawn once, and both properties moved to the question card, which already had them.)
 
 ---
 
@@ -298,7 +342,7 @@ Each has a record in [adr/](adr/); read those before reopening one.
 |---|---|---|
 | [1](adr/0001-uv-workspace-monorepo.md) | One uv-workspace monorepo | `hera_storage` and `hera_prompts` moved in from their own repositories but keep a **domain-free contract**: no table, no chat, no `hera_*` import. Packages stay independently consumable — see *Reuse* below |
 | [2](adr/0002-qwen-only-target-model.md) | Qwen3.6-35B is the only target | No harmony normalisation, no text call grammar, no second parser in the browser, no positional-argument fallback. XML prompt format, native tool calling |
-| [3](adr/0003-emotions-as-tool-calls.md) | Emotions are tool calls | `hera__emotion(kind, text)`, `kind` is free text, unknown kinds render generically. Parallel calls mean a whole turn's emotions cost one round-trip |
+| [3](adr/0003-emotions-as-tool-calls.md) | Emotions are tool calls | **Superseded by [17](adr/0017-a-stance-is-a-sentence-and-a-question-stands-alone.md).** What outlived it: what she *did* is an event variant, never something parsed back out of what she wrote |
 | [4](adr/0004-mcp-as-the-tool-layer.md) | MCP is the tool layer | `~/.hera/mcp.json` in Claude-Desktop shape. Hera's own tools are an in-process MCP server, not a special case |
 | [5](adr/0005-deterministic-skill-routing.md) | Skills are selected by code | The target model does not reliably notice a skill applies. Pinned → `/slash` → retrieval, all server-side, before the model sees the turn |
 | [6](adr/0006-spa-over-json-sse-api.md) | SvelteKit over a JSON/SSE API | API renders no HTML; client types are generated from OpenAPI; server render stays authoritative at `done` |
@@ -321,7 +365,7 @@ packages/hera_storage/    vendored, unchanged in behaviour
 packages/hera_prompts/    vendored, unchanged in behaviour
 packages/hera_providers/  the model boundary: event union, Qwen adapter, transport, FakeProvider
 packages/hera_permissions/ allow · deny · ask, resolved by pattern and profile
-packages/hera_mcp/        the MCP server she *is*: emotion, ask, remember, note, skill, search,
+packages/hera_mcp/        the MCP server she *is*: ask, remember, forget, note, skill, search,
                           the scratchpad, the artifacts, and the ports they take
 packages/hera_tools/      the MCP client: server lifecycle, the namespaced catalogue, dispatch
 packages/hera_profiles/   the git-backed mind, behaviour traits, profiles, the PromptBuilder
@@ -369,19 +413,19 @@ Two things worth knowing before building on the foundation:
 
 - **Her own server is its own package.** `hera_tools` is the **client** — subprocess lifetimes,
   namespacing, timeouts, retries, true of anybody's MCP server. `hera_mcp` is the **server she
-  is**, and everything in it is a statement about what Hera can do: the emotion vocabulary, the
-  sentence the model reads before calling `remember`. Those change for unrelated reasons, and
+  is**, and everything in it is a statement about what Hera can do: the three occasions `ask` is
+  worth stopping a turn for, the sentence the model reads before calling `remember`. Those change for unrelated reasons, and
   v0.3 serves this one over a transport of its own so Claude Code can attach to her.
 - **The client no longer names her.** `ToolRegistry.from_config(builtin=...)` mounts the server
   under `server.name`, so `"hera"` is written in one place. `open()` used to construct an
   unwired copy of her server when given none; a default that quietly mounts four tools is
   something you discover from a catalogue listing rather than from the call site, and it is
   gone. Nothing is mounted unless the application mounts it.
-- **The tools are `emotion`, `ask`, `remember`, `note`, `skill` and `search`** — `hera__*` once
+- **The tools were `emotion`, `ask`, `remember`, `note`, `skill` and `search`** — `hera__*` once
   the client namespaces them, and `TOOL_NAMES` says so in code. `ask` is the one that is never
   *run*: `hera_chats` recognises it by name before dispatch and suspends the turn, and the body on
   the server refuses, which is what a caller reaching it from outside a turn deserves to be told.
-  Three were wired in v0.1: `emotion`
+  `emotion` has since been removed entirely (ADR 17). Three were wired in v0.1: `ask`
   needs nothing, `skill` reaches `hera_skillsets` through a port, and `search` reaches
   DuckDuckGo through another. `remember` waits for `hera_memories` and `note` for somewhere to
   put a document; both are still listed and answer "not available in this deployment", because
@@ -392,7 +436,7 @@ Two things worth knowing before building on the foundation:
   `hera_core.search.DuckDuckGo` is the adapter — no key, so a fresh install can search, and
   swapping it for SearXNG is a class and one line of wiring. It stays **allowed** by the default
   policy: a card before each of the three or four lookups a real question takes would be as
-  unusable as one per emotion, and a search reads something public and changes nothing. A
+  unusable as one per scratchpad write, and a search reads something public and changes nothing. A
   *fetch* tool is the one that would deserve the card.
 - **Its tests use a real client, not a call to the function.** `mcp.Client` over the SDK's
   in-memory transport, so the schema, the description and the `is_error` convention are part of
@@ -400,7 +444,7 @@ Two things worth knowing before building on the foundation:
   pytest-asyncio finalises an async fixture in a different task, and the SDK's client owns a
   task-affine anyio group — the same trap `hera_tools` answers with a worker per server.
 - **`hera_tools`' own suite mounts a toy server** instead of hers. What fails there should be
-  the client; a stub called "hera" offering "emotion" would have been a copy of her server
+  the client; a stub called "hera" offering her tools would have been a copy of her server
   living in the package that must not know about it.
 
 ### MCP, end to end
@@ -408,7 +452,7 @@ Two things worth knowing before building on the foundation:
 Verified against a real gateway, not only against `FakeProvider`: `~/.hera/mcp.json` with
 Docker's MCP Toolkit (`docker mcp gateway run`, stdio) connects and contributes its tools
 alongside her four, and a dispatch round-trips — `docker__mcp-find` came back in 1.7 s,
-`hera__emotion` in 24 ms. `apps/core`'s suite now has `TestARealMcpServer`, which runs a turn
+`hera__skill` in 24 ms. `apps/core`'s suite now has `TestARealMcpServer`, which runs a turn
 with a real `ToolRegistry` and a real `MCPServer` and fakes only the model, so nothing between
 the model and the tool is a stub.
 
@@ -470,7 +514,8 @@ the model and the tool is a stub.
   waits for `hera_memories`. Then `emotion_vocab` left and `language` arrived: the stance list
   became data (a slot, `SLOT_EMOTIONS`, bound per turn) because the interface needs to know that
   *doubt* is cool, and answering in English became a region because a behaviour with no line in
-  the mind is one nobody can find and nobody can change.
+  the mind is one nobody can find and nobody can change. **`emotion_usage` and the slot have since
+  gone too** (ADR 17), which makes it thirteen; `language` is the one of that pair that was right.
 - **Two doors, not one door and a filter.** `MindRepository.write()` is the person's and opens
   every region including `safety` — that is the actual mechanism behind "add a rule without
   touching code". `propose()` is everything else's and raises `RegionLocked` on an owner-fixed
@@ -600,7 +645,7 @@ wrote.
   back 404. `_Interface` catches the 404 and serves the index, and a catch-all under `/api`
   is registered *before* the mount so an unknown endpoint still answers JSON.
 - **Her own tools are allowed by default.** `Policy(fallback=ASK)` means every tool asks,
-  including `hera__emotion`, which ADR 3 makes the everyday case — a confirmation card several
+  including the several calls an ordinary turn makes — a confirmation card several
   times a turn teaches a person to click through cards without reading them, which is the
   failure that actually matters. `DEFAULT_POLICY` allows `hera__*` and asks for the rest.
 - **Embeddings are deliberately unwired.** `SkillRouter.select()` is synchronous and
@@ -649,16 +694,18 @@ wrote.
   an action, because Svelte cannot bind a handler to markup it did not render. What it copies is
   read off the DOM rather than carried in a `data-` attribute: an attribute would be a second
   copy of every program she writes and a second thing to escape correctly.
-- **No stance she can hold is an error.** The emotion card was drawing *warm* in pomegranate,
-  which beside `--danger` in a dark interface reads as an alarm — so *agree* looked like
-  something had gone wrong. Warm and careful are both brass now, told apart by the glyph, and
-  nothing in that component may be the danger colour.
-- **The vocabulary is one list, editable.** Settings → Emotions writes `~/.hera/emotions.json`;
-  the same list renders into the prompt per turn and picks the colour the card is drawn in. It
-  is deliberately *not* in the tool description, which is fixed when the MCP server is built —
-  a vocabulary you can edit on screen has to apply on the next turn rather than the next
-  restart. **Reset** deletes the file, so "reset" and "never touched" are the same state and a
-  later change to the shipped list still reaches you.
+- **No stance she can hold is an error**, and the *rule* outlived the feature. The emotion card
+  was drawing *warm* in pomegranate, which beside `--danger` in a dark interface reads as an alarm
+  — so *agree* looked like something had gone wrong. The card is gone with ADR 17; the constraint
+  moved to `QuestionCard`, where nothing may be the danger colour either, because no question she
+  can ask is an error.
+- ~~**The vocabulary is one list, editable.**~~ Settings → Emotions wrote `~/.hera/emotions.json`;
+  the same list rendered into the prompt per turn and picked the colour the card was drawn in. All
+  removed by ADR 17. Two things in it are worth keeping: **a setting you can edit on screen has to
+  apply on the next turn rather than the next restart**, which is why it was a prompt slot and not
+  a tool description; and **reset by deleting the file**, so "reset" and "never touched" are the
+  same state and a later change to a shipped default still reaches you. Both apply to the next
+  editable list this project grows.
 - **Skills can be started from the interface.** *Add a skill* writes the same `SKILL.md` a person
   would write by hand. The writing is in `apps/core`, not `hera_skillsets`: that package reads
   the skills directory and says it does not write to it, and a library that both discovers
@@ -719,10 +766,10 @@ wrote.
   failed roughly one run in six — the click was sometimes faster than the round trip. The
   heading renders immediately with a line saying it is asking. Worth the note because the
   symptom was a flaky test and the cause was an interface that changed shape after opening.
-- **An emotion is drawn once.** Its `tool_call_ready` renders as a card inline; the matching
-  `tool_result` would otherwise fall through to a gutter row and draw the same thing twice. A
-  *failed* emotion keeps its row — one she showed and the system refused is exactly what
-  openness means you get to see.
+- ~~**An emotion is drawn once.**~~ Removed with the tool (ADR 17). Its `tool_call_ready`
+  rendered as a card inline, and the matching `tool_result` had to be suppressed or the gutter drew
+  the same thing twice. **The shape survives in the question card**, which is drawn once out of
+  three events for the same reason — and that one keeps the rule the emotion card taught it.
 - **Every popup is one frame** (v0.2 M1). `Select.svelte` owns every dropdown: the composer's pill
   as the trigger, the skill picker's panel as the list. The composer's two used to be a native
   `<select>` with `appearance: none`, which gave the frame back and left the *list* the platform's;
@@ -919,13 +966,13 @@ whole path runs.
 3. **A real endpoint.** Everything so far runs against `FakeProvider`. Settings → Models now
    registers one, tests it, and lists what it reports — so this is a matter of picking the right
    name and finding out what Qwen3.6-35B actually does with the prompt: the `xml` layout, the
-   tool catalogue, the emotion vocabulary.
+   tool catalogue.
 4. **The gaps left on purpose.** The command palette behind `⌘K` (it opens Settings for now),
    the mobile sheet, and the embedder seam. ~~Project instructions in the interface~~ landed with
    v0.2's M1 — the rail makes and renames projects, and `/project/<id>` edits one.
 5. **The rest of the tool surface.** `hera__search` now exists — see below — but `fetch` does
-   not, so she can find a page and not read it. The per-chat scratchpad, the emotion that can ask
-   a question back and artifacts have all landed since that list was written; what is left in
+   not, so she can find a page and not read it. The per-chat scratchpad, the question she can put
+   to you and artifacts have all landed since that list was written; what is left in
    [tooling.md](tooling.md) is `fetch`, PDFs and the eventual split into `hera_code_mcp` and
    `hera_sandbox`, and each section says whether it became a decision or is still a note.
 

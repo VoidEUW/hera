@@ -11,6 +11,51 @@ without pinning Hera. `release.yml` refuses a tag whose version disagrees with t
 so the number in this file, on the tag, and in the interface cannot drift apart. See
 [CONTRIBUTING.md](CONTRIBUTING.md) and [ADR 8](docs/adr/0008-github-flow-and-required-checks.md).
 
+## [Unreleased]
+
+Towards [v0.2.1](docs/versions/v0.2.1.md), the polish pass.
+
+### Removed
+
+- **Emotion cards, and everything that fed them** —
+  [ADR 17](docs/adr/0017-a-stance-is-a-sentence-and-a-question-stands-alone.md), which supersedes
+  [ADR 3](docs/adr/0003-emotions-as-tool-calls.md). `hera__emotion`, the fourteen-word vocabulary,
+  `~/.hera/emotions.json` and its three routes, Settings → Emotions, the card, the `emotions`
+  prompt slot and the `emotion_usage` mind region are gone. Driven against a real endpoint over
+  v0.2 she reached for a stance rarely and close to arbitrarily — `curious` on a plainly confident
+  answer, `warm` on a correction — because several of the fourteen fire on the same occasion,
+  because one of them (`ask`) had become a tool, and because asking a model to interrupt its own
+  prose to file a small form is not a shape it complies with honestly. A shorter list fixes none of
+  those. **What replaces it is nothing**: *I think this is wrong, and here is why* is the same
+  information, in the place a reader is already looking, and `tone` and `character` are the mind
+  regions that govern it. The openness the card gave is genuinely lost, and ADR 17 says what to
+  reach for if that turns out to matter. An `~/.hera/emotions.json` from an older install is
+  **ignored, never deleted**.
+- The mind is **thirteen regions**, not fourteen. `emotion_usage` asked when showing a reaction was
+  worth interrupting an answer for, which is a question with no mechanism left behind it.
+
+### Changed
+
+- **`hera__ask` stands on its own.** It was already a separate tool; what coupled it to the
+  emotions was `kind`, which read from the same editable vocabulary and picked the colour the
+  question card was drawn in — so a question could be labelled with whatever mood she reached for,
+  and a kind somebody had edited out of the list drew with no tone at all. `kind` is now a closed
+  `Literal` of **`unsure` · `blocked` · `choice`**, the three occasions the `uncertainty` mind
+  region already describes, in the tool's own input schema where there is nothing to invent. This
+  landed **before** the removal above, because doing it the other way round breaks a question card
+  that has nothing to do with stances.
+- **The question card says what sort of question it is, in your words rather than the tool's** —
+  *she is unsure*, *she cannot go on*, *she needs you to choose*. Only `blocked` is set apart in
+  colour, because it is the one of the three where the turn is genuinely stopped on your reply. A
+  `kind` this build does not recognise — a turn persisted before the set was closed, carrying a
+  stance — renders as nothing rather than as the raw word.
+- `AnswerRequired.kind` stays a plain string on the persisted event. `hera_chats` may not learn
+  what `hera__ask`'s schema says, and an event list is a record of what happened: a turn stored
+  last week has to keep loading after the tool that produced it has changed.
+- `GET /emotions` now answers **404**, and there is a test asserting it — for the reason the absent
+  `artifact_list` and the absent memory-listing tool have one: an absence nobody pinned is an
+  absence somebody adds back.
+
 ## [0.2.0] — 2026-08-31
 
 **The deepening pass: what makes her accumulate.** v0.1.0 ran a turn end to end and forgot it

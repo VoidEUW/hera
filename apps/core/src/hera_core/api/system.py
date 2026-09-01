@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, status
 
-from hera_core import __version__, emotions, trust
+from hera_core import __version__, trust
 from hera_core.clock import is_known
 from hera_core.clock import render as render_now
 from hera_core.config import load as load_config
@@ -19,9 +19,6 @@ from hera_core.config import save as save_config
 from hera_core.deps import Container, Db, Owner
 from hera_core.schemas import (
     BrokenSkillOut,
-    EmotionOut,
-    EmotionsIn,
-    EmotionsOut,
     HealthOut,
     PermissionsOut,
     PreferencesOut,
@@ -33,7 +30,6 @@ from hera_core.schemas import (
     SkillsOut,
 )
 from hera_home import home
-from hera_mcp import DEFAULT_EMOTIONS
 from hera_permissions import Rule
 from hera_skillsets import SkillUsageRepository
 
@@ -115,46 +111,6 @@ def create_skill(payload: SkillIn, container: Container) -> SkillOut:
     if written is None:  # pragma: no cover - the loader just wrote it
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="not saved")
     return SkillOut.of(written)
-
-
-@router.get("/emotions", response_model=EmotionsOut)
-def list_emotions() -> EmotionsOut:
-    """Her stance vocabulary: what she can show, and what each one means.
-
-    The same list the prompt is built from and the same list the interface colours a card
-    with, which is the whole reason it is data rather than a paragraph in a mind region.
-    """
-    return _emotions()
-
-
-@router.put("/emotions", response_model=EmotionsOut)
-def write_emotions(payload: EmotionsIn) -> EmotionsOut:
-    """Replace the vocabulary. Takes effect on the next turn — the list travels in the prompt,
-    not in the tool description, precisely so that no restart is involved."""
-    emotions.save(list(payload.emotions))
-    return _emotions()
-
-
-@router.post("/emotions/reset", response_model=EmotionsOut)
-def reset_emotions() -> EmotionsOut:
-    """Put the shipped vocabulary back."""
-    emotions.reset()
-    return _emotions()
-
-
-def _emotions() -> EmotionsOut:
-    problem = ""
-    try:
-        found = emotions.load()
-    except emotions.EmotionsError as exc:
-        # The defaults are a working vocabulary; a broken file costs the customisation and
-        # says so, rather than leaving the screen empty and her with nothing to show.
-        found, problem = list(DEFAULT_EMOTIONS), str(exc)
-    return EmotionsOut(
-        emotions=[EmotionOut.of(emotion) for emotion in found],
-        customised=emotions.emotions_path().is_file() and not problem,
-        problem=problem,
-    )
 
 
 @router.get("/servers", response_model=list[ServerOut])

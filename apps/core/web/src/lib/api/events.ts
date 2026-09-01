@@ -79,8 +79,13 @@ export interface AnswerRequired {
 	call_id: string;
 	tool: string;
 	question: string;
-	/** Her stance while asking, from the same open vocabulary an emotion card draws on. Free
-	 * text, so an unknown one renders generically. */
+	/** What sort of question it is: one of `ASK_KINDS`.
+	 *
+	 * Typed as a plain `string` and not as the union, mirroring `hera_chats.AnswerRequired.kind`.
+	 * The closed set lives in the tool's schema, where it stops the model inventing one; here it
+	 * has to stay wide, because a turn persisted before the set was closed carries a word from
+	 * the old emotion vocabulary and an event list is a record of what happened. The card draws
+	 * an unrecognised kind plainly. */
 	kind: string;
 }
 
@@ -147,13 +152,25 @@ export function isKnown(event: AnyEvent): event is ChatEvent {
 	return KNOWN.has(event.type);
 }
 
-/** The emotion tool, which renders as a card rather than as a gutter row (ADR 3). */
-export const EMOTION_TOOL = 'hera__emotion';
-
 /** The asking tool. Its call and its result are both drawn by the question card — the card is
  * built from `answer_required`, so letting the call and its eventual result also fall through
  * to the gutter would draw the same exchange three times. */
 export const ASK_TOOL = 'hera__ask';
+
+/** What sort of question she asked, mirroring `hera_mcp.ASK_KINDS` (ADR 17).
+ *
+ * Three occasions about the *question*, closed on the server so there is nothing to invent.
+ * `QuestionCard` draws a tone per kind from this and nothing else — it used to look the word up
+ * in the person's stance vocabulary, which is what coupled a question to a feature that has
+ * since been removed. */
+export const ASK_KINDS = ['unsure', 'blocked', 'choice'] as const;
+
+export type AskKind = (typeof ASK_KINDS)[number];
+
+/** Whether a persisted `kind` is one this build draws a tone for. */
+export function isAskKind(kind: string): kind is AskKind {
+	return (ASK_KINDS as readonly string[]).includes(kind);
+}
 
 /** The skill tool. Reaching for a skill mid-task and being handed one before the turn are the
  * same thing to a reader, so they are drawn the same way — see `Scroll.svelte`. */
@@ -203,19 +220,16 @@ export const HERA = 'hera__';
  *
  * Both `tool_call_started` and `tool_call_ready` are about the same call and carry the same
  * `name`, so every question of the form *is this call an X* has to accept both — otherwise the
- * emotion she announced draws a gutter row for a second and then turns into a card. */
+ * question she announced draws a gutter row for a second and then turns into a card. */
 function callName(event: AnyEvent): string {
 	if (event.type !== 'tool_call_started' && event.type !== 'tool_call_ready') return '';
 	return (event as { name?: string }).name ?? '';
 }
 
-export function isEmotion(event: AnyEvent): boolean {
-	// A plain predicate rather than a type guard: the caller already knows it holds a call
-	// event, and a guard would narrow the *negative* branch to `never`.
-	return callName(event) === EMOTION_TOOL;
-}
-
-/** Whether this call is her asking the person something. */
+/** Whether this call is her asking the person something.
+ *
+ * A plain predicate rather than a type guard: the caller already knows it holds a call event,
+ * and a guard would narrow the *negative* branch to `never`. */
 export function isAsk(event: AnyEvent): boolean {
 	return callName(event) === ASK_TOOL;
 }
@@ -223,9 +237,9 @@ export function isAsk(event: AnyEvent): boolean {
 /** Whether this tool row is about a skill, by call or by result.
  *
  * Knowing these two names is not the same as recognising tools in general: `hera__*` is *her*
- * namespace, the four tools on it are shipped in this repository, and the interface already
- * draws one of them as a card. What it must not do is learn somebody else's server — that is
- * what makes an unfamiliar tool look broken next to a familiar one. */
+ * namespace, every tool on it is shipped in this repository, and the interface already draws
+ * one of them as a card. What it must not do is learn somebody else's server — that is what
+ * makes an unfamiliar tool look broken next to a familiar one. */
 export function isSkillTool(event: AnyEvent): boolean {
 	if (event.type === 'tool_result') return (event as { tool?: string }).tool === SKILL_TOOL;
 	return callName(event) === SKILL_TOOL;

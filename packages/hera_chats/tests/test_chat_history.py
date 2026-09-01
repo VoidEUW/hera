@@ -76,14 +76,14 @@ class TestATurnWithTools:
         assert wire[2].content == "It says contents."
 
     def test_parallel_calls_each_get_their_own_tool_message(self) -> None:
-        """A turn's worth of emotions is the everyday case (ADR 3), and every one of them
-        needs its own answer or the model matches a result to nothing."""
+        """Several calls in one round is the everyday case, and every one of them needs its own
+        answer or the model matches a result to nothing."""
         wire = turn_to_messages(
             [
-                ToolCallReady(id="c1", name="hera__emotion"),
-                ToolCallReady(id="c2", name="hera__emotion"),
-                ToolResultEvent(call_id="c1", tool="hera__emotion", text="noted"),
-                ToolResultEvent(call_id="c2", tool="hera__emotion", text="noted"),
+                ToolCallReady(id="c1", name="hera__search"),
+                ToolCallReady(id="c2", name="hera__search"),
+                ToolResultEvent(call_id="c1", tool="hera__search", text="noted"),
+                ToolResultEvent(call_id="c2", tool="hera__search", text="noted"),
             ]
         )
 

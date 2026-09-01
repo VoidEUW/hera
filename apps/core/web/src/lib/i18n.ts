@@ -132,7 +132,16 @@ export const t = {
 		nothing: 'She asked something, and it arrived empty.',
 		placeholder: 'Answer…',
 		noReply: 'You answered with nothing.',
-		send: 'Reply'
+		send: 'Reply',
+		/** What sort of question it is, from `hera_mcp.ASK_KINDS` (ADR 17). Three words in the
+		 * *person's* register rather than the model's: `blocked` is what the tool calls it, and
+		 * *she cannot go on* is what it means to whoever is being asked. A kind not in here —
+		 * a turn persisted before the set was closed carries a stance word — draws nothing. */
+		kinds: {
+			unsure: 'she is unsure',
+			blocked: 'she cannot go on',
+			choice: 'she needs you to choose'
+		} as Record<string, string>
 	},
 
 	message: {
@@ -153,20 +162,6 @@ export const t = {
 		max_iterations: 'She ran out of tool calls and answered with what she had',
 		awaiting_permission: 'Waiting for you',
 		awaiting_answer: 'Waiting for your answer'
-	},
-
-	emotions: {
-		blurb:
-			'The stances she can show beside an answer. What you write here is what she reads before choosing one, and the tone is the colour the card is drawn in. She may still invent a kind when none of these is honest.',
-		kind: 'agree',
-		when: 'When is this one honest?',
-		tone: 'Tone',
-		tones: { warm: 'Warm', cool: 'Cool', sharp: 'Careful', soft: 'Quiet' },
-		add: 'Add a stance',
-		save: 'Add',
-		cancel: 'Cancel',
-		remove: 'Remove',
-		reset: 'Reset to hers'
 	},
 
 	memory: {
@@ -231,7 +226,6 @@ export const t = {
 		skills: 'Skills',
 		servers: 'Servers',
 		permissions: 'Permissions',
-		emotions: 'Emotions',
 		dreaming: 'Dreaming',
 		soon: 'v0.3',
 		dreamingSoon:

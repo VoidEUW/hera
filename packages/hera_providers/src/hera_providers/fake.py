@@ -11,7 +11,7 @@ tool loop: turn one asks for a tool, turn two sees the result and answers.
 
 ```python
 provider = FakeProvider([
-    tool_turn(tool_call("hera__emotion", {"kind": "curious", "text": "go on"})),
+    tool_turn(tool_call("hera__search", {"query": "qwen3.6 release date"})),
     text_turn("Because ", "the weights are cold."),
 ])
 ```

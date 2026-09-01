@@ -90,10 +90,10 @@ class TestEmptyRegions:
 
         The *build* keeps the slot node — whether a binding exists is a render-time question —
         so this is asserted where it matters: nothing reaches the model announcing an empty
-        block of emotions.
+        block of memory. `memory` is the group with that shape now: one region and one slot.
         """
-        mind.write("emotion_usage", "")
-        assert "emotions" not in rendered(builder)
+        mind.write("memory_instr", "")
+        assert "memory" not in rendered(builder)
 
     def test_user_prefs_starts_empty_and_is_therefore_absent(self, builder: PromptBuilder) -> None:
         assert builder.build().get("context.user") is None
@@ -128,9 +128,11 @@ class TestProfiles:
         assert builder.build().get("identity.character") is not None
 
     def test_a_disabled_region_is_left_out(self, builder: PromptBuilder) -> None:
-        prompt = builder.build(profile(disabled_regions=["emotion_usage"]))
-        assert prompt.get("emotions.usage") is None
-        assert prompt.get("emotions.vocabulary") is not None
+        prompt = builder.build(profile(disabled_regions=["memory_instr"]))
+        assert prompt.get("memory.instructions") is None
+        # The slot beside it survives: a profile disables a *region*, and what fills a slot is
+        # not one. Losing both would be a group being switched off by the wrong control.
+        assert prompt.get("memory.recalled") is not None
 
     def test_an_override_replaces_the_file_without_touching_it(
         self, builder: PromptBuilder, mind: MindRepository

@@ -165,9 +165,16 @@ class AnswerRequired(BaseModel):
     tool: str
     question: str
     kind: str = ""
-    """Her stance while asking, from the same open vocabulary ``hera__emotion`` draws on (ADR
-    3). Free text, and an unknown one renders generically — *unsure* and *blocked* are
-    different questions and the card is allowed to say which."""
+    """What sort of question it is — *unsure*, *blocked* or *choice* (ADR 17).
+
+    A closed set on the tool, and a plain ``str`` here, which is the same arrangement
+    :attr:`ToolResultEvent.failure` has. This package may not learn what ``hera__ask``'s schema
+    says, and a ``Literal`` would also make every turn persisted before the set was closed
+    unreadable — an event list is a record of what happened, so it has to keep parsing after the
+    tool that produced it has changed. The card draws a kind it does not recognise plainly.
+
+    It used to be a word from the emotion vocabulary, which is why it is worth saying what it is
+    not: a question is not a mood, and labelling one *curious* told nobody anything."""
 
 
 class AnswerGiven(BaseModel):
@@ -233,7 +240,7 @@ def coalesce(events: Sequence[ChatEvent]) -> list[ChatEvent]:
     the count differs. Merging happens at the boundary between streaming and storing, so the
     live view and the reloaded one still render the same variants.
 
-    Anything between two fragments stops the merge, so an emotion called mid-sentence stays
+    Anything between two fragments stops the merge, so a tool call made mid-sentence stays
     where she put it.
     """
     merged: list[ChatEvent] = []

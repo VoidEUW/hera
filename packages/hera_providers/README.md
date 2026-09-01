@@ -74,7 +74,7 @@ tell the two apart in a stream.
 **Tool calls arrive in fragments** indexed by position, with the arguments streamed as partial
 JSON. They are accumulated here and emitted whole, in index order, at the end of the turn.
 Several at once is the normal case, not the corner — parallel calls are why a whole turn's
-worth of emotions costs one round-trip.
+worth of independent lookups costs one round-trip.
 
 **A turn that ends in calls says so.** Some servers report `stop` alongside tool calls; the
 reason is normalised to `tool_calls`, because that is what decides whether the loop runs again.
@@ -119,7 +119,7 @@ of them needs a model running; anything genuinely needing a live endpoint is mar
 from hera_providers import FakeProvider, text_turn, tool_call, tool_turn
 
 provider = FakeProvider([
-    tool_turn(tool_call("hera__emotion", {"kind": "curious", "text": "go on"})),
+    tool_turn(tool_call("hera__search", {"query": "qwen3.6 release date"})),
     text_turn("Because ", "the weights are cold."),
 ])
 ```

@@ -133,12 +133,13 @@ async def test_a_thinking_turn_keeps_the_two_channels_apart() -> None:
 
 
 async def test_a_tool_turn_can_carry_prose_and_several_parallel_calls() -> None:
-    """The normal case for emotions: a sentence and a handful of stances, one round-trip."""
+    """The normal case for a turn that looks things up: a sentence and several calls, one
+    round-trip."""
     provider = FakeProvider(
         [
             tool_turn(
-                tool_call("hera__emotion", {"kind": "curious"}),
-                tool_call("hera__emotion", {"kind": "joke"}, call_id="c2"),
+                tool_call("hera__search", {"query": "qwen"}),
+                tool_call("hera__search", {"query": "vllm"}, call_id="c2"),
                 text="Go on.",
             )
         ]
@@ -147,7 +148,7 @@ async def test_a_tool_turn_can_carry_prose_and_several_parallel_calls() -> None:
     events = await collect(provider, ask())
 
     assert events[0] == TextDelta(text="Go on.")
-    assert [e.id for e in events if isinstance(e, ToolCallReady)] == ["call_hera__emotion", "c2"]
+    assert [e.id for e in events if isinstance(e, ToolCallReady)] == ["call_hera__search", "c2"]
     assert events[-1] == TurnEnd(reason="tool_calls")
 
 

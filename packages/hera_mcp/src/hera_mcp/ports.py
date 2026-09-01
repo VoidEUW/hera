@@ -9,8 +9,8 @@ look something up, and knows nothing about DuckDuckGo, an API key or an HTTP cli
 All of them are async because the implementations touch a database, a git repository or the
 network, and a synchronous port would force every one of them through a thread later.
 
-Every port is optional. A deployment that wires none of them still has ``emotion``, and the
-other tools answer "not available here" as a tool error the model can read and work around --
+Every port is optional. A deployment that wires none of them still lists every tool, and the
+unwired ones answer "not available here" as a tool error the model can read and work around --
 which is the whole degradation story of ADR 4 applied to her own capabilities.
 """
 

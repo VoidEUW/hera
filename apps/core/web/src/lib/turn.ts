@@ -31,7 +31,7 @@ import type {
 	ToolCallStarted,
 	ToolResultEvent
 } from './api/events';
-import { artifactOf, isAsk, isEmotion } from './api/events';
+import { artifactOf, isAsk } from './api/events';
 
 /** A row in the activity gutter: something she did before or between speaking. */
 export interface Activity {
@@ -56,7 +56,7 @@ export interface Activity {
 
 /** Something that renders in the flow of the answer, where she put it. */
 export interface Inline {
-	kind: 'prose' | 'emotion' | 'permission' | 'question' | 'artifact';
+	kind: 'prose' | 'permission' | 'question' | 'artifact';
 	key: string;
 	text?: string;
 	event?: AnyEvent;
@@ -108,7 +108,6 @@ export function reduce(events: AnyEvent[]): Turn {
 	const awaiting: Turn['awaiting'] = [];
 	const byCall = new Map<string, Activity>();
 	const decided = new Set<string>();
-	const emotions = new Set<string>();
 	const asked = new Set<string>();
 
 	let closed: Turn['closed'] = null;
@@ -201,7 +200,7 @@ export function reduce(events: AnyEvent[]): Turn {
 				// Both paths therefore have to produce the same row, and they do — this branch
 				// creates the row early and the next one reuses it if it is already there.
 				const begun = event as ToolCallStarted;
-				if (isEmotion(begun) || isAsk(begun)) break;
+				if (isAsk(begun)) break;
 				settle();
 				byCall.set(begun.id, row({ kind: 'tool', key: `call-${begun.id}`, event: begun }));
 				break;
@@ -218,15 +217,6 @@ export function reduce(events: AnyEvent[]): Turn {
 					break;
 				}
 				settle();
-				if (isEmotion(call)) {
-					// An emotion renders where she called it, between paragraphs, because that
-					// is where she meant it (ADR 3). It is not a gutter row, but it is on screen,
-					// so reasoning either side of it is two thoughts rather than one.
-					flush();
-					ordered.push({ kind: 'emotion', key, event: call });
-					emotions.add(call.id);
-					break;
-				}
 				if (isAsk(call)) {
 					// The question card is built from `answer_required`, which arrives right
 					// after this. Letting the call land in the gutter too would draw the same
@@ -248,7 +238,7 @@ export function reduce(events: AnyEvent[]): Turn {
 					// result, and the two say different things.
 					if (waiting) waiting.result = result;
 					// A card is something a person can see, so a block of reasoning either side of
-					// it is two thoughts rather than one — the same rule an emotion follows.
+					// it is two thoughts rather than one — the same rule a question card follows.
 					settle();
 					flush();
 					ordered.push({ kind: 'artifact', key, event: result, artifact: published });
@@ -259,15 +249,6 @@ export function reduce(events: AnyEvent[]): Turn {
 				} else if (asked.has(result.call_id)) {
 					// The person's reply, shaped as this call's result so the model reads it as
 					// one. On screen it is already on the card they typed it into.
-				} else if (emotions.has(result.call_id)) {
-					// The card *is* the record of an emotion, so a gutter row beside it would
-					// draw the same thing twice. A failed one is different: an emotion she
-					// showed and the system refused is exactly what openness means you get to
-					// see, so that one keeps its row.
-					if (!result.ok) {
-						settle();
-						row({ kind: 'tool', key, event: result });
-					}
 				} else {
 					// A result whose call is not in this list -- half a turn, reloaded. Keeping
 					// it beats hiding the one record that something actually ran.
@@ -358,7 +339,7 @@ function isActivity(item: Activity | Inline): item is Activity {
 	return !INLINE_KINDS.has(item.kind);
 }
 
-const INLINE_KINDS = new Set<string>(['prose', 'emotion', 'permission', 'question', 'artifact']);
+const INLINE_KINDS = new Set<string>(['prose', 'permission', 'question', 'artifact']);
 
 /** Whether a card is still open, for a message rendered from the persisted list.
  *

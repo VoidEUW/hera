@@ -7,6 +7,8 @@ checked like anybody else's (ADR 4) is `hera_tools`' claim to prove, and it does
 
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 from mcp.server.mcpserver import MCPServer
 from mcp_support import (
@@ -24,6 +26,8 @@ from mcp_support import (
 
 from hera_mcp import (
     ARTIFACT_META,
+    ASK_KINDS,
+    ASK_TOOL,
     BUILTIN_SERVER_NAME,
     SCRATCH_LISTING_LIMIT,
     SEARCH_LIMIT,
@@ -41,37 +45,102 @@ async def test_it_offers_her_whole_catalogue_under_her_name(wired: MCPServer) ->
     assert build_builtin_server().name == BUILTIN_SERVER_NAME
 
 
-class TestEmotion:
-    async def test_it_acknowledges_and_nothing_more(self, wired: MCPServer) -> None:
-        """The call itself is the record; the answer only has to let generation continue."""
+async def test_there_is_no_emotion_tool(wired: MCPServer) -> None:
+    """ADR 17. Pinned, because an absence nobody wrote down is one somebody adds back.
+
+    The tool was removed rather than left unwired, which is the opposite of what ``note`` gets
+    — and the difference is the argument. An unwired tool is a capability this deployment
+    happens not to have, and saying so beats a model concluding it cannot do the thing. There
+    is no deployment in which showing a stance as a card is the right move, so there is nothing
+    to say: she writes what she means in the sentence.
+    """
+    async with talking_to(wired) as client:
+        listing = await client.list_tools()
+        result = await client.call_tool("emotion", {"kind": "doubt"})
+
+    assert "emotion" not in {tool.name for tool in listing.tools}
+    assert "emotion" not in TOOL_NAMES
+    assert result.is_error
+
+
+class TestAsk:
+    """The one tool here that is never *run*.
+
+    Inside a turn ``hera_chats`` recognises it by name and suspends before dispatch, so none of
+    this is the path a person's question takes. What it covers is the tool standing on its own:
+    the schema the model fills in, and what a caller reaching the body from outside a turn is
+    told.
+    """
+
+    async def test_running_it_outside_a_turn_says_nobody_was_asked(self, wired: MCPServer) -> None:
+        """Reached over the transport v0.3 exposes, or by a test. Saying so plainly beats
+        returning something that looks like an answer nobody gave."""
         async with talking_to(wired) as client:
-            result = await client.call_tool("emotion", {"kind": "doubt", "text": "hm"})
+            result = await client.call_tool("ask", {"question": "which port?"})
 
-        assert not result.is_error
-        assert said(result) == "shown"
+        assert result.is_error
+        assert "not put to anybody" in said(result)
 
-    async def test_an_invented_kind_is_accepted(self, wired: MCPServer) -> None:
-        """ADR 3: ``kind`` is free text and unknown kinds render generically."""
-        async with talking_to(wired) as client:
-            result = await client.call_tool("emotion", {"kind": "wistful"})
+    async def test_the_kinds_are_closed_and_in_the_schema(self, wired: MCPServer) -> None:
+        """ADR 17, and the whole point of detaching it from the emotion vocabulary.
 
-        assert not result.is_error
-
-    async def test_the_description_says_a_kind_may_be_invented(self, wired: MCPServer) -> None:
-        """A model that hard-obeys its schema needs the freedom written where it can see it."""
+        A ``Literal`` puts the three in the tool's own input schema, where the model cannot get
+        it wrong — as opposed to a free string documented in a prompt section that a person
+        could edit the word out of. Asserted against ``ASK_KINDS`` rather than three literals,
+        because the interface draws a tone per kind from the same constant.
+        """
         async with talking_to(wired) as client:
             listing = await client.list_tools()
 
-        emotion = next(tool for tool in listing.tools if tool.name == "emotion")
-        assert emotion.description is not None
-        assert "invent" in emotion.description
+        ask = next(tool for tool in listing.tools if tool.name == ASK_TOOL)
+        properties = ask.input_schema.get("properties", {})
+        assert sorted(properties) == ["kind", "question"]
+        assert ask.input_schema.get("required") == ["question"]
+        assert set(_enum_of(properties["kind"])) == set(ASK_KINDS)
 
-    async def test_a_missing_kind_comes_back_as_a_tool_error(self, wired: MCPServer) -> None:
-        """Schema validation happens in the server, and arrives as a result, not a crash."""
+    async def test_a_kind_outside_the_set_is_refused_by_the_schema(self, wired: MCPServer) -> None:
+        """A result rather than a crash, like every other validation failure here."""
         async with talking_to(wired) as client:
-            result = await client.call_tool("emotion", {"text": "no kind"})
+            result = await client.call_tool("ask", {"question": "well?", "kind": "curious"})
 
         assert result.is_error
+
+    async def test_the_description_says_when_each_kind_applies(self, wired: MCPServer) -> None:
+        """The set being closed is only half of it: a model that can see three words and not
+        what they are for picks the first one every time. Each has its occasion in the prose,
+        and those occasions are the ones the ``uncertainty`` mind region already describes."""
+        async with talking_to(wired) as client:
+            listing = await client.list_tools()
+
+        ask = next(tool for tool in listing.tools if tool.name == ASK_TOOL)
+        assert ask.description is not None
+        for kind in ASK_KINDS:
+            assert f"`{kind}`" in ask.description
+
+    async def test_it_needs_nothing_wired(self, bare: MCPServer) -> None:
+        """No port, so it is refused for the reason above rather than for being unavailable —
+        a deployment that wired nothing still has a question she can ask."""
+        async with talking_to(bare) as client:
+            result = await client.call_tool("ask", {"question": "which port?"})
+
+        assert result.is_error
+        assert "not available" not in said(result)
+
+
+def _enum_of(schema: dict[str, Any]) -> list[str]:
+    """The allowed values of a ``Literal`` field, wherever the SDK put them.
+
+    A default turns the property into a ``$ref``/``allOf`` wrapper in some versions and leaves
+    ``enum`` inline in others, and which one this is is not a fact about Hera. Reading both
+    keeps the assertion about *the set being closed* rather than about the SDK's JSON Schema
+    dialect.
+    """
+    if "enum" in schema:
+        return list(schema["enum"])
+    for branch in schema.get("allOf", []) + schema.get("anyOf", []):
+        if "enum" in branch:
+            return list(branch["enum"])
+    raise AssertionError(f"no closed set in {schema}")
 
 
 class TestRemember:
@@ -336,12 +405,6 @@ class TestUnwiredPorts:
 
         assert result.is_error
         assert "not available" in said(result)
-
-    async def test_emotion_needs_nothing_wired(self, bare: MCPServer) -> None:
-        async with talking_to(bare) as client:
-            result = await client.call_tool("emotion", {"kind": "hope"})
-
-        assert not result.is_error
 
 
 class TestTheScratchpad:

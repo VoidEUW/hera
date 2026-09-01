@@ -62,7 +62,7 @@ def build_toy_server() -> MCPServer:
     server: MCPServer = MCPServer(TOY_SERVER_NAME, version="0.1.0")
 
     @server.tool(description="Answer with a fixed word.")
-    def emotion(kind: str, text: str = "") -> str:
+    def echo(kind: str, text: str = "") -> str:
         return "shown"
 
     @server.tool(description="Answer with another fixed word.")

@@ -221,19 +221,6 @@ MIND_REGIONS: tuple[MindRegion, ...] = (
             "dead end: read what it said and correct yourself."
         ),
     ),
-    # -- emotions -------------------------------------------------------------------------
-    MindRegion(
-        id="emotion_usage",
-        title="Emotion usage",
-        section="emotions.usage",
-        tier=Tier.EVOLVABLE,
-        purpose="When to show a reaction, and when it would be noise.",
-        default=(
-            "Show a reaction when you actually have one and it is worth interrupting the "
-            "answer for — a doubt about the premise, a contradiction you spotted, genuine "
-            "interest. Do not decorate every message with one."
-        ),
-    ),
     # -- memory ---------------------------------------------------------------------------
     MindRegion(
         id="memory_instr",
@@ -274,7 +261,7 @@ MIND_REGIONS: tuple[MindRegion, ...] = (
 )
 """Every region, in the order the settings screen lists them.
 
-Fourteen. The prototype had fifteen; ``grammar`` is gone because ADR 2 deleted the text call
+Thirteen. The prototype had fifteen; ``grammar`` is gone because ADR 2 deleted the text call
 grammar it described — shipping it would invite a call syntax nothing parses — and the two
 memory regions collapsed into one until ``hera_memories`` gives the split a reason to exist.
 
@@ -295,20 +282,22 @@ the risk every evolvable region already carries.
 
 ``uncertainty`` is the half of the sentence that ``hera__ask`` is the other half of. Telling
 her to ask when a question is worth asking, with no mechanism to ask one, would produce a
-model that announces its confusion and then guesses anyway.
+model that announces its confusion and then guesses anyway. It is also where the three kinds
+``hera__ask`` now takes come from — *a fact only they have*, *hard to undo*, *two readings that
+lead somewhere different* — so the tool's closed set and this region's prose say the same thing.
 
 ``language`` arrived as ``emotion_vocab`` left. Answering in English is a *behaviour*, and a
 behaviour with no line in the mind is one nobody can find and nobody can change — "why does she
 always answer in English" was a question with no screen to ask it on. Its own region rather than
 a sentence inside ``tone``, because that is what makes it visible in a list.
 
-``emotion_vocab`` left in the other direction. It was a paragraph listing the stances she can show,
-which meant the interface needed its own copy to know which colour ``doubt`` is drawn in. The
-list is data now, edited on the Emotions screen and bound into ``SLOT_EMOTIONS`` per turn; the
-*guidance* — when showing a reaction is worth interrupting an answer for — stays prose, in
-``emotion_usage``, because that is a judgement rather than a table. A ``mind/emotion_vocab.md``
-left over from an older install is ignored rather than deleted; nothing here removes a file
-somebody may have written in.
+``emotion_vocab`` and then ``emotion_usage`` left in the other direction. The vocabulary became
+data on a screen, and ADR 17 then removed the whole feature: a stance she means is a sentence
+she writes, and the region telling her *when* to file one has nothing left to be about. What it
+was really asking for — react when you have a reaction, do not decorate — belongs to ``tone``
+and ``character``, which are about how she writes rather than about a card. Files left over from
+an older install (``mind/emotion_vocab.md``, ``mind/emotion_usage.md``) are ignored rather than
+deleted; nothing here removes a file somebody may have written in.
 """
 
 REGIONS_BY_ID: dict[str, MindRegion] = {region.id: region for region in MIND_REGIONS}

@@ -188,8 +188,8 @@ class TestARealMcpServer:
         provider = FakeProvider(
             [
                 tool_turn(
-                    tool_call("hera__emotion", {"kind": "curious"}),
                     tool_call("hera__skill", {"name": "tdd"}),
+                    tool_call("hera__scratch_list", {}),
                 ),
                 text_turn("Tests first, then."),
             ]
@@ -199,10 +199,13 @@ class TestARealMcpServer:
             frames = await talk(client, await open_chat(client), "how do I start?")
 
         results = {body["tool"]: body for name, body in frames if name == "tool_result"}
-        assert results["hera__emotion"]["ok"]
-        assert results["hera__emotion"]["text"] == "shown"
         # Read off disk, handed over a port, returned through the protocol.
         assert results["hera__skill"]["text"] == "Red, green, refactor."
+        # Two in one round, because the target model emits parallel calls and nothing between
+        # the model and the tool is a stub here. The second also carries `_meta`, so this says
+        # the chat id survives a batch rather than only a call on its own.
+        assert results["hera__scratch_list"]["ok"]
+        assert "empty" in results["hera__scratch_list"]["text"]
         assert names(frames)[-2:] == ["turn_closed", "done"]
 
     async def test_a_scratchpad_write_lands_in_this_conversations_directory(

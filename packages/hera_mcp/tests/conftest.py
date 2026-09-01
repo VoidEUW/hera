@@ -3,8 +3,9 @@
 A real :class:`mcp.Client` over the SDK's in-memory transport, not a call to the Python
 function underneath. What is worth testing here is the part the model actually meets: the
 schema the SDK derived from the signature, the description it reads before deciding to call,
-and the ``is_error`` convention a refusal comes back through. Calling ``emotion("doubt")``
-directly would assert that our assumptions agree with themselves.
+and the ``is_error`` convention a refusal comes back through. Calling ``ask(question="?")``
+directly would assert that our assumptions agree with themselves — and would miss the whole of
+what ``ask`` is, which is the closed set of kinds the SDK put in its schema.
 
 This package imports no ``hera_*`` package and its tests keep to that as well — mounting the
 server in a `hera_tools` registry is that package's test, not this one's.
