@@ -1,0 +1,29 @@
+services:
+  hera:
+    build: .
+    ports:
+      - "8756:8756"
+    volumes:
+      # Everything Hera keeps lives under HERA_HOME (the database, the mind's git repo,
+      # skills, memories, chats). A named volume avoids the container-UID-vs-host-UID
+      # permission mismatches a bind mount hits differently on macOS/Windows Docker Desktop
+      # than on native Linux.
+      - hera_data:/data
+    environment:
+      HERA_HOME: /data
+      HERA_HOST: 0.0.0.0
+      # These seed ~/.hera/config.toml the first time it is written and are ignored after —
+      # the file wins once it exists, so editing these later has no effect on a volume that
+      # already has one. Change the model on the Settings screen instead.
+      #
+      # host.docker.internal reaches an OpenAI-compatible endpoint (LM Studio, Ollama, ...)
+      # running on the machine hosting Docker. It resolves out of the box on Docker Desktop
+      # (macOS, Windows); extra_hosts below is what makes it resolve on Linux too.
+      HERA_PROVIDER_BASE_URL: "http://host.docker.internal:1234/v1"
+      HERA_PROVIDER_MODEL: "qwen3.6-35b"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
+volumes:
+  hera_data:
