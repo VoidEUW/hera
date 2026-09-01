@@ -78,13 +78,14 @@
 		place-items: center;
 		height: 100%;
 		padding: 24px;
+		padding-bottom: max(24px, env(safe-area-inset-bottom));
 	}
 
 	/* Pinned to the foot of the screen rather than trailing the composer, so it does not move
 	   when the greeting or an error changes the height of the column above it. */
 	.version {
 		position: absolute;
-		bottom: 18px;
+		bottom: max(18px, env(safe-area-inset-bottom));
 		left: 50%;
 		transform: translateX(-50%);
 		margin: 0;

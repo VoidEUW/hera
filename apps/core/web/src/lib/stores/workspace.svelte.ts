@@ -47,6 +47,13 @@ class Workspace {
 	 * that are not the layout would otherwise need a callback threaded through every route. */
 	settingsOpen = $state(false);
 
+	/** Whether the rail is open as a sheet, below the phone breakpoint. Same reasoning as
+	 * `settingsOpen`: the control that opens it lives in the layout, but it has to be reachable
+	 * from every route's own header, and threading a callback through each one for a single
+	 * boolean is more machinery than a store field. Unused — and harmless — above the
+	 * breakpoint, where the rail is always visible and nothing reads this. */
+	railOpen = $state(false);
+
 	/** Skills switched on from the start screen, where there is no chat to pin them to yet.
 	 *
 	 * The picker is offered there because deciding *use this one* before you have typed the

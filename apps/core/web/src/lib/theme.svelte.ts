@@ -11,6 +11,14 @@ export type Appearance = 'system' | 'light' | 'dark';
 
 const KEY = 'hera:appearance';
 
+/** The ground colour of each resolved appearance, in one place with `app.css`'s `--ground`
+ * rather than read back out of a stylesheet — a PWA's chrome (status bar, task switcher) wants
+ * this before the page has necessarily painted anything to compute it from. */
+const GROUND: Record<'light' | 'dark', string> = {
+	light: '#F6EEDB',
+	dark: '#17130A'
+};
+
 class Theme {
 	appearance = $state<Appearance>('system');
 
@@ -36,6 +44,11 @@ class Theme {
 
 	apply() {
 		document.documentElement.dataset.theme = this.resolved;
+		// The installed app's chrome follows the same resolution the page does, instead of
+		// staying pinned to the dark value `app.html` ships as its pre-hydration default.
+		document
+			.querySelector('meta[name="theme-color"]')
+			?.setAttribute('content', GROUND[this.resolved]);
 	}
 }
 

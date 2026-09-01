@@ -124,6 +124,24 @@
 		border-bottom: 1px solid var(--line);
 	}
 
+	/* Beside the transcript at 46vw of a phone width is not a panel, it is the whole screen with
+	   the conversation squeezed into a sliver beside it — so below the shared breakpoint this
+	   goes full-bleed instead. Still no scrim: `artifacts.close()` above is already the way out,
+	   and a full-bleed sheet leaves nothing peeking out from behind it for a scrim to dim. */
+	@media (max-width: 780px) {
+		.drawer {
+			position: fixed;
+			inset: 0;
+			width: 100%;
+			z-index: 12;
+			border-left: 0;
+		}
+
+		.top {
+			padding-top: max(12px, env(safe-area-inset-top));
+		}
+	}
+
 	.mark {
 		display: flex;
 	}

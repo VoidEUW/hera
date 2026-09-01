@@ -239,6 +239,19 @@
 		border-bottom: 1px solid var(--line);
 	}
 
+	/* Room for the fixed menu button `+layout.svelte` draws over the top-left corner below the
+	   phone breakpoint — without it the title runs under the button instead of stopping short
+	   of it. The bar grows to match rather than the button being squeezed into whatever height
+	   the title alone needed: that button is 40px square at `top: 12px`, so 64px is what centres
+	   it — `align-items: center` above then puts the title on the same line, instead of the two
+	   merely overlapping. */
+	@media (max-width: 780px) {
+		.top {
+			min-height: 64px;
+			padding-left: 64px;
+		}
+	}
+
 	/* The way back to something published nine turns ago. Without it, the only door to an
 	   artifact is the card in the turn that made it, and an edit later on leaves you scrolling
 	   for the thing you just changed. */
@@ -303,7 +316,7 @@
 
 	.foot {
 		flex: none;
-		padding: 12px 24px 20px;
+		padding: 12px 24px max(20px, env(safe-area-inset-bottom));
 		background: linear-gradient(to top, var(--ground) 70%, transparent);
 	}
 

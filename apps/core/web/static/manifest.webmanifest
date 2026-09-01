@@ -1,0 +1,30 @@
+{
+	"name": "Hera",
+	"short_name": "Hera",
+	"description": "A self-hosted agentic chat space.",
+	"start_url": "/",
+	"scope": "/",
+	"display": "standalone",
+	"background_color": "#17130A",
+	"theme_color": "#17130A",
+	"icons": [
+		{
+			"src": "/icon-192.png",
+			"sizes": "192x192",
+			"type": "image/png",
+			"purpose": "any"
+		},
+		{
+			"src": "/icon-512.png",
+			"sizes": "512x512",
+			"type": "image/png",
+			"purpose": "any"
+		},
+		{
+			"src": "/icon-512-maskable.png",
+			"sizes": "512x512",
+			"type": "image/png",
+			"purpose": "maskable"
+		}
+	]
+}

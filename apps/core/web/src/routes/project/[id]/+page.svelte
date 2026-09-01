@@ -207,6 +207,14 @@
 		margin-bottom: 28px;
 	}
 
+	/* Same clearance the chat header gives the fixed menu button `+layout.svelte` draws over
+	   the top-left corner below the phone breakpoint. */
+	@media (max-width: 780px) {
+		header {
+			padding-left: 40px;
+		}
+	}
+
 	h1 {
 		font-size: 26px;
 		margin: 0;

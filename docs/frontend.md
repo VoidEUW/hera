@@ -9,9 +9,9 @@ typeface below is a recommendation with a reason attached, and reasons can be ar
 
 Everything structural in this document exists in `apps/core/web`: the rail with projects
 disclosing their chats, the start screen, settings as a modal with its own left nav, the ocellus
-at all three sizes, the activity gutter with a reason on every skill, emotion cards inline,
-the permission card, dark and light. What is *not* built is listed under **Open** at the bottom,
-plus the command palette behind ⌘K (it opens Settings for now) and the mobile sheet.
+at all three sizes, the activity gutter with a reason on every skill, the question and permission
+cards inline, dark and light, and the mobile sheet. What is *not* built is listed under **Open**
+at the bottom, plus the command palette behind ⌘K (it opens Settings for now).
 
 **Last updated:** 2026-08-27 · **Built:** yes — `uv run hera serve`
 
@@ -410,7 +410,7 @@ stated once and then held, or every future feature will be arguable in two place
 
 | | Answers | Lives in | Scope |
 |---|---|---|---|
-| **Profile** | *Who she is* — voice, stance, behavioural traits, the emotion vocabulary | Mind regions, in a git repository | Global. One of her. Changes rarely, and `hera_promptevo` may propose changes to it |
+| **Profile** | *Who she is* — voice, stance, behavioural traits | Mind regions, in a git repository | Global. One of her. Changes rarely, and `hera_promptevo` may propose changes to it |
 | **Project** | *What we are working on* — the domain, the conventions, the files that are context | Rows and files under `~/.hera` | This body of work. Many. Changes whenever the work does |
 
 *The coding profile* and *the Hera project* compose: she is the same person in every project, and
@@ -435,14 +435,14 @@ migration for nothing. The *behaviour* arrives in two steps:
 This is the part that matters, because it is where the design meets the data. A turn is **a list
 of events**, and the interface renders one component per variant. It never parses her text — that
 rule is not a style preference, it is the single largest source of bugs in the previous version
-and it is designed out (`CLAUDE.md`, ADR 2, ADR 3).
+and it is designed out (`CLAUDE.md`, ADR 2, ADR 11).
 
 | Event | Renders as |
 |---|---|
 | `text_delta` | Her prose, `body`, streamed in |
 | `thinking_delta` | The reasoning channel — collapsed by default, one line in the gutter per **block** |
 | `tool_call_ready` | A gutter row: ocellus, verb, target, and its result when it lands |
-| `tool_call_ready` where `name == "hera__emotion"` | An **emotion card**, inline where it was called |
+| `answer_required` | A **question card**, inline where she asked it. The `hera__ask` call and its eventual result draw nothing — all three events are about one question, and only the card is a thing a person reads |
 | `turn_end` | Ends the turn; `reason: cancelled` marks it visibly as interrupted |
 
 At `done`, the client throws away its optimistic view and re-renders from the persisted list. The
@@ -490,32 +490,52 @@ similarity — and the interface shows which of the three it was. A person needs
 "she always has this" from "she went and found this", and it is also the only feedback loop that
 tells you when your retrieval is picking the wrong thing.
 
-### Emotion cards
+### The question card
 
-`hera__emotion(kind, text)` renders inline, at the point in the event list where she called it —
-between paragraphs, in the flow of the answer, because that is where she meant it.
+`hera__ask` stops the turn and puts a question on screen. Inline, where she asked it, and drawn
+from `answer_required` rather than from the call — the call, the card and the synthesised result
+are all about the same question, and drawing three of them would be machinery pretending to be
+conversation.
 
 ```
 ╭─────────────────────────────────────────╮
-│  ◔  doubt                               │
-│     Slide 14 contradicts slide 9.       │
+│  ?  she needs you to choose  asked you  │
+│     Which deck do you mean?             │
+│     ┌─────────────────────────────────┐ │
+│     │ Answer…                         │ │
+│     └─────────────────────────────────┘ │
+│                Enter to send  [ Reply ] │
 ╰─────────────────────────────────────────╯
 ```
 
-`kind` is **free text** (ADR 3) and she is told she may invent one. So the renderer needs a
-`kind → icon + tone` map with a **generic fallback** that has to look deliberate rather than
-broken — an unfamiliar emotion is her working correctly, not a missing asset. Group the known
-kinds into four tones and colour the card's left edge by tone:
+**Laurel, not brass.** Brass is authority — *this needs a decision*. A question is her turning
+towards you, and drawing it in the permission colour would make being asked feel like being
+stopped.
 
-| Tone | Kinds | Edge |
+`kind` is a **closed set of three** and the label is the *person's* wording, not the tool's
+([ADR 17](adr/0017-a-stance-is-a-sentence-and-a-question-stands-alone.md)):
+
+| `kind` | Reads | Colour |
 |---|---|---|
-| Warm | `agree`, `hope`, `excited`, `funny`, `joke` | `pomegranate` |
-| Cool | `curious`, `surprised`, `doubt`, `ask` | `peacock` |
-| Sharp | `warn`, `disagree`, `judge`, `annoyed` | `brass` |
-| Soft | `sorry`, and every unknown kind | `--line` |
+| `unsure` | she is unsure | `--text-muted` |
+| `blocked` | she cannot go on | `brass` |
+| `choice` | she needs you to choose | `--text-muted` |
 
-`text` may be absent — a card that is only a stance is valid and should render as just the icon
-and the kind.
+Only `blocked` is set apart, because it is the one of the three where the turn is genuinely
+stopped on the reply. Nothing here may be the danger colour: no question she can ask is an error.
+
+A kind this build does not recognise renders as **nothing** rather than as the raw word. The only
+way to get one is a turn persisted before the set was closed, carrying a stance from the emotion
+vocabulary ADR 17 removed — and *doubt* on a question card is a puzzle rather than information.
+
+> **Emotion cards were here, and they are gone.** `hera__emotion(kind, text)` drew a stance —
+> `◔ doubt` — inline between paragraphs, coloured by tone from a fourteen-word vocabulary a person
+> could edit. It was removed by ADR 17 after a version of driving it against a real model: several
+> stances fired on the same occasion, one of them had become a tool, and asking a model to
+> interrupt its own prose to file a small form is not a shape it complies with honestly. The
+> *tone* idea is worth remembering if a stance ever comes back as a field on the answer — four
+> tones with a deliberate-looking fallback was the right shape for an open vocabulary, and it was
+> the vocabulary that was wrong.
 
 ### The permission card
 
@@ -584,8 +604,16 @@ direct and never coy. She is the goddess of the household, not a mascot.
 - **The server render is authoritative** at `done`.
 - **Every event variant needs a component**, including ones that arrive unknown — degrade
   visibly, never silently.
-- **Desktop-shaped, PWA on the phone.** On a phone the rail becomes a sheet and the activity
-  gutter collapses to a single summary row that expands; nothing is removed.
+- **Desktop-shaped, PWA on the phone.** One breakpoint, 780px, shared by the rail, the drawer and
+  the gutter rather than each choosing its own. Below it: the rail becomes a sheet over a scrim,
+  opened by a menu button that replaces nothing (the rail is still there above 780px, unchanged)
+  — a plain fade, the same `animation: fade` Settings already uses for its own sheet, because
+  *nothing here slides in from off-screen* is a rule and a rail is not the one exception to it.
+  The artifact drawer goes full-bleed instead of squeezing the transcript into whatever is left
+  of a phone-width screen, and keeps the no-scrim rule because it already has its own close
+  control. The activity gutter collapses each block to one summary row that expands on tap —
+  nothing is removed, only the resting state is quieter. Installable: a manifest and a service
+  worker that never touches `/api/*`, so it cannot sit between a phone and a streaming turn.
 - **Keyboard first.** Visible focus, `⌘K` for search, the composer focused on load.
 
 ## Open

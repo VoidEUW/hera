@@ -48,6 +48,9 @@ export const t = {
 		settings: 'Settings',
 		collapse: 'Collapse the sidebar',
 		expand: 'Expand the sidebar',
+		openMenu: 'Open menu',
+		closeMenu: 'Close menu',
+		title: 'Chats and projects',
 		noChats: 'No chats yet.',
 		noProjects: 'No projects yet.',
 		chatOptions: 'Chat options',
@@ -105,6 +108,7 @@ export const t = {
 		slash: 'skill · you asked for it',
 		retrieved: 'skill · matched this turn',
 		lines: (n: number) => `${n} lines — scroll for the rest`,
+		didThings: (n: number) => (n === 1 ? '1 thing she did' : `${n} things she did`),
 		unknown: 'Something this version does not know how to show'
 	},
 

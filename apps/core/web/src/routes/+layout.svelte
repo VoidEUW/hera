@@ -11,6 +11,7 @@
 	import Rail from '$lib/components/Rail.svelte';
 	import ProfileMenu from '$lib/components/ProfileMenu.svelte';
 	import Settings from '$lib/components/Settings.svelte';
+	import { t } from '$lib/i18n';
 	import { workspace } from '$lib/stores/workspace.svelte';
 	import { theme } from '$lib/theme.svelte';
 	import '../app.css';
@@ -32,6 +33,14 @@
 	const activeProjectId = $derived(
 		page.route.id?.startsWith('/project') ? (page.params.id ?? null) : null
 	);
+
+	// Below the phone breakpoint the rail is a sheet you open, pick something in, and leave —
+	// closing it here rather than wherever `onnew`/rename/etc. fire means every way of leaving
+	// the rail (a chat, a project, the start screen) closes it the same way, once.
+	$effect(() => {
+		void page.url.pathname;
+		workspace.railOpen = false;
+	});
 
 	/** **New chat** goes to the start screen rather than making a chat.
 	 *
@@ -81,29 +90,65 @@
 		if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
 			event.preventDefault();
 			workspace.openSettings();
+			return;
 		}
+		if (event.key === 'Escape' && workspace.railOpen) workspace.railOpen = false;
 	}
 </script>
 
 <svelte:window {onkeydown} />
 
 <div class="shell">
-	<Rail
-		chats={workspace.chats}
-		projects={workspace.projects}
-		profile={workspace.activeProfile}
-		{activeId}
-		{activeProjectId}
-		onnew={newChat}
-		onsettings={() => workspace.openSettings()}
-		onprofile={() => (profileOpen = true)}
-		onrename={(id, title) => workspace.renameChat(id, title)}
-		ondelete={removeChat}
-		onmove={(id, projectId) => workspace.moveChat(id, projectId)}
-		onnewproject={newProject}
-		onprojectrename={(id, name) => workspace.patchProject(id, { name })}
-		onprojectdelete={removeProject}
-	/>
+	<!-- Below the phone breakpoint the rail below is off-canvas by default; this is the one
+	     control that brings it on screen, placed once here rather than in every route's own
+	     header because it has to reach the start screen (no header at all), the chat screen and
+	     the project screen alike. -->
+	<button
+		class="menu"
+		type="button"
+		aria-label={t.rail.openMenu}
+		onclick={() => (workspace.railOpen = true)}
+	>
+		<span aria-hidden="true">☰</span>
+	</button>
+
+	{#if workspace.railOpen}
+		<!-- The exact scrim Settings and the profile menu already use, so a sheet reads as one
+		     idea across the application rather than three implementations of it. -->
+		<div
+			class="scrim"
+			role="button"
+			tabindex="-1"
+			aria-label={t.rail.closeMenu}
+			onclick={() => (workspace.railOpen = false)}
+			onkeydown={(event) => event.key === 'Enter' && (workspace.railOpen = false)}
+		></div>
+	{/if}
+
+	<div
+		class="rail-slot"
+		class:sheet={workspace.railOpen}
+		role={workspace.railOpen ? 'dialog' : undefined}
+		aria-modal={workspace.railOpen ? 'true' : undefined}
+		aria-label={workspace.railOpen ? t.rail.title : undefined}
+	>
+		<Rail
+			chats={workspace.chats}
+			projects={workspace.projects}
+			profile={workspace.activeProfile}
+			{activeId}
+			{activeProjectId}
+			onnew={newChat}
+			onsettings={() => workspace.openSettings()}
+			onprofile={() => (profileOpen = true)}
+			onrename={(id, title) => workspace.renameChat(id, title)}
+			ondelete={removeChat}
+			onmove={(id, projectId) => workspace.moveChat(id, projectId)}
+			onnewproject={newProject}
+			onprojectrename={(id, name) => workspace.patchProject(id, { name })}
+			onprojectdelete={removeProject}
+		/>
+	</div>
 
 	<main>
 		{@render children()}
@@ -138,11 +183,62 @@
 		overflow: hidden;
 	}
 
+	.menu {
+		display: none;
+	}
+
+	.scrim {
+		position: fixed;
+		inset: 0;
+		background: rgb(0 0 0 / 0.45);
+		border: 0;
+		animation: fade var(--fade) var(--ease);
+		z-index: 10;
+	}
+
+	@keyframes fade {
+		from {
+			opacity: 0;
+		}
+	}
+
 	@media (max-width: 780px) {
-		/* On a phone the rail becomes a sheet. Nothing is removed; for now it simply steps
-		   aside, and the sheet lands with the mobile pass. */
-		.shell {
-			flex-direction: column;
+		/* Off-canvas by default and brought on screen by `.menu` — nothing slides in from
+		   off-screen (the interface's one rule about motion), so this is the same plain
+		   `animation: fade` Settings already draws its own sheet with, not a translate. */
+		.rail-slot {
+			display: none;
+		}
+
+		.rail-slot.sheet {
+			/* No explicit width: the rail keeps its own `var(--rail)`, and a fixed box with only
+			   its left edge pinned shrinks to fit it — a mobile-specific width here would either
+			   fight that number or duplicate it. */
+			display: block;
+			position: fixed;
+			inset: 0 auto 0 0;
+			z-index: 11;
+			max-width: 92vw;
+			height: 100%;
+			padding-top: env(safe-area-inset-top);
+			animation: fade var(--fade) var(--ease);
+		}
+
+		.menu {
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			position: fixed;
+			top: max(12px, env(safe-area-inset-top));
+			left: max(12px, env(safe-area-inset-left));
+			width: 40px;
+			height: 40px;
+			border: 1px solid var(--line);
+			border-radius: var(--radius);
+			background: var(--surface);
+			color: var(--text-muted);
+			font-size: 16px;
+			z-index: 9;
 		}
 	}
 </style>
