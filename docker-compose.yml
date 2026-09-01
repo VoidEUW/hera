@@ -9,6 +9,14 @@ services:
       # permission mismatches a bind mount hits differently on macOS/Windows Docker Desktop
       # than on native Linux.
       - hera_data:/data
+      # On macOS or Linux, replace the line above with a bind mount to the same place a
+      # native `uv run hera serve` already uses, so the directory is one you can open,
+      # symlink or alias like any other — mind/ is a real git repository and memories/ is
+      # one markdown file per memory, both meant to be seen outside Hera too:
+      #     - ${HOME}/.hera:/data
+      # The container then writes as root, so on native Linux (not Docker Desktop, which
+      # maps this back to you already) files land root-owned until you also add
+      # `user: "${UID}:${GID}"` here, with UID/GID exported from your shell.
     environment:
       HERA_HOME: /data
       HERA_HOST: 0.0.0.0
