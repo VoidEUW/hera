@@ -218,6 +218,17 @@ export const t = {
 		pick: 'Choose skills'
 	},
 
+	servers: {
+		title: 'Servers she can reach',
+		blurb:
+			'Only connected servers count — one that failed to start changes nothing for the next message. Adding or removing one happens in Settings.',
+		close: 'Close',
+		toolSingular: 'tool',
+		toolPlural: 'tools',
+		none: 'No servers connected. Add one in Settings to give her more tools.',
+		configure: 'Manage servers'
+	},
+
 	settings: {
 		title: 'Settings',
 		subtitle: 'How she works: what she runs on, what she knows, what she may do.',

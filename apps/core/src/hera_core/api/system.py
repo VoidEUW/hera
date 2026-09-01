@@ -30,6 +30,7 @@ from hera_core.schemas import (
     SkillsOut,
 )
 from hera_home import home
+from hera_mcp import BUILTIN_SERVER_NAME
 from hera_permissions import Rule
 from hera_skillsets import SkillUsageRepository
 
@@ -115,7 +116,13 @@ def create_skill(payload: SkillIn, container: Container) -> SkillOut:
 
 @router.get("/servers", response_model=list[ServerOut])
 async def list_servers(container: Container) -> list[ServerOut]:
-    """One row per MCP server, with its failure reason when it has one."""
+    """One row per MCP server, with its failure reason when it has one.
+
+    Her own in-process server is not one of these: "servers" to a person means the
+    ``mcp.json`` entries they added, and counting the builtin makes the composer say
+    "1 server" on a machine with none. The row disappears here rather than in the
+    interface because the health card reads the same list.
+    """
     if container.registry is None:
         return []
     return [
@@ -126,6 +133,7 @@ async def list_servers(container: Container) -> list[ServerOut]:
             failure=status.failure,
         )
         for status in await container.registry.status()
+        if status.name != BUILTIN_SERVER_NAME
     ]
 
 

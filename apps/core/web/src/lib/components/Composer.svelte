@@ -8,11 +8,13 @@
 	 * is who is answering, an endpoint is what she is thinking with, and ADR 2 fixes the model
 	 * *family* rather than how many endpoints you may keep registered.
 	 *
-	 * The context pill exists because a pinned skill and a running MCP server change what
-	 * happens to the next thing you type, and both were previously only visible two screens
-	 * away in Settings. Clicking it opens the **skill picker**: ADR 5 says the model is never
+	 * The bar holds two context pills side by side — one for **skills** and one for
+	 * **servers** — because a pinned skill and a running MCP server change what happens to
+	 * the next thing you type, and both were previously only visible two screens away in
+	 * Settings. The skills pill opens the **skill picker** (ADR 5 says the model is never
 	 * asked which skill applies, and this is where a person answers instead when code guesses
-	 * wrong.
+	 * wrong); the servers pill opens a small sheet listing what is connected, read-only,
+	 * because changing the list is Settings → Servers, not something a chat owns.
 	 *
 	 * `/commands` are left in the text on purpose: the router strips them server-side, and a
 	 * browser that also stripped them would be a second implementation of the same rule.
@@ -21,6 +23,7 @@
 	import { isImage, read, size, type Attachment } from '$lib/attachments';
 	import { t } from '$lib/i18n';
 	import Select from './Select.svelte';
+	import ServerSheet from './ServerSheet.svelte';
 	import SkillPicker from './SkillPicker.svelte';
 
 	interface Props {
@@ -72,6 +75,7 @@
 	}: Props = $props();
 
 	let picking = $state(false);
+	let showingServers = $state(false);
 
 	let text = $state('');
 	let field = $state<HTMLTextAreaElement | null>(null);
@@ -107,17 +111,14 @@
 		)
 	]);
 	const connected = $derived(servers.filter((server) => server.connected));
-	const context = $derived.by(() => {
-		const parts: string[] = [];
-		if (pinned.length) parts.push(t.composer.skillCount(pinned.length));
-		if (connected.length) parts.push(t.composer.serverCount(connected.length));
-		return parts.join(' · ');
-	});
-	const contextDetail = $derived(
-		[pinned.join(', '), connected.map((server) => `${server.name} (${server.tools})`).join(', ')]
-			.filter(Boolean)
-			.join(' · ')
+	// Each pill counts only its own kind, so "0 servers" really means none are reachable —
+	// a number that changed with every message would be noise, and a folded-together one
+	// says wrong words about whichever it was not named after.
+	const skillsLabel = $derived(
+		pinned.length ? t.composer.skillCount(pinned.length) : t.skills.pick
 	);
+	const serversLabel = $derived(t.composer.serverCount(connected.length));
+	const skillsDetail = $derived(pinned.join(', '));
 
 	const model = $derived(providers.find((entry) => entry.name === activeProvider) ?? null);
 
@@ -155,6 +156,17 @@
 		pinned={chatSkills ?? []}
 		onclose={() => (picking = false)}
 		onpick={(names) => onskills(names)}
+	/>
+{/if}
+
+{#if showingServers}
+	<ServerSheet
+		servers={connected}
+		onclose={() => (showingServers = false)}
+		onsettings={() => {
+			showingServers = false;
+			onsettings?.();
+		}}
 	/>
 {/if}
 
@@ -216,21 +228,30 @@
 		</button>
 		<input bind:this={picker} class="sr-only" type="file" multiple tabindex="-1" onchange={pick} />
 
-		<!-- One pill, one destination: the picker. It used to fall through to Settings whenever
-		     the caller had no chat to pin to, which meant the start screen answered "what is
-		     switched on?" by opening a different screen about something else. -->
-		{#if onskills || context}
+		<!-- Two pills, two destinations. The skills pill opens the picker; the servers pill
+		     opens the read-only sheet. They sit side by side because the two "switched on"
+		     facts they report are about the same next message, not about the same thing. -->
+		{#if onskills}
 			<button
 				class="context"
 				type="button"
-				title={contextDetail || t.skills.pick}
-				onclick={() => (onskills ? (picking = true) : onsettings?.())}
+				title={skillsDetail || t.skills.pick}
+				onclick={() => (picking = true)}
 			>
-				<span class="dot" class:idle={!pinned.length && !connected.length} aria-hidden="true"
-				></span>
-				{context || t.skills.pick}
+				<span class="dot" class:idle={!pinned.length} aria-hidden="true"></span>
+				{skillsLabel}
 			</button>
 		{/if}
+
+		<button
+			class="context"
+			type="button"
+			title={t.servers.title}
+			onclick={() => (showingServers = true)}
+		>
+			<span class="dot" class:idle={!connected.length} aria-hidden="true"></span>
+			{serversLabel}
+		</button>
 
 		{#if profiles.length > 1}
 			<div class="profile">
