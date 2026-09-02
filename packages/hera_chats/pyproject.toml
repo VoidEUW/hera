@@ -26,7 +26,7 @@ dependencies = [
     "hera-skillsets",
     "hera-storage",
     "hera-tools",
-    "pydantic>=2.7",
+    "pydantic>=2.13.5",
     "pydantic-settings>=2.4.0",
     "sqlmodel>=0.0.42",
 ]

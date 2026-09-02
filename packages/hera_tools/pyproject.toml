@@ -22,7 +22,7 @@ dependencies = [
     "hera-permissions",
     "httpx2>=2.12",
     "mcp>=2.1",
-    "pydantic>=2.7",
+    "pydantic>=2.13.5",
     "pydantic-settings>=2.4.0",
 ]
 
