@@ -217,7 +217,7 @@ def test_a_skill_is_switched_on_for_one_chat(page: Any) -> None:
     page.wait_for_url("**/chat/**", timeout=15_000)
     page.wait_for_selector("text=ticket-granting ticket", timeout=30_000)
 
-    page.locator("button.context").click()
+    page.locator("button.context.skills").click()
     page.wait_for_selector("[role=dialog]", timeout=10_000)
 
     # Wait for the write itself, not for the pill. `ChatStore.pinSkills` is deliberately
@@ -232,11 +232,11 @@ def test_a_skill_is_switched_on_for_one_chat(page: Any) -> None:
     assert patched.value.ok
 
     page.keyboard.press("Escape")
-    page.wait_for_selector("button.context:has-text('1 skill')", timeout=10_000)
+    page.wait_for_selector("button.context.skills:has-text('1 skill')", timeout=10_000)
 
     page.reload(wait_until="networkidle")
     # Stored on the chat, so it survives the reload that everything else here survives.
-    page.wait_for_selector("button.context:has-text('1 skill')", timeout=15_000)
+    page.wait_for_selector("button.context.skills:has-text('1 skill')", timeout=15_000)
 
 
 def test_settings_holds_what_changes_her_behaviour(page: Any) -> None:

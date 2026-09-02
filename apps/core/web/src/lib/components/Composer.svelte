@@ -233,7 +233,7 @@
 		     facts they report are about the same next message, not about the same thing. -->
 		{#if onskills}
 			<button
-				class="context"
+				class="context skills"
 				type="button"
 				title={skillsDetail || t.skills.pick}
 				onclick={() => (picking = true)}
@@ -244,7 +244,7 @@
 		{/if}
 
 		<button
-			class="context"
+			class="context servers"
 			type="button"
 			title={t.servers.title}
 			onclick={() => (showingServers = true)}
