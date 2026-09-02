@@ -9,6 +9,7 @@
 	 * thing a person types is never lost to a page transition.
 	 */
 	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
 	import type { Attachment } from '$lib/attachments';
 	import Composer from '$lib/components/Composer.svelte';
 	import Ocellus from '$lib/components/Ocellus.svelte';
@@ -32,7 +33,7 @@
 		// Handed over through the store rather than a query string: a message is not a URL, and
 		// a refresh must not send it a second time.
 		workspace.handOff(text, files);
-		await goto(`/chat/${chat.id}`);
+		await goto(resolve('/chat/[id]', { id: chat.id }));
 	}
 </script>
 

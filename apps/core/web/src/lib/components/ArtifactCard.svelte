@@ -75,6 +75,7 @@
 				class="save"
 				href={downloadUrl(chatId, artifact.name)}
 				download={artifact.name}
+				rel="external"
 				title={t.artifact.download}
 				aria-label={t.artifact.downloadOne(artifact.name)}
 			>

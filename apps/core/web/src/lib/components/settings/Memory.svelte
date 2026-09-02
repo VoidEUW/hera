@@ -167,7 +167,7 @@
 		<!-- A plain link at the export route. The browser knows how to save a file, and the
 		     response says `attachment` — the document is partly text a model wrote, and Hera's
 		     own origin is not where that gets rendered. -->
-		<a class="action" href={`${API}/memories/export/MEMORY.md`} download="MEMORY.md">
+		<a class="action" href={`${API}/memories/export/MEMORY.md`} download="MEMORY.md" rel="external">
 			{t.memory.export}
 		</a>
 	</div>

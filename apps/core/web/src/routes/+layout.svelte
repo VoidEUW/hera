@@ -7,6 +7,7 @@
 	 * is created rather than on the next load.
 	 */
 	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import Rail from '$lib/components/Rail.svelte';
 	import ProfileMenu from '$lib/components/ProfileMenu.svelte';
@@ -56,27 +57,27 @@
 	 */
 	async function newChat(projectId?: string) {
 		workspace.pendingProject = projectId ?? null;
-		await goto('/');
+		await goto(resolve('/'));
 	}
 
 	async function removeChat(id: string) {
 		const removed = await workspace.deleteChat(id);
 		// Only when the conversation on screen is the one that just went. Deleting another
 		// chat from the rail must not take you away from what you were reading.
-		if (removed && page.params.id === id) await goto('/');
+		if (removed && page.params.id === id) await goto(resolve('/'));
 	}
 
 	/** A new project opens its own screen. A project is instructions and pinned skills; one with
 	 * neither is a name, and the screen is where it becomes a project. */
 	async function newProject(name: string) {
 		const project = await workspace.createProject(name);
-		if (project) await goto(`/project/${project.id}`);
+		if (project) await goto(resolve('/project/[id]', { id: project.id }));
 	}
 
 	async function removeProject(id: string) {
 		const removed = await workspace.deleteProject(id);
 		// Same rule as a chat: only navigate away if you were looking at the thing that went.
-		if (removed && page.url.pathname === `/project/${id}`) await goto('/');
+		if (removed && page.url.pathname === `/project/${id}`) await goto(resolve('/'));
 	}
 
 	/** The composer shows what she can reach, and settings is where that changes. */

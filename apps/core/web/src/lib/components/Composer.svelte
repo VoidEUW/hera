@@ -211,8 +211,7 @@
 			{onkeydown}
 			rows="1"
 			disabled={blocked}
-			aria-label={placeholder}
-		></textarea>
+			aria-label={placeholder}></textarea>
 
 		<!-- Beside the first line rather than under the bar, and gone the moment there is
 		     something to send: it is the one thing here that a person needs exactly once. -->

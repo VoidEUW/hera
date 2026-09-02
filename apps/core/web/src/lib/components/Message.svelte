@@ -164,8 +164,7 @@
 							event.preventDefault();
 							saveEdit();
 						}
-					}}
-				></textarea>
+					}}></textarea>
 				<div class="editing">
 					<span class="caption">{t.message.editNote}</span>
 					<button class="quiet" type="button" onclick={() => (editing = false)}>

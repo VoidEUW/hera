@@ -63,7 +63,7 @@
 			<!-- A plain link, not a fetch and a blob: the browser knows how to save a file, and the
 			     response says `attachment` with a neutral media type, so a page she wrote is never
 			     a document rendered at Hera's own origin. -->
-			<a class="action save" href={downloadUrl(chatId, chosen)} download={chosen}>
+			<a class="action save" href={downloadUrl(chatId, chosen)} download={chosen} rel="external">
 				<Tray size={13} />
 				{t.artifact.download}
 			</a>

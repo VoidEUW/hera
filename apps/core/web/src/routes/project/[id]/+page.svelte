@@ -12,6 +12,7 @@
 	 * left open in a second tab, overwrite a pin somebody added in the first on its way past.
 	 */
 	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { untrack } from 'svelte';
 	import type { Project } from '$lib/api/client';
@@ -70,7 +71,7 @@
 {#if !project}
 	<div class="missing">
 		<p>{t.project.notFound}</p>
-		<button class="save" type="button" onclick={() => goto('/')}>{t.rail.newChat}</button>
+		<button class="save" type="button" onclick={() => goto(resolve('/'))}>{t.rail.newChat}</button>
 	</div>
 {:else}
 	{@const accent = colourOf(project.color)}
@@ -164,12 +165,15 @@
 			<h2>{t.project.chats}</h2>
 			<ul class="chats">
 				{#each chats as chat (chat.id)}
-					<li><a href="/chat/{chat.id}">{chat.title || t.empty.title}</a></li>
+					<li>
+						<a href={resolve('/chat/[id]', { id: chat.id })}>{chat.title || t.empty.title}</a>
+					</li>
 				{:else}
 					<li class="caption">{t.project.noChats}</li>
 				{/each}
 			</ul>
-			<button class="link" type="button" onclick={() => goto('/')}>{t.rail.newChat}</button>
+			<button class="link" type="button" onclick={() => goto(resolve('/'))}>{t.rail.newChat}</button
+			>
 		</section>
 	</div>
 {/if}

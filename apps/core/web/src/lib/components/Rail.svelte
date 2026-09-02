@@ -16,6 +16,7 @@
 	 * are the same question, and answering it with two parallel sets of fields is how a project
 	 * ends up being renamed by the chat handler.
 	 */
+	import { resolve } from '$app/paths';
 	import { api, type Chat, type Profile, type Project } from '$lib/api/client';
 	import { t } from '$lib/i18n';
 	import { colourOf } from '$lib/projects';
@@ -196,7 +197,11 @@
 				}}
 			/>
 		{:else}
-			<a class="entry" class:active={chat.id === activeId} href="/chat/{chat.id}">
+			<a
+				class="entry"
+				class:active={chat.id === activeId}
+				href={resolve('/chat/[id]', { id: chat.id })}
+			>
 				<span class="label">{chat.title || t.empty.title}</span>
 			</a>
 			<button
@@ -370,7 +375,12 @@
 							{t.rail.cancel}
 						</button>
 					{:else}
-						<a class="option" role="menuitem" href="/project/{project.id}" onclick={closeMenu}>
+						<a
+							class="option"
+							role="menuitem"
+							href={resolve('/project/[id]', { id: project.id })}
+							onclick={closeMenu}
+						>
 							{t.rail.open}
 						</a>
 						<button
@@ -425,7 +435,7 @@
 {/if}
 
 <nav class="rail" aria-label={t.appName}>
-	<a class="brand" href="/">
+	<a class="brand" href={resolve('/')}>
 		<Ocellus size={22} />
 		<span class="display wordmark">{t.appName}</span>
 	</a>

@@ -92,8 +92,7 @@
 				rows="2"
 				disabled={busy}
 				placeholder={t.question.placeholder}
-				aria-label={card.question || t.question.asked}
-			></textarea>
+				aria-label={card.question || t.question.asked}></textarea>
 			<div class="actions">
 				<span class="caption hint">{t.composer.hint}</span>
 				<button type="button" disabled={busy} onclick={send}>{t.question.send}</button>

@@ -12,7 +12,7 @@ export default ts.config(
 	...svelte.configs['flat/prettier'],
 	{ languageOptions: { globals: { ...globals.browser, ...globals.node } } },
 	{
-		files: ['**/*.svelte'],
+		files: ['**/*.svelte', '**/*.svelte.ts', '**/*.svelte.js'],
 		languageOptions: { parserOptions: { parser: ts.parser } }
 	},
 	{ ignores: ['.svelte-kit/', 'build/', 'node_modules/', 'src/lib/api/schema.d.ts'] }
