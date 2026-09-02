@@ -1,13 +1,29 @@
 {
     "version": "https://jsonfeed.org/version/1",
-    "title": "Hera Docs",
+    "title": "Hera",
     "description": "",
     "home_page_url": "https://voideuw.github.io/hera",
     "feed_url": "https://voideuw.github.io/hera/feed.json",
     "user_comment": "",
+    "icon": "https://voideuw.github.io/hera/media/website/favicon.svg",
     "author": {
-        "name": "Lukas Kreuz"
+        "name": "VoidEUW"
     },
     "items": [
+        {
+            "id": "https://voideuw.github.io/hera/v010/",
+            "url": "https://voideuw.github.io/hera/v010/",
+            "title": "v0.1.0",
+            "summary": "The first release. A message typed into the browser reaches a model and comes back as an answer, with tools, permissions and skills along the way. Nothing before this version worked end to end; everything after it builds on this. Full detail in CHANGELOG.md.",
+            "content_html": "<p>The first release. A message typed into the browser reaches a model and comes back as an\nanswer, with tools, permissions and skills along the way. Nothing before this version worked\nend to end; everything after it builds on this.</p><h2 id=\"whats-in-it\">What’s in it</h2>\n<ul>\n<li><strong>A uv workspace monorepo.</strong> Ten small libraries under <code>packages/</code>, one application\n(<code>hera-core</code>) serving a SvelteKit interface built into the same directory the API serves.</li>\n<li><strong>One model event union.</strong> <code>hera_providers</code> defines everything a model can emit; nothing\nabove it parses text. A malformed tool call arrives as an event, not an exception.</li>\n<li><strong>Tools as MCP servers.</strong> External tools come from <code>~/.hera/mcp.json</code>, in the same shape as\nClaude Desktop’s configuration. Hera’s own capabilities — <code>hera__emotion</code>, <code>hera__remember</code>,\n<code>hera__note</code>, <code>hera__skill</code>, <code>hera__search</code> — are mounted the same way, through the same\nclient.</li>\n<li><strong>Web search</strong>, over DuckDuckGo, no API key required.</li>\n<li><strong>Skills as <code>SKILL.md</code> packages</strong>, selected by code — pinned, then <code>/slash</code>, then keyword\nretrieval — never left to the model to notice on its own.</li>\n<li><strong>A git-backed mind.</strong> Twelve regions, one file each, in a real git repository at\n<code>~/.hera/mind/</code>.</li>\n<li><strong>Permissions.</strong> Allow, deny or ask, resolved by pattern and profile. A confirmation card\nsuspends the turn and waits for a person; “always allow” writes a rule.</li>\n<li><strong>Chats and projects</strong>, with the full event stream persisted so a reload always shows what\nactually happened.</li>\n<li><strong>Attachments, including pictures.</strong> Read in the browser and sent as a field, never pasted\ninto the message text.</li>\n<li><strong>Configurable model endpoints.</strong> Several can be registered in <code>~/.hera/config.toml</code>, one\nactive at a time; switching takes effect on the next turn, no restart.</li>\n</ul>\n<h2 id=\"whats-not-in-it-yet\">What’s not in it yet</h2>\n<ul>\n<li>No memory — <code>hera__remember</code> and <code>hera__note</code> are wired to nothing and say so.</li>\n<li>No <code>hera__fetch</code> — she can find a page, not read it.</li>\n<li>No PDFs.</li>\n<li>No command palette; <code>⌘K</code> opens Settings.</li>\n<li>No mobile layout.</li>\n<li>Single user, behind a seam meant for more.</li>\n</ul>\n<p>Full detail in\n<a href=\"https://github.com/VoidEUW/hera/blob/main/CHANGELOG.md#010--2026-08-27\">CHANGELOG.md</a>.</p>",
+            "author": {
+                "name": "VoidEUW"
+            },
+            "tags": [
+                   "release"
+            ],
+            "date_published": "2026-09-01T00:51:37+02:00",
+            "date_modified": "2026-09-03T00:58:51+02:00"
+        }
     ]
 }

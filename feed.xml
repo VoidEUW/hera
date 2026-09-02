@@ -1,12 +1,69 @@
 <?xml version="1.0" encoding="utf-8"?>
 <feed xmlns="http://www.w3.org/2005/Atom" xmlns:media="http://search.yahoo.com/mrss/">
-    <title>Hera Docs</title>
+    <title>Hera</title>
     <link href="https://voideuw.github.io/hera/feed.xml" rel="self" />
     <link href="https://voideuw.github.io/hera" />
-    <updated>1970-01-01T01:00:00+01:00</updated>
+    <updated>2026-09-03T00:58:51+02:00</updated>
     <author>
-        <name>Lukas Kreuz</name>
+        <name>VoidEUW</name>
     </author>
     <id>https://voideuw.github.io/hera</id>
 
+    <entry>
+        <title>v0.1.0</title>
+        <author>
+            <name>VoidEUW</name>
+        </author>
+        <link href="https://voideuw.github.io/hera/v010/"/>
+        <id>https://voideuw.github.io/hera/v010/</id>
+            <category term="release"/>
+
+        <updated>2026-09-01T00:51:37+02:00</updated>
+            <summary type="html">
+                <![CDATA[
+                    The first release. A message typed into the browser reaches a model and comes back as an answer, with tools, permissions and skills along the way. Nothing before this version worked end to end; everything after it builds on this. Full detail in CHANGELOG.md.
+                ]]>
+            </summary>
+        <content type="html">
+            <![CDATA[
+                <p>The first release. A message typed into the browser reaches a model and comes back as an
+answer, with tools, permissions and skills along the way. Nothing before this version worked
+end to end; everything after it builds on this.</p><h2 id="whats-in-it">What’s in it</h2>
+<ul>
+<li><strong>A uv workspace monorepo.</strong> Ten small libraries under <code>packages/</code>, one application
+(<code>hera-core</code>) serving a SvelteKit interface built into the same directory the API serves.</li>
+<li><strong>One model event union.</strong> <code>hera_providers</code> defines everything a model can emit; nothing
+above it parses text. A malformed tool call arrives as an event, not an exception.</li>
+<li><strong>Tools as MCP servers.</strong> External tools come from <code>~/.hera/mcp.json</code>, in the same shape as
+Claude Desktop’s configuration. Hera’s own capabilities — <code>hera__emotion</code>, <code>hera__remember</code>,
+<code>hera__note</code>, <code>hera__skill</code>, <code>hera__search</code> — are mounted the same way, through the same
+client.</li>
+<li><strong>Web search</strong>, over DuckDuckGo, no API key required.</li>
+<li><strong>Skills as <code>SKILL.md</code> packages</strong>, selected by code — pinned, then <code>/slash</code>, then keyword
+retrieval — never left to the model to notice on its own.</li>
+<li><strong>A git-backed mind.</strong> Twelve regions, one file each, in a real git repository at
+<code>~/.hera/mind/</code>.</li>
+<li><strong>Permissions.</strong> Allow, deny or ask, resolved by pattern and profile. A confirmation card
+suspends the turn and waits for a person; “always allow” writes a rule.</li>
+<li><strong>Chats and projects</strong>, with the full event stream persisted so a reload always shows what
+actually happened.</li>
+<li><strong>Attachments, including pictures.</strong> Read in the browser and sent as a field, never pasted
+into the message text.</li>
+<li><strong>Configurable model endpoints.</strong> Several can be registered in <code>~/.hera/config.toml</code>, one
+active at a time; switching takes effect on the next turn, no restart.</li>
+</ul>
+<h2 id="whats-not-in-it-yet">What’s not in it yet</h2>
+<ul>
+<li>No memory — <code>hera__remember</code> and <code>hera__note</code> are wired to nothing and say so.</li>
+<li>No <code>hera__fetch</code> — she can find a page, not read it.</li>
+<li>No PDFs.</li>
+<li>No command palette; <code>⌘K</code> opens Settings.</li>
+<li>No mobile layout.</li>
+<li>Single user, behind a seam meant for more.</li>
+</ul>
+<p>Full detail in
+<a href="https://github.com/VoidEUW/hera/blob/main/CHANGELOG.md#010--2026-08-27">CHANGELOG.md</a>.</p>
+            ]]>
+        </content>
+    </entry>
 </feed>

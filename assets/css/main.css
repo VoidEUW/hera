@@ -1,3 +1,157 @@
+/* === Parchment & Laurel override — Fundament (Fonts + Variablen) ===
+   Diese Datei wird bei jedem Publii-Build nach dem von theme-variables.js
+   generierten :root eingehängt, daher gewinnen die Werte hier ohne
+   !important. Theme-Settings fuer Farben/Schriften (config.json) werden
+   dadurch bewusst wirkungslos ueberschrieben. */
+
+@font-face {
+  font-family: 'Fraunces';
+  src: url('../fonts/fraunces/fraunces-variable.woff2') format('woff2');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Source Serif 4';
+  src: url('../fonts/source-serif-4/source-serif-4-variable.woff2') format('woff2');
+  font-weight: 200 900;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Source Serif 4';
+  src: url('../fonts/source-serif-4/source-serif-4-italic-variable.woff2') format('woff2');
+  font-weight: 200 900;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Figtree';
+  src: url('../fonts/figtree/figtree-variable.woff2') format('woff2');
+  font-weight: 300 900;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Figtree';
+  src: url('../fonts/figtree/figtree-italic-variable.woff2') format('woff2');
+  font-weight: 300 900;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'IBM Plex Mono';
+  src: url('../fonts/ibm-plex-mono/ibm-plex-mono-400.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'IBM Plex Mono';
+  src: url('../fonts/ibm-plex-mono/ibm-plex-mono-600.woff2') format('woff2');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  /* Typografie */
+  --body-font: 'Source Serif 4', Georgia, serif;
+  --heading-font: 'Fraunces', Georgia, serif;
+  --menu-font: 'Figtree', system-ui, sans-serif;
+  --logo-font: 'Fraunces', serif;
+  --mono-font: 'IBM Plex Mono', ui-monospace, monospace;
+  --font-size: 17px;
+  --line-height: 1.65;
+  --headings-line-height: 1.25;
+  --headings-letter-spacing: -0.01em;
+  --headings-weight: 600;
+  --border-radius: 4px;
+  --entry-width: 68ch;
+
+  /* Farben — Dark (Standard) */
+  --page-bg: #17130A;
+  --dark: #F4EEDF;
+  --light: #3D3421;
+  --lighter: #211B10;
+  --gray: #B0A68D;
+  --white: #17130A;
+  --text-color: #F4EEDF;
+  --link-color: #D9AE52;
+  --link-color-hover: #DE4E64;
+  --color: #D9AE52;
+  --nav-link-color: #B0A68D;
+  --nav-link-color-hover: #D9AE52;
+  --headings-color: #F4EEDF;
+  --black: #17130A;
+  --helper: #17130A;
+  --logo-color: #F4EEDF;
+  --highlight-color: #D9AE52;
+  --warning-color: #E0685E;
+  --success-color: #7FB069;
+  --info-color: #7FB069;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --page-bg: #F6EEDB;
+    --dark: #201B10;
+    --light: #E0D2B4;
+    --lighter: #EFE4CC;
+    --gray: #6B6250;
+    --white: #FDFAF1;
+    --text-color: #201B10;
+    --link-color: #80621A;
+    --link-color-hover: #A82A45;
+    --color: #80621A;
+    --nav-link-color: #6B6250;
+    --nav-link-color-hover: #80621A;
+    --headings-color: #201B10;
+    --black: #201B10;
+    --helper: #FDFAF1;
+    --logo-color: #201B10;
+    --highlight-color: #80621A;
+    --warning-color: #B03A2E;
+    --success-color: #3F6B32;
+    --info-color: #3F6B32;
+  }
+}
+
+/* Parchment & Laurel: Publiis eigenes GDPR-Cookie-Banner-CSS wird beim
+   Build HINTER main.css angehaengt und deklariert seine --pcb-*-Variablen
+   erneut auf :root -- ohne Gegenmassnahme wuerden unsere Werte hier von
+   Publiis spaeteren Defaults ueberschrieben. "html:root" trifft dasselbe
+   Element (<html>), hat aber hoehere Spezifitaet als ein blosses ":root",
+   daher gewinnen wir ohne !important. Werte folgen ueber var() automatisch
+   dem aktiven Farbmodus, keine eigene light/dark-Dopplung noetig. */
+html:root {
+  --pcb-font-base-size: var(--font-size);
+  --pcb-border-radius: var(--border-radius);
+  --pcb-bg: var(--white);
+  --pcb-overlay: color-mix(in srgb, var(--black) 80%, transparent);
+  --pcb-text-color: var(--text-color);
+  --pcb-headings-color: var(--headings-color);
+  --pcb-border-color: var(--light);
+  --pcb-bg-light: var(--lighter);
+  --pcb-btn-primary-bg: var(--lighter);
+  --pcb-btn-primary-bg-hover: var(--light);
+  --pcb-btn-primary-text: var(--dark);
+  --pcb-btn-primary-text-hover: var(--dark);
+  --pcb-btn-secondary-bg: var(--color);
+  --pcb-btn-secondary-bg-hover: color-mix(in srgb, var(--color) 80%, var(--black));
+  --pcb-btn-secondary-text: var(--helper);
+  --pcb-btn-secondary-text-hover: var(--helper);
+  --pcb-btn-link: var(--link-color);
+  --pcb-btn-link-hover: var(--link-color-hover);
+  --pcb-badge-bg: var(--color);
+  --pcb-badge-bg-hover: color-mix(in srgb, var(--color) 80%, var(--black));
+  --pcb-badge-color: var(--helper);
+  --pcb-badge-color-hover: var(--helper);
+}
+
 *,
 *:before,
 *:after {
@@ -146,33 +300,38 @@ h6 {
 
 h1,
 .h1 {
-  font-size: clamp(1.5710900065rem, 1.5710900065rem + 1.424540906 * (100vw - 20rem) / 70, 2.9956309125rem);
+  /* Parchment & Laurel: feste Skala statt vw-Fluid, siehe CLAUDE.md Typografie-Tabelle */
+  font-size: 22px;
+  line-height: 1.3;
   font-family: var(--heading-font);
 }
 
 h2,
 .h2 {
-  font-size: clamp(1.3808408252rem, 1.3808408252rem + 0.9332127447 * (100vw - 20rem) / 70, 2.3140535699rem);
+  font-size: 18px;
+  line-height: 1.35;
 }
 
 h3,
 .h3 {
-  font-size: clamp(1.2136296308rem, 1.2136296308rem + 0.4621997101 * (100vw - 20rem) / 70, 1.6758293408rem);
+  /* nicht Teil der benannten Skala; Zwischenschritt, damit die Hierarchie
+     zwischen H2 (18px) und UI/Body (14-17px) nicht kollabiert */
+  font-size: 16px;
 }
 
 h4,
 .h4 {
-  font-size: clamp(1.1377777785rem, 1.1377777785rem + 0.1567604947 * (100vw - 20rem) / 70, 1.2945382732rem);
+  font-size: 15px;
 }
 
 h5,
 .h5 {
-  font-size: clamp(1.066666667rem, 1.066666667rem + 0.0711111115 * (100vw - 20rem) / 70, 1.1377777785rem);
+  font-size: 14px;
 }
 
 h6,
 .h6 {
-  font-size: clamp(1rem, 1rem + 0 * (100vw - 20rem) / 70, 1rem);
+  font-size: 13px;
 }
 
 h2 + *,
@@ -218,7 +377,10 @@ dl dt {
 
 pre {
   background-color: var(--lighter);
-  font-size: 0.8239746086rem;
+  border: 1px solid var(--light);
+  border-radius: calc(var(--border-radius) * 2);
+  font-size: 13.5px;
+  line-height: 1.55;
   padding: calc(var(--baseline) * 6);
   white-space: pre-wrap;
   word-wrap: break-word;
@@ -233,8 +395,8 @@ pre > code {
 code {
   background-color: var(--lighter);
   color: var(--color);
-  font-size: 0.8239746086rem;
-  font-family: Menlo, Monaco, Consolas, Courier New, monospace;
+  font-size: 13.5px;
+  font-family: var(--mono-font);
 }
 
 table {
@@ -244,12 +406,10 @@ table {
   vertical-align: top;
   text-align: left;
   width: 100%;
-}
-@media all and (max-width: 37.4375em) {
-  table {
-    display: block;
-    overflow-x: auto;
-  }
+  /* Parchment & Laurel: Tabellen scrollen innerhalb der Spalte statt die
+     Seite zu verbreitern -- nicht mehr nur auf Mobile beschraenkt. */
+  display: block;
+  overflow-x: auto;
 }
 table th {
   font-variation-settings: "wght" var(--font-weight-bold);
@@ -275,7 +435,8 @@ figcaption {
   clear: both;
   color: var(--gray);
   font-style: italic;
-  font-size: 0.7241964329rem;
+  font-size: 12.5px;
+  line-height: 1.4;
   padding: calc(var(--baseline) * 3) 0 0;
   text-align: center;
 }
@@ -284,8 +445,8 @@ kbd {
   background: var(--dark);
   border-radius: 2px;
   color: var(--white);
-  font-family: Menlo, Monaco, Consolas, Courier New, monospace;
-  font-size: 0.8789062495rem;
+  font-family: var(--mono-font);
+  font-size: 13.5px;
   padding: calc(var(--baseline) * 0.5) calc(var(--baseline) * 1.5);
 }
 
@@ -295,7 +456,7 @@ sup {
 }
 
 small {
-  font-size: 0.8789062495rem;
+  font-size: 12.5px;
 }
 
 hr,
@@ -353,7 +514,8 @@ button {
   cursor: pointer;
   display: inline-flex;
   font-family: var(--menu-font);
-  font-size: 0.8239746086rem;
+  font-size: 14px;
+  line-height: 1.45;
   font-variation-settings: "wght" var(--font-weight-bold);
   overflow: hidden;
   padding: calc(var(--baseline) * 2) calc(var(--baseline) * 4);
@@ -455,11 +617,17 @@ fieldset > legend {
 }
 
 legend {
+  font-family: var(--menu-font);
+  font-size: 14px;
+  line-height: 1.45;
   font-variation-settings: "wght" 500;
   padding: 0;
 }
 
 label {
+  font-family: var(--menu-font);
+  font-size: 14px;
+  line-height: 1.45;
   font-variation-settings: "wght" 500;
   margin: 0 calc(var(--baseline) * 4) calc(var(--baseline) * 3) 0;
 }
@@ -545,7 +713,9 @@ input[type=radio] + label:before {
 input[type=checkbox]:checked + label:before,
 input[type=radio]:checked + label:before {
   content: "";
-  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 11 8'%3e%3cpolygon points='9.53 0 4.4 5.09 1.47 2.18 0 3.64 2.93 6.54 4.4 8 5.87 6.54 11 1.46 9.53 0' fill='%23d73a42'/%3e%3c/svg%3e");
+  /* Checkmark-Farbe folgt --color (brass); Data-URI kann keine CSS-Variable
+     referenzieren, daher hier + im prefers-color-scheme:light Block unten. */
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 11 8'%3e%3cpolygon points='9.53 0 4.4 5.09 1.47 2.18 0 3.64 2.93 6.54 4.4 8 5.87 6.54 11 1.46 9.53 0' fill='%23d9ae52'/%3e%3c/svg%3e");
   background-repeat: no-repeat;
   background-size: 11px 8px;
   background-position: 50% 50%;
@@ -555,7 +725,16 @@ input[type=radio] + label:before {
   border-radius: 50%;
 }
 input[type=radio]:checked + label:before {
-  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8'%3e%3ccircle cx='4' cy='4' r='4' fill='%23d73a42'/%3e%3c/svg%3e");
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8'%3e%3ccircle cx='4' cy='4' r='4' fill='%23d9ae52'/%3e%3c/svg%3e");
+}
+@media (prefers-color-scheme: light) {
+  input[type=checkbox]:checked + label:before,
+  input[type=radio]:checked + label:before {
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 11 8'%3e%3cpolygon points='9.53 0 4.4 5.09 1.47 2.18 0 3.64 2.93 6.54 4.4 8 5.87 6.54 11 1.46 9.53 0' fill='%238a6a1c'/%3e%3c/svg%3e");
+  }
+  input[type=radio]:checked + label:before {
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8'%3e%3ccircle cx='4' cy='4' r='4' fill='%238a6a1c'/%3e%3c/svg%3e");
+  }
 }
 
 [type=file] {
@@ -569,9 +748,14 @@ select {
   position: relative;
 }
 select:not([multiple]) {
-  background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 6 6"><polygon points="3 6 3 6 0 0 6 0 3 6" fill="%238a8b8c"/></svg>') no-repeat 90% 50%;
+  background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 6 6"><polygon points="3 6 3 6 0 0 6 0 3 6" fill="%23b0a68d"/></svg>') no-repeat 90% 50%;
   background-size: 8px;
   padding-right: calc(var(--baseline) * 12);
+}
+@media (prefers-color-scheme: light) {
+  select:not([multiple]) {
+    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 6 6"><polygon points="3 6 3 6 0 0 6 0 3 6" fill="%236b6250"/></svg>');
+  }
 }
 
 select[multiple] {
@@ -606,6 +790,7 @@ textarea {
   height: var(--navbar-height);
   position: relative;
   padding: 0 var(--page-margin);
+  border-bottom: 1px solid var(--light);
   -webkit-transition: background 0.5s ease;
   transition: background 0.5s ease;
   width: 100%;
@@ -776,8 +961,8 @@ textarea {
 .navbar .navbar__menu li {
   font-family: var(--menu-font);
   display: block;
-  font-size: 0.8789062495rem;
-  line-height: var(--line-height);
+  font-size: 14px;
+  line-height: 1.45;
   font-variation-settings: "wght" 500;
   padding: 0;
   position: relative;
@@ -865,8 +1050,8 @@ textarea {
   z-index: 2;
 }
 .navbar .navbar__submenu li {
-  line-height: 1.5;
-  font-size: 0.8789062495rem;
+  line-height: 1.45;
+  font-size: 14px;
 }
 .navbar .navbar__submenu li a,
 .navbar .navbar__submenu li span[role=button] {
@@ -891,7 +1076,10 @@ textarea {
   color: var(--nav-link-color);
 }
 .navbar .navbar__toggle {
-  background: var(--black);
+  /* --black/--white koennen im Dark Mode denselben Ton treffen (beide
+     #17130A); Button nutzt daher das --dark/--helper-Paar, das im Theme
+     bereits als Flaechen-/Text-Kontrastpaar definiert ist (siehe .btn:hover). */
+  background: var(--dark);
   -webkit-box-shadow: none;
           box-shadow: none;
   border: none;
@@ -949,7 +1137,7 @@ textarea {
 .navbar .navbar__toggle-inner, .navbar .navbar__toggle-inner::before, .navbar .navbar__toggle-inner::after {
   width: 20px;
   height: 1px;
-  background-color: var(--white);
+  background-color: var(--helper);
   position: absolute;
   -webkit-transition: opacity 0.14s ease-out, -webkit-transform;
   transition: opacity 0.14s ease-out, -webkit-transform;
@@ -1200,6 +1388,41 @@ textarea {
   position: relative;
   z-index: 1;
 }
+/* Parchment & Laurel: Hero (Text + Screenshot) fuellt den ersten Bildschirm
+   und deutet mit dem Scroll-Cue dezent an, dass darunter mehr folgt. Nur
+   auf der Startseite -- .hero ist der Kopfbereich jeder Seite. */
+body.home-template .hero {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 100vh;
+  min-height: 100svh;
+}
+.hero__scroll-cue {
+  position: absolute;
+  bottom: calc(var(--baseline) * 6);
+  left: 50%;
+  color: var(--gray);
+  animation: hero-scroll-cue 2.4s ease-in-out infinite;
+}
+.hero__scroll-cue svg {
+  display: block;
+  stroke: currentColor;
+  -webkit-transform: rotate(180deg);
+          transform: rotate(180deg);
+}
+@keyframes hero-scroll-cue {
+  0%, 100% {
+    -webkit-transform: translate(-50%, 0);
+            transform: translate(-50%, 0);
+    opacity: 0.35;
+  }
+  50% {
+    -webkit-transform: translate(-50%, 6px);
+            transform: translate(-50%, 6px);
+    opacity: 0.7;
+  }
+}
 .hero--noimage::after {
   background: var(--dark);
   content: "";
@@ -1216,6 +1439,13 @@ textarea {
 }
 .hero__content {
   padding-bottom: calc(var(--baseline) * 6 + 1.5vw);
+}
+/* Parchment & Laurel: "Display"-Groesse nur fuer die Homepage-Tagline,
+   nicht fuer Seitentitel wie 404/Suche/Tags, die dieselbe .hero-Struktur
+   nutzen. */
+body.home-template .hero__content h1 {
+  font-size: 40px;
+  line-height: 1.15;
 }
 .hero__content h1 > sup {
   font-size: 1.066666667rem;
@@ -1265,6 +1495,31 @@ textarea {
   }
 }
 
+/* Parchment & Laurel override: Der Homepage-Screenshot bekommt eine eigene
+   Darstellung (Breite gedeckelt, voll sichtbar, brass-Rahmen + Glow direkt
+   am Bild) statt des sitweiten Hero-Cover-Crops, den Tag-/Seiten-Hero-Bilder
+   weiterhin nutzen. Gescopt ueber body.home-template, da .hero der
+   Kopfbereich jeder Seite ist. Glow sitzt bewusst am img selbst, nicht an
+   einem Wrapper -- :has()-Ansaetze auf verschachtelten Containern haben
+   zuvor die Zentrierung verschoben. */
+body.home-template .hero__image {
+  box-sizing: content-box;
+  margin: 0 auto;
+  max-width: 760px;
+  padding: 0 var(--page-margin);
+}
+body.home-template .hero__image-wrapper {
+  height: auto;
+}
+body.home-template .hero__image-wrapper img {
+  height: auto;
+  border: 1px solid color-mix(in srgb, var(--light) 65%, var(--color) 35%);
+  box-shadow:
+    0 24px 48px -16px rgba(0, 0, 0, 0.45),
+    0 0 48px -12px color-mix(in srgb, var(--color) 40%, transparent),
+    0 0 80px -24px color-mix(in srgb, var(--success-color) 35%, transparent);
+}
+
 .feed__item {
   display: flex;
   flex-wrap: wrap;
@@ -1311,7 +1566,8 @@ textarea {
   align-items: center;
   color: var(--gray);
   display: flex;
-  font-size: 0.8239746086rem;
+  font-size: 12.5px;
+  line-height: 1.4;
   gap: 0.8rem;
   margin-bottom: calc(var(--baseline) * 3);
 }
@@ -1415,7 +1671,8 @@ textarea {
 }
 .content__updated {
   color: var(--gray);
-  font-size: 0.8789062495rem;
+  font-size: 12.5px;
+  line-height: 1.4;
   font-style: italic;
 }
 .content__actions {
@@ -1505,7 +1762,8 @@ textarea {
   border: 1px solid var(--light);
   border-radius: calc(var(--border-radius) * 10);
   color: var(--dark);
-  font-size: 0.7241964329rem;
+  font-size: 12.5px;
+  line-height: 1.4;
   font-variation-settings: "wght" var(--font-weight-normal);
   padding: calc(var(--baseline) * 1) calc(var(--baseline) * 2.5);
 }
@@ -1639,7 +1897,8 @@ textarea {
 .content__nav-link span {
   color: var(--gray);
   display: block;
-  font-size: 0.7724761953rem;
+  font-size: 12.5px;
+  line-height: 1.4;
   font-family: var(--menu-font);
   font-style: normal;
   font-variation-settings: "wght" var(--font-weight-normal);
@@ -1878,10 +2137,169 @@ textarea {
   padding-bottom: 0;
 }
 
+/* Parchment & Laurel: Docs-Sidebar-Layout (Task 5), nur aktiv wenn
+   config.page.docsSidebar in Publii aktiviert ist. Unterhalb von 900px
+   bleibt es einfaches Blockverhalten -- Sidebar steht als Liste oberhalb
+   des Inhalts, keine eigene Mobile-Umschaltung noetig. */
+@media all and (min-width: 56.25em) {
+  .docs-layout {
+    display: grid;
+    /* Content-Spalte = exakt --page-width, damit .wrapper/.entry-wrapper
+       (die selbst schon auf max-width: var(--page-width); margin: auto
+       zentrieren) hier zu einem No-op werden statt mit dem Grid zu
+       kollidieren -- kein Ueberschreiben der Innenelemente noetig. */
+    grid-template-columns: 220px var(--page-width);
+    justify-content: center;
+    gap: calc(var(--baseline) * 12);
+    padding: 0 var(--page-margin);
+  }
+  .docs-sidebar {
+    position: sticky;
+    top: calc(var(--navbar-height) + var(--baseline) * 6);
+    align-self: start;
+    max-height: calc(100vh - var(--navbar-height) - var(--baseline) * 12);
+    overflow-y: auto;
+  }
+}
+.docs-sidebar {
+  font-family: var(--menu-font);
+  font-size: 14px;
+  line-height: 1.45;
+  margin-bottom: calc(var(--baseline) * 9);
+}
+.docs-sidebar__root {
+  display: block;
+  color: var(--headings-color);
+  font-variation-settings: "wght" var(--font-weight-bold);
+  margin-bottom: calc(var(--baseline) * 3);
+}
+.docs-sidebar__list,
+.docs-sidebar__sublist {
+  list-style: none;
+  margin: 0;
+}
+.docs-sidebar__sublist {
+  margin-left: 1rem;
+}
+.docs-sidebar__link {
+  display: block;
+  color: var(--nav-link-color);
+  padding: calc(var(--baseline) * 1.5) 0;
+}
+.docs-sidebar__link:hover {
+  color: var(--nav-link-color-hover);
+}
+.docs-sidebar__link.is-active {
+  color: var(--color);
+  font-variation-settings: "wght" var(--font-weight-bold);
+}
+
+/* Parchment & Laurel: Karten-Grid fuer Docs-Uebersichtsseiten (z.B.
+   Installationsmethoden), zum manuellen Einsatz per Custom-HTML im
+   Seiten-Text -- keine Entsprechung im Basis-Theme, komplett neue
+   Klassen. Erbt die Breitenbegrenzung automatisch von .entry-wrapper. */
+.docs-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: calc(var(--baseline) * 6);
+  margin-top: calc(var(--baseline) * 6 + 1vw);
+}
+.docs-card {
+  background: var(--lighter);
+  border: 1px solid var(--light);
+  border-radius: calc(var(--border-radius) * 2);
+  padding: calc(var(--baseline) * 6);
+  display: flex;
+  flex-direction: column;
+}
+.docs-card__meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: calc(var(--baseline) * 3);
+}
+.docs-card__badge {
+  font-family: var(--menu-font);
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--color);
+  background: color-mix(in srgb, var(--color) 16%, transparent);
+  border-radius: calc(var(--border-radius) * 10);
+  padding: 0.15rem 0.7rem;
+}
+.docs-card__time {
+  font-family: var(--menu-font);
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--gray);
+  margin-left: auto;
+}
+.docs-card__title {
+  margin: 0 0 calc(var(--baseline) * 2);
+}
+.docs-card__desc {
+  font-family: var(--body-font);
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--text-color);
+  margin: 0 0 calc(var(--baseline) * 4);
+}
+.docs-card__steps {
+  list-style: none;
+  counter-reset: docs-card-step;
+  margin: 0 0 calc(var(--baseline) * 4);
+  flex-grow: 1;
+}
+.docs-card__steps li {
+  counter-increment: docs-card-step;
+  position: relative;
+  padding: 0 0 calc(var(--baseline) * 2.5) calc(var(--baseline) * 8);
+  font-family: var(--menu-font);
+  font-size: 14px;
+  line-height: 1.45;
+}
+.docs-card__steps li::before {
+  content: counter(docs-card-step);
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1.4rem;
+  height: 1.4rem;
+  border-radius: 50%;
+  background: var(--light);
+  color: var(--dark);
+  font-size: 12px;
+  line-height: 1.4rem;
+  text-align: center;
+}
+.docs-card__requirements {
+  list-style: none;
+  margin: 0 0 calc(var(--baseline) * 4);
+  color: var(--gray);
+  font-family: var(--menu-font);
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+.docs-card__requirements li {
+  padding: calc(var(--baseline) * 0.5) 0;
+}
+.docs-card__link {
+  display: inline-block;
+  margin-top: auto;
+  font-family: var(--menu-font);
+  font-size: 14px;
+  font-variation-settings: "wght" var(--font-weight-bold);
+  color: var(--link-color);
+}
+.docs-card__link:hover {
+  color: var(--link-color-hover);
+}
+
 .readmore {
   display: inline-block;
   color: var(--gray);
-  font-size: 0.9374999997rem;
+  font-size: 12.5px;
+  line-height: 1.4;
   font-style: italic;
   text-decoration: underline;
   -webkit-text-decoration-skip: ink;
@@ -2031,7 +2449,8 @@ textarea {
   fill: var(--gray);
 }
 .footer__copyright {
-  font-size: 0.8239746086rem;
+  font-size: 12.5px;
+  line-height: 1.4;
   margin-top: var(--baseline);
 }
 .footer__copyright > *:first-child {
@@ -2204,4 +2623,19 @@ textarea {
   opacity: 1;
   -webkit-transform: translate(-50%, 0);
           transform: translate(-50%, 0);
+}
+
+/* === Parchment & Laurel override — Bewegungsreduktion ===
+   Einzige bewusste !important-Ausnahme: ein universeller Selector hat
+   Spezifitaet 0 und wuerde sonst von jeder klassenbasierten Transition-Regel
+   im Theme geschlagen, egal an welcher Stelle der Datei er steht. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.001ms !important;
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+  }
 }

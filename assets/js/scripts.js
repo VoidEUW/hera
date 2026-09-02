@@ -802,3 +802,28 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 })();
+
+// Parchment & Laurel: mark the active link in the docs sidebar (Task 5).
+// Done client-side because nested {{#getPage}} calls in the recursive
+// sidebar partial would otherwise need the current page URL re-passed
+// down through every recursion level.
+(function () {
+    var links = document.querySelectorAll('.docs-sidebar__link');
+
+    if (!links.length) {
+        return;
+    }
+
+    var normalize = function (pathname) {
+        return pathname.replace(/\/index\.html$/, '/').replace(/\/$/, '');
+    };
+
+    var currentPath = normalize(window.location.pathname);
+
+    for (var i = 0; i < links.length; i++) {
+        if (normalize(links[i].pathname) === currentPath) {
+            links[i].classList.add('is-active');
+            links[i].setAttribute('aria-current', 'page');
+        }
+    }
+})();
