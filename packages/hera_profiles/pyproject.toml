@@ -22,7 +22,7 @@ dependencies = [
     "hera-prompts",
     "hera-storage",
     "pydantic>=2.7",
-    "sqlmodel>=0.0.22",
+    "sqlmodel>=0.0.42",
 ]
 
 [tool.hatch.build.targets.wheel]
