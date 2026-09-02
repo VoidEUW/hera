@@ -31,7 +31,7 @@ dependencies = [
     "hera-skillsets",
     "hera-storage",
     "hera-tools",
-    "pydantic>=2.7",
+    "pydantic>=2.13.5",
     "pydantic-settings>=2.4.0",
     # tomllib reads TOML; nothing in the standard library writes it, and hand-rolling the
     # serialisation is exactly what breaks on a quote in an API key.

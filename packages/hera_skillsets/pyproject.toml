@@ -20,7 +20,7 @@ classifiers = [
 dependencies = [
     "hera-home",
     "hera-storage",
-    "pydantic>=2.7",
+    "pydantic>=2.13.5",
     "pyyaml>=6.0",
     "sqlmodel>=0.0.22",
 ]
