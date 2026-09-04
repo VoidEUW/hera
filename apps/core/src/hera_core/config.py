@@ -22,10 +22,10 @@ from __future__ import annotations
 
 import tomllib
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import tomli_w
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from hera_home import config_path
 from hera_providers import ProviderSettings
@@ -46,20 +46,78 @@ def validate_provider_name(name: str) -> str:
     return cleaned
 
 
+ProviderKind = Literal[
+    "openai",
+    "anthropic",
+    "google",
+    "mistral",
+    "openrouter",
+    "lmstudio",
+    "ollama",
+    "vllm",
+    "llamacpp",
+    "generic",
+    "custom",
+]
+"""Who an endpoint is, for the small icon beside its name. Manual rather than guessed from
+``base_url``: these are arbitrary self-hosted OpenAI-compatible servers, and a hostname is not
+a reliable way to tell LM Studio from vLLM from a proxy in front of either. ``custom`` is the
+one kind that carries an uploaded image instead of a bundled one — see
+:attr:`ProviderEntry.logo_media_type`."""
+
+
+class ModelEntry(BaseModel):
+    """One named model registered against an endpoint."""
+
+    model_config = ConfigDict(frozen=True)
+
+    id: str = Field(min_length=1)
+    """What travels in the request body's ``model`` field — has to match what the endpoint
+    calls it."""
+
+    name: str = ""
+    """The friendly label shown on screen. Empty is filled in with :attr:`id` below, so nothing
+    that reads a model entry has to fall back itself."""
+
+    @model_validator(mode="before")
+    @classmethod
+    def _default_name(cls, data: object) -> object:
+        """A ``mode="after"`` validator that returns a *different* instance is silently a no-op
+        when a model is constructed via ``__init__`` rather than ``model_validate`` — pydantic
+        only applies that return value on the ``model_validate`` path. Doing the fallback here,
+        on the raw input, works on both."""
+        if isinstance(data, dict) and not data.get("name") and data.get("id"):
+            return {**data, "name": data["id"]}
+        return data
+
+
 class ProviderEntry(BaseModel):
-    """One endpoint she can be pointed at."""
+    """One endpoint she can be pointed at, and the named models registered on it."""
 
     model_config = ConfigDict(frozen=True)
 
     name: str
     """What you call it. Also the identifier in the URL, so it is kept URL-safe."""
 
+    kind: ProviderKind = "generic"
+
     base_url: str = "http://localhost:1234/v1"
     api_key: str = ""
     """Empty for a local server, which is the intended deployment. Never sent to the browser —
     :meth:`redacted` is what the API returns."""
 
-    model: str = "qwen3.6-35b"
+    models: list[ModelEntry] = Field(default_factory=list)
+    active_model: str = ""
+    """Which of :attr:`models` is currently selected. Kept consistent with ``models`` by
+    :meth:`_valid_active_model` rather than trusted at face value — a person can delete the file's
+    active model by hand without also fixing this field."""
+
+    logo_media_type: str = ""
+    """Set only when ``kind == "custom"`` and an upload has succeeded. Empty means "no custom
+    logo" — the same empty-string-means-off convention as :attr:`embedding_model` and
+    :attr:`api_key`, not ``None``, so it round-trips through TOML with no special-casing in
+    :func:`_writable`."""
+
     embedding_model: str = ""
     """Empty means embeddings are off and retrieval falls back to keyword overlap (ADR 5)."""
 
@@ -77,12 +135,52 @@ class ProviderEntry(BaseModel):
     def _usable_name(cls, name: str) -> str:
         return validate_provider_name(name)
 
+    @model_validator(mode="before")
+    @classmethod
+    def _normalize(cls, data: object) -> object:
+        """Two things, done together and both on the raw input — not as an ``after`` validator,
+        which is silently a no-op on the ``__init__`` path when it returns a different instance
+        (only ``model_validate`` applies that return value; every route in this app constructs
+        ``ProviderEntry`` directly via keyword arguments).
+
+        **Migrating an old file.** Old files (and old call sites) said ``model: str``. New ones
+        say ``models`` + ``active_model``. A permanent read-time normalization, not a one-off
+        migration script — every load handles both shapes forever, the same stance
+        :data:`TUNING_FIELDS` already takes on old/new default drift in this file.
+
+        **Keeping ``active_model`` honest.** A person can hand-edit ``active_model`` to a model
+        that was never registered, or that has since been removed — falls back to the first
+        registered model, the same defensive stance as :meth:`HeraConfig.active`.
+        """
+        if not isinstance(data, dict):
+            return data
+        data = dict(data)
+        if "models" not in data:
+            bare = data.pop("model", None)
+            if bare:
+                data["models"] = [{"id": bare, "name": bare}]
+                data["active_model"] = bare
+
+        def model_id(entry: object) -> str:
+            if isinstance(entry, dict):
+                return str(entry["id"])
+            return entry.id  # type: ignore[attr-defined,no-any-return]
+
+        models = data.get("models") or []
+        ids = {model_id(m) for m in models}
+        active = data.get("active_model") or ""
+        if models and active not in ids:
+            data["active_model"] = model_id(models[0])
+        elif not models and active:
+            data["active_model"] = ""
+        return data
+
     def settings(self) -> ProviderSettings:
         """As ``hera_providers`` wants it."""
         return ProviderSettings(
             base_url=self.base_url,
             api_key=self.api_key,
-            model=self.model,
+            model=self.active_model,
             embedding_model=self.embedding_model,
             timeout_s=self.timeout_s,
             connect_timeout_s=self.connect_timeout_s,
@@ -98,6 +196,34 @@ class ProviderEntry(BaseModel):
         data.pop("api_key")
         data["api_key_set"] = bool(self.api_key)
         return data
+
+    def with_model(self, model: ModelEntry) -> ProviderEntry:
+        """Register a model, or replace the one already registered under that id.
+
+        The first one registered becomes active — the model-level echo of "the first provider
+        added becomes active" on :meth:`HeraConfig.with_provider`.
+        """
+        if any(m.id == model.id for m in self.models):
+            replaced = [model if m.id == model.id else m for m in self.models]
+        else:
+            replaced = [*self.models, model]
+        return self.model_copy(
+            update={"models": replaced, "active_model": self.active_model or model.id}
+        )
+
+    def without_model(self, model_id: str) -> ProviderEntry:
+        """Drop one model. If it was active, another registered one takes over — or none does,
+        if that was the last."""
+        remaining = [m for m in self.models if m.id != model_id]
+        active = self.active_model
+        if active == model_id:
+            active = remaining[0].id if remaining else ""
+        return self.model_copy(update={"models": remaining, "active_model": active})
+
+    def with_active_model(self, model_id: str) -> ProviderEntry:
+        if model_id not in {m.id for m in self.models}:
+            raise ValueError(f"no model called {model_id!r} on {self.name!r}")
+        return self.model_copy(update={"active_model": model_id})
 
 
 class HeraConfig(BaseModel):
@@ -262,7 +388,8 @@ def _from_environment() -> ProviderEntry:
         name="local",
         base_url=settings.base_url,
         api_key=settings.api_key,
-        model=settings.model,
+        models=[ModelEntry(id=settings.model, name=settings.model)],
+        active_model=settings.model,
         embedding_model=settings.embedding_model,
         timeout_s=settings.timeout_s,
         connect_timeout_s=settings.connect_timeout_s,

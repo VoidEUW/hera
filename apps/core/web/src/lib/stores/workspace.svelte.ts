@@ -130,11 +130,14 @@ class Workspace {
 		}
 	}
 
-	/** Point her at another registered endpoint. Takes effect on the next turn, no restart. */
-	async useProvider(name: string) {
-		if (name === this.activeProvider) return;
+	/** Point her at another registered endpoint, optionally switching which of its models is
+	 * active in the same call. Takes effect on the next turn, no restart. */
+	async useProvider(name: string, modelId?: string) {
+		if (name === this.activeProvider && (!modelId || modelId === this.model?.active_model)) {
+			return;
+		}
 		try {
-			const found = await api.activateProvider(name);
+			const found = await api.activateProvider(name, modelId);
 			this.providers = found.providers;
 			this.activeProvider = found.active;
 		} catch (cause) {

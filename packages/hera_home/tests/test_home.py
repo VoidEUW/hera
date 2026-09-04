@@ -14,6 +14,8 @@ from hera_home import (
     config_path,
     database_path,
     home,
+    logo_path,
+    logos_dir,
     mcp_path,
     memories_dir,
     mind_dir,
@@ -65,6 +67,8 @@ def test_every_well_known_path_sits_under_the_home(
     assert chat_dir("c-1") == tmp_path / "chats" / "c-1"
     assert scratch_dir("c-1") == tmp_path / "chats" / "c-1" / "scratch"
     assert artifacts_dir("c-1") == tmp_path / "chats" / "c-1" / "artifacts"
+    assert logos_dir() == tmp_path / "logos"
+    assert logo_path("studio") == tmp_path / "logos" / "studio.logo"
 
 
 def test_nothing_is_created_by_asking(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -95,4 +99,21 @@ def test_a_chat_directory_is_not_created_by_asking(
 ) -> None:
     monkeypatch.setenv(hera_home.HOME_ENV, str(tmp_path))
     for path in (chats_dir(), chat_dir("c-1"), scratch_dir("c-1"), artifacts_dir("c-1")):
+        assert not path.exists()
+
+
+@pytest.mark.parametrize("name", ["", ".", "..", "../mind", "a/b", "a\\b", "/etc"])
+def test_a_provider_name_that_is_not_one_path_segment_is_refused(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, name: str
+) -> None:
+    monkeypatch.setenv(hera_home.HOME_ENV, str(tmp_path))
+    with pytest.raises(ValueError, match="not a usable provider name"):
+        logo_path(name)
+
+
+def test_a_logo_path_is_not_created_by_asking(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv(hera_home.HOME_ENV, str(tmp_path))
+    for path in (logos_dir(), logo_path("studio")):
         assert not path.exists()

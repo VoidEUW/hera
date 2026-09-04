@@ -26,6 +26,9 @@
 		 * called — an endpoint's URL, a profile's description — where the label alone is a name
 		 * you have to already know. */
 		hint?: string;
+		/** A small image drawn before the label, in both the trigger and the row — a provider's
+		 * logo beside its model, say. Omitted entirely means no icon column, not a blank one. */
+		icon?: string;
 	}
 
 	interface Props {
@@ -141,6 +144,7 @@
 		onclick={toggle}
 		onkeydown={openFrom}
 	>
+		{#if current?.icon}<img class="icon" src={current.icon} alt="" aria-hidden="true" />{/if}
 		<span class="shown">{shown}</span>
 		<span class="chevron" aria-hidden="true"></span>
 	</button>
@@ -165,6 +169,7 @@
 					onclick={() => choose(choice.value)}
 				>
 					<span class="mark" aria-hidden="true">{on ? '✓' : ''}</span>
+					{#if choice.icon}<img class="icon" src={choice.icon} alt="" aria-hidden="true" />{/if}
 					<span class="what">
 						<span class="name">{choice.label}</span>
 						{#if choice.hint}<span class="caption hint">{choice.hint}</span>{/if}
@@ -223,6 +228,14 @@
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
+	}
+
+	.icon {
+		width: 14px;
+		height: 14px;
+		flex: none;
+		border-radius: 3px;
+		object-fit: cover;
 	}
 
 	/* Two borders on a rotated square: one shape, no asset, and it takes the colour of the row

@@ -1,19 +1,22 @@
-"""Registering endpoints.
+"""Registering endpoints and the named models on them.
 
 The screen a person reaches for first, because nothing else in Hera does anything until she is
-pointed at a model. The two things worth being strict about: the key never comes back, and a
-change takes effect without a restart.
+pointed at a model. The things worth being strict about: the key never comes back, a change
+takes effect without a restart, an old ``model: str`` file still loads, and a model id
+containing ``/`` still works everywhere one is accepted.
 """
 
 from __future__ import annotations
 
+import base64
 from pathlib import Path
 
 import pytest
 from core_support import API
 from httpx import AsyncClient
 
-from hera_core.config import HeraConfig, ProviderEntry, load, save
+from hera_core.config import HeraConfig, ModelEntry, ProviderEntry, load, save
+from hera_home import logo_path
 
 
 class TestReading:
@@ -27,6 +30,8 @@ class TestReading:
         assert [p["name"] for p in body["providers"]] == ["local"]
         assert body["active"] == "local"
         assert body["providers"][0]["base_url"].startswith("http")
+        assert body["providers"][0]["active_model"]
+        assert body["providers"][0]["models"][0]["id"] == body["providers"][0]["active_model"]
 
     async def test_an_existing_environment_variable_is_what_you_find_filled_in(
         self, client: AsyncClient, monkeypatch: pytest.MonkeyPatch
@@ -43,7 +48,7 @@ class TestReading:
             json={
                 "name": "cloud",
                 "base_url": "https://api.example.com/v1",
-                "model": "qwen3.6-35b",
+                "model_id": "qwen3.6-35b",
                 "api_key": "sk-secret",
             },
         )
@@ -60,15 +65,16 @@ class TestRegistering:
     async def test_adding_one_and_activating_it(self, client: AsyncClient) -> None:
         added = await client.post(
             f"{API}/providers",
-            json={"name": "studio", "base_url": "http://localhost:4891/v1", "model": "qwen"},
+            json={"name": "studio", "base_url": "http://localhost:4891/v1", "model_id": "qwen"},
         )
         assert added.status_code == 201
+        assert added.json()["providers"][-1]["active_model"] == "qwen"
 
         body = (await client.post(f"{API}/providers/studio/activate")).json()
         assert body["active"] == "studio"
 
     async def test_a_duplicate_name_is_refused(self, client: AsyncClient) -> None:
-        payload = {"name": "studio", "base_url": "http://localhost:4891/v1", "model": "qwen"}
+        payload = {"name": "studio", "base_url": "http://localhost:4891/v1", "model_id": "qwen"}
         assert (await client.post(f"{API}/providers", json=payload)).status_code == 201
         assert (await client.post(f"{API}/providers", json=payload)).status_code == 409
 
@@ -77,7 +83,7 @@ class TestRegistering:
     ) -> None:
         response = await client.post(
             f"{API}/providers",
-            json={"name": "My Server!", "base_url": "http://x/v1", "model": "qwen"},
+            json={"name": "My Server!", "base_url": "http://x/v1", "model_id": "qwen"},
         )
         assert response.status_code == 422
 
@@ -86,7 +92,7 @@ class TestRegistering:
         with a Hera pointed at nothing."""
         await client.post(
             f"{API}/providers",
-            json={"name": "studio", "base_url": "http://localhost:4891/v1", "model": "qwen"},
+            json={"name": "studio", "base_url": "http://localhost:4891/v1", "model_id": "qwen"},
         )
         await client.post(f"{API}/providers/studio/activate")
 
@@ -102,17 +108,17 @@ class TestRegistering:
 
 class TestPatching:
     async def test_a_field_left_out_is_left_alone(self, client: AsyncClient) -> None:
-        await client.patch(f"{API}/providers/local", json={"model": "qwen3.6-35b-instruct"})
+        await client.patch(f"{API}/providers/local", json={"embedding_model": "e5"})
 
         body = (await client.get(f"{API}/providers")).json()
         entry = body["providers"][0]
-        assert entry["model"] == "qwen3.6-35b-instruct"
+        assert entry["embedding_model"] == "e5"
         assert entry["base_url"].startswith("http")
 
     async def test_omitting_the_key_keeps_it(self, client: AsyncClient) -> None:
         """The screen never receives the key, so this is the only way it can preserve one."""
         await client.patch(f"{API}/providers/local", json={"api_key": "sk-kept"})
-        await client.patch(f"{API}/providers/local", json={"model": "something-else"})
+        await client.patch(f"{API}/providers/local", json={"embedding_model": "e5"})
 
         assert (await client.get(f"{API}/providers")).json()["providers"][0]["api_key_set"]
 
@@ -123,6 +129,198 @@ class TestPatching:
         assert not (await client.get(f"{API}/providers")).json()["providers"][0]["api_key_set"]
 
 
+class TestModels:
+    async def test_registering_a_second_model_does_not_change_the_active_one(
+        self, client: AsyncClient
+    ) -> None:
+        before = (await client.get(f"{API}/providers")).json()["providers"][0]["active_model"]
+
+        body = (await client.post(f"{API}/providers/local/models", json={"id": "second"})).json()
+
+        entry = next(p for p in body["providers"] if p["name"] == "local")
+        assert {m["id"] for m in entry["models"]} == {before, "second"}
+        assert entry["active_model"] == before
+
+    async def test_registering_an_existing_id_replaces_it_rather_than_duplicating(
+        self, client: AsyncClient
+    ) -> None:
+        await client.post(f"{API}/providers/local/models", json={"id": "second", "name": "old"})
+
+        body = (
+            await client.post(f"{API}/providers/local/models", json={"id": "second", "name": "new"})
+        ).json()
+
+        entry = next(p for p in body["providers"] if p["name"] == "local")
+        matching = [m for m in entry["models"] if m["id"] == "second"]
+        assert len(matching) == 1
+        assert matching[0]["name"] == "new"
+
+    async def test_a_registered_models_name_defaults_to_its_id(self, client: AsyncClient) -> None:
+        body = (
+            await client.post(f"{API}/providers/local/models", json={"id": "no-name-given"})
+        ).json()
+        entry = next(p for p in body["providers"] if p["name"] == "local")
+        registered = next(m for m in entry["models"] if m["id"] == "no-name-given")
+        assert registered["name"] == "no-name-given"
+
+    async def test_the_first_model_registered_on_a_model_less_provider_becomes_active(
+        self, client: AsyncClient
+    ) -> None:
+        await client.post(f"{API}/providers/local/models", json={"id": "only"})
+        first = (await client.get(f"{API}/providers")).json()["providers"][0]
+        await client.delete(f"{API}/providers/local/models?id={first['active_model']}")
+
+        remaining = (await client.get(f"{API}/providers")).json()["providers"][0]
+        assert remaining["active_model"] == "only"
+
+        await client.delete(f"{API}/providers/local/models?id=only")
+        empty = (await client.get(f"{API}/providers")).json()["providers"][0]
+        assert empty["models"] == []
+        assert empty["active_model"] == ""
+
+        body = (await client.post(f"{API}/providers/local/models", json={"id": "revived"})).json()
+        assert body["providers"][0]["active_model"] == "revived"
+
+    async def test_removing_the_active_model_promotes_another_remaining_one(
+        self, client: AsyncClient
+    ) -> None:
+        original = (await client.get(f"{API}/providers")).json()["providers"][0]["active_model"]
+        await client.post(f"{API}/providers/local/models", json={"id": "second"})
+
+        body = (await client.delete(f"{API}/providers/local/models?id={original}")).json()
+
+        entry = body["providers"][0]
+        assert entry["active_model"] == "second"
+        assert original not in {m["id"] for m in entry["models"]}
+
+    async def test_removing_the_last_model_leaves_the_provider_model_less(
+        self, client: AsyncClient
+    ) -> None:
+        original = (await client.get(f"{API}/providers")).json()["providers"][0]["active_model"]
+
+        body = (await client.delete(f"{API}/providers/local/models?id={original}")).json()
+
+        entry = body["providers"][0]
+        assert entry["models"] == []
+        assert entry["active_model"] == ""
+
+    async def test_removing_an_unknown_model_is_a_404(self, client: AsyncClient) -> None:
+        response = await client.delete(f"{API}/providers/local/models?id=nope")
+        assert response.status_code == 404
+
+    async def test_a_model_id_containing_a_slash_can_be_registered_and_removed(
+        self, client: AsyncClient
+    ) -> None:
+        """Model ids are routinely vendor-prefixed. A path segment cannot match `/`, so the id
+        travels as a query parameter instead."""
+        slashed = "meta-llama/Llama-3-70b"
+        await client.post(f"{API}/providers/local/models", json={"id": slashed})
+
+        removed = await client.delete(
+            f"{API}/providers/local/models",
+            params={"id": slashed},
+        )
+        assert removed.status_code == 200
+        entry = removed.json()["providers"][0]
+        assert slashed not in {m["id"] for m in entry["models"]}
+
+    async def test_activate_with_a_model_switches_both_in_one_call(
+        self, client: AsyncClient
+    ) -> None:
+        await client.post(
+            f"{API}/providers",
+            json={"name": "studio", "base_url": "http://localhost:4891/v1", "model_id": "a"},
+        )
+        await client.post(f"{API}/providers/studio/models", json={"id": "b"})
+
+        body = (await client.post(f"{API}/providers/studio/activate", json={"model": "b"})).json()
+
+        assert body["active"] == "studio"
+        entry = next(p for p in body["providers"] if p["name"] == "studio")
+        assert entry["active_model"] == "b"
+
+    async def test_activate_with_an_unknown_model_is_a_404(self, client: AsyncClient) -> None:
+        response = await client.post(f"{API}/providers/local/activate", json={"model": "nope"})
+        assert response.status_code == 404
+
+    async def test_activate_with_no_body_still_works(self, client: AsyncClient) -> None:
+        response = await client.post(f"{API}/providers/local/activate")
+        assert response.status_code == 200
+        assert response.json()["active"] == "local"
+
+
+class TestLogo:
+    async def test_uploading_a_custom_logo_is_served_back_with_its_content_type(
+        self, client: AsyncClient
+    ) -> None:
+        raw = base64.b64encode(b"not-really-a-png").decode()
+        await client.patch(
+            f"{API}/providers/local",
+            json={
+                "kind": "custom",
+                "logo_data_url": f"data:image/png;base64,{raw}",
+                "logo_media_type": "image/png",
+            },
+        )
+
+        response = await client.get(f"{API}/providers/local/logo")
+
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "image/png"
+        assert response.content == b"not-really-a-png"
+
+    async def test_a_non_image_media_type_is_refused(self, client: AsyncClient) -> None:
+        raw = base64.b64encode(b"<script>").decode()
+        response = await client.patch(
+            f"{API}/providers/local",
+            json={
+                "logo_data_url": f"data:text/html;base64,{raw}",
+                "logo_media_type": "text/html",
+            },
+        )
+        assert response.status_code == 422
+
+    async def test_clearing_the_logo_removes_the_file(
+        self, client: AsyncClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        monkeypatch.setenv("HERA_HOME", str(tmp_path))
+        raw = base64.b64encode(b"a-logo").decode()
+        await client.patch(
+            f"{API}/providers/local",
+            json={"logo_data_url": f"data:image/png;base64,{raw}", "logo_media_type": "image/png"},
+        )
+        assert logo_path("local").is_file()
+
+        await client.patch(f"{API}/providers/local", json={"logo_data_url": ""})
+
+        assert not logo_path("local").is_file()
+
+    async def test_deleting_the_provider_also_deletes_its_logo_file(
+        self, client: AsyncClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        monkeypatch.setenv("HERA_HOME", str(tmp_path))
+        await client.post(
+            f"{API}/providers",
+            json={"name": "studio", "base_url": "http://localhost:4891/v1", "model_id": "a"},
+        )
+        raw = base64.b64encode(b"a-logo").decode()
+        await client.patch(
+            f"{API}/providers/studio",
+            json={"logo_data_url": f"data:image/png;base64,{raw}", "logo_media_type": "image/png"},
+        )
+        assert logo_path("studio").is_file()
+
+        await client.delete(f"{API}/providers/studio")
+
+        assert not logo_path("studio").is_file()
+
+    async def test_a_provider_with_no_logo_uploaded_is_a_404_on_the_logo_route(
+        self, client: AsyncClient
+    ) -> None:
+        response = await client.get(f"{API}/providers/local/logo")
+        assert response.status_code == 404
+
+
 class TestTakingEffect:
     async def test_activating_repoints_the_running_application(
         self, client: AsyncClient, services: object
@@ -131,7 +329,11 @@ class TestTakingEffect:
         URL was right turns a two-second correction into a minute."""
         await client.post(
             f"{API}/providers",
-            json={"name": "studio", "base_url": "http://localhost:4891/v1", "model": "big-one"},
+            json={
+                "name": "studio",
+                "base_url": "http://localhost:4891/v1",
+                "model_id": "big-one",
+            },
         )
         await client.post(f"{API}/providers/studio/activate")
 
@@ -140,7 +342,8 @@ class TestTakingEffect:
     async def test_the_model_name_travels_with_the_endpoint(self, client: AsyncClient) -> None:
         """They are one decision: pointing a new server at the old model's name fails as an
         unhelpful 404 from somebody else's API."""
-        await client.patch(f"{API}/providers/local", json={"model": "renamed"})
+        await client.post(f"{API}/providers/local/models", json={"id": "renamed"})
+        await client.post(f"{API}/providers/local/activate", json={"model": "renamed"})
         assert (await client.get(f"{API}/health")).json()["model"] == "renamed"
 
     async def test_an_injected_provider_is_not_closed_by_a_reconfiguration(
@@ -150,7 +353,7 @@ class TestTakingEffect:
         not open is how a suite starts failing in whatever order it happens to run in."""
         injected = services.provider  # type: ignore[attr-defined]
 
-        await client.patch(f"{API}/providers/local", json={"model": "renamed"})
+        await client.patch(f"{API}/providers/local", json={"embedding_model": "e5"})
 
         assert injected.closed is False
         assert services.provider is not injected  # type: ignore[attr-defined]
@@ -173,11 +376,56 @@ class TestProbing:
         assert body["error"]
 
 
+class TestMigration:
+    def test_a_bare_model_field_is_read_as_one_registered_model(self, tmp_path: Path) -> None:
+        """Old files said `model: str`. Every load normalizes that into one registered, active
+        model — a permanent read-time rule, not a one-off migration script."""
+        path = tmp_path / "config.toml"
+        path.write_text(
+            '[[providers]]\nname = "studio"\nbase_url = "http://x/v1"\nmodel = "qwen"\n'
+        )
+
+        entry = load(path).get("studio")
+
+        assert entry is not None
+        assert entry.models == [ModelEntry(id="qwen", name="qwen")]
+        assert entry.active_model == "qwen"
+
+    def test_a_file_with_both_shapes_present_prefers_the_new_one(self, tmp_path: Path) -> None:
+        path = tmp_path / "config.toml"
+        path.write_text(
+            '[[providers]]\nname = "studio"\nbase_url = "http://x/v1"\nmodel = "old"\n'
+            'models = [{ id = "new", name = "new" }]\nactive_model = "new"\n'
+        )
+
+        entry = load(path).get("studio")
+
+        assert entry is not None
+        assert [m.id for m in entry.models] == ["new"]
+        assert entry.active_model == "new"
+
+    def test_an_active_model_naming_a_removed_model_falls_back_to_the_first(self) -> None:
+        entry = ProviderEntry(
+            name="studio", models=[ModelEntry(id="a", name="a")], active_model="gone"
+        )
+        assert entry.active_model == "a"
+
+    def test_an_active_model_with_no_registered_models_is_cleared(self) -> None:
+        entry = ProviderEntry(name="studio", models=[], active_model="stale")
+        assert entry.active_model == ""
+
+
 class TestTheFile:
     def test_it_is_readable_and_editable_by_hand(self, tmp_path: Path) -> None:
         """There must be nothing in ~/.hera you cannot open in an editor."""
         config = load(tmp_path / "config.toml").with_provider(
-            ProviderEntry(name="studio", base_url="http://x/v1", model="qwen", api_key='a"quote')
+            ProviderEntry(
+                name="studio",
+                base_url="http://x/v1",
+                models=[ModelEntry(id="qwen", name="qwen")],
+                active_model="qwen",
+                api_key='a"quote',
+            )
         )
         save(config, tmp_path / "config.toml")
 
@@ -201,7 +449,13 @@ class TestTheFile:
         """Deleting an entry by hand must not leave a working install with no model."""
         path = tmp_path / "config.toml"
         save(
-            load(path).with_provider(ProviderEntry(name="studio", model="q")).activated("gone"),
+            load(path)
+            .with_provider(
+                ProviderEntry(
+                    name="studio", models=[ModelEntry(id="q", name="q")], active_model="q"
+                )
+            )
+            .activated("gone"),
             path,
         )
         active = load(path).active()
@@ -256,6 +510,24 @@ class TestWhatIsWrittenDown:
         path = tmp_path / "config.toml"
         save(HeraConfig(providers=[ProviderEntry(name="local")]), path)
 
+        assert "base_url" in path.read_text(encoding="utf-8")
+
+    def test_kind_and_models_are_written_even_when_default(self, tmp_path: Path) -> None:
+        path = tmp_path / "config.toml"
+        save(
+            HeraConfig(
+                providers=[
+                    ProviderEntry(
+                        name="local",
+                        models=[ModelEntry(id="qwen", name="qwen")],
+                        active_model="qwen",
+                    )
+                ]
+            ),
+            path,
+        )
+
         body = path.read_text(encoding="utf-8")
-        assert "base_url" in body
-        assert "model" in body
+        assert "kind" in body
+        assert "models" in body
+        assert "active_model" in body
