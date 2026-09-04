@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 460 900">
+	<!--
+		Placeholder for the backdrop figure (issue #43). Applied as a mask and tinted by
+		Backdrop.svelte, so only the alpha channel matters here. Replace this file with the
+		real artwork — nothing in the code refers to anything but the path.
+	-->
+	<g fill="#000">
+		<!-- sceptre -->
+		<rect x="106" y="240" width="10" height="612" rx="5" />
+		<!-- lotus atop the sceptre -->
+		<path d="M111 158 C128 178 130 204 111 232 C92 204 94 178 111 158 Z" />
+		<!-- polos, the tall crown -->
+		<path d="M204 118 L196 62 Q230 50 264 62 L256 118 Q230 110 204 118 Z" />
+		<!-- head -->
+		<ellipse cx="230" cy="152" rx="38" ry="46" />
+		<!-- neck -->
+		<rect x="216" y="196" width="28" height="20" />
+		<!-- right arm reaching to the sceptre -->
+		<path d="M154 234 C132 240 116 250 104 264 L114 276 C126 262 140 254 158 248 Z" />
+		<ellipse cx="110" cy="252" rx="13" ry="15" />
+		<!-- left arm resting -->
+		<path d="M308 244 C324 254 334 272 340 292 L328 300 C320 280 312 264 298 254 Z" />
+		<ellipse cx="336" cy="306" rx="12" ry="14" />
+		<!-- shoulders -->
+		<path d="M230 206 C190 206 164 218 152 244 C190 262 270 262 308 244 C296 218 270 206 230 206 Z" />
+		<!-- robe, narrowing to the waist and falling to the hem -->
+		<path
+			d="M152 244
+			C 152 320 168 380 176 430
+			C 168 520 130 700 118 860
+			L 342 860
+			C 330 700 292 520 284 430
+			C 292 380 308 320 308 244
+			C 270 262 190 262 152 244 Z"
+		/>
+		<!-- plinth she stands on -->
+		<rect x="100" y="852" width="260" height="22" rx="10" />
+	</g>
+</svg>

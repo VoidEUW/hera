@@ -15,6 +15,14 @@ so the number in this file, on the tag, and in the interface cannot drift apart.
 
 Towards [v0.2.1](docs/versions/v0.2.1.md), the polish pass.
 
+### Added
+
+- **Her silhouette behind the start screen and the conversation** ([issue #43](https://github.com/VoidEUW/hera/issues/43)).
+  A masked figure rises from the foot of both rooms at a whisper of opacity — present, never
+  busy — tinted from the theme's text colour so it reads on either mode. The drawing at
+  `static/background.svg` is a placeholder; replacing that one file swaps the artwork without
+  touching any code.
+
 ### Removed
 
 - **Emotion cards, and everything that fed them** —

@@ -291,6 +291,12 @@ interface must be completely usable and completely legible with all motion off.
 
 ## The screen
 
+Both rooms stand in front of her. A backdrop — her silhouette, masked from
+`static/background.svg` and tinted from the theme's text colour — is pinned to the foot of the
+start screen and the conversation at a whisper of opacity: present, never busy, and never
+a picture pasted over the work. The drawing itself is a placeholder until the real artwork
+replaces the file.
+
 ### Start
 
 Mark, greeting, composer. The greeting is the one place the display face gets to be large, and

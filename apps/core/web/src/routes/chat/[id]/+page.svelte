@@ -10,6 +10,7 @@
 	import { api } from '$lib/api/client';
 	import { artifactOf } from '$lib/api/events';
 	import ArtifactDrawer from '$lib/components/ArtifactDrawer.svelte';
+	import Backdrop from '$lib/components/Backdrop.svelte';
 	import Composer from '$lib/components/Composer.svelte';
 	import Message from '$lib/components/Message.svelte';
 	import { t } from '$lib/i18n';
@@ -159,6 +160,8 @@
      watching it change. A modal would cover the thing you are talking about. -->
 <div class="split">
 	<div class="conversation">
+		<Backdrop />
+
 		<div class="scroll" bind:this={scroller} {onscroll}>
 			<div class="column" use:follows>
 				{#if session.error}
@@ -283,6 +286,8 @@
 	}
 
 	.conversation {
+		position: relative;
+		isolation: isolate;
 		display: flex;
 		flex-direction: column;
 		flex: 1;

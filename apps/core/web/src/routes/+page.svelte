@@ -11,6 +11,7 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import type { Attachment } from '$lib/attachments';
+	import Backdrop from '$lib/components/Backdrop.svelte';
 	import Composer from '$lib/components/Composer.svelte';
 	import Ocellus from '$lib/components/Ocellus.svelte';
 	import { greetingFor, t } from '$lib/i18n';
@@ -38,6 +39,8 @@
 </script>
 
 <div class="start">
+	<Backdrop />
+
 	<div class="middle">
 		<p class="greeting display">
 			<Ocellus size={26} />
@@ -75,6 +78,7 @@
 <style>
 	.start {
 		position: relative;
+		isolation: isolate;
 		display: grid;
 		place-items: center;
 		height: 100%;
