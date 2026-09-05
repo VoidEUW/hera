@@ -47,7 +47,10 @@ describe('providerIcon', () => {
 
 describe('kindIcon', () => {
 	it('points at a bundled logo file for a kind that has one', () => {
+		expect(kindIcon('openai')).toBe('/providers/openai.svg');
 		expect(kindIcon('anthropic')).toBe('/providers/claude.svg');
+		expect(kindIcon('google')).toBe('/providers/google.svg');
+		expect(kindIcon('mistral')).toBe('/providers/mistral.svg');
 		expect(kindIcon('lmstudio')).toBe('/providers/lmstudio.svg');
 		expect(kindIcon('ollama')).toBe('/providers/ollama.svg');
 		expect(kindIcon('openrouter')).toBe('/providers/openrouter.svg');
@@ -55,8 +58,7 @@ describe('kindIcon', () => {
 	});
 
 	it('falls back to a monogram for a kind with no bundled file yet', () => {
-		// `openai` belongs here too: Simple Icons doesn't carry it, so nothing is bundled.
-		for (const kind of ['openai', 'google', 'mistral', 'llamacpp', 'generic'] as const) {
+		for (const kind of ['llamacpp', 'generic'] as const) {
 			expect(kindIcon(kind)).toBe(kindFallbackIcon(kind));
 			expect(kindIcon(kind)).toMatch(/^data:image\/svg\+xml,/);
 		}
