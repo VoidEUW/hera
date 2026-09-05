@@ -22,7 +22,7 @@
 	import type { Profile, Provider, Server } from '$lib/api/client';
 	import { isImage, read, size, type Attachment } from '$lib/attachments';
 	import { t } from '$lib/i18n';
-	import { providerIcon } from '$lib/providers';
+	import { providerFallbackIcon, providerIcon } from '$lib/providers';
 	import Select from './Select.svelte';
 	import ServerSheet from './ServerSheet.svelte';
 	import SkillPicker from './SkillPicker.svelte';
@@ -135,7 +135,8 @@
 				value: `${entry.name}::${model.id}`,
 				label: model.name,
 				hint: `${entry.name} · ${entry.base_url}`,
-				icon: providerIcon(entry)
+				icon: providerIcon(entry),
+				iconFallback: providerFallbackIcon(entry)
 			}))
 		)
 	);

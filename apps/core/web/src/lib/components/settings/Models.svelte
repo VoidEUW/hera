@@ -23,7 +23,7 @@
 	 */
 	import { api, type Probe, type Provider, type ProviderKind } from '$lib/api/client';
 	import { t } from '$lib/i18n';
-	import { kindIcon, PROVIDER_KINDS } from '$lib/providers';
+	import { kindFallbackIcon, kindIcon, PROVIDER_KINDS } from '$lib/providers';
 
 	interface Props {
 		filter?: string;
@@ -228,6 +228,17 @@
 		}
 	}
 
+	/** A bundled logo file can be listed and still be missing on disk — swap to the monogram
+	 * rather than showing a broken image. `onerror` is removed first so a fallback that somehow
+	 * also fails does not loop. */
+	function onLogoError(kind: ProviderKind) {
+		return (event: Event) => {
+			const img = event.currentTarget as HTMLImageElement;
+			img.onerror = null;
+			img.src = kindFallbackIcon(kind);
+		};
+	}
+
 	function probeShown(entry: Provider): string[] {
 		const result = probes[entry.name];
 		if (!result || result === 'running' || !result.ok) return [];
@@ -257,6 +268,7 @@
 					src={logoPreview(entry) || kindIcon(effectiveKind)}
 					alt=""
 					aria-hidden="true"
+					onerror={onLogoError(effectiveKind)}
 				/>
 				<h3>{entry.name}</h3>
 			</div>

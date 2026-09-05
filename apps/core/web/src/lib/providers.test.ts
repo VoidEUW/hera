@@ -7,7 +7,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { Provider } from './api/client';
-import { kindIcon, providerIcon } from './providers';
+import { kindFallbackIcon, kindIcon, providerFallbackIcon, providerIcon } from './providers';
 
 function provider(overrides: Partial<Provider> = {}): Provider {
 	return {
@@ -42,5 +42,36 @@ describe('providerIcon', () => {
 		for (const kind of ['openai', 'anthropic', 'ollama', 'generic'] as const) {
 			expect(providerIcon(provider({ kind }))).toBe(kindIcon(kind));
 		}
+	});
+});
+
+describe('kindIcon', () => {
+	it('points at a bundled logo file for a kind that has one', () => {
+		expect(kindIcon('anthropic')).toBe('/providers/claude.svg');
+		expect(kindIcon('lmstudio')).toBe('/providers/lmstudio.svg');
+		expect(kindIcon('ollama')).toBe('/providers/ollama.svg');
+		expect(kindIcon('openrouter')).toBe('/providers/openrouter.svg');
+		expect(kindIcon('vllm')).toBe('/providers/vllm.svg');
+	});
+
+	it('falls back to a monogram for a kind with no bundled file yet', () => {
+		// `openai` belongs here too: Simple Icons doesn't carry it, so nothing is bundled.
+		for (const kind of ['openai', 'google', 'mistral', 'llamacpp', 'generic'] as const) {
+			expect(kindIcon(kind)).toBe(kindFallbackIcon(kind));
+			expect(kindIcon(kind)).toMatch(/^data:image\/svg\+xml,/);
+		}
+	});
+});
+
+describe('kindFallbackIcon / providerFallbackIcon', () => {
+	it('is always a generated monogram, even for a kind with a bundled file', () => {
+		expect(kindIcon('anthropic')).not.toMatch(/^data:/);
+		expect(kindFallbackIcon('anthropic')).toMatch(/^data:image\/svg\+xml,/);
+	});
+
+	it('matches the kind fallback for a given provider', () => {
+		expect(providerFallbackIcon(provider({ kind: 'anthropic' }))).toBe(
+			kindFallbackIcon('anthropic')
+		);
 	});
 });
