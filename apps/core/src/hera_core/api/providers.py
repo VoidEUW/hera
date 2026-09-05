@@ -197,7 +197,7 @@ def _apply_logo(entry: ProviderEntry, data_url: str, media_type: str) -> Provide
     _clear_logo_file(entry.name)
     if not data_url:
         return entry.model_copy(update={"logo_media_type": ""})
-    raw = base64.b64decode(data_url.split(",", 1)[1])
+    raw = base64.b64decode(data_url.split(",", 1)[1], validate=True)
     path = logo_path(entry.name)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(raw)

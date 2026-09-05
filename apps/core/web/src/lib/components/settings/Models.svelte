@@ -398,7 +398,7 @@
 							</span>
 							{#if model.id === entry.active_model}
 								<span class="badge">{t.models.active}</span>
-							{:else}
+							{:else if entry.name === active}
 								<button
 									class="ghost tiny"
 									type="button"

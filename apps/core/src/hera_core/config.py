@@ -163,7 +163,10 @@ class ProviderEntry(BaseModel):
 
         def model_id(entry: object) -> str:
             if isinstance(entry, dict):
-                return str(entry["id"])
+                # A missing id normalizes to "" rather than raising here — a `KeyError` would
+                # escape `load()`'s `ValueError`-only handling as a 500. Left this way, it fails
+                # `min_length=1` on `ModelEntry.id` instead, which does become a `ConfigError`.
+                return str(entry.get("id") or "")
             return entry.id  # type: ignore[attr-defined,no-any-return]
 
         models = data.get("models") or []
@@ -295,7 +298,7 @@ def load(path: Path | None = None) -> HeraConfig:
     """
     path = path if path is not None else config_path()
     if not path.is_file():
-        return HeraConfig(providers=[_from_environment()], active_provider="local")
+        return HeraConfig(providers=[_seeded_from_environment()], active_provider="local")
 
     try:
         raw = tomllib.loads(path.read_text(encoding="utf-8"))
@@ -311,9 +314,24 @@ def load(path: Path | None = None) -> HeraConfig:
         # Seeded, but the rest of the file is kept: a person who deleted every endpoint by hand
         # should not also lose the timezone they set on the screen above it.
         return HeraConfig(
-            providers=[_from_environment()], active_provider="local", timezone=config.timezone
+            providers=[_seeded_from_environment()],
+            active_provider="local",
+            timezone=config.timezone,
         )
     return config
+
+
+def _seeded_from_environment() -> ProviderEntry:
+    """:func:`_from_environment`, wrapped the same way ``model_validate`` is above.
+
+    An environment variable is still a person's hand-edited input — ``HERA_PROVIDER_MODEL=""``
+    reaches :class:`ModelEntry` as an empty id, since ``pydantic-settings`` does not treat an
+    empty value as unset. That should read as a wrong deployment, not a 500.
+    """
+    try:
+        return _from_environment()
+    except ValueError as exc:
+        raise ConfigError(f"the environment describes an invalid provider: {exc}") from exc
 
 
 def save(config: HeraConfig, path: Path | None = None) -> None:

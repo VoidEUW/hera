@@ -18,6 +18,8 @@ to keep in step with the union.
 
 from __future__ import annotations
 
+import base64
+import binascii
 from datetime import date, datetime
 from typing import Any
 from uuid import UUID
@@ -629,8 +631,15 @@ class ProviderPatch(BaseModel):
                     f"{self.logo_media_type or 'that'} is not an image Hera can store — "
                     f"{', '.join(sorted(IMAGE_TYPES))}"
                 )
-            if not self.logo_data_url.startswith(f"data:{self.logo_media_type};base64,"):
+            prefix = f"data:{self.logo_media_type};base64,"
+            if not self.logo_data_url.startswith(prefix):
                 raise ValueError("a logo must be a base64 data URL")
+            try:
+                decoded = base64.b64decode(self.logo_data_url[len(prefix) :], validate=True)
+            except binascii.Error as exc:
+                raise ValueError("a logo's base64 body is malformed") from exc
+            if not decoded:
+                raise ValueError("a logo cannot be empty")
         return self
 
 

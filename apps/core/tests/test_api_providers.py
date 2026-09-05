@@ -15,7 +15,7 @@ import pytest
 from core_support import API
 from httpx import AsyncClient
 
-from hera_core.config import HeraConfig, ModelEntry, ProviderEntry, load, save
+from hera_core.config import ConfigError, HeraConfig, ModelEntry, ProviderEntry, load, save
 from hera_home import logo_path
 
 
@@ -280,6 +280,35 @@ class TestLogo:
         )
         assert response.status_code == 422
 
+    async def test_malformed_base64_is_refused_rather_than_500ing(
+        self, client: AsyncClient
+    ) -> None:
+        """`abc` is valid-looking but wrong-length base64 — `binascii.Error` on decode, not a
+        clean `ValueError`. Caught in the schema, before anything on disk is touched."""
+        response = await client.patch(
+            f"{API}/providers/local",
+            json={"logo_data_url": "data:image/png;base64,abc", "logo_media_type": "image/png"},
+        )
+        assert response.status_code == 422
+
+    async def test_malformed_base64_does_not_delete_the_existing_logo(
+        self, client: AsyncClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        monkeypatch.setenv("HERA_HOME", str(tmp_path))
+        raw = base64.b64encode(b"a-logo").decode()
+        await client.patch(
+            f"{API}/providers/local",
+            json={"logo_data_url": f"data:image/png;base64,{raw}", "logo_media_type": "image/png"},
+        )
+
+        await client.patch(
+            f"{API}/providers/local",
+            json={"logo_data_url": "data:image/png;base64,abc", "logo_media_type": "image/png"},
+        )
+
+        assert logo_path("local").is_file()
+        assert logo_path("local").read_bytes() == b"a-logo"
+
     async def test_clearing_the_logo_removes_the_file(
         self, client: AsyncClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
     ) -> None:
@@ -345,6 +374,18 @@ class TestTakingEffect:
         await client.post(f"{API}/providers/local/models", json={"id": "renamed"})
         await client.post(f"{API}/providers/local/activate", json={"model": "renamed"})
         assert (await client.get(f"{API}/health")).json()["model"] == "renamed"
+
+    async def test_removing_the_last_model_clears_the_live_model_too(
+        self, client: AsyncClient
+    ) -> None:
+        """`active_model` going to `""` must reach the running application, not just the file —
+        otherwise a later chat request still carries a model id that no longer exists anywhere
+        in the registry."""
+        original = (await client.get(f"{API}/providers")).json()["providers"][0]["active_model"]
+
+        await client.delete(f"{API}/providers/local/models?id={original}")
+
+        assert (await client.get(f"{API}/health")).json()["model"] == ""
 
     async def test_an_injected_provider_is_not_closed_by_a_reconfiguration(
         self, client: AsyncClient, services: object
@@ -413,6 +454,32 @@ class TestMigration:
     def test_an_active_model_with_no_registered_models_is_cleared(self) -> None:
         entry = ProviderEntry(name="studio", models=[], active_model="stale")
         assert entry.active_model == ""
+
+    def test_a_model_table_with_no_id_is_a_config_error_not_a_key_error(
+        self, tmp_path: Path
+    ) -> None:
+        """A hand-edited file missing the one required field belongs on the same "the parser's
+        own complaint" path as any other malformed file, not a 500 from an unwrapped
+        `KeyError`."""
+        path = tmp_path / "config.toml"
+        path.write_text(
+            '[[providers]]\nname = "studio"\nbase_url = "http://x/v1"\n'
+            'models = [{ name = "qwen" }]\n'
+        )
+
+        with pytest.raises(ConfigError):
+            load(path)
+
+    def test_an_empty_provider_model_environment_variable_is_a_config_error(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        """`pydantic-settings` does not treat an empty environment value as unset, so
+        `HERA_PROVIDER_MODEL=""` reaches `ModelEntry` as an empty id. That should read as a
+        wrong deployment, not an unhandled `ValidationError`."""
+        monkeypatch.setenv("HERA_PROVIDER_MODEL", "")
+
+        with pytest.raises(ConfigError):
+            load(tmp_path / "config.toml")
 
 
 class TestTheFile:
