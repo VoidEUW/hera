@@ -279,8 +279,10 @@ from off-screen. There is exactly one piece of choreography, and everything else
 height change.
 
 **The thinking indicator** is that one piece. The ocellus appears where her answer will begin;
-its iris rotates once every four seconds and the brass ring breathes between 60 % and 100 %
-opacity on the same cycle. Slow enough to read as attention rather than as a spinner. When the
+while she is still without words it loops between the peacock feather and the open eye, and
+once she is speaking the iris rotates once every four seconds with the brass ring breathing
+between 60 % and 100 % opacity on the same cycle. Slow enough to read as attention rather than
+as a spinner. When the
 first `text_delta` arrives it does not disappear — it shrinks to 8 px and takes its place at the
 top of the activity gutter, where it stays as the first eye of that turn. The animation becomes
 the record.

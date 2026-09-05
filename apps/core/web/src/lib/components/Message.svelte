@@ -277,7 +277,7 @@
 		{/each}
 
 		{#if waiting}
-			<p class="waiting"><Ocellus size={16} alive /> <span class="sr-only">Thinking</span></p>
+			<p class="waiting"><Ocellus size={16} alive morph /> <span class="sr-only">Thinking</span></p>
 		{/if}
 
 		{#if note}

@@ -15,6 +15,13 @@ so the number in this file, on the tag, and in the interface cannot drift apart.
 
 Towards [v0.2.1](docs/versions/v0.2.1.md), the polish pass.
 
+### Added
+
+- **Her waiting ocellus breathes between feather and eye** ([issue #44](https://github.com/VoidEUW/hera/issues/44)).
+  Before her first word the thinking mark folds into a peacock feather and opens again into the
+  eye — feather, hold, eye — over one slow four-second beat, instead of a bare spinner. The
+  running eyes in the activity gutter keep the plain look.
+
 ### Removed
 
 - **Emotion cards, and everything that fed them** —
