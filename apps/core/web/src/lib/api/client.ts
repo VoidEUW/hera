@@ -189,15 +189,38 @@ export interface Rule {
 	profile: string | null;
 }
 
+export interface ModelEntry {
+	id: string;
+	name: string;
+}
+
+export type ProviderKind =
+	| 'openai'
+	| 'anthropic'
+	| 'google'
+	| 'mistral'
+	| 'openrouter'
+	| 'lmstudio'
+	| 'ollama'
+	| 'vllm'
+	| 'llamacpp'
+	| 'generic'
+	| 'custom';
+
 export interface Provider {
 	name: string;
+	kind: ProviderKind;
 	base_url: string;
-	model: string;
+	models: ModelEntry[];
+	active_model: string;
 	embedding_model: string;
 	timeout_s: number;
 	connect_timeout_s: number;
 	/** Whether a key is stored. The key itself never leaves the machine it was typed on. */
 	api_key_set: boolean;
+	/** Set only when `kind` is `'custom'` and a logo was uploaded — the media type to expect
+	 * from {@link api.logoUrl}, empty when there is none. */
+	logo_media_type: string;
 }
 
 export interface Providers {
@@ -308,14 +331,46 @@ export const api = {
 		request<ArtifactContent>(`/chats/${chatId}/artifacts/${encodeURIComponent(name)}`),
 
 	providers: () => request<Providers>('/providers'),
-	addProvider: (body: Partial<Provider> & { name: string; api_key?: string }) =>
-		request<Providers>('/providers', { method: 'POST', body: JSON.stringify(body) }),
-	updateProvider: (name: string, patch: Partial<Provider> & { api_key?: string }) =>
-		request<Providers>(`/providers/${name}`, { method: 'PATCH', body: JSON.stringify(patch) }),
-	activateProvider: (name: string) =>
-		request<Providers>(`/providers/${name}/activate`, { method: 'POST' }),
+	addProvider: (body: {
+		name: string;
+		kind?: ProviderKind;
+		base_url: string;
+		model_id: string;
+		model_name?: string;
+		api_key?: string;
+		embedding_model?: string;
+		timeout_s?: number;
+		connect_timeout_s?: number;
+	}) => request<Providers>('/providers', { method: 'POST', body: JSON.stringify(body) }),
+	updateProvider: (
+		name: string,
+		patch: Partial<{
+			kind: ProviderKind;
+			base_url: string;
+			api_key: string;
+			embedding_model: string;
+			timeout_s: number;
+			connect_timeout_s: number;
+			logo_data_url: string;
+			logo_media_type: string;
+		}>
+	) => request<Providers>(`/providers/${name}`, { method: 'PATCH', body: JSON.stringify(patch) }),
+	activateProvider: (name: string, model?: string) =>
+		request<Providers>(`/providers/${name}/activate`, {
+			method: 'POST',
+			body: JSON.stringify(model ? { model } : {})
+		}),
 	deleteProvider: (name: string) => request<Providers>(`/providers/${name}`, { method: 'DELETE' }),
 	probeProvider: (name: string) => request<Probe>(`/providers/${name}/models`),
+	addModel: (name: string, body: { id: string; name?: string }) =>
+		request<Providers>(`/providers/${name}/models`, { method: 'POST', body: JSON.stringify(body) }),
+	removeModel: (name: string, modelId: string) =>
+		request<Providers>(`/providers/${name}/models?id=${encodeURIComponent(modelId)}`, {
+			method: 'DELETE'
+		}),
+	/** Where a `'custom'`-kind provider's uploaded logo is served from — not fetched through
+	 * `request`, since callers hand this straight to an `<img src>`. */
+	logoUrl: (name: string) => `${API}/providers/${encodeURIComponent(name)}/logo`,
 
 	skills: () =>
 		request<{ skills: Skill[]; broken: BrokenSkill[]; trust_problem: string }>('/skills'),

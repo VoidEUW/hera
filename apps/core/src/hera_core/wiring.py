@@ -100,7 +100,7 @@ class Services:
     close something it did not open.
     """
 
-    async def use_provider(self, provider: Provider, *, model: str = "") -> None:
+    async def use_provider(self, provider: Provider, *, model: str | None = None) -> None:
         """Point her at a different endpoint, without a restart.
 
         Changing the model is something a person does while trying to get Hera working at all,
@@ -110,12 +110,14 @@ class Services:
         ``model`` travels with the provider because the two are one decision: the endpoint
         knows where to send a request and ``ChatsSettings.model`` decides what name goes in the
         body, and leaving the second behind would point a new server at the old model's name —
-        which fails as an unhelpful 404 from somebody else's API.
+        which fails as an unhelpful 404 from somebody else's API. ``None`` means "leave it
+        alone"; ``""`` is a real value — a provider with no models registered — and must clear
+        the live setting rather than leaving a since-removed model's name behind.
         """
         previous, owned = self.provider, self.owns_provider
         self.provider = provider
         self.orchestrator.provider = provider
-        if model:
+        if model is not None:
             self.orchestrator.settings = self.orchestrator.settings.model_copy(
                 update={"model": model}
             )

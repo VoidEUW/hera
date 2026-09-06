@@ -288,7 +288,7 @@ export const t = {
 		add: 'Add an endpoint',
 		name: 'Name',
 		baseUrl: 'Base URL',
-		model: 'Model',
+		model: 'Model id',
 		embeddingModel: 'Embedding model',
 		embeddingHint: 'Optional. Empty means retrieval falls back to keyword overlap.',
 		timeout: 'Silence before giving up',
@@ -302,12 +302,42 @@ export const t = {
 		test: 'Test',
 		testing: 'Asking…',
 		reachable: (n: number) => `Reachable — ${n} ${n === 1 ? 'model' : 'models'}`,
-		pick: 'Use',
+		pick: 'Add',
 		unreachable: 'Could not reach it',
 		remove: 'Remove',
 		none: 'No endpoint registered yet. Add one and she has somewhere to think.',
 		saved: 'Saved',
-		nameRule: 'Lowercase letters, digits, - and _'
+		nameRule: 'Lowercase letters, digits, - and _',
+
+		kindLabel: 'Kind',
+		kind: {
+			openai: 'OpenAI',
+			anthropic: 'Anthropic',
+			google: 'Google',
+			mistral: 'Mistral',
+			openrouter: 'OpenRouter',
+			lmstudio: 'LM Studio',
+			ollama: 'Ollama',
+			vllm: 'vLLM',
+			llamacpp: 'llama.cpp',
+			generic: 'Generic',
+			custom: 'Custom'
+		},
+
+		logo: 'Logo',
+		logoUpload: 'Upload a logo',
+		logoClear: 'Remove logo',
+		logoHint: 'PNG, JPEG, WebP or GIF.',
+
+		modelsHeading: 'Registered models',
+		modelId: 'Model id',
+		modelName: 'Display name',
+		addModel: 'Add a model',
+		removeModel: 'Remove',
+		setActiveModel: 'Use this model',
+		noModels: 'No models registered on this endpoint yet.',
+		search: 'Search models…',
+		alreadyAdded: 'Added'
 	},
 
 	profileMenu: {

@@ -216,7 +216,7 @@
 					chatSkills={session.chat?.pinned_skills ?? []}
 					onsend={(text, files) => session.send(text, files)}
 					onstop={() => session.stop()}
-					onmodel={(name) => workspace.useProvider(name)}
+					onmodel={(name, modelId) => workspace.useProvider(name, modelId)}
 					onsettings={() => workspace.openSettings()}
 					onskills={(names) => session.pinSkills(names)}
 				/>

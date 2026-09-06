@@ -54,7 +54,7 @@
 			servers={workspace.servers}
 			chatSkills={workspace.pendingSkills}
 			onsend={start}
-			onmodel={(name) => workspace.useProvider(name)}
+			onmodel={(name, modelId) => workspace.useProvider(name, modelId)}
 			onsettings={() => workspace.openSettings()}
 			onskills={(names) => (workspace.pendingSkills = names)}
 		/>

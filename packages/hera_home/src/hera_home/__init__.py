@@ -25,6 +25,7 @@ MEMORIES_DIRNAME = "memories"
 CHATS_DIRNAME = "chats"
 SCRATCH_DIRNAME = "scratch"
 ARTIFACTS_DIRNAME = "artifacts"
+LOGOS_DIRNAME = "logos"
 DATABASE_FILENAME = "hera.sqlite3"
 MCP_FILENAME = "mcp.json"
 CONFIG_FILENAME = "config.toml"
@@ -36,6 +37,7 @@ __all__ = [
     "DATABASE_FILENAME",
     "DEFAULT_HOME",
     "HOME_ENV",
+    "LOGOS_DIRNAME",
     "MCP_FILENAME",
     "MEMORIES_DIRNAME",
     "MIND_DIRNAME",
@@ -47,6 +49,8 @@ __all__ = [
     "config_path",
     "database_path",
     "home",
+    "logo_path",
+    "logos_dir",
     "mcp_path",
     "memories_dir",
     "mind_dir",
@@ -116,6 +120,25 @@ def artifacts_dir(chat_id: str) -> Path:
     directory a person browses for the deliverable is one she has a reason to be tidy in.
     """
     return chat_dir(chat_id) / ARTIFACTS_DIRNAME
+
+
+def logos_dir() -> Path:
+    """Custom provider logos — one file per provider that uploaded one."""
+    return home() / LOGOS_DIRNAME
+
+
+def logo_path(provider_name: str) -> Path:
+    """One provider's uploaded logo, named after it and nothing else.
+
+    Guarded the same way ``chat_dir`` guards its id, even though ``hera_core`` already
+    restricts a provider name to lowercase/digits/-/_ before this is ever called — defense in
+    depth costs one more check.
+    """
+    bad = not provider_name or provider_name in {".", ".."}
+    bad = bad or "/" in provider_name or "\\" in provider_name
+    if bad:
+        raise ValueError(f"not a usable provider name: {provider_name!r}")
+    return logos_dir() / f"{provider_name}.logo"
 
 
 def database_path() -> Path:

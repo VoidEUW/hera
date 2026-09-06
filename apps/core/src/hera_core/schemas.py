@@ -18,6 +18,8 @@ to keep in step with the union.
 
 from __future__ import annotations
 
+import base64
+import binascii
 from datetime import date, datetime
 from typing import Any
 from uuid import UUID
@@ -26,7 +28,7 @@ from hera_skillsets.models import ID_PATTERN
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from hera_chats import Chat, Message, Project
-from hera_core.config import validate_provider_name
+from hera_core.config import ProviderKind, validate_provider_name
 from hera_memories import MAX_DESCRIPTION, MAX_TEXT
 from hera_profiles import MindRegion, Profile
 from hera_skillsets import BrokenSkill, Skill, SkillUsage
@@ -541,18 +543,30 @@ class PermissionsOut(BaseModel):
     rules: list[RuleOut]
 
 
+class ModelOut(BaseModel):
+    """One named model registered on an endpoint."""
+
+    model_config = ConfigDict(frozen=True)
+
+    id: str
+    name: str
+
+
 class ProviderOut(BaseModel):
     """One registered endpoint. Never carries the key — see ``api_key_set``."""
 
     model_config = ConfigDict(frozen=True)
 
     name: str
+    kind: ProviderKind
     base_url: str
-    model: str
+    models: list[ModelOut]
+    active_model: str
     embedding_model: str
     timeout_s: float
     connect_timeout_s: float
     api_key_set: bool
+    logo_media_type: str
 
 
 class ProvidersOut(BaseModel):
@@ -567,8 +581,14 @@ class ProviderIn(BaseModel):
     """Validated with the same function the stored entry uses, so a bad name is a 422 that
     says what a name may contain rather than a 500 from inside the handler."""
 
+    kind: ProviderKind = "generic"
     base_url: str = Field(min_length=1)
-    model: str = Field(min_length=1)
+
+    model_id: str = Field(min_length=1)
+    """The first model, registered in the same call that creates the provider — mirrors "the
+    first provider added becomes active" for the model living inside it."""
+    model_name: str = ""
+
     api_key: str = ""
     embedding_model: str = ""
     timeout_s: float = Field(default=600.0, gt=0)
@@ -585,15 +605,56 @@ class ProviderPatch(BaseModel):
 
     That is why ``api_key`` is ``str | None`` rather than ``str``: left out it keeps the key
     already on disk, and sent as ``""`` it clears it. A screen that never receives the key
-    cannot otherwise preserve one.
+    cannot otherwise preserve one. ``logo_data_url`` follows the same three-state rule: left out
+    keeps the stored logo, ``""`` clears it, anything else replaces it.
+
+    Model membership does not travel here — registering, renaming or removing one is
+    ``POST``/``DELETE /providers/{name}/models``, and switching which is active is
+    ``POST /providers/{name}/activate``.
     """
 
+    kind: ProviderKind | None = None
     base_url: str | None = Field(default=None, min_length=1)
-    model: str | None = Field(default=None, min_length=1)
     api_key: str | None = None
     embedding_model: str | None = None
     timeout_s: float | None = Field(default=None, gt=0)
     connect_timeout_s: float | None = Field(default=None, gt=0)
+
+    logo_data_url: str | None = Field(default=None, max_length=MAX_DATA_URL_CHARS)
+    logo_media_type: str | None = None
+
+    @model_validator(mode="after")
+    def _logo_shape(self) -> ProviderPatch:
+        if self.logo_data_url:
+            if self.logo_media_type not in IMAGE_TYPES:
+                raise ValueError(
+                    f"{self.logo_media_type or 'that'} is not an image Hera can store — "
+                    f"{', '.join(sorted(IMAGE_TYPES))}"
+                )
+            prefix = f"data:{self.logo_media_type};base64,"
+            if not self.logo_data_url.startswith(prefix):
+                raise ValueError("a logo must be a base64 data URL")
+            try:
+                decoded = base64.b64decode(self.logo_data_url[len(prefix) :], validate=True)
+            except binascii.Error as exc:
+                raise ValueError("a logo's base64 body is malformed") from exc
+            if not decoded:
+                raise ValueError("a logo cannot be empty")
+        return self
+
+
+class ModelIn(BaseModel):
+    """A model to register on an already-existing endpoint."""
+
+    id: str = Field(min_length=1, max_length=200)
+    name: str = ""
+
+
+class ActivateIn(BaseModel):
+    """Which model to make active when switching to an endpoint. Empty keeps whichever one was
+    already active there."""
+
+    model: str | None = None
 
 
 class ProbeOut(BaseModel):

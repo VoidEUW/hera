@@ -6,17 +6,24 @@
 	 * pointed at a model — and until now there was no way to do it without an environment
 	 * variable and a restart.
 	 *
+	 * **Several models, one endpoint.** A provider used to carry exactly one model string. Now
+	 * it carries a small registry of named ones, and switching which is active is a click on a
+	 * row rather than retyping an id.
+	 *
 	 * **Test before you commit to it.** The endpoint is asked what models it has, and the answer
-	 * either fills a dropdown or says plainly why it could not. "Nothing is listening on that
-	 * port" is the commonest thing to be wrong on a fresh install, and it belongs on the screen
-	 * you are already looking at.
+	 * either fills a searchable list or says plainly why it could not. "Nothing is listening on
+	 * that port" is the commonest thing to be wrong on a fresh install, and it belongs on the
+	 * screen you are already looking at. A model can also be typed in by hand — some
+	 * OpenAI-compatible endpoints don't implement the listing this probe uses.
 	 *
 	 * **The key is write-only.** It never comes back from the API, so an empty field means
 	 * "leave what is stored alone". Saying so under the field is the difference between that
-	 * being a sensible rule and a trap.
+	 * being a sensible rule and a trap. A custom logo follows the same rule: left alone unless a
+	 * new file is chosen or explicitly cleared.
 	 */
-	import { api, type Probe, type Provider } from '$lib/api/client';
+	import { api, type Probe, type Provider, type ProviderKind } from '$lib/api/client';
 	import { t } from '$lib/i18n';
+	import { kindFallbackIcon, kindIcon, PROVIDER_KINDS } from '$lib/providers';
 
 	interface Props {
 		filter?: string;
@@ -29,15 +36,31 @@
 	let error = $state<string | null>(null);
 	let saved = $state<string | null>(null);
 	let probes = $state<Record<string, Probe | 'running'>>({});
+	let probeQuery = $state<Record<string, string>>({});
 	let adding = $state(false);
 
 	// One draft per endpoint, so typing in a field does not fight the list refreshing under it.
-	let drafts = $state<Record<string, Partial<Provider> & { api_key?: string }>>({});
-	let fresh = $state({ name: '', base_url: 'http://localhost:1234/v1', model: '', api_key: '' });
+	// `logo_data_url`/`logo_media_type` ride along here rather than on `Provider` itself — a
+	// staged upload is not a fact about the endpoint until Save sends it.
+	let drafts = $state<
+		Record<string, Partial<Provider> & { api_key?: string; logo_data_url?: string }>
+	>({});
+	let fresh = $state({
+		name: '',
+		kind: 'generic' as ProviderKind,
+		base_url: 'http://localhost:1234/v1',
+		model_id: '',
+		model_name: '',
+		api_key: ''
+	});
+
+	// A model typed by hand, one draft per provider — kept apart from `drafts` because it adds
+	// to the registry rather than changing a field on the endpoint itself.
+	let newModel = $state<Record<string, { id: string; name: string }>>({});
 
 	const shown = $derived(
 		providers.filter(
-			(p) => !filter || `${p.name} ${p.base_url} ${p.model}`.toLowerCase().includes(filter)
+			(p) => !filter || `${p.name} ${p.base_url} ${p.active_model}`.toLowerCase().includes(filter)
 		)
 	);
 
@@ -51,6 +74,7 @@
 			providers = body.providers;
 			active = body.active;
 			drafts = Object.fromEntries(body.providers.map((p) => [p.name, {}]));
+			newModel = Object.fromEntries(body.providers.map((p) => [p.name, { id: '', name: '' }]));
 			error = null;
 		} catch (cause) {
 			error = say(cause);
@@ -66,7 +90,18 @@
 		const patch = drafts[entry.name] ?? {};
 		if (Object.keys(patch).length === 0) return;
 		try {
-			apply(await api.updateProvider(entry.name, patch));
+			apply(
+				await api.updateProvider(entry.name, {
+					kind: patch.kind as ProviderKind | undefined,
+					base_url: patch.base_url,
+					api_key: patch.api_key,
+					embedding_model: patch.embedding_model,
+					timeout_s: patch.timeout_s,
+					connect_timeout_s: patch.connect_timeout_s,
+					logo_data_url: patch.logo_data_url,
+					logo_media_type: patch.logo_media_type
+				})
+			);
 			drafts = { ...drafts, [entry.name]: {} };
 			saved = entry.name;
 			setTimeout(() => (saved = null), 1600);
@@ -78,7 +113,14 @@
 	async function add() {
 		try {
 			apply(await api.addProvider({ ...fresh }));
-			fresh = { name: '', base_url: 'http://localhost:1234/v1', model: '', api_key: '' };
+			fresh = {
+				name: '',
+				kind: 'generic',
+				base_url: 'http://localhost:1234/v1',
+				model_id: '',
+				model_name: '',
+				api_key: ''
+			};
 			adding = false;
 			error = null;
 		} catch (cause) {
@@ -88,6 +130,7 @@
 
 	async function probe(name: string) {
 		probes = { ...probes, [name]: 'running' };
+		probeQuery = { ...probeQuery, [name]: '' };
 		try {
 			probes = { ...probes, [name]: await api.probeProvider(name) };
 		} catch (cause) {
@@ -99,9 +142,41 @@
 		drafts = { ...drafts, [name]: { ...drafts[name], [field]: value } };
 	}
 
-	function current(entry: Provider, field: 'base_url' | 'model' | 'embedding_model'): string {
+	function readLogo(name: string, event: Event) {
+		const input = event.currentTarget as HTMLInputElement;
+		const file = input.files?.[0];
+		input.value = '';
+		if (!file) return;
+		const reader = new FileReader();
+		reader.onload = () => {
+			drafts = {
+				...drafts,
+				[name]: {
+					...drafts[name],
+					logo_data_url: String(reader.result),
+					logo_media_type: file.type
+				}
+			};
+		};
+		reader.readAsDataURL(file);
+	}
+
+	function clearLogo(name: string) {
+		drafts = { ...drafts, [name]: { ...drafts[name], logo_data_url: '', logo_media_type: '' } };
+	}
+
+	function current(entry: Provider, field: 'base_url' | 'embedding_model' | 'kind'): string {
 		const draft = drafts[entry.name]?.[field];
 		return draft !== undefined ? String(draft) : entry[field];
+	}
+
+	/** What to preview for the logo: the file just chosen, the one already on disk, or nothing —
+	 * a staged clear (`''`) must win over what is stored, or clicking "Remove logo" would keep
+	 * showing the old picture until Save. */
+	function logoPreview(entry: Provider): string {
+		const draft = drafts[entry.name]?.logo_data_url;
+		if (draft !== undefined) return draft;
+		return entry.logo_media_type ? api.logoUrl(entry.name) : '';
 	}
 
 	/** The silence budget, in seconds, as the field shows it.
@@ -113,6 +188,62 @@
 	function seconds(entry: Provider): number {
 		const draft = drafts[entry.name]?.timeout_s;
 		return typeof draft === 'number' ? draft : entry.timeout_s;
+	}
+
+	async function addModel(name: string) {
+		const draft = newModel[name];
+		if (!draft?.id.trim()) return;
+		try {
+			apply(await api.addModel(name, { id: draft.id.trim(), name: draft.name.trim() }));
+			newModel = { ...newModel, [name]: { id: '', name: '' } };
+		} catch (cause) {
+			error = say(cause);
+		}
+	}
+
+	async function pickFromProbe(name: string, modelId: string) {
+		// Applied as it is clicked rather than staged behind Save — the same rule the skill
+		// picker uses for a set of switches: a click that needs confirming is a click you have
+		// to remember you made.
+		try {
+			apply(await api.addModel(name, { id: modelId }));
+		} catch (cause) {
+			error = say(cause);
+		}
+	}
+
+	async function removeModel(name: string, modelId: string) {
+		try {
+			apply(await api.removeModel(name, modelId));
+		} catch (cause) {
+			error = say(cause);
+		}
+	}
+
+	async function setActiveModel(name: string, modelId: string) {
+		try {
+			apply(await api.activateProvider(name, modelId));
+		} catch (cause) {
+			error = say(cause);
+		}
+	}
+
+	/** A bundled logo file can be listed and still be missing on disk — swap to the monogram
+	 * rather than showing a broken image. `onerror` is removed first so a fallback that somehow
+	 * also fails does not loop. */
+	function onLogoError(kind: ProviderKind) {
+		return (event: Event) => {
+			const img = event.currentTarget as HTMLImageElement;
+			img.onerror = null;
+			img.src = kindFallbackIcon(kind);
+		};
+	}
+
+	function probeShown(entry: Provider): string[] {
+		const result = probes[entry.name];
+		if (!result || result === 'running' || !result.ok) return [];
+		const query = (probeQuery[entry.name] ?? '').trim().toLowerCase();
+		return result.models.filter((id) => !query || id.toLowerCase().includes(query));
 	}
 
 	function say(cause: unknown): string {
@@ -128,9 +259,19 @@
 
 {#each shown as entry (entry.name)}
 	{@const result = probes[entry.name]}
+	{@const effectiveKind = current(entry, 'kind') as ProviderKind}
 	<section class="entry" class:current={entry.name === active}>
 		<header>
-			<h3>{entry.name}</h3>
+			<div class="identity">
+				<img
+					class="logo"
+					src={logoPreview(entry) || kindIcon(effectiveKind)}
+					alt=""
+					aria-hidden="true"
+					onerror={onLogoError(effectiveKind)}
+				/>
+				<h3>{entry.name}</h3>
+			</div>
 			{#if entry.name === active}
 				<span class="badge">{t.models.active}</span>
 			{:else}
@@ -145,18 +286,44 @@
 		</header>
 
 		<label>
+			<span>{t.models.kindLabel}</span>
+			<select
+				value={current(entry, 'kind')}
+				onchange={(e) => edit(entry.name, 'kind', e.currentTarget.value)}
+			>
+				{#each PROVIDER_KINDS as kind (kind)}
+					<option value={kind}>{t.models.kind[kind]}</option>
+				{/each}
+			</select>
+		</label>
+
+		{#if effectiveKind === 'custom'}
+			<label class="logo-field">
+				<span>{t.models.logo}</span>
+				<div class="logo-row">
+					{#if logoPreview(entry)}
+						<img class="logo-preview" src={logoPreview(entry)} alt="" />
+					{/if}
+					<input
+						type="file"
+						accept="image/png,image/jpeg,image/webp,image/gif"
+						onchange={(e) => readLogo(entry.name, e)}
+					/>
+					{#if logoPreview(entry)}
+						<button class="ghost tiny" type="button" onclick={() => clearLogo(entry.name)}>
+							{t.models.logoClear}
+						</button>
+					{/if}
+				</div>
+				<small>{t.models.logoHint}</small>
+			</label>
+		{/if}
+
+		<label>
 			<span>{t.models.baseUrl}</span>
 			<input
 				value={current(entry, 'base_url')}
 				oninput={(e) => edit(entry.name, 'base_url', e.currentTarget.value)}
-			/>
-		</label>
-
-		<label>
-			<span>{t.models.model}</span>
-			<input
-				value={current(entry, 'model')}
-				oninput={(e) => edit(entry.name, 'model', e.currentTarget.value)}
 			/>
 		</label>
 
@@ -219,21 +386,111 @@
 			</button>
 		</div>
 
+		<div class="models-block">
+			<h4>{t.models.modelsHeading}</h4>
+			{#if entry.models.length}
+				<ul class="registered">
+					{#each entry.models as model (model.id)}
+						<li class:on={model.id === entry.active_model}>
+							<span class="what">
+								<span class="name">{model.name}</span>
+								{#if model.name !== model.id}<code class="hint">{model.id}</code>{/if}
+							</span>
+							{#if model.id === entry.active_model}
+								<span class="badge">{t.models.active}</span>
+							{:else if entry.name === active}
+								<button
+									class="ghost tiny"
+									type="button"
+									onclick={() => setActiveModel(entry.name, model.id)}
+								>
+									{t.models.setActiveModel}
+								</button>
+							{/if}
+							<button
+								class="ghost tiny danger"
+								type="button"
+								onclick={() => removeModel(entry.name, model.id)}
+							>
+								{t.models.removeModel}
+							</button>
+						</li>
+					{/each}
+				</ul>
+			{:else}
+				<p class="empty">{t.models.noModels}</p>
+			{/if}
+
+			<div class="add-model">
+				<input
+					class="mono"
+					placeholder={t.models.modelId}
+					value={newModel[entry.name]?.id ?? ''}
+					oninput={(e) =>
+						(newModel = {
+							...newModel,
+							[entry.name]: {
+								...newModel[entry.name],
+								id: e.currentTarget.value,
+								name: newModel[entry.name]?.name ?? ''
+							}
+						})}
+				/>
+				<input
+					placeholder={t.models.modelName}
+					value={newModel[entry.name]?.name ?? ''}
+					oninput={(e) =>
+						(newModel = {
+							...newModel,
+							[entry.name]: {
+								...newModel[entry.name],
+								name: e.currentTarget.value,
+								id: newModel[entry.name]?.id ?? ''
+							}
+						})}
+				/>
+				<button
+					class="ghost tiny"
+					type="button"
+					disabled={!newModel[entry.name]?.id.trim()}
+					onclick={() => addModel(entry.name)}
+				>
+					{t.models.addModel}
+				</button>
+			</div>
+		</div>
+
 		{#if result && result !== 'running'}
 			{#if result.ok}
 				<p class="ok">{t.models.reachable(result.models.length)}</p>
-				<ul class="models">
-					{#each result.models as name (name)}
+				<label class="search">
+					<span class="sr-only">{t.models.search}</span>
+					<input
+						type="search"
+						placeholder={t.models.search}
+						value={probeQuery[entry.name] ?? ''}
+						oninput={(e) => (probeQuery = { ...probeQuery, [entry.name]: e.currentTarget.value })}
+					/>
+				</label>
+				<ul class="probed">
+					{#each probeShown(entry) as id (id)}
+						{@const already = entry.models.some((m) => m.id === id)}
 						<li>
-							<code>{name}</code>
 							<button
-								class="ghost tiny"
+								class="row"
+								class:on={already}
 								type="button"
-								onclick={() => edit(entry.name, 'model', name)}
+								disabled={already}
+								onclick={() => pickFromProbe(entry.name, id)}
 							>
-								{t.models.pick}
+								<span class="mark" aria-hidden="true">{already ? '✓' : ''}</span>
+								<code class="id">{id}</code>
+								{#if !already}<span class="add-hint">{t.models.pick}</span>{/if}
+								{#if already}<span class="caption">{t.models.alreadyAdded}</span>{/if}
 							</button>
 						</li>
+					{:else}
+						<li class="empty">{t.settings.noMatch}</li>
 					{/each}
 				</ul>
 			{:else}
@@ -254,12 +511,24 @@
 			<small>{t.models.nameRule}</small>
 		</label>
 		<label>
+			<span>{t.models.kindLabel}</span>
+			<select bind:value={fresh.kind}>
+				{#each PROVIDER_KINDS as kind (kind)}
+					<option value={kind}>{t.models.kind[kind]}</option>
+				{/each}
+			</select>
+		</label>
+		<label>
 			<span>{t.models.baseUrl}</span>
 			<input bind:value={fresh.base_url} />
 		</label>
 		<label>
-			<span>{t.models.model}</span>
-			<input bind:value={fresh.model} placeholder="qwen3.6-35b" />
+			<span>{t.models.modelId}</span>
+			<input bind:value={fresh.model_id} placeholder="qwen3.6-35b" />
+		</label>
+		<label>
+			<span>{t.models.modelName}</span>
+			<input bind:value={fresh.model_name} placeholder={t.models.modelId} />
 		</label>
 		<label>
 			<span>{t.models.apiKey}</span>
@@ -267,7 +536,7 @@
 			<small>{t.models.keyBlank}</small>
 		</label>
 		<div class="actions">
-			<button class="primary" type="button" disabled={!fresh.name || !fresh.model} onclick={add}>
+			<button class="primary" type="button" disabled={!fresh.name || !fresh.model_id} onclick={add}>
 				{t.models.add}
 			</button>
 			<button class="ghost" type="button" onclick={() => (adding = false)}>Cancel</button>
@@ -308,6 +577,21 @@
 		margin-bottom: 10px;
 	}
 
+	.identity {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		min-width: 0;
+	}
+
+	.logo {
+		width: 20px;
+		height: 20px;
+		flex: none;
+		border-radius: 5px;
+		object-fit: cover;
+	}
+
 	h3 {
 		margin: 0;
 		font-size: 14px;
@@ -333,7 +617,8 @@
 		margin-bottom: 3px;
 	}
 
-	input {
+	input,
+	select {
 		width: 100%;
 		padding: 7px 10px;
 		background: var(--surface);
@@ -348,6 +633,26 @@
 		margin-top: 3px;
 		font-size: 12px;
 		color: var(--text-faint);
+	}
+
+	.logo-row {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+	}
+
+	.logo-row input[type='file'] {
+		flex: 1;
+		min-width: 0;
+	}
+
+	.logo-preview {
+		width: 32px;
+		height: 32px;
+		flex: none;
+		border-radius: 6px;
+		border: 1px solid var(--line);
+		object-fit: cover;
 	}
 
 	.actions {
@@ -398,23 +703,71 @@
 		margin-top: 16px;
 	}
 
-	.models {
-		list-style: none;
-		margin: 8px 0 0;
-		padding: 0;
-		display: flex;
-		flex-wrap: wrap;
-		gap: 6px;
+	.models-block {
+		margin-top: 14px;
+		padding-top: 14px;
+		border-top: 1px dashed var(--line);
 	}
 
-	.models li {
+	.models-block h4 {
+		margin: 0 0 8px;
+		font-size: 12.5px;
+		font-weight: 500;
+		color: var(--text-muted);
+	}
+
+	.registered {
+		list-style: none;
+		margin: 0 0 10px;
+		padding: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+	}
+
+	.registered li {
 		display: flex;
 		align-items: center;
-		gap: 6px;
-		padding: 3px 6px 3px 10px;
+		gap: 8px;
+		padding: 6px 8px;
 		background: var(--surface);
 		border: 1px solid var(--line);
 		border-radius: var(--radius);
+	}
+
+	.registered li.on {
+		border-color: var(--brass);
+	}
+
+	.registered .what {
+		flex: 1;
+		min-width: 0;
+		display: flex;
+		align-items: baseline;
+		gap: 8px;
+	}
+
+	.registered .name {
+		font-size: 13px;
+		color: var(--text);
+	}
+
+	.registered .hint {
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+		font-size: 11.5px;
+		color: var(--text-faint);
+	}
+
+	.add-model {
+		display: flex;
+		gap: 6px;
+	}
+
+	.add-model input {
+		flex: 1;
+		min-width: 0;
 	}
 
 	code {
@@ -431,5 +784,64 @@
 		margin: 8px 0 0;
 		font-size: 12.5px;
 		color: var(--danger);
+	}
+
+	.search input {
+		margin: 8px 0;
+	}
+
+	.probed {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		max-height: 220px;
+		overflow-y: auto;
+		border: 1px solid var(--line);
+		border-radius: var(--radius);
+	}
+
+	.probed li + li {
+		border-top: 1px solid var(--line);
+	}
+
+	.row {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		width: 100%;
+		padding: 6px 10px;
+		text-align: left;
+		border: 0;
+		border-radius: 0;
+	}
+
+	.row.on {
+		cursor: default;
+	}
+
+	.mark {
+		width: 13px;
+		flex: none;
+		color: var(--brass);
+		font-size: 11px;
+	}
+
+	.row .id {
+		flex: 1;
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.add-hint {
+		flex: none;
+		font-size: 11.5px;
+		color: var(--text-faint);
+	}
+
+	.probed .empty {
+		margin: 0;
+		padding: 10px;
 	}
 </style>

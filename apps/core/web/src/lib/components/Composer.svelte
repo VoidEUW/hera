@@ -22,6 +22,7 @@
 	import type { Profile, Provider, Server } from '$lib/api/client';
 	import { isImage, read, size, type Attachment } from '$lib/attachments';
 	import { t } from '$lib/i18n';
+	import { providerFallbackIcon, providerIcon } from '$lib/providers';
 	import Select from './Select.svelte';
 	import ServerSheet from './ServerSheet.svelte';
 	import SkillPicker from './SkillPicker.svelte';
@@ -50,7 +51,7 @@
 		onsend?: (text: string, attachments: Attachment[]) => void;
 		onstop?: () => void;
 		onprofile?: (id: string) => void;
-		onmodel?: (name: string) => void;
+		onmodel?: (providerName: string, modelId?: string) => void;
 		onsettings?: () => void;
 		onskills?: (names: string[]) => void;
 	}
@@ -120,7 +121,33 @@
 	const serversLabel = $derived(t.composer.serverCount(connected.length));
 	const skillsDetail = $derived(pinned.join(', '));
 
-	const model = $derived(providers.find((entry) => entry.name === activeProvider) ?? null);
+	const activeEntry = $derived(providers.find((entry) => entry.name === activeProvider) ?? null);
+	const activeModel = $derived(
+		activeEntry?.models.find((entry) => entry.id === activeEntry.active_model) ?? null
+	);
+	// One choice per model, across every endpoint — not one per endpoint, now that an endpoint
+	// may carry several. `${provider}::${model}` is safe to split on the *first* `::`: a
+	// provider name is restricted to [a-z0-9_-] (`validate_provider_name`), so it can never
+	// contain `::`, while a model id legally could.
+	const modelChoices = $derived(
+		providers.flatMap((entry) =>
+			entry.models.map((model) => ({
+				value: `${entry.name}::${model.id}`,
+				label: model.name,
+				hint: `${entry.name} · ${entry.base_url}`,
+				icon: providerIcon(entry),
+				iconFallback: providerFallbackIcon(entry)
+			}))
+		)
+	);
+	const activeChoice = $derived(
+		activeEntry && activeModel ? `${activeEntry.name}::${activeModel.id}` : ''
+	);
+
+	function chooseModel(value: string) {
+		const sep = value.indexOf('::');
+		onmodel?.(value.slice(0, sep), value.slice(sep + 2));
+	}
 
 	function submit() {
 		if (!sendable || blocked) return;
@@ -268,20 +295,16 @@
 			</div>
 		{/if}
 
-		{#if providers.length}
+		{#if modelChoices.length}
 			<div class="model">
 				<Select
-					choices={providers.map((entry) => ({
-						value: entry.name,
-						label: entry.model || entry.name,
-						hint: entry.base_url
-					}))}
-					value={activeProvider}
+					choices={modelChoices}
+					value={activeChoice}
 					label={t.composer.model}
 					placement="above"
 					align="end"
-					title={model ? `${model.name} · ${model.base_url}` : ''}
-					onchange={(name) => onmodel?.(name)}
+					title={activeModel ? `${activeModel.name} · ${activeEntry?.base_url}` : ''}
+					onchange={chooseModel}
 				/>
 			</div>
 		{:else}

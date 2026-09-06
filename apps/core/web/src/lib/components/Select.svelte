@@ -26,6 +26,13 @@
 		 * called — an endpoint's URL, a profile's description — where the label alone is a name
 		 * you have to already know. */
 		hint?: string;
+		/** A small image drawn before the label, in both the trigger and the row — a provider's
+		 * logo beside its model, say. Omitted entirely means no icon column, not a blank one. */
+		icon?: string;
+		/** Swapped in if `icon` fails to load — a bundled logo file that turned out to be
+		 * missing on disk, say. Should itself never be able to fail (a generated placeholder,
+		 * not another network fetch), since there is nothing after it to fall back to. */
+		iconFallback?: string;
 	}
 
 	interface Props {
@@ -112,6 +119,17 @@
 		open = false;
 		trigger?.focus();
 	}
+
+	/** A bundled logo file can be listed and still be missing on disk — swap to the fallback
+	 * rather than showing a broken image. `onerror` is removed first so a fallback that somehow
+	 * also fails does not loop. */
+	function onIconError(fallback: string | undefined) {
+		return (event: Event) => {
+			const img = event.currentTarget as HTMLImageElement;
+			img.onerror = null;
+			if (fallback) img.src = fallback;
+		};
+	}
 </script>
 
 <svelte:window {onkeydown} />
@@ -141,6 +159,15 @@
 		onclick={toggle}
 		onkeydown={openFrom}
 	>
+		{#if current?.icon}
+			<img
+				class="icon"
+				src={current.icon}
+				alt=""
+				aria-hidden="true"
+				onerror={onIconError(current.iconFallback)}
+			/>
+		{/if}
 		<span class="shown">{shown}</span>
 		<span class="chevron" aria-hidden="true"></span>
 	</button>
@@ -165,6 +192,15 @@
 					onclick={() => choose(choice.value)}
 				>
 					<span class="mark" aria-hidden="true">{on ? '✓' : ''}</span>
+					{#if choice.icon}
+						<img
+							class="icon"
+							src={choice.icon}
+							alt=""
+							aria-hidden="true"
+							onerror={onIconError(choice.iconFallback)}
+						/>
+					{/if}
 					<span class="what">
 						<span class="name">{choice.label}</span>
 						{#if choice.hint}<span class="caption hint">{choice.hint}</span>{/if}
@@ -223,6 +259,14 @@
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
+	}
+
+	.icon {
+		width: 14px;
+		height: 14px;
+		flex: none;
+		border-radius: 3px;
+		object-fit: cover;
 	}
 
 	/* Two borders on a rotated square: one shape, no asset, and it takes the colour of the row
