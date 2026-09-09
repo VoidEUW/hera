@@ -1,0 +1,67 @@
+name: Preview command
+
+# The on-demand half of the preview flow. A comment saying "/preview" on a pull request
+# re-films that pull request by rerunning the latest push-triggered capture for its head;
+# the rerun fires preview-comment.yml like any other capture, and the walkthrough comment
+# updates in place. Restricted to people with write access -- a stranger's comment must not
+# queue a five-minute job.
+#
+# Why a rerun instead of a blank workflow_dispatch: runs started by GITHUB_TOKEN via the
+# dispatch endpoint do not cascade into workflow_run events, so the comment job would never
+# wake. A rerun of an existing pull_request run is a fresh execution of the same event and
+# cascades normally. Runs are only rerun when their head SHA is the pull request's current
+# head, so an outdated capture never overwrites a newer one.
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  issues: write
+  actions: write
+
+jobs:
+  rerun:
+    if: >-
+      ${{
+        github.event.issue.pull_request &&
+        startsWith(github.event.comment.body, '/preview') &&
+        contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)
+      }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      COMMENT_ID: ${{ github.event.comment.id }}
+      PR_NUMBER: ${{ github.event.issue.number }}
+    steps:
+      - name: Rerun the latest capture for the current head
+        run: |
+          set -euo pipefail
+
+          gh api "repos/${GITHUB_REPOSITORY}/issues/comments/${COMMENT_ID}/reactions" \
+            -f content=eyes || echo "::warning::Could not react to the comment; continuing."
+
+          read -r head_sha head_branch < <(
+            gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" \
+              --jq '"\(.head.sha) \(.head.ref)"'
+          )
+
+          runs_json="$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/preview.yml/runs?event=pull_request&per_page=20")"
+          run_id="$(printf '%s' "$runs_json" | jq -r --arg sha "$head_sha" '[.workflow_runs[] | select(.head_sha == $sha)] | .[0].id // ""')"
+
+          if [ -z "$run_id" ]; then
+            gh api "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" -f \
+              body="No push-triggered capture exists for the current head of this pull request to rerun, so \`/preview\` has nothing to re-film. Push a commit (even an empty one) to create one."
+            exit 1
+          fi
+
+          status="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}" --jq '.status')"
+          if [ "$status" = "queued" ] || [ "$status" = "in_progress" ]; then
+            echo "A capture for ${head_branch}@${head_sha} is already running (${run_id}); it will update the comment when it finishes."
+            exit 0
+          fi
+
+          gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}/rerun" -X POST
+          echo "Rerunning preview capture ${run_id} for ${head_branch}@${head_sha}."

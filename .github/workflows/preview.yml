@@ -1,0 +1,83 @@
+name: Preview
+
+# What a change looks like, on the request itself. Builds the real interface, serves it from a
+# real server with a scripted model behind it, and walks a browser through the scenes a
+# reviewer would walk to -- start page, the waiting mark mid-breath, answers, a long trace,
+# the phone -- and attaches screenshots and a video to the run. No live endpoint, nothing
+# deployed, everything disposable.
+#
+# This job only films and uploads; preview-comment.yml (workflow_run) publishes the media to
+# the previews-media branch and comments on the pull request. Keeping the two apart is what
+# lets the flow work for pull requests opened from forks: this run holds a read-only token,
+# and the follow-up run in this repository holds the write token.
+
+on:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: Pull request to film, e.g. 50
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: preview-${{ github.event.pull_request.number || inputs.pr_number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      # A dispatch (from a /preview comment) runs on the default branch, so ask for the
+      # pull request's head explicitly. Plain pull_request runs keep the default checkout.
+      # The ref is taken from an untrusted input, so the checkout must not persist the token
+      # into .git/config (CodeQL: cache poisoning via execution of untrusted code).
+      - uses: actions/checkout@v4
+        if: inputs.pr_number
+        with:
+          ref: refs/pull/${{ inputs.pr_number }}/head
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        if: ${{ !inputs.pr_number }}
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-python-workspace
+        with:
+          # A dispatch checkouts refs/pull/<n>/head, i.e. untrusted code; both cache triggers
+          # must be off so the default-branch cache cannot be poisoned (CodeQL cache-poisoning).
+          cache: ${{ !inputs.pr_number }}
+
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          # Same cache token: keep npm cold on the dispatch path.
+          cache: ${{ !inputs.pr_number && 'npm' || '' }}
+          cache-dependency-path: apps/core/web/package-lock.json
+
+      - name: Build the interface
+        working-directory: apps/core/web
+        run: npm ci && npm run build
+
+      - name: Install the browser
+        run: uv run playwright install chromium --with-deps
+
+      - name: Film the walkthrough
+        run: uv run python tests/e2e/capture_preview.py preview-media
+
+      # Dispatched runs carry the default branch's identity, so the follow-up comment job
+      # cannot learn which pull request to report on from the run itself. Leave the number
+      # inside the artifact instead.
+      - name: Note which pull request this is
+        run: echo "${{ github.event.pull_request.number || inputs.pr_number || '' }}" > preview-media/pr-number
+
+      - name: Upload the media
+        uses: actions/upload-artifact@v4
+        with:
+          name: preview-media
+          path: preview-media/
+          retention-days: 14
+          if-no-files-found: error
