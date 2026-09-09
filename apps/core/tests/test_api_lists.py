@@ -297,6 +297,48 @@ class TestChats:
         assert response.status_code == 404
 
 
+class TestChatExport:
+    async def test_an_unknown_chats_export_is_a_404(self, client: AsyncClient) -> None:
+        assert (await client.get(f"{API}/chats/{uuid4()}/export.md")).status_code == 404
+
+    async def test_it_arrives_as_a_file_rather_than_as_a_page(self, client: AsyncClient) -> None:
+        chat = (await client.post(f"{API}/chats", json={})).json()
+
+        response = await client.get(f"{API}/chats/{chat['id']}/export.md")
+
+        assert response.status_code == 200
+        assert "attachment" in response.headers["content-disposition"]
+        assert response.headers["x-content-type-options"] == "nosniff"
+        assert response.headers["content-type"].startswith("text/markdown")
+
+    async def test_a_titled_chat_names_the_download_after_itself(self, client: AsyncClient) -> None:
+        chat = (await client.post(f"{API}/chats", json={})).json()
+        await client.patch(f"{API}/chats/{chat['id']}", json={"title": "Kerberos, Revisited"})
+
+        response = await client.get(f"{API}/chats/{chat['id']}/export.md")
+
+        assert 'filename="kerberos-revisited.md"' in response.headers["content-disposition"]
+
+    async def test_an_untitled_chat_falls_back_to_a_plain_filename(
+        self, client: AsyncClient
+    ) -> None:
+        chat = (await client.post(f"{API}/chats", json={})).json()
+
+        response = await client.get(f"{API}/chats/{chat['id']}/export.md")
+
+        assert 'filename="chat.md"' in response.headers["content-disposition"]
+
+    async def test_a_chat_with_no_messages_still_exports(self, client: AsyncClient) -> None:
+        """An empty conversation is the ordinary state for a chat nobody has written in yet,
+        and a 404 would make *nothing here yet* look like *no such chat*."""
+        chat = (await client.post(f"{API}/chats", json={})).json()
+
+        response = await client.get(f"{API}/chats/{chat['id']}/export.md")
+
+        assert response.status_code == 200
+        assert "title: Untitled" in response.text
+
+
 class TestTheSettingsLists:
     async def test_skills_are_listed_with_their_problems(
         self, client: AsyncClient, write_skill: WriteSkill, skills_path: Any

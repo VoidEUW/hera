@@ -17,7 +17,7 @@
 	 * ends up being renamed by the chat handler.
 	 */
 	import { resolve } from '$app/paths';
-	import { api, type Chat, type Profile, type Project } from '$lib/api/client';
+	import { API, api, type Chat, type Profile, type Project } from '$lib/api/client';
 	import { t } from '$lib/i18n';
 	import { colourOf } from '$lib/projects';
 	import Ocellus from './Ocellus.svelte';
@@ -281,6 +281,16 @@
 					>
 						{t.rail.rename}
 					</button>
+					<a
+						class="option"
+						role="menuitem"
+						href={`${API}/chats/${chat.id}/export.md`}
+						download
+						rel="external"
+						onclick={closeMenu}
+					>
+						{t.rail.export}
+					</a>
 					{#if projects.length}
 						<button class="option" type="button" role="menuitem" onclick={() => (moving = chat.id)}>
 							{t.rail.moveTo}

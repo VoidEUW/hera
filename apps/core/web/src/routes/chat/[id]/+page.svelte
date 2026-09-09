@@ -7,11 +7,12 @@
 	 */
 	import { page } from '$app/state';
 	import { untrack } from 'svelte';
-	import { api } from '$lib/api/client';
+	import { API, api } from '$lib/api/client';
 	import { artifactOf } from '$lib/api/events';
 	import ArtifactDrawer from '$lib/components/ArtifactDrawer.svelte';
 	import Composer from '$lib/components/Composer.svelte';
 	import Message from '$lib/components/Message.svelte';
+	import Tray from '$lib/components/Tray.svelte';
 	import { t } from '$lib/i18n';
 	import { artifacts } from '$lib/stores/artifacts.svelte';
 	import { ChatSession } from '$lib/stores/chat.svelte';
@@ -142,16 +143,34 @@
 
 <header class="top">
 	<h1 class="title">{session.chat?.title || t.empty.title}</h1>
-	{#if published && session.chat}
-		<button
-			class="published"
-			type="button"
-			onclick={() =>
-				artifacts.open ? artifacts.close() : artifacts.show(session.chat!.id, artifacts.name)}
-		>
-			{t.artifact.count(published)}
-		</button>
-	{/if}
+	<div class="right">
+		{#if published && session.chat}
+			<button
+				class="published"
+				type="button"
+				onclick={() =>
+					artifacts.open ? artifacts.close() : artifacts.show(session.chat!.id, artifacts.name)}
+			>
+				{t.artifact.count(published)}
+			</button>
+		{/if}
+		<!-- The first tool, and likely not the last -- a home for anything else that acts on the
+		     conversation as a whole rather than on one message in it. -->
+		<div class="toolbar" role="toolbar" aria-label={t.chat.toolbar}>
+			{#if session.chat}
+				<a
+					class="tool"
+					aria-label={t.chat.export}
+					title={t.chat.export}
+					href={`${API}/chats/${session.chat.id}/export.md`}
+					download
+					rel="external"
+				>
+					<Tray size={15} />
+				</a>
+			{/if}
+		</div>
+	</div>
 </header>
 
 <!-- The conversation and the drawer are side by side rather than stacked, which is the whole
@@ -252,11 +271,20 @@
 		}
 	}
 
+	/* Everything that is not the title, pinned to the far edge as one group -- the artifact
+	   count and the toolbar read as a pair rather than as two things that happen to have
+	   ended up on the same side. */
+	.right {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		margin-left: auto;
+	}
+
 	/* The way back to something published nine turns ago. Without it, the only door to an
 	   artifact is the card in the turn that made it, and an edit later on leaves you scrolling
 	   for the thing you just changed. */
 	.published {
-		margin-left: auto;
 		flex: none;
 		padding: 3px 9px;
 		border: 1px solid var(--line);
@@ -271,6 +299,32 @@
 	.published:hover {
 		color: var(--text);
 		border-color: var(--brass);
+	}
+
+	.toolbar {
+		display: flex;
+		align-items: center;
+		gap: 4px;
+	}
+
+	.tool {
+		display: grid;
+		place-items: center;
+		width: 28px;
+		height: 28px;
+		flex: none;
+		border-radius: 50%;
+		color: var(--text-muted);
+		transition:
+			color var(--fade) var(--ease),
+			background var(--fade) var(--ease);
+	}
+
+	.tool:hover,
+	.tool:focus-visible {
+		color: var(--brass);
+		background: var(--surface);
+		outline: none;
 	}
 
 	/* The conversation keeps its own column and its own scrolling; the drawer takes width from

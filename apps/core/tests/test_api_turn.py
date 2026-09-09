@@ -271,6 +271,33 @@ class TestARealMcpServer:
             "artifact": {"name": "page.html", "inline": False, "bytes": 11}
         }
 
+    async def test_the_export_names_what_she_published(
+        self, make_services: Any, mcp_registry: ToolRegistry
+    ) -> None:
+        """The transcript and the file bar are two different stores (ADR 13) — the export is
+        where they meet, so what was published has to be findable from the document alone."""
+        provider = FakeProvider(
+            [
+                tool_turn(
+                    tool_call(
+                        "hera__artifact_create",
+                        {"name": "page.html", "content": "<h1>Hi</h1>", "inline": False},
+                    )
+                ),
+                text_turn("Published."),
+            ]
+        )
+        services = make_services(provider, mcp_registry)
+        async with _client(services) as client:
+            chat_id = await open_chat(client)
+            await talk(client, chat_id, "build me a page")
+            export = await client.get(f"{API}/chats/{chat_id}/export.md")
+
+        assert export.status_code == 200
+        assert "> called `hera__artifact_create`" in export.text
+        assert "## Artifacts" in export.text
+        assert "`page.html`" in export.text
+
     async def test_an_edit_changes_the_file_without_republishing_it(
         self, make_services: Any, mcp_registry: ToolRegistry
     ) -> None:
