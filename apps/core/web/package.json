@@ -39,7 +39,7 @@
 		"@fontsource-variable/fraunces": "^5.1.1",
 		"@fontsource-variable/source-serif-4": "^5.1.1",
 		"@fontsource/ibm-plex-mono": "^5.1.1",
-		"dompurify": "^3.4.14",
+		"dompurify": "^3.4.15",
 		"katex": "^0.18.4",
 		"marked": "^18.0.11",
 		"marked-katex-extension": "^5.1.12"
