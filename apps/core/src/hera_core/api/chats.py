@@ -21,7 +21,7 @@ from typing import Any
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, status
-from fastapi.responses import StreamingResponse
+from fastapi.responses import Response, StreamingResponse
 from hera_chats.events import (
     AnswerGiven,
     AnswerRequired,
@@ -43,9 +43,11 @@ from hera_chats import (
     TurnContext,
     build_history,
     events_of,
+    for_export,
+    slugify,
     title_from,
 )
-from hera_core.chat_files import forget_chat
+from hera_core.chat_files import FileArtifacts, forget_chat
 from hera_core.clock import render as render_now
 from hera_core.config import ConfigError
 from hera_core.config import load as load_config
@@ -68,6 +70,8 @@ from hera_providers import ToolCallReady
 from hera_skillsets import SkillUsageRepository
 
 router = APIRouter(tags=["chats"])
+
+EXPORT_TYPE = "text/markdown; charset=utf-8"
 
 
 @router.get("/chats", response_model=list[ChatOut])
@@ -110,6 +114,30 @@ def read_chat(chat_id: UUID, owner: Owner, db: Db) -> ChatDetail:
     return ChatDetail(
         chat=ChatOut.of(chat),
         messages=[MessageOut.of(m) for m in MessageRepository(db).for_chat(chat.id)],
+    )
+
+
+@router.get("/chats/{chat_id}/export.md")
+async def export_chat(chat_id: UUID, owner: Owner, db: Db) -> Response:
+    """The chat as one markdown document — what a person can take somewhere else.
+
+    Same pattern as `hera_core.api.memories.export_memories`: an attachment with a neutral
+    media type, because this is a document assembled partly from text a model wrote.
+    """
+    chat = require_chat(db, chat_id, owner)
+    body = for_export(chat, MessageRepository(db).for_chat(chat.id))
+    artifacts = await FileArtifacts().files(str(chat.id))
+    if artifacts:
+        listed = "\n".join(f"- `{artifact.name}` ({artifact.size} bytes)" for artifact in artifacts)
+        body += f"\n## Artifacts\n\n{listed}\n"
+    filename = f"{slugify(chat.title, fallback='chat')}.md"
+    return Response(
+        content=body,
+        media_type=EXPORT_TYPE,
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "X-Content-Type-Options": "nosniff",
+        },
     )
 
 

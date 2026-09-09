@@ -41,6 +41,7 @@ from hera_chats.history import (
 )
 from hera_chats.models import Chat, Message, Project
 from hera_chats.ports import Tools
+from hera_chats.render import for_export
 from hera_chats.repository import (
     ChatRepository,
     MessageRepository,
@@ -80,6 +81,7 @@ __all__ = [
     "compose",
     "content_of",
     "events_of",
+    "for_export",
     "says_something",
     "slugify",
     "title_from",

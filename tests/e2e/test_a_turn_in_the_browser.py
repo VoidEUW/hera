@@ -169,6 +169,46 @@ def test_a_chat_is_renamed_and_deleted_from_the_rail(page: Any) -> None:
     assert page.locator("nav.rail li.item").count() == 0
 
 
+def test_a_chat_can_be_exported_from_the_rail(page: Any) -> None:
+    """The same `⋯` menu `test_a_chat_is_renamed_and_deleted_from_the_rail` opens, one item
+    over. A plain `<a download>` at the export route, same as `MEMORY.md`'s: the document is
+    partly text a model wrote, so it arrives as an attachment rather than as a page at Hera's
+    own origin."""
+    composer = page.locator("textarea").first
+    composer.fill("Explain Kerberos")
+    composer.press("Enter")
+    page.wait_for_url("**/chat/**", timeout=15_000)
+    page.wait_for_selector("text=ticket-granting ticket", timeout=30_000)
+    page.wait_for_selector("nav.rail li.item", timeout=15_000)
+
+    page.locator("nav.rail button.more").first.click()
+    export = page.get_by_role("menuitem", name="Export")
+
+    assert export.count() == 1
+    assert export.get_attribute("download") is not None
+    assert "/export.md" in (export.get_attribute("href") or "")
+
+
+def test_a_chat_can_be_exported_from_the_header_toolbar(page: Any) -> None:
+    """The other door to the same route: a toolbar above the conversation itself, for anything
+    that acts on the whole chat rather than on one row in the rail. Export is the first tool in
+    it — worth its own control here because it should not cost opening the `⋯` menu on a chat
+    you are already reading."""
+    composer = page.locator("textarea").first
+    composer.fill("Explain Kerberos")
+    composer.press("Enter")
+    page.wait_for_url("**/chat/**", timeout=15_000)
+    page.wait_for_selector("text=ticket-granting ticket", timeout=30_000)
+
+    toolbar = page.get_by_role("toolbar", name="Conversation tools")
+    assert toolbar.count() == 1
+
+    export = toolbar.get_by_role("link", name="Export as Markdown")
+    assert export.count() == 1
+    assert export.get_attribute("download") is not None
+    assert "/export.md" in (export.get_attribute("href") or "")
+
+
 def test_the_composer_says_what_she_runs_on(page: Any) -> None:
     """The model is a control beside send rather than a setting two screens away, and the
     Enter hint gets out of the way as soon as there is something to send.

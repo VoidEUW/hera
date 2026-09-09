@@ -22,10 +22,10 @@ from hera_storage import Repository, utcnow
 _SLUG_STRIP = re.compile(r"[^a-z0-9]+")
 
 
-def slugify(name: str) -> str:
+def slugify(name: str, *, fallback: str = "project") -> str:
     """A URL-safe handle. Never empty."""
     slug = _SLUG_STRIP.sub("-", name.strip().lower()).strip("-")
-    return slug or "project"
+    return slug or fallback
 
 
 def title_from(text: str, *, limit: int = 60) -> str:

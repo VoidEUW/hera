@@ -56,6 +56,7 @@ export const t = {
 		chatOptions: 'Chat options',
 		projectOptions: 'Project options',
 		rename: 'Rename',
+		export: 'Export',
 		delete: 'Delete',
 		deleteAsk: 'Delete this chat?',
 		/** What else goes with it. A chat owns what she published in it, and *a chat is a thing
@@ -393,6 +394,11 @@ export const t = {
 		 * nothing at all is what makes a renderer this build does not have look like an artifact
 		 * that came out broken. */
 		noMermaid: 'Mermaid diagrams are not drawn in this version — the source is below.'
+	},
+
+	chat: {
+		toolbar: 'Conversation tools',
+		export: 'Export as Markdown'
 	},
 
 	empty: {
