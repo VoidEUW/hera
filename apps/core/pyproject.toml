@@ -18,7 +18,7 @@ classifiers = [
     "Typing :: Typed",
 ]
 dependencies = [
-    "alembic>=1.13",
+    "alembic>=1.19.2",
     "ddgs>=9.16.0",
     "fastapi>=0.115",
     "hera-chats",
