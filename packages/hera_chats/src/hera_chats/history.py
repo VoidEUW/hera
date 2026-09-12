@@ -18,6 +18,13 @@ above it hands over attachments and everything below it moves whatever shape it 
 **Thinking never comes back.** The reasoning channel is not the answer, and replaying it as one
 teaches her that deliberating out loud is what an assistant message looks like.
 
+**Two things close an assistant message, and the second is the one that is easy to miss.**
+Prose after a round of calls belongs to the next message, which is obvious. So does a *call*
+made after a result has come back: she chose it having read that result, and replaying the two
+together would say she asked for both at once. The distinction is the difference between calls
+made in parallel and calls made in sequence, and it is the whole shape of how she worked a
+problem.
+
 **A very long argument does not come back in full either.** A call's arguments are persisted and
 replayed on every later turn, so a tool whose argument *is* a document — a published page, a
 scratchpad file — would otherwise sit in the prompt for the rest of the conversation, growing it
@@ -217,7 +224,11 @@ def turn_to_messages(
     results: dict[str, ToolResultEvent] = {}
 
     def flush() -> None:
-        """Close the assistant message in progress and answer its calls."""
+        """Close the assistant message in progress and answer its calls.
+
+        A no-op when there is nothing open, which is what lets the callers below ask for a
+        flush without first working out whether one is due.
+        """
         if not text and not calls:
             return
         wire.append(
@@ -242,6 +253,7 @@ def turn_to_messages(
             )
         text.clear()
         calls.clear()
+        results.clear()
 
     for event in events:
         if isinstance(event, TextDelta):
@@ -251,6 +263,14 @@ def turn_to_messages(
                 flush()
             text.append(event.text)
         elif isinstance(event, ToolCallReady):
+            # A result already in hand closes the assistant message too, and for the sharper
+            # reason: this call was made *after* reading that result, so it belongs to the
+            # round after it. Without this, a turn that searched, read the answer and then
+            # searched again came back as one assistant message asking for both at once —
+            # a sequence rebuilt as a parallel batch, which is a different conversation from
+            # the one that happened and one a model with a strict turn format cannot follow.
+            if results:
+                flush()
             calls.append(
                 ToolCall(
                     id=event.id,

@@ -109,6 +109,55 @@ class TestATurnWithTools:
             Role.ASSISTANT,
         ]
 
+    def test_two_silent_rounds_are_still_two_assistant_messages(self) -> None:
+        """Issue #63. The rounds above are separated by prose, which is the case that always
+        worked. A model that calls, reads the result and calls again *without saying anything*
+        used to come back as one assistant message asking for both at once — a sequence rebuilt
+        as a parallel batch, which claims she chose the second call without having seen the
+        first result. The result already in hand is what closes the message."""
+        wire = turn_to_messages(
+            [
+                ToolCallReady(id="c1", name="fs__read"),
+                ToolResultEvent(call_id="c1", tool="fs__read", text="one"),
+                ToolCallReady(id="c2", name="fs__read"),
+                ToolResultEvent(call_id="c2", tool="fs__read", text="two"),
+                TextDelta(text="Done."),
+            ]
+        )
+
+        assert [m.role for m in wire] == [
+            Role.ASSISTANT,
+            Role.TOOL,
+            Role.ASSISTANT,
+            Role.TOOL,
+            Role.ASSISTANT,
+        ]
+        assert [call.id for call in wire[0].tool_calls] == ["c1"]
+        assert [call.id for call in wire[2].tool_calls] == ["c2"]
+
+    def test_a_parallel_batch_in_a_later_round_stays_one_message(self) -> None:
+        """The other half of the rule: two calls made *together* after an earlier result are
+        still one assistant message, and neither of them is answered before it has run."""
+        wire = turn_to_messages(
+            [
+                ToolCallReady(id="c1", name="fs__read"),
+                ToolResultEvent(call_id="c1", tool="fs__read", text="one"),
+                ToolCallReady(id="c2", name="fs__read"),
+                ToolCallReady(id="c3", name="fs__read"),
+                ToolResultEvent(call_id="c2", tool="fs__read", text="two"),
+                ToolResultEvent(call_id="c3", tool="fs__read", text="three"),
+            ]
+        )
+
+        assert [m.role for m in wire] == [
+            Role.ASSISTANT,
+            Role.TOOL,
+            Role.ASSISTANT,
+            Role.TOOL,
+            Role.TOOL,
+        ]
+        assert [m.content for m in wire if m.role is Role.TOOL] == ["one", "two", "three"]
+
     def test_a_failed_call_still_answers_the_model(self) -> None:
         """A failure is information the model can act on. Omitting it leaves a hole it
         notices and often tries to fill by calling again."""

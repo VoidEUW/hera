@@ -99,7 +99,17 @@ class TurnContext:
     profile: Profile | None = None
 
     history: Sequence[ChatMessage] = ()
-    """The conversation so far, already rebuilt by :mod:`hera_chats.history`."""
+    """The conversation **before** this message, already rebuilt by :mod:`hera_chats.history`.
+
+    Before, and not including: the question itself is :attr:`text` and :attr:`attachments`, and
+    the turn appends it — that is the only place a ``/command`` has been stripped and a file has
+    become something the model can read. A caller that leaves the stored row in here as well
+    sends the question twice, which is issue #63 and was invisible for exactly as long as this
+    docstring said "the conversation so far".
+
+    A resumed turn is the mirror image: it has no text of its own, so its question arrives here
+    like every other message.
+    """
 
     resume: Sequence[ChatEvent] = ()
     """Events of a turn being continued after a permission card was answered.
@@ -234,7 +244,10 @@ class Turn:
         # The catalogue is fetched first: its rendered form is bound into the prompt, so the
         # prompt cannot be compiled before it is known.
         tools, catalogue_text = await self._tool_specs()
-        messages = await asyncio.to_thread(self._prepare, catalogue_text)
+        # The frame, the history and the question: everything that is true before she has said
+        # anything. Fixed for the whole turn, and what every round is rebuilt *from* -- see
+        # `_messages`.
+        base = await asyncio.to_thread(self._prepare, catalogue_text)
         for event in self._recorded[self._inherited :]:
             if isinstance(event, SkillSelected):
                 yield event
@@ -243,13 +256,12 @@ class Turn:
         if pending:
             async for event in self._answer(pending):
                 yield event
-            messages.extend(turn_to_messages(self._recorded))
 
         total = Usage()
         reported = False
         for iteration in range(1, self._settings.max_iterations + 1):
             round_ = _Round()
-            async for event in self._ask(messages, tools, round_):
+            async for event in self._ask(self._messages(base), tools, round_):
                 yield event
             if round_.usage is not None:
                 reported = True
@@ -302,7 +314,6 @@ class Turn:
 
             async for event in self._answer(round_.calls):
                 yield event
-            messages = [*messages, *turn_to_messages(self._recorded)]
 
         # The budget is spent. Rather than stopping here — which left the turn ending on a
         # half-sentence about what she was *about* to look up, with the last round's results
@@ -310,7 +321,7 @@ class Turn:
         # An empty tool list is the only thing that reliably stops a model asking for more:
         # telling it in prose to stop is advice, and this is arithmetic.
         final = _Round()
-        async for event in self._ask([*messages, _wrap_up()], [], final):
+        async for event in self._ask([*self._messages(base), _wrap_up()], [], final):
             yield event
         if final.usage is not None:
             reported = True
@@ -323,6 +334,23 @@ class Turn:
         )
 
     # -- building the request -----------------------------------------------------------
+
+    def _messages(self, base: Sequence[ChatMessage]) -> list[ChatMessage]:
+        """What this round is asking about: everything before the turn, plus the turn so far.
+
+        **Rebuilt, never appended to.** A round used to add its own messages to the previous
+        round's list while also reconstructing the whole record, so round three sent round
+        one's assistant message and its ``tool_call_id`` twice and round four sent it three
+        times — quadratic in :attr:`ChatsSettings.max_iterations`, and duplicate call ids are
+        what a model with a strict turn format turns into unusable tool calls. Deriving the
+        list from the record each time makes that class of bug unrepresentable: the record is
+        the only thing that grows.
+
+        It is also what makes the sentence in :mod:`hera_chats.history` true rather than
+        aspirational — the conversation the model sees mid-turn and the one it sees after a
+        reload come out of :func:`turn_to_messages` on the same events.
+        """
+        return [*base, *turn_to_messages(self._recorded)]
 
     def _prepare(self, catalogue_text: str) -> list[ChatMessage]:
         """Route skills, compile the prompt, and lay out the conversation.

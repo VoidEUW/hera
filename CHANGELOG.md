@@ -72,6 +72,32 @@ Towards [v0.2.1](docs/versions/v0.2.1.md), the polish pass.
   she did*) plus the most recent row — expanding to the whole trace on click; the phone's old
   anything-past-one-row rule works the same way now.
 
+### Fixed
+
+- **Your question was sent to the model twice, one copy after the other**
+  ([issue #63](https://github.com/VoidEUW/hera/issues/63)). The user message is written to the
+  database before the turn starts, so the history rebuilt from the message list already contained
+  it — and the turn appended it again, because the turn is where a `/command` is stripped and a
+  file becomes something the model can read. Every ordinary turn went out ending
+  `user: X / user: X`. Qwen3.6, DeepSeek and GLM5.3 absorb that; a model that expects roles to
+  alternate reads it as a fresh opening, which is why **GLM-4.7-Flash and GPT-OSS-20B re-greeted
+  from turn two** and behaved as though the previous message had never happened.
+- **A turn that used tools sent every earlier round again, once per round.** The round's messages
+  were appended to the previous round's while being rebuilt from the whole record, so round three
+  carried round one's assistant message and its `tool_call_id`s twice and round four carried them
+  three times — quadratic in the twelve-round budget. Duplicate call ids in one request are what a
+  strict backend turns into unusable tool calls, which is the other half of #63: *plain text works,
+  artifacts are garbage*. The round is now derived from the record each time, so only the record
+  grows.
+- **Two rounds of tools with nothing said between them came back as one round.** A call made after
+  a result had arrived was replayed in the same assistant message as the call before it — a
+  sequence rebuilt as a parallel batch, claiming she had asked for both at once without having
+  seen the first answer. Prose between rounds happened to hide this, which is why it survived. It
+  applies to a reload as well as to a turn in progress: both go through `turn_to_messages`.
+- The `ThinkingDelta` leak #63 opens with was **not** happening — reasoning has never been replayed
+  as an assistant message — and there is now a test saying so rather than a reader having to
+  re-derive it from the absence of a branch.
+
 ## [0.2.0] — 2026-08-31
 
 **The deepening pass: what makes her accumulate.** v0.1.0 ran a turn end to end and forgot it

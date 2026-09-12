@@ -72,6 +72,14 @@ server connected, so it reads back empty.
 it. If you are writing a parser for model output outside that package, something is wrong — the
 answer is almost always a tool call.
 
+**The request is derived from the record, never accumulated.** Every round of a turn rebuilds its
+message list out of `TurnContext.history` plus `turn_to_messages(recorded)` — the record is the only
+thing that grows. Appending to the previous round's list instead is [issue #63](https://github.com/VoidEUW/hera/issues/63):
+it sent round one's `tool_call_id`s three times by round four, and a model with a strict turn format
+answers duplicate call ids with garbage. The same rule is why `history` is the conversation **before**
+this message — the question itself is `text` plus `attachments`, appended by the turn, because that
+is where a `/command` has been stripped and a file has become something the model can read.
+
 **No second parser in the browser.** The frontend renders event variants it is given. This is
 the single largest source of bugs in the previous version and it is designed out. Typesetting
 her prose as Markdown and TeX is not that parser and may not become one — it draws text as what
