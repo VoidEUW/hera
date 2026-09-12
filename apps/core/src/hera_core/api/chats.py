@@ -202,11 +202,19 @@ def send_message(
     messages = MessageRepository(db)
 
     attachments = [Attachment(**item.model_dump()) for item in payload.attachments]
-    messages.add_user_message(chat, payload.text, attachments)
+    spoken = messages.add_user_message(chat, payload.text, attachments)
     ChatRepository(db).touch(chat)
     assistant = messages.start_assistant_message(chat)
 
-    return _stream(container, db, chat, assistant, text=payload.text, attachments=attachments)
+    return _stream(
+        container,
+        db,
+        chat,
+        assistant,
+        text=payload.text,
+        spoken=spoken,
+        attachments=attachments,
+    )
 
 
 @router.post("/chats/{chat_id}/messages/{message_id}/redo")
@@ -253,11 +261,13 @@ def redo_message(
         )
 
     messages.truncate_from(chat.id, asked.sequence)
-    messages.add_user_message(chat, text, attachments)
+    spoken = messages.add_user_message(chat, text, attachments)
     ChatRepository(db).touch(chat)
     assistant = messages.start_assistant_message(chat)
 
-    return _stream(container, db, chat, assistant, text=text, attachments=attachments)
+    return _stream(
+        container, db, chat, assistant, text=text, spoken=spoken, attachments=attachments
+    )
 
 
 def _question_behind(history: Sequence[Message], target: Message) -> Message | None:
@@ -359,6 +369,7 @@ def _stream(
     *,
     text: str,
     lead: Sequence[ChatEvent] = (),
+    spoken: Message | None = None,
     **extra: object,
 ) -> StreamingResponse:
     """Close this request's unit of work, then stream the turn.
@@ -378,6 +389,8 @@ def _stream(
     persists them, and a resumed turn deliberately does not re-stream what it inherited — the
     client is already rendering that half. These are the exception: they were made by *this*
     request, so without them the card only settles on the ``done`` re-render.
+
+    ``spoken`` is the user row this turn answers, when there is one — see :func:`_context`.
     """
     db.commit()
 
@@ -385,6 +398,7 @@ def _stream(
         db,
         chat,
         text=text,
+        spoken_id=spoken.id if spoken is not None else None,
         history_limit=container.orchestrator.settings.max_history_argument_chars,
         # Read per turn, like the vocabulary and the date, and for the same reason: a memory
         # switched off on the settings screen has to stop arriving on the next turn rather than
@@ -448,7 +462,13 @@ def _record(
 
 
 def _context(
-    session: Session, chat: Chat, *, text: str, history_limit: int, **extra: object
+    session: Session,
+    chat: Chat,
+    *,
+    text: str,
+    history_limit: int,
+    spoken_id: UUID | None = None,
+    **extra: object,
 ) -> TurnContext:
     """Gather the profile, the project, the history and the vocabulary for one turn.
 
@@ -456,14 +476,24 @@ def _context(
     value a deployment can change that quietly does not apply is worse than one that is not
     offered. It shortens a string argument that is really a document — a page published in turn
     four is otherwise in the prompt of every turn after it.
+
+    ``spoken_id`` is **the row this turn is answering**, and it is left out of the history — the
+    turn appends the question itself, from ``text`` and ``attachments``, because that is the
+    only place a ``/command`` has been stripped and a file has become something the model can
+    read. The user message is written before the turn starts, so without this it arrives twice,
+    back to back (issue #63). A resumed turn passes nothing and is right to: it sends no text of
+    its own, so the question has to come from the history like every other message in it.
     """
     profile = _profile_of(session, chat)
     project = None
     if chat.project_id is not None:
         project = ProjectRepository(session).get(chat.project_id)
-    history = build_history(
-        MessageRepository(session).for_chat(chat.id), max_argument_chars=history_limit
-    )
+    stored = [
+        message
+        for message in MessageRepository(session).for_chat(chat.id)
+        if message.id != spoken_id
+    ]
+    history = build_history(stored, max_argument_chars=history_limit)
     return TurnContext(
         text=text,
         chat=chat,

@@ -36,6 +36,7 @@ from hera_providers import (
     Role,
     StreamInterrupted,
     TextDelta,
+    ThinkingDelta,
     ToolCallReady,
     Usage,
     text_turn,
@@ -304,6 +305,92 @@ class TestTheToolLoop:
         assert isinstance(events[-1], TurnClosed)
         assert events[-1].reason == "max_iterations"
         assert events[-1].iterations == 4
+
+
+class TestWhatTheModelIsSentEachRound:
+    """Issue #63. A turn goes round once per batch of calls, and each round is a *fresh*
+    request carrying the whole conversation — so what the second round adds to the first must
+    be exactly the round that happened in between.
+
+    It was not. The round's messages were *appended* to the previous round's while being
+    rebuilt from the whole record, so round three sent round one twice and round four sent it
+    three times. Duplicate ``tool_call_id`` values in one request are what a strict backend
+    turns into unusable tool calls, which is the half of #63 that showed up as garbage
+    artifacts; the growth is quadratic in ``max_iterations``.
+    """
+
+    def _ids(self, request: ChatRequest) -> list[str]:
+        return [call.id for message in request.messages for call in message.tool_calls]
+
+    async def test_a_call_is_replayed_once_however_many_rounds_follow_it(
+        self, make_orchestrator: Make, tools: StubTools
+    ) -> None:
+        provider = FakeProvider(
+            [
+                tool_turn(tool_call("fs__read_file", {"p": "one"}, call_id="c1")),
+                tool_turn(tool_call("fs__read_file", {"p": "two"}, call_id="c2")),
+                tool_turn(tool_call("fs__read_file", {"p": "three"}, call_id="c3")),
+                text_turn("done"),
+            ]
+        )
+
+        await drain(make_orchestrator(provider, tools).begin(TurnContext(text="go")).stream())
+
+        assert self._ids(provider.requests[3]) == ["c1", "c2", "c3"]
+
+    async def test_every_call_is_answered_exactly_once(
+        self, make_orchestrator: Make, tools: StubTools
+    ) -> None:
+        """One ``tool`` message per call, paired by id. Two results for one id is a hole of a
+        different kind: the model reads the second as an answer to a call it cannot place."""
+        provider = FakeProvider(
+            [
+                tool_turn(tool_call("fs__read_file", {"p": "one"}, call_id="c1")),
+                tool_turn(tool_call("fs__read_file", {"p": "two"}, call_id="c2")),
+                text_turn("done"),
+            ]
+        )
+
+        await drain(make_orchestrator(provider, tools).begin(TurnContext(text="go")).stream())
+
+        last = provider.requests[2].messages
+        answers = [m.tool_call_id for m in last if m.role is Role.TOOL]
+        assert answers == ["c1", "c2"]
+
+    async def test_each_round_extends_the_one_before_it(
+        self, make_orchestrator: Make, tools: StubTools
+    ) -> None:
+        """The strongest form of the property, and the one that would have caught this: a
+        conversation only ever grows at the end."""
+        provider = FakeProvider(
+            [
+                tool_turn(tool_call("fs__read_file", {"p": "one"}, call_id="c1")),
+                tool_turn(tool_call("fs__read_file", {"p": "two"}, call_id="c2")),
+                text_turn("done"),
+            ]
+        )
+
+        await drain(make_orchestrator(provider, tools).begin(TurnContext(text="go")).stream())
+
+        for earlier, later in zip(provider.requests, provider.requests[1:], strict=False):
+            assert later.messages[: len(earlier.messages)] == earlier.messages
+            assert len(later.messages) > len(earlier.messages)
+
+    async def test_thinking_is_never_replayed(
+        self, make_orchestrator: Make, tools: StubTools
+    ) -> None:
+        """The hypothesis #63 opens with, pinned as a property rather than left to be
+        re-derived from the fact that ``turn_to_messages`` has no branch for it."""
+        deliberated: list[Event] = [
+            ThinkingDelta(text="the file is the thing to read"),
+            *tool_turn(tool_call("fs__read_file", call_id="c1")),
+        ]
+        provider = FakeProvider([deliberated, text_turn("It says so.")])
+
+        await drain(make_orchestrator(provider, tools).begin(TurnContext(text="go")).stream())
+
+        sent = "".join(m.text for m in provider.requests[1].messages)
+        assert "the file is the thing to read" not in sent
 
 
 class TestWhenSheKeepsAskingTheSameThing:

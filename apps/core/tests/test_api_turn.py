@@ -122,6 +122,38 @@ class TestASimpleTurn:
         assert "One." in contents
         assert "first" in contents
 
+    async def test_the_question_is_sent_once(self, make_services: Any) -> None:
+        """Issue #63. The user row is written before the turn starts, so the history rebuilt
+        from the message list already contains this question — and the turn appends it again as
+        the message it is answering. Every turn went out ending ``user: X / user: X``, which is
+        an opening rather than a continuation to a model that expects roles to alternate, and
+        the reason GLM-4.7-Flash and GPT-OSS-20B re-greeted from turn two."""
+        services = make_services(
+            FakeProvider([text_turn("One."), text_turn("Two."), text_turn("Three.")])
+        )
+        async with _client(services) as client:
+            chat_id = await open_chat(client)
+            await talk(client, chat_id, "first")
+            await talk(client, chat_id, "second")
+            await talk(client, chat_id, "third")
+
+        for index, question in enumerate(["first", "second", "third"]):
+            sent = services.provider.requests[index].messages
+            assert [m.content for m in sent].count(question) == 1
+            assert sent[-1].content == question
+
+    async def test_the_conversation_alternates(self, make_services: Any) -> None:
+        """The property behind the one above, and the one the affected models actually care
+        about: after the frame, questions and answers take turns."""
+        services = make_services(FakeProvider([text_turn("One."), text_turn("Two.")]))
+        async with _client(services) as client:
+            chat_id = await open_chat(client)
+            await talk(client, chat_id, "first")
+            await talk(client, chat_id, "second")
+
+        roles = [m.role.value for m in services.provider.requests[1].messages]
+        assert roles == ["system", "user", "assistant", "user"]
+
 
 class TestSkillsAndTools:
     async def test_a_slash_command_shows_up_as_a_skill_frame(

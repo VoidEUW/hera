@@ -3,10 +3,32 @@
 Current state of the rebuild, so a new session can start without re-reading history. A snapshot,
 not a changelog — historical detail and full rationale live in `versions/` and the ADRs.
 
-**Updated:** 2026-08-31 · **Version:** v0.2.0 tagged, v0.2.1 in progress · **Strategy:** thin spine
+**Updated:** 2026-09-10 · **Version:** v0.2.0 tagged, v0.2.1 in progress · **Strategy:** thin spine
 first, then deepen
 
 ## Now: v0.2.1
+
+### The turn was sending the wrong conversation ([issue #63](https://github.com/VoidEUW/hera/issues/63))
+
+Fixed. Three duplication bugs in what went on the wire, all of the same shape — the request was
+being *accumulated* rather than derived:
+
+1. **The current question went out twice**, because it is persisted before the turn starts and the
+   turn also appends it. Two identical consecutive user turns.
+2. **Every earlier tool round was re-appended each round** — round four carried round one's
+   `tool_call_id`s three times.
+3. **Two rounds with nothing said between them were flattened** into one assistant message asking
+   for both calls at once.
+
+Qwen3.6, DeepSeek and GLM5.3 absorb all three; **GLM-4.7-Flash and GPT-OSS-20B do not** — they
+re-greeted from turn two and produced unusable tool calls. The fix is one property, now stated in
+`CLAUDE.md`: the record grows, and each round's messages are rebuilt from it.
+
+**Still to do:** re-run the comparison against the real endpoints — GLM-4.7-Flash on the local GGUF
+and via OpenRouter, GPT-OSS-20B, and Qwen3.6-35B to confirm nothing regressed. That is issue #63's
+last unchecked box and it needs a machine with the weights on it.
+
+### `hera__ask` and the stance vocabulary
 
 Two coupled changes, landed in this order because `hera__ask`'s `kind` used to read from the
 stance vocabulary ([versions/v0.2.1.md](versions/v0.2.1.md) § 4,
