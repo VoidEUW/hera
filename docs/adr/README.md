@@ -24,3 +24,4 @@ later.
 | [15](0015-running-code-in-a-container.md) | Running code happens in a container, and here is which claim that makes | **deferred to v0.3** |
 | [16](0016-a-memory-is-a-file-and-all-of-them-are-in-the-prompt.md) | A memory is a file, and every enabled one is in the prompt | accepted |
 | [17](0017-a-stance-is-a-sentence-and-a-question-stands-alone.md) | A stance is a sentence, and a question stands on its own | accepted · supersedes [3](0003-emotions-as-tool-calls.md) |
+| [18](0018-a-model-may-carry-request-options.md) | A model may carry request options, and Hera does not know what they mean | accepted |

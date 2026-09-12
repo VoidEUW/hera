@@ -338,7 +338,18 @@ export const t = {
 		setActiveModel: 'Use this model',
 		noModels: 'No models registered on this endpoint yet.',
 		search: 'Search models…',
-		alreadyAdded: 'Added'
+		alreadyAdded: 'Added',
+
+		options: 'Request options',
+		optionsOpen: 'Options',
+		optionsHint:
+			'Extra fields sent in the request body — for something this endpoint understands and Hera does not need to. Leave empty unless a model asks for one.',
+		optionsPreset: 'Known options',
+		optionsPresetNone: 'Choose…',
+		optionsInvalid: 'This is not valid JSON yet.',
+		optionsSet: (count: number) => (count === 1 ? '1 option' : `${count} options`),
+		optionsSave: 'Save options',
+		optionsClear: 'Clear'
 	},
 
 	profileMenu: {

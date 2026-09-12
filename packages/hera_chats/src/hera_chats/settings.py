@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from typing import Any
+
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from hera_chats.history import MAX_ARGUMENT_CHARS
@@ -61,6 +64,22 @@ class ChatsSettings(BaseSettings):
     temperature: float | None = None
     top_p: float | None = None
     max_tokens: int | None = None
+
+    extra: dict[str, Any] = Field(default_factory=dict)
+    """Request-body fields this endpoint understands and Hera does not need to.
+
+    Handed straight to :attr:`hera_providers.ChatRequest.extra`, which merges it into the body
+    last. It travels with :attr:`model` because it is the same decision — a flag is a fact about
+    *this* model on *this* server, not about the deployment.
+
+    What it is for, from the case that earned it: GLM-4.7 strips the reasoning of earlier turns
+    when it renders the history unless it is told ``chat_template_kwargs.clear_thinking =
+    false``, and gpt-oss takes a ``reasoning_effort``. Neither is something this package could
+    have guessed at, and a field invented here would be one every other server rejects — which
+    is exactly why ``ChatRequest.extra`` exists rather than a growing list of named options.
+
+    Empty is the ordinary state. A model that needs nothing sends the same body it always did.
+    """
 
     title_length: int = 60
     """How much of the first message becomes the chat's title in the sidebar."""

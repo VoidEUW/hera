@@ -449,6 +449,9 @@ class Turn:
             temperature=self._settings.temperature,
             top_p=self._settings.top_p,
             max_tokens=self._settings.max_tokens,
+            # Whatever this particular model needs said to its server. Nothing here reads it --
+            # see ChatsSettings.extra.
+            extra=self._settings.extra,
         )
         async for event in self._provider.stream(request):
             if isinstance(event, TurnEnd):

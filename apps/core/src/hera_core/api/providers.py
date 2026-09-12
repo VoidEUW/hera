@@ -56,7 +56,7 @@ async def add_provider(payload: ProviderIn, container: Container) -> ProvidersOu
             status_code=status.HTTP_409_CONFLICT,
             detail=f"there is already a provider called {payload.name!r}",
         )
-    first = ModelEntry(id=payload.model_id, name=payload.model_name)
+    first = ModelEntry(id=payload.model_id, name=payload.model_name, options=payload.model_options)
     entry = ProviderEntry(
         name=payload.name,
         kind=payload.kind,
@@ -150,10 +150,18 @@ async def probe_provider(name: str) -> ProbeOut:
 )
 async def register_model(name: str, payload: ModelIn, container: Container) -> ProvidersOut:
     """Register a model against an endpoint — from a probe result or typed by hand. The first
-    one registered becomes active."""
+    one registered becomes active.
+
+    Also how a registered model is **edited**: an id that is already there is replaced rather
+    than duplicated, which is what makes changing its request options this call. If it happens
+    to be the active one, ``_commit`` re-points the running orchestrator at the new options and
+    the next turn uses them.
+    """
     config = _read()
     entry = _require(config, name)
-    updated = entry.with_model(ModelEntry(id=payload.id, name=payload.name))
+    updated = entry.with_model(
+        ModelEntry(id=payload.id, name=payload.name, options=payload.options)
+    )
     return await _commit(container, config.with_provider(updated))
 
 
@@ -232,7 +240,11 @@ async def _commit(container: Container, config: HeraConfig) -> ProvidersOut:
     active = config.active()
     if active is not None:
         await container.use_provider(
-            OpenAICompatibleProvider(active.settings()), model=active.active_model
+            OpenAICompatibleProvider(active.settings()),
+            model=active.active_model,
+            # The active model's request flags travel with its name, because they are a fact
+            # about that model rather than about the endpoint -- see `use_provider`.
+            options=active.active_options(),
         )
     return ProvidersOut(
         providers=[entry.redacted() for entry in config.providers],

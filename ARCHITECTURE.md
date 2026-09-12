@@ -126,6 +126,14 @@ and neither of those packages may import the other. A listed id whose digest no 
 reads as **changed**, which is a different sentence from *never verified* and the one worth
 saying out loud.
 
+A registered model may carry **`options`**: request-body fields Hera merges in last and never
+reads ([ADR 18](docs/adr/0018-a-model-may-carry-request-options.md)). They exist because GLM-4.7
+drops earlier turns' reasoning unless it is told `chat_template_kwargs.clear_thinking = false`, and
+because naming that field anywhere in `hera_providers` would put one server's chat template in the
+vocabulary four packages share. Per *model* rather than per endpoint — one URL serves several — and
+picked from a short list on the Models screen rather than inferred from a model id. This is not
+provider-specific normalisation and does not reopen ADR 2: nothing parses anything.
+
 `config.toml` holds the model providers — several may be registered, one is active. Each library
 still reads its own `HERA_*` environment variables and the file is **seeded from them** the
 first time it is written, so an existing `HERA_PROVIDER_BASE_URL` is what you find already

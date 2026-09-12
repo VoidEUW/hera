@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import base64
 import binascii
+import json
 from datetime import date, datetime
 from typing import Any
 from uuid import UUID
@@ -29,6 +30,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 from hera_chats import Chat, Message, Project
 from hera_core.config import ProviderKind, validate_provider_name
+from hera_core.model_presets import PRESETS, ModelPreset
 from hera_memories import MAX_DESCRIPTION, MAX_TEXT
 from hera_profiles import MindRegion, Profile
 from hera_skillsets import BrokenSkill, Skill, SkillUsage
@@ -543,6 +545,41 @@ class PermissionsOut(BaseModel):
     rules: list[RuleOut]
 
 
+RESERVED_OPTIONS = frozenset(
+    {"model", "messages", "stream", "stream_options", "tools", "tool_choice"}
+)
+"""Request-body keys a model's ``options`` may not set.
+
+``ChatRequest.extra`` is merged into the body **last**, which is what makes it a general seam
+and also what makes this necessary: ``{"messages": []}`` typed into the options field would
+replace the conversation with nothing, and the symptom would be a model that has forgotten
+everything — indistinguishable from the bug this whole field was added to fix (#63).
+
+Refused rather than dropped. A setting that is silently ignored is worse than one that says no.
+"""
+
+MAX_OPTIONS_CHARS = 4_000
+"""How large a model's ``options`` may be, serialised. Generous for a handful of flags, small
+enough that the field cannot become a second prompt nobody can see."""
+
+
+def _checked_options(options: dict[str, Any]) -> dict[str, Any]:
+    """Options a person typed, or a ``ValueError`` naming what is wrong with them.
+
+    Shared by every schema that accepts them, so the rule cannot differ between registering a
+    model and editing one — the same reason ``validate_provider_name`` is a function.
+    """
+    reserved = sorted(RESERVED_OPTIONS & set(options))
+    if reserved:
+        raise ValueError(
+            f"{', '.join(reserved)} would replace part of the request rather than add to it — "
+            "options are for fields Hera does not already send"
+        )
+    if len(json.dumps(options)) > MAX_OPTIONS_CHARS:
+        raise ValueError(f"model options are limited to {MAX_OPTIONS_CHARS} characters")
+    return options
+
+
 class ModelOut(BaseModel):
     """One named model registered on an endpoint."""
 
@@ -550,6 +587,7 @@ class ModelOut(BaseModel):
 
     id: str
     name: str
+    options: dict[str, Any] = Field(default_factory=dict)
 
 
 class ProviderOut(BaseModel):
@@ -575,6 +613,14 @@ class ProvidersOut(BaseModel):
     providers: list[ProviderOut]
     active: str
 
+    presets: list[ModelPreset] = Field(default_factory=lambda: list(PRESETS))
+    """The known request options a model can be given, for the picker beside the options field.
+
+    Served rather than held in the browser, because the server is what validates them — a second
+    copy of these values in TypeScript is a second place they can be wrong, and the one that
+    would be wrong silently.
+    """
+
 
 class ProviderIn(BaseModel):
     name: str = Field(min_length=1, max_length=40)
@@ -588,6 +634,14 @@ class ProviderIn(BaseModel):
     """The first model, registered in the same call that creates the provider — mirrors "the
     first provider added becomes active" for the model living inside it."""
     model_name: str = ""
+    model_options: dict[str, Any] = Field(default_factory=dict)
+    """Its request options, so a model that needs one can be given it while the endpoint is
+    being added rather than in a second visit to the screen."""
+
+    @field_validator("model_options")
+    @classmethod
+    def _usable_options(cls, options: dict[str, Any]) -> dict[str, Any]:
+        return _checked_options(options)
 
     api_key: str = ""
     embedding_model: str = ""
@@ -644,10 +698,22 @@ class ProviderPatch(BaseModel):
 
 
 class ModelIn(BaseModel):
-    """A model to register on an already-existing endpoint."""
+    """A model to register on an already-existing endpoint.
+
+    Also how one is **edited**: registering an id that is already there replaces it
+    (``ProviderEntry.with_model``), so changing a model's options is this same call rather than
+    a route of its own. The consequence worth knowing is that ``options`` is sent whole — an
+    empty object clears them.
+    """
 
     id: str = Field(min_length=1, max_length=200)
     name: str = ""
+    options: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("options")
+    @classmethod
+    def _usable_options(cls, options: dict[str, Any]) -> dict[str, Any]:
+        return _checked_options(options)
 
 
 class ActivateIn(BaseModel):
