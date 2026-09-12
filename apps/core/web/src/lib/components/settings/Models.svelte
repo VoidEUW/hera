@@ -21,7 +21,14 @@
 	 * being a sensible rule and a trap. A custom logo follows the same rule: left alone unless a
 	 * new file is chosen or explicitly cleared.
 	 */
-	import { api, type Probe, type Provider, type ProviderKind } from '$lib/api/client';
+	import {
+		api,
+		type ModelEntry,
+		type ModelPreset,
+		type Probe,
+		type Provider,
+		type ProviderKind
+	} from '$lib/api/client';
 	import { t } from '$lib/i18n';
 	import { kindFallbackIcon, kindIcon, PROVIDER_KINDS } from '$lib/providers';
 
@@ -32,6 +39,7 @@
 	let { filter = '' }: Props = $props();
 
 	let providers = $state<Provider[]>([]);
+	let presets = $state<ModelPreset[]>([]);
 	let active = $state('');
 	let error = $state<string | null>(null);
 	let saved = $state<string | null>(null);
@@ -58,6 +66,11 @@
 	// to the registry rather than changing a field on the endpoint itself.
 	let newModel = $state<Record<string, { id: string; name: string }>>({});
 
+	// The options editor, keyed by `provider/model`. Held as *text* rather than as an object,
+	// because half-typed JSON is the normal state of a textarea and a person must be able to be
+	// mid-edit without the field fighting them. `null` is closed.
+	let optionsDraft = $state<Record<string, string>>({});
+
 	const shown = $derived(
 		providers.filter(
 			(p) => !filter || `${p.name} ${p.base_url} ${p.active_model}`.toLowerCase().includes(filter)
@@ -72,6 +85,7 @@
 		try {
 			const body = await api.providers();
 			providers = body.providers;
+			presets = body.presets;
 			active = body.active;
 			drafts = Object.fromEntries(body.providers.map((p) => [p.name, {}]));
 			newModel = Object.fromEntries(body.providers.map((p) => [p.name, { id: '', name: '' }]));
@@ -84,6 +98,62 @@
 	function apply(body: { providers: Provider[]; active: string }) {
 		providers = body.providers;
 		active = body.active;
+	}
+
+	// -- request options, per registered model ------------------------------------------------
+
+	const optionsKey = (name: string, modelId: string) => `${name}/${modelId}`;
+
+	/** Closes one editor. A new object rather than `delete`, so the rune sees the change. */
+	function closeOptions(key: string) {
+		optionsDraft = Object.fromEntries(Object.entries(optionsDraft).filter(([k]) => k !== key));
+	}
+
+	function toggleOptions(name: string, model: ModelEntry) {
+		const key = optionsKey(name, model.id);
+		if (key in optionsDraft) {
+			closeOptions(key);
+			return;
+		}
+		optionsDraft = { ...optionsDraft, [key]: written(model.options) };
+	}
+
+	/** How stored options are shown: pretty-printed, and an empty set as an empty field rather
+	 * than as `{}` — a person opening the editor on a model that needs nothing should find room
+	 * to type, not a token to delete first. */
+	function written(options: Record<string, unknown>): string {
+		return Object.keys(options).length ? JSON.stringify(options, null, 2) : '';
+	}
+
+	/** The draft as an object, or `null` while it is not valid JSON yet. An empty field is `{}`,
+	 * which is how the editor clears options: saving nothing means nothing is sent. */
+	function parsed(text: string): Record<string, unknown> | null {
+		if (!text.trim()) return {};
+		try {
+			const value: unknown = JSON.parse(text);
+			return value && typeof value === 'object' && !Array.isArray(value)
+				? (value as Record<string, unknown>)
+				: null;
+		} catch {
+			return null;
+		}
+	}
+
+	async function saveOptions(name: string, model: ModelEntry) {
+		const key = optionsKey(name, model.id);
+		const options = parsed(optionsDraft[key] ?? '');
+		if (options === null) return;
+		try {
+			// The same call that registers a model: an id already there is replaced, so this is
+			// an edit. The server is what validates the options — the parse above only decides
+			// whether the button is worth offering.
+			apply(await api.addModel(name, { id: model.id, name: model.name, options }));
+			closeOptions(key);
+			saved = name;
+			setTimeout(() => (saved = null), 1600);
+		} catch (cause) {
+			error = say(cause);
+		}
 	}
 
 	async function save(entry: Provider) {
@@ -391,29 +461,100 @@
 			{#if entry.models.length}
 				<ul class="registered">
 					{#each entry.models as model (model.id)}
+						{@const key = optionsKey(entry.name, model.id)}
+						{@const draft = optionsDraft[key]}
+						{@const count = Object.keys(model.options).length}
 						<li class:on={model.id === entry.active_model}>
-							<span class="what">
-								<span class="name">{model.name}</span>
-								{#if model.name !== model.id}<code class="hint">{model.id}</code>{/if}
-							</span>
-							{#if model.id === entry.active_model}
-								<span class="badge">{t.models.active}</span>
-							{:else if entry.name === active}
+							<div class="row">
+								<span class="what">
+									<span class="name">{model.name}</span>
+									{#if model.name !== model.id}<code class="hint">{model.id}</code>{/if}
+									{#if count}<span class="badge quiet">{t.models.optionsSet(count)}</span>{/if}
+								</span>
+								{#if model.id === entry.active_model}
+									<span class="badge">{t.models.active}</span>
+								{:else if entry.name === active}
+									<button
+										class="ghost tiny"
+										type="button"
+										onclick={() => setActiveModel(entry.name, model.id)}
+									>
+										{t.models.setActiveModel}
+									</button>
+								{/if}
 								<button
 									class="ghost tiny"
 									type="button"
-									onclick={() => setActiveModel(entry.name, model.id)}
+									aria-expanded={draft !== undefined}
+									onclick={() => toggleOptions(entry.name, model)}
 								>
-									{t.models.setActiveModel}
+									{t.models.optionsOpen}
 								</button>
+								<button
+									class="ghost tiny danger"
+									type="button"
+									onclick={() => removeModel(entry.name, model.id)}
+								>
+									{t.models.removeModel}
+								</button>
+							</div>
+
+							{#if draft !== undefined}
+								{@const valid = parsed(draft) !== null}
+								<div class="options">
+									<!-- Not `hint`: that class is the one-line ellipsised model id above, and
+									     this is a sentence that has to wrap. -->
+									<p class="explains">{t.models.optionsHint}</p>
+									<label>
+										<span>{t.models.optionsPreset}</span>
+										<select
+											value=""
+											onchange={(e) => {
+												const chosen = presets.find((p) => p.id === e.currentTarget.value);
+												if (chosen)
+													optionsDraft = { ...optionsDraft, [key]: written(chosen.options) };
+												e.currentTarget.value = '';
+											}}
+										>
+											<option value="">{t.models.optionsPresetNone}</option>
+											{#each presets as preset (preset.id)}
+												<option value={preset.id} title={preset.hint}>{preset.label}</option>
+											{/each}
+										</select>
+									</label>
+									<label>
+										<span>{t.models.options}</span>
+										<textarea
+											class="mono"
+											rows="5"
+											spellcheck="false"
+											value={draft}
+											oninput={(e) =>
+												(optionsDraft = { ...optionsDraft, [key]: e.currentTarget.value })}
+										></textarea>
+									</label>
+									{#if !valid}
+										<p class="warn">{t.models.optionsInvalid}</p>
+									{/if}
+									<div class="options-actions">
+										<button
+											class="ghost tiny"
+											type="button"
+											disabled={!valid}
+											onclick={() => saveOptions(entry.name, model)}
+										>
+											{t.models.optionsSave}
+										</button>
+										<button
+											class="ghost tiny"
+											type="button"
+											onclick={() => (optionsDraft = { ...optionsDraft, [key]: '' })}
+										>
+											{t.models.optionsClear}
+										</button>
+									</div>
+								</div>
 							{/if}
-							<button
-								class="ghost tiny danger"
-								type="button"
-								onclick={() => removeModel(entry.name, model.id)}
-							>
-								{t.models.removeModel}
-							</button>
 						</li>
 					{/each}
 				</ul>
@@ -726,9 +867,6 @@
 	}
 
 	.registered li {
-		display: flex;
-		align-items: center;
-		gap: 8px;
 		padding: 6px 8px;
 		background: var(--surface);
 		border: 1px solid var(--line);
@@ -737,6 +875,57 @@
 
 	.registered li.on {
 		border-color: var(--brass);
+	}
+
+	.registered .row {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+	}
+
+	/* The options editor, open only when somebody asked for it — a model that needs nothing
+	   should read exactly as it did before this existed. */
+	.options {
+		margin-top: 8px;
+		padding-top: 8px;
+		border-top: 1px solid var(--line);
+	}
+
+	.options .explains {
+		margin: 0 0 8px;
+		max-width: 60ch;
+		font-family: var(--font-body);
+		font-size: 12.5px;
+		line-height: 1.5;
+		color: var(--text-muted);
+	}
+
+	.options textarea {
+		width: 100%;
+		padding: 7px 10px;
+		background: var(--bg);
+		border: 1px solid var(--line);
+		border-radius: var(--radius);
+		font-family: var(--font-mono);
+		font-size: 12.5px;
+		line-height: 1.5;
+		resize: vertical;
+	}
+
+	.options-actions {
+		display: flex;
+		gap: 6px;
+	}
+
+	.warn {
+		margin: 0 0 8px;
+		font-family: var(--font-body);
+		font-size: 12.5px;
+		color: var(--text-muted);
+	}
+
+	.badge.quiet {
+		color: var(--text-faint);
 	}
 
 	.registered .what {

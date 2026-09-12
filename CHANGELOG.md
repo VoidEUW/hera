@@ -98,6 +98,21 @@ Towards [v0.2.1](docs/versions/v0.2.1.md), the polish pass.
   as an assistant message — and there is now a test saying so rather than a reader having to
   re-derive it from the absence of a branch.
 
+### Added
+
+- **A registered model can carry request options** —
+  [ADR 18](docs/adr/0018-a-model-may-carry-request-options.md). Fields Hera passes into the request
+  body and does not read, so a model that needs something the OpenAI protocol has no word for can
+  be given it: GLM-4.7 wants `chat_template_kwargs.clear_thinking = false` or it drops earlier
+  turns' reasoning when it renders the history, and gpt-oss takes a `reasoning_effort`. They live
+  on the model rather than the endpoint, because one OpenRouter URL serves GLM-4.7 and GLM5.3 and
+  only one of them wants it. Editable on **Settings → Models** behind an *Options* disclosure, with
+  a picker for the two that are known — **picked, never guessed from a model id**, since
+  `glm-4.7-flash` and `zai/glm-4.7` are the same weights under two names a person typed. Stored as
+  a nested table in `config.toml` and applied on the next turn without a restart. Options may not
+  set `model`, `messages`, `stream`, `stream_options`, `tools` or `tool_choice`: the merge is last,
+  so those would replace the request rather than add to it.
+
 ## [0.2.0] — 2026-08-31
 
 **The deepening pass: what makes her accumulate.** v0.1.0 ran a turn end to end and forgot it

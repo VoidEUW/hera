@@ -79,6 +79,21 @@ class ModelEntry(BaseModel):
     """The friendly label shown on screen. Empty is filled in with :attr:`id` below, so nothing
     that reads a model entry has to fall back itself."""
 
+    options: dict[str, Any] = Field(default_factory=dict)
+    """Request-body fields this model's server understands and Hera does not.
+
+    Merged into the body last, through ``ChatsSettings.extra`` and
+    ``hera_providers.ChatRequest.extra``. Registered per *model* rather than per endpoint
+    because that is the grain the need has: the same OpenRouter URL serves GLM-4.7, which wants
+    ``chat_template_kwargs.clear_thinking = false`` so it keeps earlier turns' reasoning when it
+    renders the history, and GLM5.3, which wants nothing.
+
+    Empty for almost everything, and deliberately not a schema — the whole point is that this
+    package does not know what a given server accepts. What it *does* refuse is a key that would
+    overwrite the request rather than add to it; that check lives in ``hera_core.schemas``, at
+    the edge where a person's input arrives.
+    """
+
     @model_validator(mode="before")
     @classmethod
     def _default_name(cls, data: object) -> object:
@@ -188,6 +203,19 @@ class ProviderEntry(BaseModel):
             timeout_s=self.timeout_s,
             connect_timeout_s=self.connect_timeout_s,
         )
+
+    def active_options(self) -> dict[str, Any]:
+        """The request options of whichever model is active here, or none.
+
+        Not on :meth:`settings` alongside the rest: ``ProviderSettings`` is where a request goes
+        and how long it may take, and ``hera_providers`` has no business holding a bag of fields
+        it will not read. These reach the wire through ``ChatsSettings.extra``, which is the
+        layer that assembles a request.
+        """
+        for model in self.models:
+            if model.id == self.active_model:
+                return dict(model.options)
+        return {}
 
     def redacted(self) -> dict[str, Any]:
         """For the API. The key never leaves the machine it was typed on.

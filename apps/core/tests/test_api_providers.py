@@ -400,6 +400,100 @@ class TestTakingEffect:
         assert services.provider is not injected  # type: ignore[attr-defined]
 
 
+GLM_OPTIONS = {"chat_template_kwargs": {"enable_thinking": True, "clear_thinking": False}}
+
+
+class TestModelOptions:
+    """Issue #63. GLM-4.7 renders a multi-turn history as if it had just started unless it is
+    told ``chat_template_kwargs.clear_thinking = false``, and there was nowhere to say so.
+
+    Registered per model rather than per endpoint, because the same OpenRouter URL serves
+    GLM-4.7 and GLM5.3 and only one of them wants it.
+    """
+
+    async def test_they_are_stored_and_come_back(self, client: AsyncClient) -> None:
+        await client.post(
+            f"{API}/providers/local/models", json={"id": "glm-4.7-flash", "options": GLM_OPTIONS}
+        )
+
+        body = (await client.get(f"{API}/providers")).json()
+        model = next(m for m in body["providers"][0]["models"] if m["id"] == "glm-4.7-flash")
+        assert model["options"] == GLM_OPTIONS
+
+    async def test_they_reach_the_running_turn_when_the_model_is_activated(
+        self, client: AsyncClient, services: object
+    ) -> None:
+        """The whole point. A flag that is saved and does not apply until a restart is a flag
+        somebody will conclude does not work."""
+        await client.post(
+            f"{API}/providers/local/models", json={"id": "glm-4.7-flash", "options": GLM_OPTIONS}
+        )
+        await client.post(f"{API}/providers/local/activate", json={"model": "glm-4.7-flash"})
+
+        assert services.orchestrator.settings.extra == GLM_OPTIONS  # type: ignore[attr-defined]
+
+    async def test_switching_to_a_plain_model_takes_them_away_again(
+        self, client: AsyncClient, services: object
+    ) -> None:
+        """They belong to a model, not to an endpoint. Carrying GLM-4.7's flags over to the
+        model beside it sends them to a server that has never heard of them."""
+        await client.post(
+            f"{API}/providers/local/models", json={"id": "glm-4.7-flash", "options": GLM_OPTIONS}
+        )
+        await client.post(f"{API}/providers/local/activate", json={"model": "glm-4.7-flash"})
+        await client.post(f"{API}/providers/local/models", json={"id": "glm5.3"})
+        await client.post(f"{API}/providers/local/activate", json={"model": "glm5.3"})
+
+        assert services.orchestrator.settings.extra == {}  # type: ignore[attr-defined]
+
+    async def test_editing_a_registered_model_replaces_its_options(
+        self, client: AsyncClient
+    ) -> None:
+        await client.post(
+            f"{API}/providers/local/models", json={"id": "glm-4.7-flash", "options": GLM_OPTIONS}
+        )
+        await client.post(
+            f"{API}/providers/local/models", json={"id": "glm-4.7-flash", "options": {}}
+        )
+
+        body = (await client.get(f"{API}/providers")).json()
+        model = next(m for m in body["providers"][0]["models"] if m["id"] == "glm-4.7-flash")
+        assert model["options"] == {}
+
+    async def test_a_key_that_would_replace_the_conversation_is_refused(
+        self, client: AsyncClient
+    ) -> None:
+        """``extra`` is merged into the body last, so ``messages`` typed in here would empty
+        the conversation — and the symptom would be a model that has forgotten everything,
+        which is indistinguishable from the bug this field exists to fix."""
+        response = await client.post(
+            f"{API}/providers/local/models", json={"id": "m", "options": {"messages": []}}
+        )
+
+        assert response.status_code == 422
+        assert "messages" in response.text
+
+    async def test_they_survive_the_file(self, client: AsyncClient) -> None:
+        """It is a nested TOML table, and a person has to be able to read and edit it."""
+        await client.post(
+            f"{API}/providers/local/models", json={"id": "glm-4.7-flash", "options": GLM_OPTIONS}
+        )
+
+        entry = load().get("local")
+        assert entry is not None
+        assert next(m for m in entry.models if m.id == "glm-4.7-flash").options == GLM_OPTIONS
+
+    async def test_the_known_ones_are_offered(self, client: AsyncClient) -> None:
+        """Picked, never guessed from a model id — `glm-4.7-flash` and `zai/glm-4.7` are the
+        same weights under two names, and guessing wrong sends a flag to a server that rejects
+        the whole request."""
+        body = (await client.get(f"{API}/providers")).json()
+
+        glm = next(p for p in body["presets"] if p["id"] == "glm-4.7")
+        assert glm["options"] == GLM_OPTIONS
+        assert glm["hint"]
+
+
 class TestProbing:
     async def test_an_unreachable_endpoint_answers_rather_than_erroring(
         self, client: AsyncClient

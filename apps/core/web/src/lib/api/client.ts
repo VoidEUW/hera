@@ -192,6 +192,22 @@ export interface Rule {
 export interface ModelEntry {
 	id: string;
 	name: string;
+	/** Request-body fields this model's server understands and Hera does not — merged into the
+	 * body last. Empty for almost everything; GLM-4.7 needs
+	 * `chat_template_kwargs.clear_thinking = false` or it reads a multi-turn history as if the
+	 * conversation had just started. */
+	options: Record<string, unknown>;
+}
+
+/** A known set of {@link ModelEntry.options}, offered on Settings → Models.
+ *
+ * Served rather than held here, because the server is what validates them — a second copy in
+ * TypeScript is a second place they can be wrong, and the one that would be wrong silently. */
+export interface ModelPreset {
+	id: string;
+	label: string;
+	hint: string;
+	options: Record<string, unknown>;
 }
 
 export type ProviderKind =
@@ -226,6 +242,7 @@ export interface Provider {
 export interface Providers {
 	providers: Provider[];
 	active: string;
+	presets: ModelPreset[];
 }
 
 export interface Probe {
@@ -337,6 +354,7 @@ export const api = {
 		base_url: string;
 		model_id: string;
 		model_name?: string;
+		model_options?: Record<string, unknown>;
 		api_key?: string;
 		embedding_model?: string;
 		timeout_s?: number;
@@ -362,7 +380,12 @@ export const api = {
 		}),
 	deleteProvider: (name: string) => request<Providers>(`/providers/${name}`, { method: 'DELETE' }),
 	probeProvider: (name: string) => request<Probe>(`/providers/${name}/models`),
-	addModel: (name: string, body: { id: string; name?: string }) =>
+	/** Registers a model, or replaces the one already registered under that id — which is how a
+	 * model's `options` are edited. They are sent whole: an empty object clears them. */
+	addModel: (
+		name: string,
+		body: { id: string; name?: string; options?: Record<string, unknown> }
+	) =>
 		request<Providers>(`/providers/${name}/models`, { method: 'POST', body: JSON.stringify(body) }),
 	removeModel: (name: string, modelId: string) =>
 		request<Providers>(`/providers/${name}/models?id=${encodeURIComponent(modelId)}`, {

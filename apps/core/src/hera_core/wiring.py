@@ -24,6 +24,7 @@ the seam it lands on.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
 from hera_chats import ChatsSettings, TurnOrchestrator
 from hera_core.chat_files import FileArtifacts, FileScratchpad
@@ -100,7 +101,13 @@ class Services:
     close something it did not open.
     """
 
-    async def use_provider(self, provider: Provider, *, model: str | None = None) -> None:
+    async def use_provider(
+        self,
+        provider: Provider,
+        *,
+        model: str | None = None,
+        options: dict[str, Any] | None = None,
+    ) -> None:
         """Point her at a different endpoint, without a restart.
 
         Changing the model is something a person does while trying to get Hera working at all,
@@ -113,14 +120,22 @@ class Services:
         which fails as an unhelpful 404 from somebody else's API. ``None`` means "leave it
         alone"; ``""`` is a real value — a provider with no models registered — and must clear
         the live setting rather than leaving a since-removed model's name behind.
+
+        ``options`` follows the same three-state rule and for a sharper version of the same
+        reason: they are that *model's* request flags, so carrying the old model's over would
+        send GLM-4.7's ``chat_template_kwargs`` to a server that has never heard of it. ``{}``
+        is the ordinary value and must clear.
         """
         previous, owned = self.provider, self.owns_provider
         self.provider = provider
         self.orchestrator.provider = provider
+        changes: dict[str, Any] = {}
         if model is not None:
-            self.orchestrator.settings = self.orchestrator.settings.model_copy(
-                update={"model": model}
-            )
+            changes["model"] = model
+        if options is not None:
+            changes["extra"] = dict(options)
+        if changes:
+            self.orchestrator.settings = self.orchestrator.settings.model_copy(update=changes)
         self.owns_provider = True
         if owned:
             # Closed after the swap, so a request arriving mid-change gets the new client
@@ -162,6 +177,7 @@ def build_services(
     # first time it is written -- see hera_core.config.
     entry = load_config().active()
     provider_settings = entry.settings() if entry is not None else ProviderSettings()
+    model_options = entry.active_options() if entry is not None else {}
     injected = provider is not None
     if provider is None:
         provider = OpenAICompatibleProvider(provider_settings)
@@ -226,6 +242,10 @@ def build_services(
             registry=registry,
             settings=ChatsSettings(
                 model=provider_settings.model,
+                # The active model's own request flags, merged into the body last. Seeded here
+                # and replaced by `use_provider` when a person switches models on the Models
+                # screen, exactly as `model` is -- the two are one decision.
+                extra=model_options,
                 # The one place her `ask` tool is named to the turn layer. `hera_chats` does
                 # not know what a Hera tool is and must not learn; it takes the qualified name
                 # and suspends on it, the way it takes a policy rather than a list of rules.

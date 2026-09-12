@@ -108,7 +108,7 @@ columns, never `ForeignKey`; migrations live in `apps/core`.
 | `chats/<id>/scratch/` | her working files for one conversation. A cache, not something you keep — deleting the chat deletes it |
 | `chats/<id>/artifacts/` | what she publishes there: the filename is the identity, the extension is the kind. Goes with the chat too ([ADR 13](docs/adr/0013-an-artifact-is-a-file-she-publishes.md)) |
 | `mcp.json` | MCP servers, in the Claude-Desktop `mcpServers` shape |
-| `config.toml` | registered model endpoints, written by the interface |
+| `config.toml` | registered model endpoints, written by the interface. A model in here may carry **`options`** — request-body fields merged in last and never read ([ADR 18](docs/adr/0018-a-model-may-carry-request-options.md)) |
 | `trusted.json` | **where trusted skills are recorded** — optional |
 
 `trusted.json` is the only thing that can put a *verified* mark on a skill, because a skill

@@ -921,6 +921,49 @@ async def test_an_empty_message_sends_no_user_turn(make_orchestrator: Make, text
     assert all(m.text.strip() for m in provider.requests[0].messages)
 
 
+class TestWhatThisModelNeedsSaidToItsServer:
+    """``ChatsSettings.extra`` reaches ``ChatRequest.extra`` untouched.
+
+    Nothing in this package reads it, which is the point: GLM-4.7 wants
+    ``chat_template_kwargs.clear_thinking = false`` so it keeps earlier turns' reasoning when it
+    renders the history, gpt-oss wants a ``reasoning_effort``, and a named field for either here
+    would be a field every other server rejects.
+    """
+
+    async def test_it_travels_to_the_request(
+        self, make_orchestrator: Make, settings: ChatsSettings
+    ) -> None:
+        provider = FakeProvider([text_turn("ok")])
+        orchestrator = make_orchestrator(provider)
+        orchestrator.settings = settings.model_copy(
+            update={"extra": {"chat_template_kwargs": {"clear_thinking": False}}}
+        )
+
+        await drain(orchestrator.begin(TurnContext(text="hi")).stream())
+
+        assert provider.requests[0].extra == {"chat_template_kwargs": {"clear_thinking": False}}
+
+    async def test_it_is_on_every_round_of_a_tool_loop(
+        self, make_orchestrator: Make, tools: StubTools, settings: ChatsSettings
+    ) -> None:
+        """A flag that only applies to the first request would apply to exactly the turn that
+        has no history to render — which is the one turn that never needed it."""
+        provider = FakeProvider([tool_turn(tool_call("fs__read_file")), text_turn("done")])
+        orchestrator = make_orchestrator(provider, tools)
+        orchestrator.settings = settings.model_copy(update={"extra": {"reasoning_effort": "high"}})
+
+        await drain(orchestrator.begin(TurnContext(text="go")).stream())
+
+        assert [r.extra for r in provider.requests] == [{"reasoning_effort": "high"}] * 2
+
+    async def test_nothing_is_sent_by_default(self, make_orchestrator: Make) -> None:
+        """A deployment whose model needs nothing sends the body it always sent."""
+        provider = FakeProvider([text_turn("ok")])
+        await drain(make_orchestrator(provider).begin(TurnContext(text="hi")).stream())
+
+        assert provider.requests[0].extra == {}
+
+
 class TestAnnouncingACall:
     """`tool_call_started` is streamed and never recorded.
 
