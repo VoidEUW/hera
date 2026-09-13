@@ -15,6 +15,7 @@ import {
 	type Server
 } from '$lib/api/client';
 import type { Attachment } from '$lib/attachments';
+import type { Tab as SettingsTab } from '$lib/components/Settings.svelte';
 
 class Workspace {
 	chats = $state<Chat[]>([]);
@@ -46,6 +47,9 @@ class Workspace {
 	 * open it — the rail, ⌘K, and the composer's model and context chips — and the two of them
 	 * that are not the layout would otherwise need a callback threaded through every route. */
 	settingsOpen = $state(false);
+	/** Which tab settings lands on when it opens next. Set by `openSettings`, so a caller
+	 * already talking about servers or skills can land there instead of always on models. */
+	settingsTab = $state<SettingsTab>('models');
 
 	/** Whether the rail is open as a sheet, below the phone breakpoint. Same reasoning as
 	 * `settingsOpen`: the control that opens it lives in the layout, but it has to be reachable
@@ -69,7 +73,8 @@ class Workspace {
 	 * re-enact a decision somebody has walked away from. */
 	pendingProject = $state<string | null>(null);
 
-	openSettings() {
+	openSettings(section: SettingsTab = 'models') {
+		this.settingsTab = section;
 		this.settingsOpen = true;
 	}
 

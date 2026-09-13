@@ -21,13 +21,18 @@
 	import Models from './settings/Models.svelte';
 	import Skills from './settings/Skills.svelte';
 
+	export type Tab =
+		'models' | 'skills' | 'servers' | 'permissions' | 'memory' | 'mind' | 'dreaming';
+
 	interface Props {
 		onclose?: () => void;
+		/** Which tab to land on. Defaults to models — the one nothing else works without — but
+		 * a caller opening this from, say, the composer's server sheet wants to land on the
+		 * tab it was already talking about, not send a person back to the start. */
+		tab?: Tab;
 	}
 
-	let { onclose }: Props = $props();
-
-	type Tab = 'models' | 'skills' | 'servers' | 'permissions' | 'memory' | 'mind' | 'dreaming';
+	let { onclose, tab: initialTab = 'models' }: Props = $props();
 
 	const TABS: Array<{ id: Tab; label: string; soon?: boolean }> = [
 		{ id: 'models', label: t.settings.models },
@@ -39,7 +44,7 @@
 		{ id: 'dreaming', label: t.settings.dreaming, soon: true }
 	];
 
-	let tab = $state<Tab>('models');
+	let tab = $state<Tab>(initialTab);
 	let query = $state('');
 
 	let regions = $state<Region[]>([]);

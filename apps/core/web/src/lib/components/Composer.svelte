@@ -25,6 +25,7 @@
 	import { providerFallbackIcon, providerIcon } from '$lib/providers';
 	import Select from './Select.svelte';
 	import ServerSheet from './ServerSheet.svelte';
+	import type { Tab as SettingsTab } from './Settings.svelte';
 	import SkillPicker from './SkillPicker.svelte';
 
 	interface Props {
@@ -52,7 +53,7 @@
 		onstop?: () => void;
 		onprofile?: (id: string) => void;
 		onmodel?: (providerName: string, modelId?: string) => void;
-		onsettings?: () => void;
+		onsettings?: (section?: SettingsTab) => void;
 		onskills?: (names: string[]) => void;
 	}
 
@@ -192,7 +193,7 @@
 		onclose={() => (showingServers = false)}
 		onsettings={() => {
 			showingServers = false;
-			onsettings?.();
+			onsettings?.('servers');
 		}}
 	/>
 {/if}

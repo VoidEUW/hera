@@ -239,7 +239,7 @@
 					onsend={(text, files) => session.send(text, files)}
 					onstop={() => session.stop()}
 					onmodel={(name, modelId) => workspace.useProvider(name, modelId)}
-					onsettings={() => workspace.openSettings()}
+					onsettings={(section) => workspace.openSettings(section)}
 					onskills={(names) => session.pinSkills(names)}
 				/>
 			</div>
