@@ -63,6 +63,27 @@ describe('prose', () => {
 		expect(turn.thinking).toBe('ab');
 	});
 
+	it('drops a thought that is only whitespace, rather than a row of nothing', () => {
+		// A Gemma-family template can emit a well-formed but empty `<think>` block, which a
+		// stored turn carries as whitespace. It should not exist in the gutter as "thought · 0
+		// words" — see issue #70.
+		const turn = reduce([{ type: 'thinking_delta', text: '  \n' }, text('Yes.'), closed()]);
+		expect(turn.activity).toHaveLength(0);
+		expect(turn.inline.map((i) => i.text)).toEqual(['Yes.']);
+	});
+
+	it('keeps a thought that only starts with whitespace', () => {
+		const turn = reduce([
+			{ type: 'thinking_delta', text: ' \n' },
+			{ type: 'thinking_delta', text: 'weighing it' },
+			text('Yes.'),
+			closed()
+		]);
+		expect(turn.activity.map((row) => (row.event as { text?: string }).text)).toEqual([
+			' \nweighing it'
+		]);
+	});
+
 	it('opens a new block after a tool call, so the trace reads downwards', () => {
 		// The reason this matters: she thinks, calls something, reads the answer and thinks
 		// again. Appending the second stretch to the first puts it *above* the call that

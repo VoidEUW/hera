@@ -6,7 +6,9 @@ jobs, and the first two are the reason the file exists:
 * **Reasoning.** Qwen served through an OpenAI-compatible endpoint reports its reasoning
   either in a ``reasoning_content`` field beside ``content``, or -- depending on the server
   and its chat template -- inline in ``content`` wrapped in ``<think>`` tags. Both are lifted
-  into :class:`ThinkingDelta`, so no layer above ever sees a tag.
+  into :class:`ThinkingDelta`, so no layer above ever sees a tag. A thought that turns out to
+  be whitespace only -- another model family's empty ``<think>\n\n</think>`` -- is swallowed
+  rather than announced; see :meth:`QwenAdapter._think`.
 * **Tool calls.** They arrive as fragments indexed by position, with the arguments streamed as
   partial JSON. They are accumulated here and emitted whole -- preceded by one
   :class:`ToolCallStarted` as soon as the *name* is known, because the whole call can be
@@ -20,7 +22,7 @@ a ``<think>`` tag split across two chunks -- cheap to test exhaustively.
 from __future__ import annotations
 
 import json
-from collections.abc import Iterator, Mapping
+from collections.abc import Iterable, Iterator, Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -56,6 +58,8 @@ class QwenAdapter:
         self._reason: FinishReason | None = None
         self._usage: Usage | None = None
         self._finished = False
+        self._think_buffer = ""
+        self._think_has_content = False
 
     def feed(self, chunk: Mapping[str, Any]) -> Iterator[Event]:
         """Consume one decoded chunk of the stream."""
@@ -73,11 +77,11 @@ class QwenAdapter:
 
         reasoning = delta.get("reasoning_content")
         if isinstance(reasoning, str) and reasoning:
-            yield ThinkingDelta(text=reasoning)
+            yield from self._think(reasoning)
 
         content = delta.get("content")
         if isinstance(content, str) and content:
-            yield from _as_events(self._splitter.feed(content))
+            yield from self._route(_as_events(self._splitter.feed(content)))
 
         for raw in delta.get("tool_calls") or []:
             yield from self._accumulate(raw)
@@ -86,13 +90,39 @@ class QwenAdapter:
         if isinstance(finish, str) and finish:
             self._reason = _FINISH_REASONS.get(finish, "stop")
 
+    def _think(self, text: str) -> Iterator[Event]:
+        """Gate a run of reasoning text so a whitespace-only think block is silent.
+
+        A Gemma-family template can emit a well-formed but empty ``<think>\\n\\n</think>``,
+        which is a *present* thought with nothing in it -- the browser has no way to tell that
+        apart from a real one and shows "thought · 0 words". Buffering until non-whitespace
+        text is seen lets that case simply never announce a thought at all; a stream that turns
+        out to have real reasoning still streams it live from then on.
+        """
+        if self._think_has_content:
+            yield ThinkingDelta(text=text)
+            return
+        self._think_buffer += text
+        if self._think_buffer.strip():
+            self._think_has_content = True
+            yield ThinkingDelta(text=self._think_buffer)
+            self._think_buffer = ""
+
+    def _route(self, events: Iterable[Event]) -> Iterator[Event]:
+        """Send split-out thinking runs through the gate; text runs pass straight through."""
+        for event in events:
+            if isinstance(event, ThinkingDelta):
+                yield from self._think(event.text)
+            else:
+                yield event
+
     def finish(self) -> Iterator[Event]:
         """Flush and close. Calling it twice yields nothing the second time."""
         if self._finished:
             return
         self._finished = True
 
-        yield from _as_events(self._splitter.flush())
+        yield from self._route(_as_events(self._splitter.flush()))
         for index in sorted(self._calls):
             yield self._calls[index].build()
 
