@@ -25,6 +25,11 @@ Towards [v0.2.1](docs/versions/v0.2.1.md), the polish pass.
   is drawn at 22 px, larger than the 16 px thinking mark it replaces, because a fanned tail at
   16 px is a smudge. The running eyes in the activity gutter keep the plain look and the slower
   four-second cycle, and `prefers-reduced-motion` leaves the tail folded.
+- **Her silhouette behind the start screen and the conversation** ([issue #43](https://github.com/VoidEUW/hera/issues/43)).
+  A masked figure rises from the foot of both rooms at a whisper of opacity — present, never
+  busy — tinted from the theme's text colour so it reads on either mode. The drawing at
+  `static/background.svg` is a placeholder; replacing that one file swaps the artwork without
+  touching any code.
 
 ### Removed
 
