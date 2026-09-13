@@ -297,6 +297,22 @@ def test_settings_holds_what_changes_her_behaviour(page: Any) -> None:
     page.wait_for_selector("[role=dialog]", state="detached", timeout=10_000)
 
 
+def test_manage_servers_lands_on_the_servers_tab(page: Any) -> None:
+    """Issue #45: the composer's servers pill opens a read-only sheet, and its "Manage
+    servers" button used to always reopen Settings on Models — the tab it defaults to,
+    not the one the person was just looking at."""
+    page.locator("button.context.servers").click()
+    page.wait_for_selector("[role=dialog]", timeout=10_000)
+
+    page.get_by_role("button", name="Manage servers").click()
+    page.wait_for_selector(
+        "[role=dialog] nav.tabs button.active:has-text('Servers')", timeout=10_000
+    )
+
+    page.keyboard.press("Escape")
+    page.wait_for_selector("[role=dialog]", state="detached", timeout=10_000)
+
+
 def test_the_profile_card_holds_everything_that_is_not_about_her(page: Any) -> None:
     """Appearance and where your data lives are not model behaviour, and mixing the two is how
     a person ends up scrolling past six model fields to find a light-mode toggle."""

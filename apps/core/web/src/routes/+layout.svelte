@@ -157,7 +157,7 @@
 </div>
 
 {#if workspace.settingsOpen}
-	<Settings onclose={closeSettings} />
+	<Settings onclose={closeSettings} tab={workspace.settingsTab} />
 {/if}
 
 {#if profileOpen}
