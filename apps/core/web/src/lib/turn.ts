@@ -154,9 +154,14 @@ export function reduce(events: AnyEvent[]): Turn {
 	 * `…I can answer now.Nothing more to add…` — with nothing on screen to explain the join.
 	 * Bookkeeping that draws nothing (`permission_decided`, `turn_closed`) leaves a block alone.
 	 *
-	 * A no-op when there is no reasoning in progress, so callers do not have to check. */
+	 * A no-op when there is no reasoning in progress, so callers do not have to check. A thought
+	 * that is only whitespace is discarded the same way: some templates emit a well-formed but
+	 * empty `<think>` block, and a row that says "thought · 0 words" is worse than no row. */
 	const settle = (last = false) => {
-		if (!thought) return;
+		if (!thought.trim()) {
+			thought = '';
+			return;
+		}
 		row({
 			kind: 'thinking',
 			key: `thinking-${thoughtAt}`,

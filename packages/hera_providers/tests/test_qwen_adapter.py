@@ -108,6 +108,30 @@ def test_content_arriving_one_character_at_a_time_reads_the_same() -> None:
     assert thoughts(events) == "bd"
 
 
+def test_a_whitespace_only_think_block_is_not_announced() -> None:
+    """A Gemma-family template can emit a well-formed but empty `<think>` block; a person should
+    see no thought at all rather than a row that says "thought · 0 words"."""
+    events = drain([chunk(content="<think>\n\n</think>B"), chunk(finish="stop")])
+
+    assert texts(events) == "B"
+    assert thoughts(events) == ""
+    assert not any(isinstance(e, ThinkingDelta) for e in events)
+
+
+def test_a_whitespace_only_reasoning_field_is_not_announced() -> None:
+    events = drain([chunk(reasoning="  \n"), chunk(content="B"), chunk(finish="stop")])
+
+    assert texts(events) == "B"
+    assert not any(isinstance(e, ThinkingDelta) for e in events)
+
+
+def test_reasoning_that_starts_blank_still_streams_once_it_has_content() -> None:
+    """The gate must not eat a real thought just because it opens with whitespace."""
+    events = drain([chunk(reasoning=" \n"), chunk(reasoning="weighing it"), chunk(finish="stop")])
+
+    assert thoughts(events) == " \nweighing it"
+
+
 def test_an_unterminated_think_block_is_flushed_as_thinking() -> None:
     """A truncated turn must not tip its reasoning into the visible answer."""
     events = drain([chunk(content="A<think>hm and then"), chunk(finish="length")])
