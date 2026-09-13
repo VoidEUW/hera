@@ -178,7 +178,7 @@ jobs:
 
       - name: Post or update the pull request comment
         if: steps.pr.outputs.number || steps.pr_marker.outputs.number
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           PR_NUMBER: ${{ steps.pr.outputs.number || steps.pr_marker.outputs.number }}
         with:
