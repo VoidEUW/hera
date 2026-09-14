@@ -115,6 +115,13 @@
 		return t.turn[closed.reason] ?? '';
 	});
 
+	/** What she generated for this turn — `completion_tokens`, not the total. The prompt side
+	 * (history, skills, the question itself) is mostly *carried forward*, not produced by this
+	 * message, and folding it in would make a one-line answer after a long conversation look
+	 * like it cost as much as the essay it was asked to shorten. `null` on a turn still running,
+	 * and on one closed against a provider that never reported usage. */
+	const generated = $derived(closed?.usage?.completion_tokens ?? null);
+
 	/** What the clipboard gets. `content` is the server's derived text and is what a reloaded
 	 * message carries; a turn still streaming has only its events, so the prose is joined back
 	 * out of them — the same runs, in the same order, without the cards between them. */
@@ -313,8 +320,11 @@
 			<p class="note" class:bad={closed?.reason === 'failed'}>{note}</p>
 		{/if}
 
-		{#if canCopy || canRedo}
+		{#if canCopy || canRedo || generated !== null}
 			<div class="actions">
+				{#if generated !== null}
+					<span class="tokens">{t.turn.tokens(generated)}</span>
+				{/if}
 				{#if canCopy}
 					<button type="button" onclick={copy}>{copied ? t.message.copied : t.message.copy}</button>
 				{/if}
@@ -365,6 +375,13 @@
 	.actions button:hover {
 		background: var(--surface);
 		color: var(--text);
+	}
+
+	.tokens {
+		margin-right: auto;
+		padding: 3px 7px;
+		font-size: 12px;
+		color: var(--text-faint);
 	}
 
 	.editor {
