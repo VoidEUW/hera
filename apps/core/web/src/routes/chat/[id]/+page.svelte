@@ -239,8 +239,10 @@
 					onsend={(text, files) => session.send(text, files)}
 					onstop={() => session.stop()}
 					onmodel={(name, modelId) => workspace.useProvider(name, modelId)}
+					onreasoning={(name, modelId, value) => workspace.setReasoningEffort(name, modelId, value)}
 					onsettings={(section) => workspace.openSettings(section)}
 					onskills={(names) => session.pinSkills(names)}
+					usage={session.usage}
 				/>
 			</div>
 		</div>

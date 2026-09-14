@@ -3,10 +3,11 @@
 	 * The composer. Stays put, focused on load, Enter to send.
 	 *
 	 * The bar under the field carries, left to right: **＋** to attach a file, what is *switched
-	 * on* for this turn, the **profile** she is answering as, then the **model** and send. The
-	 * two dropdowns answer different questions and sit at opposite ends on purpose — a profile
-	 * is who is answering, an endpoint is what she is thinking with, and ADR 2 fixes the model
-	 * *family* rather than how many endpoints you may keep registered.
+	 * on* for this turn, the **profile** she is answering as, then **reasoning effort**, the
+	 * **model**, and send. The trailing pair answer different questions and sit at opposite ends
+	 * from the profile on purpose — a profile is who is answering, an endpoint is what she is
+	 * thinking with, and ADR 2 fixes the model *family* rather than how many endpoints you may
+	 * keep registered.
 	 *
 	 * The bar holds two context pills side by side — one for **skills** and one for
 	 * **servers** — because a pinned skill and a running MCP server change what happens to
@@ -15,6 +16,17 @@
 	 * asked which skill applies, and this is where a person answers instead when code guesses
 	 * wrong); the servers pill opens a small sheet listing what is connected, read-only,
 	 * because changing the list is Settings → Servers, not something a chat owns.
+	 *
+	 * **Reasoning effort** reads and writes the active model's own `options.reasoning_effort` —
+	 * there is no typed field for it (ADR 18), so changing it here is the same call Settings →
+	 * Models makes to edit any other option. Global, like the model picker beside it: it applies
+	 * to every chat from the next message on, not just this one.
+	 *
+	 * **The context bar**, above the field, is a fact about the active model — its declared
+	 * `context_length` against the last exchange's token usage — so it lives here rather than in
+	 * the chat header, which carries chat-level concerns instead. Absent entirely when the model
+	 * carries no `context_length`, the same "no bar rather than a guessed one" rule ADR 16's
+	 * memory budget follows.
 	 *
 	 * `/commands` are left in the text on purpose: the router strips them server-side, and a
 	 * browser that also stripped them would be a second implementation of the same rule.
@@ -53,8 +65,13 @@
 		onstop?: () => void;
 		onprofile?: (id: string) => void;
 		onmodel?: (providerName: string, modelId?: string) => void;
+		/** Changes `options.reasoning_effort` on the active model — global and immediate, the
+		 * same reach as `onmodel`, not scoped to this chat or this message. */
+		onreasoning?: (providerName: string, modelId: string, value: string) => void;
 		onsettings?: (section?: SettingsTab) => void;
 		onskills?: (names: string[]) => void;
+		/** The last exchange's token usage, for the context-window bar. `null` draws no bar. */
+		usage?: { prompt_tokens: number; completion_tokens: number; total_tokens: number } | null;
 	}
 
 	let {
@@ -72,8 +89,10 @@
 		onstop,
 		onprofile,
 		onmodel,
+		onreasoning,
 		onsettings,
-		onskills
+		onskills,
+		usage = null
 	}: Props = $props();
 
 	let picking = $state(false);
@@ -145,9 +164,33 @@
 		activeEntry && activeModel ? `${activeEntry.name}::${activeModel.id}` : ''
 	);
 
+	// Fixed, not read from the server: there is no catalogue of valid values for a field Hera
+	// does not interpret (ADR 18). `''` means "absent from options" rather than a chosen value.
+	const reasoningChoices = $derived([
+		{ value: '', label: t.composer.effort.default },
+		{ value: 'low', label: t.composer.effort.low },
+		{ value: 'medium', label: t.composer.effort.medium },
+		{ value: 'high', label: t.composer.effort.high }
+	]);
+	const reasoningValue = $derived(
+		typeof activeModel?.options.reasoning_effort === 'string'
+			? activeModel.options.reasoning_effort
+			: ''
+	);
+
+	const contextLimit = $derived(activeModel?.context_length ?? null);
+	const contextFilled = $derived(
+		contextLimit && usage ? Math.min(1, usage.total_tokens / contextLimit) : 0
+	);
+
 	function chooseModel(value: string) {
 		const sep = value.indexOf('::');
 		onmodel?.(value.slice(0, sep), value.slice(sep + 2));
+	}
+
+	function chooseReasoning(value: string) {
+		if (!activeEntry || !activeModel) return;
+		onreasoning?.(activeEntry.name, activeModel.id, value);
 	}
 
 	function submit() {
@@ -226,6 +269,28 @@
 		<p class="refused">{reason}</p>
 	{/each}
 
+	{#if contextLimit}
+		<!-- No bar at all when the active model carries no `context_length` — a person who never
+		     filled it in sees nothing rather than a bar pinned at a guessed ceiling. -->
+		<div class="usage">
+			<div
+				class="track"
+				role="meter"
+				aria-valuenow={usage?.total_tokens ?? 0}
+				aria-valuemin={0}
+				aria-valuemax={contextLimit}
+				aria-label={t.composer.contextLabel}
+			>
+				<div
+					class="fill"
+					class:tight={contextFilled > 0.85}
+					style:width={`${contextFilled * 100}%`}
+				></div>
+			</div>
+			<span class="reading">{t.composer.contextUsed(usage?.total_tokens ?? 0, contextLimit)}</span>
+		</div>
+	{/if}
+
 	<div class="field">
 		<!-- Disabled while a turn is running or a card is open. The second case is the one that
 		     matters: sending past an open card writes a fresh assistant row, and the resume
@@ -297,6 +362,16 @@
 		{/if}
 
 		{#if modelChoices.length}
+			<div class="effort">
+				<Select
+					choices={reasoningChoices}
+					value={reasoningValue}
+					label={t.composer.reasoning}
+					placement="above"
+					align="end"
+					onchange={chooseReasoning}
+				/>
+			</div>
 			<div class="model">
 				<Select
 					choices={modelChoices}
@@ -400,6 +475,48 @@
 		color: var(--danger);
 	}
 
+	/* Styled to match Settings → Memory's gauge (ADR 16) -- same shape, smaller, because this one
+	   is glanced at on every message rather than read once on a settings screen. Its own class,
+	   not `.context` — that name already belongs to the skills/servers pills below, and sharing
+	   it merged both rule sets onto whichever element had it (this bar picked up the pills'
+	   padding and pill-shaped border; the pills picked up this bar's margin). */
+	.usage {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		margin-bottom: 6px;
+	}
+
+	.usage .track {
+		flex: 1;
+		min-width: 0;
+		height: 4px;
+		border: 1px solid var(--line);
+		border-radius: 999px;
+		background: var(--surface-raised);
+		overflow: hidden;
+	}
+
+	.usage .fill {
+		height: 100%;
+		background: var(--brass);
+		transition: width var(--fade) var(--ease);
+	}
+
+	.usage .fill.tight {
+		background: var(--danger);
+	}
+
+	.usage .reading {
+		flex: none;
+		overflow: hidden;
+		max-width: 40%;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+		font-size: 11px;
+		color: var(--text-faint);
+	}
+
 	.field {
 		position: relative;
 	}
@@ -497,15 +614,22 @@
 	   system's own panel into an interface that draws everything else itself. What is left here
 	   is only where they sit in the row. */
 	.profile,
+	.effort,
 	.model {
 		display: flex;
 		align-items: center;
 		min-width: 0;
 	}
 
-	.model,
+	/* Only the first of a trailing group needs the auto margin — it pushes itself and everything
+	   after it to the end of the bar, which is what keeps `.effort` and `.model` adjacent. */
+	.effort,
 	.nomodel {
 		margin-left: auto;
+	}
+
+	.effort {
+		max-width: 14ch;
 	}
 
 	.model {
@@ -568,6 +692,10 @@
 
 	@media (max-width: 640px) {
 		.hint {
+			display: none;
+		}
+
+		.effort {
 			display: none;
 		}
 

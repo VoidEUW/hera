@@ -150,6 +150,31 @@ class Workspace {
 		}
 	}
 
+	/** Change `reasoning_effort` on one model's own `options` — there is no typed field or
+	 * dedicated endpoint for it (ADR 18), so this is `register_model` with one key changed, the
+	 * same call Settings → Models makes to edit any other option. Global and immediate, like
+	 * {@link useProvider}: it applies to every chat from the next message on, no restart. */
+	async setReasoningEffort(providerName: string, modelId: string, value: string) {
+		const entry = this.providers.find((provider) => provider.name === providerName);
+		const model = entry?.models.find((candidate) => candidate.id === modelId);
+		if (!entry || !model) return;
+		const options = { ...model.options };
+		if (value) options.reasoning_effort = value;
+		else delete options.reasoning_effort;
+		try {
+			const found = await api.addModel(providerName, {
+				id: model.id,
+				name: model.name,
+				options,
+				context_length: model.context_length
+			});
+			this.providers = found.providers;
+			this.activeProvider = found.active;
+		} catch (cause) {
+			this.error = cause instanceof Error ? cause.message : String(cause);
+		}
+	}
+
 	async createChat(projectId?: string): Promise<Chat | null> {
 		const project = projectId ?? this.pendingProject;
 		try {

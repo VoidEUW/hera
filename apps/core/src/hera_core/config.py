@@ -94,6 +94,13 @@ class ModelEntry(BaseModel):
     the edge where a person's input arrives.
     """
 
+    context_length: int | None = None
+    """How many tokens this model's window holds, for the composer's usage bar. ``None`` means
+    "no bar" — never probed, because there is no reliable OpenAI-compatible way to ask a server
+    for it; a person fills it in the way :attr:`ProviderEntry.timeout_s` already is. Kept
+    ``None`` rather than ``0`` so an install that genuinely doesn't know is distinguishable from
+    one that measured zero."""
+
     @model_validator(mode="before")
     @classmethod
     def _default_name(cls, data: object) -> object:
@@ -409,6 +416,12 @@ def _writable(config: HeraConfig) -> dict[str, Any]:
         for field in TUNING_FIELDS:
             if getattr(entry, field) == getattr(blank, field):
                 dumped.pop(field, None)
+        # TOML has no null: an unset `context_length` has to be left out of the document
+        # entirely rather than written as one, the same way pydantic's own `None` fields never
+        # reach `model_dump(mode="python")`'s TOML-bound sibling for anything else in this file.
+        for model, dumped_model in zip(entry.models, dumped["models"], strict=True):
+            if model.context_length is None:
+                dumped_model.pop("context_length", None)
     return document
 
 

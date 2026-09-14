@@ -248,6 +248,32 @@ class TestModels:
         assert response.status_code == 200
         assert response.json()["active"] == "local"
 
+    async def test_context_length_is_stored_and_comes_back(self, client: AsyncClient) -> None:
+        body = (
+            await client.post(
+                f"{API}/providers/local/models",
+                json={"id": "long-context", "context_length": 131072},
+            )
+        ).json()
+        entry = next(p for p in body["providers"] if p["name"] == "local")
+        model = next(m for m in entry["models"] if m["id"] == "long-context")
+        assert model["context_length"] == 131072
+
+    async def test_context_length_left_out_is_none(self, client: AsyncClient) -> None:
+        body = (
+            await client.post(f"{API}/providers/local/models", json={"id": "no-ceiling"})
+        ).json()
+        entry = next(p for p in body["providers"] if p["name"] == "local")
+        model = next(m for m in entry["models"] if m["id"] == "no-ceiling")
+        assert model["context_length"] is None
+
+    async def test_context_length_of_zero_is_refused(self, client: AsyncClient) -> None:
+        """A bar drawn against zero divides by zero. Refused rather than silently accepted."""
+        response = await client.post(
+            f"{API}/providers/local/models", json={"id": "m", "context_length": 0}
+        )
+        assert response.status_code == 422
+
 
 class TestLogo:
     async def test_uploading_a_custom_logo_is_served_back_with_its_content_type(
@@ -483,6 +509,22 @@ class TestModelOptions:
         assert entry is not None
         assert next(m for m in entry.models if m.id == "glm-4.7-flash").options == GLM_OPTIONS
 
+    async def test_reasoning_effort_is_just_another_option_and_reaches_the_running_turn(
+        self, client: AsyncClient, services: object
+    ) -> None:
+        """There is no typed field or dedicated endpoint for this — a composer control that
+        changes it is `register_model` with one key changed, the same call the options editor
+        already uses. This is the test that makes that safe to rely on."""
+        await client.post(
+            f"{API}/providers/local/models",
+            json={"id": "gpt-oss-20b", "options": {"reasoning_effort": "high"}},
+        )
+        await client.post(f"{API}/providers/local/activate", json={"model": "gpt-oss-20b"})
+
+        assert services.orchestrator.settings.extra == {  # type: ignore[attr-defined]
+            "reasoning_effort": "high"
+        }
+
     async def test_the_known_ones_are_offered(self, client: AsyncClient) -> None:
         """Picked, never guessed from a model id — `glm-4.7-flash` and `zai/glm-4.7` are the
         same weights under two names, and guessing wrong sends a flag to a server that rejects
@@ -662,6 +704,40 @@ class TestWhatIsWrittenDown:
         save(HeraConfig(providers=[ProviderEntry(name="local")]), path)
 
         assert load(path).providers[0].timeout_s == ProviderEntry(name="x").timeout_s
+
+    def test_an_unset_context_length_is_left_out_rather_than_crashing_the_writer(
+        self, tmp_path: Path
+    ) -> None:
+        """TOML has no null. `context_length` defaults to `None`, unlike `timeout_s`'s numeric
+        default, so it needs its own exclusion in `_writable` or every save of a model with no
+        ceiling set raises."""
+        path = tmp_path / "config.toml"
+        save(
+            HeraConfig(
+                providers=[ProviderEntry(name="local", models=[ModelEntry(id="m", name="m")])]
+            ),
+            path,
+        )
+
+        assert "context_length" not in path.read_text(encoding="utf-8")
+        assert load(path).providers[0].models[0].context_length is None
+
+    def test_a_set_context_length_is_written_and_comes_back(self, tmp_path: Path) -> None:
+        path = tmp_path / "config.toml"
+        save(
+            HeraConfig(
+                providers=[
+                    ProviderEntry(
+                        name="local",
+                        models=[ModelEntry(id="m", name="m", context_length=32768)],
+                    )
+                ]
+            ),
+            path,
+        )
+
+        assert "context_length = 32768" in path.read_text(encoding="utf-8")
+        assert load(path).providers[0].models[0].context_length == 32768
 
     def test_the_endpoint_itself_is_written_even_when_it_is_the_default(
         self, tmp_path: Path

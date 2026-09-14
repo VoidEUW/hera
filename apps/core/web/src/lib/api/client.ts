@@ -197,6 +197,10 @@ export interface ModelEntry {
 	 * `chat_template_kwargs.clear_thinking = false` or it reads a multi-turn history as if the
 	 * conversation had just started. */
 	options: Record<string, unknown>;
+	/** How many tokens this model's window holds, for the composer's usage bar. Never probed —
+	 * a person fills it in, the same convention as {@link Provider.timeout_s}. `null` draws no
+	 * bar at all rather than one pinned at some guessed ceiling. */
+	context_length: number | null;
 }
 
 /** A known set of {@link ModelEntry.options}, offered on Settings → Models.
@@ -384,7 +388,12 @@ export const api = {
 	 * model's `options` are edited. They are sent whole: an empty object clears them. */
 	addModel: (
 		name: string,
-		body: { id: string; name?: string; options?: Record<string, unknown> }
+		body: {
+			id: string;
+			name?: string;
+			options?: Record<string, unknown>;
+			context_length?: number | null;
+		}
 	) =>
 		request<Providers>(`/providers/${name}/models`, { method: 'POST', body: JSON.stringify(body) }),
 	removeModel: (name: string, modelId: string) =>

@@ -31,7 +31,21 @@ export const t = {
 		profile: 'Profile',
 		noModel: 'No model',
 		skillCount: (n: number) => `${n} ${n === 1 ? 'skill' : 'skills'}`,
-		serverCount: (n: number) => `${n} ${n === 1 ? 'server' : 'servers'}`
+		serverCount: (n: number) => `${n} ${n === 1 ? 'server' : 'servers'}`,
+		/** A fixed vocabulary offered here, not one read from the server — there is no catalogue
+		 * of valid values (ADR 18: Hera does not interpret a model's `options`). Changing it is
+		 * global, the same reach as the model picker beside it: the value written to the active
+		 * model's `options.reasoning_effort` applies to every chat from the next message on. */
+		reasoning: 'Reasoning',
+		effort: {
+			default: 'Default',
+			low: 'Low',
+			medium: 'Medium',
+			high: 'High'
+		},
+		contextLabel: 'Context window',
+		contextUsed: (used: number, limit: number) =>
+			`${used.toLocaleString()} of ${limit.toLocaleString()} tokens`
 	},
 
 	select: {
@@ -344,12 +358,35 @@ export const t = {
 		optionsOpen: 'Options',
 		optionsHint:
 			'Extra fields sent in the request body — for something this endpoint understands and Hera does not need to. Leave empty unless a model asks for one.',
+		optionsRawHint: 'The same data as the fields above, and anything else this server takes.',
 		optionsPreset: 'Known options',
 		optionsPresetNone: 'Choose…',
 		optionsInvalid: 'This is not valid JSON yet.',
 		optionsSet: (count: number) => (count === 1 ? '1 option' : `${count} options`),
 		optionsSave: 'Save options',
-		optionsClear: 'Clear'
+		optionsClear: 'Clear',
+
+		// A structured form over the same opaque `options` bag (ADR 18) — Hera still does not
+		// interpret these values, it just no longer makes typing them raw JSON the only way in.
+		sampling: {
+			temperature: 'Temperature',
+			topP: 'Top P',
+			topK: 'Top K',
+			minP: 'Min P',
+			repeatPenalty: 'Repeat penalty',
+			reasoningEffort: 'Reasoning effort',
+			reasoningEffortHint:
+				'A starting vocabulary — the values a server actually accepts are its own.',
+			overrideNote:
+				'A temperature or top P set here overrides the deployment’s own default for this model.',
+			unset: 'Unset'
+		},
+
+		contextLength: 'Context window',
+		contextLengthPlaceholder: 'e.g. 32768',
+		contextLengthHint:
+			'Tokens this model can hold, for the composer’s usage bar. Not probed — fill it in yourself; empty means no bar.',
+		contextLengthInvalid: 'This should be a whole number greater than zero, or empty.'
 	},
 
 	profileMenu: {
