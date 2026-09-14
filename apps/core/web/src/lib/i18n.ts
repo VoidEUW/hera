@@ -180,7 +180,12 @@ export const t = {
 		failed: 'This turn failed',
 		max_iterations: 'She ran out of tool calls and answered with what she had',
 		awaiting_permission: 'Waiting for you',
-		awaiting_answer: 'Waiting for your answer'
+		awaiting_answer: 'Waiting for your answer',
+		/** How many tokens *this message* generated, in the corner nobody has to look at.
+		 * `completion_tokens`, not the turn's total — the prompt side is mostly history carried
+		 * forward, not something this message produced (issue #51 rules dollars out entirely — a
+		 * deployment's pricing isn't Hera's to know either way). */
+		tokens: (n: number) => `${n.toLocaleString()} tokens`
 	},
 
 	memory: {
