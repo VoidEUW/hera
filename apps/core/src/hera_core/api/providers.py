@@ -160,7 +160,12 @@ async def register_model(name: str, payload: ModelIn, container: Container) -> P
     config = _read()
     entry = _require(config, name)
     updated = entry.with_model(
-        ModelEntry(id=payload.id, name=payload.name, options=payload.options)
+        ModelEntry(
+            id=payload.id,
+            name=payload.name,
+            options=payload.options,
+            context_length=payload.context_length,
+        )
     )
     return await _commit(container, config.with_provider(updated))
 

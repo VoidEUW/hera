@@ -588,6 +588,7 @@ class ModelOut(BaseModel):
     id: str
     name: str
     options: dict[str, Any] = Field(default_factory=dict)
+    context_length: int | None = None
 
 
 class ProviderOut(BaseModel):
@@ -709,6 +710,10 @@ class ModelIn(BaseModel):
     id: str = Field(min_length=1, max_length=200)
     name: str = ""
     options: dict[str, Any] = Field(default_factory=dict)
+    context_length: int | None = Field(default=None, gt=0)
+    """How many tokens this model's window holds, for the composer's usage bar. Never probed —
+    see ``ModelEntry.context_length``. ``gt=0`` refuses a bar that couldn't be drawn rather than
+    accepting it silently."""
 
     @field_validator("options")
     @classmethod

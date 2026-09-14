@@ -29,8 +29,34 @@
 		type Provider,
 		type ProviderKind
 	} from '$lib/api/client';
+	import Select from '$lib/components/Select.svelte';
 	import { t } from '$lib/i18n';
 	import { kindFallbackIcon, kindIcon, PROVIDER_KINDS } from '$lib/providers';
+
+	/** The five sampling keys offered as sliders over `ModelEntry.options` (ADR 18 — still an
+	 * opaque pass-through, just with a form over the JSON instead of a blank textarea). Bounds
+	 * are soft: the slider clamps to them, the paired number field does not, since someone
+	 * hand-tuning a `repeat_penalty` of 2.3 should not be blocked by a guessed ceiling. */
+	const SAMPLING_FIELDS: {
+		key: string;
+		label: string;
+		min: number;
+		max: number;
+		step: number;
+	}[] = [
+		{ key: 'temperature', label: t.models.sampling.temperature, min: 0, max: 2, step: 0.05 },
+		{ key: 'top_p', label: t.models.sampling.topP, min: 0, max: 1, step: 0.01 },
+		{ key: 'top_k', label: t.models.sampling.topK, min: 0, max: 100, step: 1 },
+		{ key: 'min_p', label: t.models.sampling.minP, min: 0, max: 1, step: 0.01 },
+		{ key: 'repeat_penalty', label: t.models.sampling.repeatPenalty, min: 0.5, max: 2, step: 0.01 }
+	];
+
+	const REASONING_CHOICES = [
+		{ value: '', label: t.composer.effort.default },
+		{ value: 'low', label: t.composer.effort.low },
+		{ value: 'medium', label: t.composer.effort.medium },
+		{ value: 'high', label: t.composer.effort.high }
+	];
 
 	interface Props {
 		filter?: string;
@@ -71,6 +97,11 @@
 	// mid-edit without the field fighting them. `null` is closed.
 	let optionsDraft = $state<Record<string, string>>({});
 
+	// `context_length` rides beside the options editor rather than inside it — a typed field on
+	// `ModelEntry`, not one of its opaque `options`. Text, same reason as `optionsDraft`: an
+	// emptied field mid-edit must not be forced back into a number before the person is done.
+	let contextDraft = $state<Record<string, string>>({});
+
 	const shown = $derived(
 		providers.filter(
 			(p) => !filter || `${p.name} ${p.base_url} ${p.active_model}`.toLowerCase().includes(filter)
@@ -107,6 +138,7 @@
 	/** Closes one editor. A new object rather than `delete`, so the rune sees the change. */
 	function closeOptions(key: string) {
 		optionsDraft = Object.fromEntries(Object.entries(optionsDraft).filter(([k]) => k !== key));
+		contextDraft = Object.fromEntries(Object.entries(contextDraft).filter(([k]) => k !== key));
 	}
 
 	function toggleOptions(name: string, model: ModelEntry) {
@@ -116,6 +148,23 @@
 			return;
 		}
 		optionsDraft = { ...optionsDraft, [key]: written(model.options) };
+		contextDraft = {
+			...contextDraft,
+			[key]: model.context_length != null ? String(model.context_length) : ''
+		};
+	}
+
+	/** Set or clear one key in a model's options, through the same text the raw textarea reads
+	 * and writes — a slider and the JSON underneath it are one piece of state, never two that
+	 * could drift. `parsed()` already returns `{}` for an empty field and `null` for invalid
+	 * JSON, so a structured control touched mid-invalid-edit sees "nothing set" rather than
+	 * throwing, and starts a clean object from there. */
+	function updateOption(name: string, model: ModelEntry, field: string, value: unknown) {
+		const key = optionsKey(name, model.id);
+		const current = { ...(parsed(optionsDraft[key] ?? '') ?? {}) };
+		if (value === undefined || value === '') delete current[field];
+		else current[field] = value;
+		optionsDraft = { ...optionsDraft, [key]: written(current) };
 	}
 
 	/** How stored options are shown: pretty-printed, and an empty set as an empty field rather
@@ -139,15 +188,34 @@
 		}
 	}
 
+	/** `contextDraft`'s text as a number to send, or `null` for "no ceiling" — mirrors how an
+	 * emptied `options` textarea means "send nothing", not "send the previous value". Invalid
+	 * text (not blank, not a positive number) reports itself as `undefined` so the caller can
+	 * refuse to save rather than silently clearing a typo. */
+	function contextLengthToSave(text: string): number | null | undefined {
+		const trimmed = text.trim();
+		if (!trimmed) return null;
+		const parsedValue = Number(trimmed);
+		return Number.isFinite(parsedValue) && parsedValue > 0 ? parsedValue : undefined;
+	}
+
 	async function saveOptions(name: string, model: ModelEntry) {
 		const key = optionsKey(name, model.id);
 		const options = parsed(optionsDraft[key] ?? '');
-		if (options === null) return;
+		const contextLength = contextLengthToSave(contextDraft[key] ?? '');
+		if (options === null || contextLength === undefined) return;
 		try {
 			// The same call that registers a model: an id already there is replaced, so this is
 			// an edit. The server is what validates the options — the parse above only decides
 			// whether the button is worth offering.
-			apply(await api.addModel(name, { id: model.id, name: model.name, options }));
+			apply(
+				await api.addModel(name, {
+					id: model.id,
+					name: model.name,
+					options,
+					context_length: contextLength
+				})
+			);
 			closeOptions(key);
 			saved = name;
 			setTimeout(() => (saved = null), 1600);
@@ -501,10 +569,99 @@
 
 							{#if draft !== undefined}
 								{@const valid = parsed(draft) !== null}
+								{@const current = parsed(draft) ?? {}}
+								{@const contextValid = contextLengthToSave(contextDraft[key] ?? '') !== undefined}
 								<div class="options">
 									<!-- Not `hint`: that class is the one-line ellipsised model id above, and
 									     this is a sentence that has to wrap. -->
 									<p class="explains">{t.models.optionsHint}</p>
+
+									<div class="sampling">
+										{#each SAMPLING_FIELDS as field (field.key)}
+											{@const raw = current[field.key]}
+											{@const value = typeof raw === 'number' ? raw : undefined}
+											<div class="sampling-field">
+												<span>{field.label}</span>
+												<div class="sampling-row">
+													<input
+														type="range"
+														min={field.min}
+														max={field.max}
+														step={field.step}
+														value={value ?? field.min}
+														oninput={(e) =>
+															updateOption(
+																entry.name,
+																model,
+																field.key,
+																Number(e.currentTarget.value)
+															)}
+													/>
+													<input
+														class="mono"
+														type="number"
+														step={field.step}
+														placeholder={t.models.sampling.unset}
+														value={value ?? ''}
+														oninput={(e) => {
+															const text = e.currentTarget.value;
+															updateOption(
+																entry.name,
+																model,
+																field.key,
+																text === '' ? undefined : Number(text)
+															);
+														}}
+													/>
+													{#if value !== undefined}
+														<button
+															class="clear"
+															type="button"
+															title={t.models.sampling.unset}
+															onclick={() => updateOption(entry.name, model, field.key, undefined)}
+														>
+															<span class="sr-only">{t.models.sampling.unset}</span>
+															<span aria-hidden="true">✕</span>
+														</button>
+													{/if}
+												</div>
+											</div>
+										{/each}
+
+										<div class="sampling-field">
+											<span>{t.models.sampling.reasoningEffort}</span>
+											<Select
+												choices={REASONING_CHOICES}
+												value={typeof current.reasoning_effort === 'string'
+													? current.reasoning_effort
+													: ''}
+												label={t.models.sampling.reasoningEffort}
+												onchange={(value) =>
+													updateOption(entry.name, model, 'reasoning_effort', value)}
+											/>
+											<small>{t.models.sampling.reasoningEffortHint}</small>
+										</div>
+									</div>
+
+									<p class="warn note">{t.models.sampling.overrideNote}</p>
+
+									<label>
+										<span>{t.models.contextLength}</span>
+										<input
+											type="number"
+											min="1"
+											step="1"
+											placeholder={t.models.contextLengthPlaceholder}
+											value={contextDraft[key] ?? ''}
+											oninput={(e) =>
+												(contextDraft = { ...contextDraft, [key]: e.currentTarget.value })}
+										/>
+										<small>{t.models.contextLengthHint}</small>
+									</label>
+									{#if !contextValid}
+										<p class="warn">{t.models.contextLengthInvalid}</p>
+									{/if}
+
 									<label>
 										<span>{t.models.optionsPreset}</span>
 										<select
@@ -532,6 +689,7 @@
 											oninput={(e) =>
 												(optionsDraft = { ...optionsDraft, [key]: e.currentTarget.value })}
 										></textarea>
+										<small>{t.models.optionsRawHint}</small>
 									</label>
 									{#if !valid}
 										<p class="warn">{t.models.optionsInvalid}</p>
@@ -540,7 +698,7 @@
 										<button
 											class="ghost tiny"
 											type="button"
-											disabled={!valid}
+											disabled={!valid || !contextValid}
 											onclick={() => saveOptions(entry.name, model)}
 										>
 											{t.models.optionsSave}
@@ -912,6 +1070,56 @@
 		resize: vertical;
 	}
 
+	.sampling {
+		display: flex;
+		flex-direction: column;
+		gap: 10px;
+		margin-bottom: 10px;
+		padding: 10px;
+		background: var(--bg);
+		border: 1px solid var(--line);
+		border-radius: var(--radius);
+	}
+
+	.sampling-field span {
+		display: block;
+		font-size: 12px;
+		color: var(--text-muted);
+		margin-bottom: 3px;
+	}
+
+	.sampling-row {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+	}
+
+	.sampling-row input[type='range'] {
+		flex: 1;
+		width: auto;
+		padding: 0;
+		background: none;
+		border: none;
+	}
+
+	.sampling-row input[type='number'] {
+		width: 8ch;
+		flex: none;
+		padding: 3px 6px;
+		font-size: 12.5px;
+	}
+
+	.sampling-row .clear {
+		flex: none;
+		padding: 1px 6px;
+		font-size: 11px;
+		color: var(--text-faint);
+	}
+
+	.sampling-row .clear:hover {
+		color: var(--danger);
+	}
+
 	.options-actions {
 		display: flex;
 		gap: 6px;
@@ -922,6 +1130,13 @@
 		font-family: var(--font-body);
 		font-size: 12.5px;
 		color: var(--text-muted);
+	}
+
+	/* The one line calling out that a sampling field set here can silently outrank the
+	   deployment's own default (`packages/hera_providers`'s `extra` merges last) — worth saying
+	   plainly now that this form is the encouraged way to set it, not a JSON edge case. */
+	.warn.note {
+		color: var(--text-faint);
 	}
 
 	.badge.quiet {

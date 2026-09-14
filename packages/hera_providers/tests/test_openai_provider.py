@@ -270,6 +270,16 @@ def test_extra_is_merged_last_so_a_server_specific_field_can_be_passed_through()
     assert payload["reasoning_effort"] == "high"
 
 
+def test_extra_overrides_a_typed_sampling_field_on_the_same_request() -> None:
+    """A model's own ``options`` (arriving as ``extra``) is meant to win over the deployment's
+    global default for that same field — not just add a field the typed request has none for.
+    Worth its own test now that a model's options are the encouraged way to set this, not an
+    edge case nobody exercises."""
+    payload = chat_payload(request(temperature=0.8, extra={"temperature": 0.2}), stream=False)
+
+    assert payload["temperature"] == 0.2
+
+
 # -- failures ---------------------------------------------------------------------------
 
 
