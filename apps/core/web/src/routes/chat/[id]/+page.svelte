@@ -42,7 +42,10 @@
 		// Taken before the load, so a slow first request cannot let a second effect run and
 		// send it twice.
 		const first = workspace.takeHandoff();
-		await session.open(id);
+		// Everything after this belongs to *this* conversation, and `send` goes to whichever
+		// chat the session currently holds -- so a load that was overtaken has to stop here
+		// rather than put the message a chat was started with into the one that overtook it.
+		if (!(await session.open(id))) return;
 		if (first) await session.send(first.text, first.files);
 		await reopenIfPublished(id);
 	}

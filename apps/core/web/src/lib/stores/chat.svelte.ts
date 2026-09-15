@@ -36,10 +36,12 @@ export class ChatSession {
 	pendingFiles = $state<Attachment[]>([]);
 
 	#abort: AbortController | null = null;
-	/** The chat `open()` is currently loading. Lets a call superseded by a faster later switch
-	 * recognise that on return and drop its response instead of overwriting `chat`/`messages`
-	 * with a conversation nobody is looking at any more. */
-	#pendingChatId: string | null = null;
+	/** Which load owns the session, counted rather than named.
+	 *
+	 * A chat id is not enough: `A → B → A` gives two loads the same name, and the first one's
+	 * response would pass an id check and overwrite the newer one. A number that only goes up
+	 * tells any request whether it is still the one being waited for. */
+	#load = 0;
 
 	get turn(): Turn {
 		return reduce(this.draft);
@@ -89,18 +91,24 @@ export class ChatSession {
 		return this.busy || this.awaiting.length > 0;
 	}
 
-	async open(id: string) {
+	/** Load a conversation. `true` when this load is still the one that matters by the time it
+	 * lands -- the caller has to know, because anything it does *next* with the session (sending
+	 * the message a chat was started with, opening a drawer) would otherwise be done to whichever
+	 * chat overtook it. */
+	async open(id: string): Promise<boolean> {
+		const token = ++this.#load;
 		this.reset();
-		this.#pendingChatId = id;
 		try {
 			const detail = await api.chat(id);
-			// A second `open()` for a different chat may have started, and finished, while this
-			// fetch was in flight -- landing here would overwrite that chat's state with ours.
-			if (this.#pendingChatId !== id) return;
+			// A later `open()` may have started, and finished, while this fetch was in flight --
+			// landing here would overwrite that chat's state with ours.
+			if (token !== this.#load) return false;
 			this.chat = detail.chat;
 			this.messages = detail.messages;
+			return true;
 		} catch (cause) {
-			if (this.#pendingChatId === id) this.error = message(cause);
+			if (token === this.#load) this.error = message(cause);
+			return false;
 		}
 	}
 
@@ -253,8 +261,12 @@ export class ChatSession {
 
 	async #refresh() {
 		if (!this.chat) return;
+		// The same token the loads use: a refresh for the chat just left must not land on the
+		// one just arrived, which is the same overwrite `open` guards against by a slower route.
+		const token = this.#load;
 		try {
 			const detail = await api.chat(this.chat.id);
+			if (token !== this.#load) return;
 			this.chat = detail.chat;
 			this.messages = detail.messages;
 		} catch {

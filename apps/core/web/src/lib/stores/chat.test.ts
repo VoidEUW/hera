@@ -129,4 +129,49 @@ describe('open', () => {
 
 		expect(session.chat?.id).toBe('b');
 	});
+
+	it('drops an earlier load of the same chat, which an id alone cannot tell apart', async () => {
+		const waiting: ReturnType<typeof deferred<Response>>[] = [];
+		vi.stubGlobal('fetch', () => {
+			const waiter = deferred<Response>();
+			waiting.push(waiter);
+			return waiter.promise;
+		});
+
+		const session = new ChatSession();
+		const first = session.open('a');
+		const second = session.open('b');
+		const third = session.open('a');
+
+		// The *second* load of 'a' answers first; the first one is stale by the time it lands.
+		waiting[2].resolve(new Response(JSON.stringify(chatDetail('a'))));
+		waiting[1].resolve(new Response(JSON.stringify(chatDetail('b'))));
+		waiting[0].resolve(new Response(JSON.stringify(chatDetail('a'))));
+
+		expect(await third).toBe(true);
+		expect(await second).toBe(false);
+		expect(await first).toBe(false);
+		expect(session.chat?.id).toBe('a');
+	});
+
+	it('reports a superseded load as not current, so the caller does not act on it', async () => {
+		const waiting: ReturnType<typeof deferred<Response>>[] = [];
+		vi.stubGlobal('fetch', () => {
+			const waiter = deferred<Response>();
+			waiting.push(waiter);
+			return waiter.promise;
+		});
+
+		const session = new ChatSession();
+		const first = session.open('a');
+		const second = session.open('b');
+
+		waiting[1].resolve(new Response(JSON.stringify(chatDetail('b'))));
+		waiting[0].resolve(new Response(JSON.stringify(chatDetail('a'))));
+
+		// The route sends a chat's first message only when this is `true` -- otherwise it would
+		// go to whichever conversation overtook this one.
+		expect(await first).toBe(false);
+		expect(await second).toBe(true);
+	});
 });
