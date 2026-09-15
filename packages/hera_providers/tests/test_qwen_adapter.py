@@ -75,6 +75,125 @@ def test_a_reasoning_field_becomes_thinking() -> None:
     assert texts(events) == "Yes."
 
 
+def raw(delta: dict[str, Any], *, finish: str | None = None) -> dict[str, Any]:
+    """One chunk with the delta given verbatim, for the reasoning spellings `chunk()` has no
+    argument for."""
+    return {"choices": [{"index": 0, "delta": delta, "finish_reason": finish}]}
+
+
+def test_openrouter_structured_reasoning_becomes_thinking() -> None:
+    """OpenRouter puts reasoning in `reasoning_details`, not `reasoning_content`. Reading only
+    the latter meant a reasoning model streamed nothing at all until it reached `content` --
+    the turn looked frozen for exactly as long as the model was thinking hardest."""
+    events = drain(
+        [
+            raw({"reasoning_details": [{"type": "reasoning.text", "text": "weighing it"}]}),
+            raw({"content": "Yes."}, finish="stop"),
+        ]
+    )
+
+    assert thoughts(events) == "weighing it"
+    assert texts(events) == "Yes."
+
+
+def test_a_plain_reasoning_field_becomes_thinking() -> None:
+    """OpenRouter's backwards-compatibility spelling, and the fallback for anything else that
+    picked the short name."""
+    events = drain([raw({"reasoning": "weighing it"}), raw({"content": "Yes."}, finish="stop")])
+
+    assert thoughts(events) == "weighing it"
+
+
+def test_reasoning_sent_in_two_spellings_at_once_is_not_doubled() -> None:
+    """A server sending both must not make every thought appear twice."""
+    events = drain(
+        [
+            raw(
+                {
+                    "reasoning": "weighing it",
+                    "reasoning_details": [{"type": "reasoning.text", "text": "weighing it"}],
+                }
+            ),
+            raw({"content": "Yes."}, finish="stop"),
+        ]
+    )
+
+    assert thoughts(events) == "weighing it"
+
+
+def test_an_encrypted_reasoning_block_falls_back_rather_than_showing_its_payload() -> None:
+    """An encrypted block carries opaque `data` and nothing legible. Showing it would put a wall
+    of base64 where a thought should be, so it contributes nothing and the plain field is used."""
+    events = drain(
+        [
+            raw(
+                {
+                    "reasoning": "weighing it",
+                    "reasoning_details": [{"type": "reasoning.encrypted", "data": "Ab3Kd9=="}],
+                }
+            ),
+            raw({"content": "Yes."}, finish="stop"),
+        ]
+    )
+
+    assert thoughts(events) == "weighing it"
+    assert "Ab3Kd9" not in thoughts(events)
+
+
+def test_a_summary_reasoning_block_is_read_too() -> None:
+    events = drain(
+        [
+            raw({"reasoning_details": [{"type": "reasoning.summary", "summary": "in short"}]}),
+            raw({"content": "Yes."}, finish="stop"),
+        ]
+    )
+
+    assert thoughts(events) == "in short"
+
+
+def test_a_blank_reasoning_content_falls_through_to_a_filled_field() -> None:
+    """`_think` swallows a whitespace-only thought, so picking a blank field over a filled one
+    beside it would drop that delta's reasoning rather than fall back to it."""
+    events = drain(
+        [
+            raw({"reasoning_content": "   ", "reasoning": "weighing it"}),
+            raw({"content": "Yes."}, finish="stop"),
+        ]
+    )
+
+    assert thoughts(events) == "weighing it"
+
+
+def test_a_blank_reasoning_details_falls_through_to_a_filled_field() -> None:
+    events = drain(
+        [
+            raw(
+                {
+                    "reasoning_details": [{"type": "reasoning.text", "text": "  "}],
+                    "reasoning": "weighing it",
+                }
+            ),
+            raw({"content": "Yes."}, finish="stop"),
+        ]
+    )
+
+    assert thoughts(events) == "weighing it"
+
+
+def test_a_malformed_reasoning_details_is_not_an_error() -> None:
+    """It comes off somebody else's API. A shape nothing can read is silence, not a crash."""
+    events = drain(
+        [
+            raw({"reasoning_details": "not a list"}),
+            raw({"reasoning_details": [None, {"no": "text"}, 7]}),
+            raw({"content": "Yes."}, finish="stop"),
+        ]
+    )
+
+    assert thoughts(events) == ""
+    assert texts(events) == "Yes."
+
+
 def test_inline_think_tags_are_lifted_out_of_the_content() -> None:
     """The other case: the same model, a server whose template leaves the tags in `content`.
 
