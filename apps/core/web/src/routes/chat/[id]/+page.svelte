@@ -49,13 +49,19 @@
 
 	/** Coming back to a conversation that already published something reopens the drawer on it,
 	 * the same door a fresh artifact opens for itself mid-turn -- without this, the only way
-	 * back in is the header button, and the person has to already know it is worth clicking. */
+	 * back in is the header button, and the person has to already know it is worth clicking.
+	 *
+	 * **Never over an open drawer.** A turn that publishes while this is in flight opens the
+	 * drawer on the file it just made (`noticed`), and this landing afterwards with no filename
+	 * would put the bar back to nothing chosen -- taking the page away the moment it arrived.
+	 * Checked on both sides of the request, because that is the gap the turn streams through. */
 	async function reopenIfPublished(id: string) {
+		if (artifacts.open) return;
 		try {
 			const found = await api.artifacts(id);
 			// `page.params.id` rather than `session.chat?.id`: a faster later switch may have
 			// moved both on by the time this resolves, and neither should show for the old id.
-			if (found.length && page.params.id === id) artifacts.show(id, null);
+			if (found.length && page.params.id === id && !artifacts.open) artifacts.show(id, null);
 		} catch {
 			/* the transcript is what matters; failing to reopen is not an error */
 		}

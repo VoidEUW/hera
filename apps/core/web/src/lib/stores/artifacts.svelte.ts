@@ -70,7 +70,8 @@ class Artifacts {
 	 * what `inline` asked for. The caller reads the turn in flight, so this happens while she is
 	 * publishing and never on a reload — reopening for a conversation that already had published
 	 * artifacts before this visit is the page's own job (`+page.svelte`'s `reopenIfPublished`),
-	 * not this method's. */
+	 * not this method's. That one defers to this one: a drawer already open on the file she just
+	 * made is never reset to nothing chosen. */
 	noticed(chatId: string | null, callId: string, tool: string, published: Artifact | null) {
 		if (!tool.startsWith(ARTIFACT_TOOL) || this.#seen.has(callId)) return;
 		this.#seen.add(callId);
