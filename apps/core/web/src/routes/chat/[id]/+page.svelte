@@ -44,6 +44,21 @@
 		const first = workspace.takeHandoff();
 		await session.open(id);
 		if (first) await session.send(first.text, first.files);
+		await reopenIfPublished(id);
+	}
+
+	/** Coming back to a conversation that already published something reopens the drawer on it,
+	 * the same door a fresh artifact opens for itself mid-turn -- without this, the only way
+	 * back in is the header button, and the person has to already know it is worth clicking. */
+	async function reopenIfPublished(id: string) {
+		try {
+			const found = await api.artifacts(id);
+			// `page.params.id` rather than `session.chat?.id`: a faster later switch may have
+			// moved both on by the time this resolves, and neither should show for the old id.
+			if (found.length && page.params.id === id) artifacts.show(id, null);
+		} catch {
+			/* the transcript is what matters; failing to reopen is not an error */
+		}
 	}
 
 	// How many artifacts this conversation has, for the control in the header. Re-read when

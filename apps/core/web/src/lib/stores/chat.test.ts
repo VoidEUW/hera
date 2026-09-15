@@ -4,11 +4,33 @@
  * to read usage off of, live versus after a reload.
  */
 
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { AnyEvent } from '../api/events';
-import type { Message } from '../api/client';
+import type { Chat, ChatDetail, Message } from '../api/client';
 import { ChatSession } from './chat.svelte';
+
+function deferred<T>() {
+	let resolve!: (value: T) => void;
+	const promise = new Promise<T>((r) => {
+		resolve = r;
+	});
+	return { promise, resolve };
+}
+
+function chatDetail(id: string): ChatDetail {
+	const chat: Chat = {
+		id,
+		title: id,
+		project_id: null,
+		profile_id: null,
+		pinned: false,
+		pinned_skills: [],
+		created_at: '',
+		last_message_at: null
+	};
+	return { chat, messages: [] };
+}
 
 const usage = (total: number): AnyEvent => ({
 	type: 'turn_closed',
@@ -78,5 +100,33 @@ describe('usage', () => {
 			})
 		];
 		expect(session.usage).toBeNull();
+	});
+});
+
+describe('open', () => {
+	afterEach(() => {
+		vi.unstubAllGlobals();
+	});
+
+	it('drops a chat load that resolves after a faster later switch already landed', async () => {
+		const pending = new Map<string, ReturnType<typeof deferred<Response>>>();
+		vi.stubGlobal('fetch', (url: string) => {
+			const id = url.split('/').pop() as string;
+			const waiter = deferred<Response>();
+			pending.set(id, waiter);
+			return waiter.promise;
+		});
+
+		const session = new ChatSession();
+		const first = session.open('a');
+		const second = session.open('b');
+
+		// 'b' answers before 'a' does, even though 'a' was asked for first.
+		pending.get('b')!.resolve(new Response(JSON.stringify(chatDetail('b'))));
+		await second;
+		pending.get('a')!.resolve(new Response(JSON.stringify(chatDetail('a'))));
+		await first;
+
+		expect(session.chat?.id).toBe('b');
 	});
 });

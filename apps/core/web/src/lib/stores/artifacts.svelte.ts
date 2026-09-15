@@ -68,8 +68,9 @@ class Artifacts {
 	 * wants. A figure she marked `inline` does **not** open: it is already on screen where she
 	 * drew it, and taking half the width away from the sentence it explains is the opposite of
 	 * what `inline` asked for. The caller reads the turn in flight, so this happens while she is
-	 * publishing and never on a reload — coming back to a conversation leaves you where you
-	 * left it. */
+	 * publishing and never on a reload — reopening for a conversation that already had published
+	 * artifacts before this visit is the page's own job (`+page.svelte`'s `reopenIfPublished`),
+	 * not this method's. */
 	noticed(chatId: string | null, callId: string, tool: string, published: Artifact | null) {
 		if (!tool.startsWith(ARTIFACT_TOOL) || this.#seen.has(callId)) return;
 		this.#seen.add(callId);

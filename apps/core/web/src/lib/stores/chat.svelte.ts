@@ -36,6 +36,10 @@ export class ChatSession {
 	pendingFiles = $state<Attachment[]>([]);
 
 	#abort: AbortController | null = null;
+	/** The chat `open()` is currently loading. Lets a call superseded by a faster later switch
+	 * recognise that on return and drop its response instead of overwriting `chat`/`messages`
+	 * with a conversation nobody is looking at any more. */
+	#pendingChatId: string | null = null;
 
 	get turn(): Turn {
 		return reduce(this.draft);
@@ -87,12 +91,16 @@ export class ChatSession {
 
 	async open(id: string) {
 		this.reset();
+		this.#pendingChatId = id;
 		try {
 			const detail = await api.chat(id);
+			// A second `open()` for a different chat may have started, and finished, while this
+			// fetch was in flight -- landing here would overwrite that chat's state with ours.
+			if (this.#pendingChatId !== id) return;
 			this.chat = detail.chat;
 			this.messages = detail.messages;
 		} catch (cause) {
-			this.error = message(cause);
+			if (this.#pendingChatId === id) this.error = message(cause);
 		}
 	}
 
@@ -197,11 +205,18 @@ export class ChatSession {
 			this.draft = [...carried.events];
 		}
 
+		// `#begin()` runs inside `start()`, not before it, so `this.#abort` only names this
+		// call's own controller once `start()` has returned -- captured here, it is the identity
+		// a later `stop()`/`reset()`/`#begin()` clears or replaces, which is what lets a
+		// straggler frame from a stream nobody wants any more recognise itself as one.
+		let owner: AbortController | null = null;
 		try {
 			const response = await start();
+			owner = this.#abort;
 			if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
 
 			for await (const frame of frames(response)) {
+				if (owner !== this.#abort) return;
 				if (frame.name === 'done') {
 					// The whole point. Everything drawn optimistically is discarded and the
 					// persisted message takes its place, so a reload cannot show something
@@ -212,14 +227,16 @@ export class ChatSession {
 				this.draft = [...this.draft, frame.data as AnyEvent];
 			}
 		} catch (cause) {
-			if (!isAbort(cause)) this.error = message(cause);
+			if (owner === this.#abort && !isAbort(cause)) this.error = message(cause);
 		} finally {
-			this.streaming = false;
-			this.#abort = null;
-			// A stream that ended without a `done` frame -- a dropped connection -- leaves the
-			// draft on screen rather than blanking the answer. Reloading will show whatever the
-			// server managed to persist.
-			if (this.draft.length === 0) this.pending = null;
+			if (owner === this.#abort) {
+				this.streaming = false;
+				this.#abort = null;
+				// A stream that ended without a `done` frame -- a dropped connection -- leaves
+				// the draft on screen rather than blanking the answer. Reloading will show
+				// whatever the server managed to persist.
+				if (this.draft.length === 0) this.pending = null;
+			}
 		}
 	}
 
