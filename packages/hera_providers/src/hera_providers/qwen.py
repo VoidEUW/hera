@@ -3,12 +3,13 @@
 Everything provider-specific about the target model is here and nowhere else. It does three
 jobs, and the first two are the reason the file exists:
 
-* **Reasoning.** Qwen served through an OpenAI-compatible endpoint reports its reasoning
-  either in a ``reasoning_content`` field beside ``content``, or -- depending on the server
-  and its chat template -- inline in ``content`` wrapped in ``<think>`` tags. Both are lifted
-  into :class:`ThinkingDelta`, so no layer above ever sees a tag. A thought that turns out to
-  be whitespace only -- another model family's empty ``<think>\n\n</think>`` -- is swallowed
-  rather than announced; see :meth:`QwenAdapter._think`.
+* **Reasoning.** A model served through an OpenAI-compatible endpoint reports its reasoning in
+  one of several places, because there is no standard for it and every server picked its own.
+  All of them are lifted into :class:`ThinkingDelta`, so no layer above ever sees a tag or
+  learns which server it was talking to -- see :func:`_reasoning_of` for the field shapes and
+  why the order they are tried in matters. A thought that turns out to be whitespace only --
+  another model family's empty ``<think>\n\n</think>`` -- is swallowed rather than announced;
+  see :meth:`QwenAdapter._think`.
 * **Tool calls.** They arrive as fragments indexed by position, with the arguments streamed as
   partial JSON. They are accumulated here and emitted whole -- preceded by one
   :class:`ToolCallStarted` as soon as the *name* is known, because the whole call can be
@@ -75,8 +76,8 @@ class QwenAdapter:
         choice = choices[0]
         delta = choice.get("delta") or {}
 
-        reasoning = delta.get("reasoning_content")
-        if isinstance(reasoning, str) and reasoning:
+        reasoning = _reasoning_of(delta)
+        if reasoning:
             yield from self._think(reasoning)
 
         content = delta.get("content")
@@ -268,3 +269,59 @@ def _partial_tag_suffix(buffer: str, tag: str) -> int:
 def _as_events(runs: list[tuple[bool, str]]) -> Iterator[Event]:
     for thinking, text in runs:
         yield ThinkingDelta(text=text) if thinking else TextDelta(text=text)
+
+
+def _reasoning_of(delta: Mapping[str, Any]) -> str:
+    """The reasoning in one delta, whichever field this server decided to put it in.
+
+    There is no standard here, and reading only one spelling is not a cosmetic bug: a reasoning
+    model whose thoughts land in a field nothing reads streams *nothing at all* until it reaches
+    ``content``, because a delta carrying only reasoning has an empty ``content``. The turn looks
+    frozen for as long as the model thinks -- which is worst exactly when the question was
+    hardest. That was the observed failure on OpenRouter, where a local LM Studio serving the
+    same weights was fine.
+
+    Three spellings, tried in this order, and **the first one that yields text wins** rather than
+    all of them being concatenated -- a server that sends both ``reasoning`` and
+    ``reasoning_details`` (OpenRouter does, the first for backwards compatibility) would
+    otherwise show every thought twice:
+
+    * ``reasoning_content`` -- a plain string beside ``content``. LM Studio, vLLM, llama.cpp,
+      and DeepSeek's own API. The original spelling and still the commonest.
+    * ``reasoning_details`` -- OpenRouter's structured form, a list of blocks. Preferred over
+      ``reasoning`` below because it is the documented current shape, and it is read leniently:
+      an ``encrypted`` block carries opaque ``data`` rather than ``text`` and is skipped, which
+      is why this can be present and still yield nothing.
+    * ``reasoning`` -- a plain string. OpenRouter's compatibility field, and the fallback for
+      when the structured form held nothing legible.
+    """
+    direct = delta.get("reasoning_content")
+    if isinstance(direct, str) and direct:
+        return direct
+    detailed = _detailed_reasoning(delta.get("reasoning_details"))
+    if detailed:
+        return detailed
+    plain = delta.get("reasoning")
+    return plain if isinstance(plain, str) and plain else ""
+
+
+def _detailed_reasoning(details: object) -> str:
+    """The legible text of a ``reasoning_details`` list, or ``""``.
+
+    Deliberately lenient about the block type: what matters is whether a block carries something
+    a person can read, not what it calls itself. ``text`` and ``summary`` are the two fields that
+    do; an encrypted block has neither and contributes nothing, rather than putting a wall of
+    base64 where a thought should be.
+    """
+    if not isinstance(details, list):
+        return ""
+    found: list[str] = []
+    for block in details:
+        if not isinstance(block, Mapping):
+            continue
+        for key in ("text", "summary"):
+            value = block.get(key)
+            if isinstance(value, str) and value:
+                found.append(value)
+                break
+    return "".join(found)
