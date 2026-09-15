@@ -281,10 +281,19 @@ def _reasoning_of(delta: Mapping[str, Any]) -> str:
     hardest. That was the observed failure on OpenRouter, where a local LM Studio serving the
     same weights was fine.
 
-    Three spellings, tried in this order, and **the first one that yields text wins** rather than
-    all of them being concatenated -- a server that sends both ``reasoning`` and
+    Three spellings, tried in this order, and **the first one holding something legible wins**
+    rather than all of them being concatenated -- a server that sends both ``reasoning`` and
     ``reasoning_details`` (OpenRouter does, the first for backwards compatibility) would
-    otherwise show every thought twice:
+    otherwise show every thought twice.
+
+    *Legible* rather than merely present, because :meth:`QwenAdapter._think` swallows a
+    whitespace-only thought: selecting a blank ``reasoning_content`` over a filled ``reasoning``
+    beside it would drop that delta's reasoning entirely rather than fall through to it. When
+    **nothing** is legible the first field that was there at all is returned anyway, whitespace
+    and all -- ``_think`` holds it against the next chunk, and that is what keeps a thought
+    opening with a newline from arriving with its first line missing. Either way the value is
+    returned unstripped: the whitespace belongs to the thought, and the gate decides what is
+    worth announcing.
 
     * ``reasoning_content`` -- a plain string beside ``content``. LM Studio, vLLM, llama.cpp,
       and DeepSeek's own API. The original spelling and still the commonest.
@@ -295,14 +304,24 @@ def _reasoning_of(delta: Mapping[str, Any]) -> str:
     * ``reasoning`` -- a plain string. OpenRouter's compatibility field, and the fallback for
       when the structured form held nothing legible.
     """
+    found: list[str] = []
     direct = delta.get("reasoning_content")
     if isinstance(direct, str) and direct:
-        return direct
+        found.append(direct)
     detailed = _detailed_reasoning(delta.get("reasoning_details"))
     if detailed:
-        return detailed
+        found.append(detailed)
     plain = delta.get("reasoning")
-    return plain if isinstance(plain, str) and plain else ""
+    if isinstance(plain, str) and plain:
+        found.append(plain)
+
+    for value in found:
+        if value.strip():
+            return value
+    # Nothing legible anywhere, so the whitespace itself is the best answer available: `_think`
+    # holds it against the next chunk rather than dropping it, which is what keeps a thought
+    # that opens with a newline from arriving with its first line missing.
+    return found[0] if found else ""
 
 
 def _detailed_reasoning(details: object) -> str:

@@ -151,6 +151,35 @@ def test_a_summary_reasoning_block_is_read_too() -> None:
     assert thoughts(events) == "in short"
 
 
+def test_a_blank_reasoning_content_falls_through_to_a_filled_field() -> None:
+    """`_think` swallows a whitespace-only thought, so picking a blank field over a filled one
+    beside it would drop that delta's reasoning rather than fall back to it."""
+    events = drain(
+        [
+            raw({"reasoning_content": "   ", "reasoning": "weighing it"}),
+            raw({"content": "Yes."}, finish="stop"),
+        ]
+    )
+
+    assert thoughts(events) == "weighing it"
+
+
+def test_a_blank_reasoning_details_falls_through_to_a_filled_field() -> None:
+    events = drain(
+        [
+            raw(
+                {
+                    "reasoning_details": [{"type": "reasoning.text", "text": "  "}],
+                    "reasoning": "weighing it",
+                }
+            ),
+            raw({"content": "Yes."}, finish="stop"),
+        ]
+    )
+
+    assert thoughts(events) == "weighing it"
+
+
 def test_a_malformed_reasoning_details_is_not_an_error() -> None:
     """It comes off somebody else's API. A shape nothing can read is silence, not a crash."""
     events = drain(
