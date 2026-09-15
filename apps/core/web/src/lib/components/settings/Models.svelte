@@ -102,6 +102,11 @@
 	// emptied field mid-edit must not be forced back into a number before the person is done.
 	let contextDraft = $state<Record<string, string>>({});
 
+	// `tool_calling` (ADR 19), the same way — a typed field beside the options editor, seeded
+	// from the model rather than defaulted to `true`, so saving an unrelated option never
+	// silently turns tools back on for a model somebody already flagged off.
+	let toolCallingDraft = $state<Record<string, boolean>>({});
+
 	const shown = $derived(
 		providers.filter(
 			(p) => !filter || `${p.name} ${p.base_url} ${p.active_model}`.toLowerCase().includes(filter)
@@ -139,6 +144,9 @@
 	function closeOptions(key: string) {
 		optionsDraft = Object.fromEntries(Object.entries(optionsDraft).filter(([k]) => k !== key));
 		contextDraft = Object.fromEntries(Object.entries(contextDraft).filter(([k]) => k !== key));
+		toolCallingDraft = Object.fromEntries(
+			Object.entries(toolCallingDraft).filter(([k]) => k !== key)
+		);
 	}
 
 	function toggleOptions(name: string, model: ModelEntry) {
@@ -152,6 +160,7 @@
 			...contextDraft,
 			[key]: model.context_length != null ? String(model.context_length) : ''
 		};
+		toolCallingDraft = { ...toolCallingDraft, [key]: model.tool_calling };
 	}
 
 	/** Set or clear one key in a model's options, through the same text the raw textarea reads
@@ -213,7 +222,8 @@
 					id: model.id,
 					name: model.name,
 					options,
-					context_length: contextLength
+					context_length: contextLength,
+					tool_calling: toolCallingDraft[key] ?? model.tool_calling
 				})
 			);
 			closeOptions(key);
@@ -661,6 +671,20 @@
 									{#if !contextValid}
 										<p class="warn">{t.models.contextLengthInvalid}</p>
 									{/if}
+
+									<label class="switch">
+										<input
+											type="checkbox"
+											checked={toolCallingDraft[key] ?? model.tool_calling}
+											onchange={(e) =>
+												(toolCallingDraft = {
+													...toolCallingDraft,
+													[key]: e.currentTarget.checked
+												})}
+										/>
+										<span class="word">{t.models.toolCalling}</span>
+									</label>
+									<small>{t.models.toolCallingHint}</small>
 
 									<label>
 										<span>{t.models.optionsPreset}</span>
@@ -1123,6 +1147,16 @@
 	.options-actions {
 		display: flex;
 		gap: 6px;
+	}
+
+	.switch {
+		display: flex;
+		align-items: center;
+		gap: 5px;
+		margin: 0 0 4px;
+		font-size: 12px;
+		color: var(--text-muted);
+		cursor: pointer;
 	}
 
 	.warn {

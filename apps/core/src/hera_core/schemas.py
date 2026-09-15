@@ -589,6 +589,7 @@ class ModelOut(BaseModel):
     name: str
     options: dict[str, Any] = Field(default_factory=dict)
     context_length: int | None = None
+    tool_calling: bool = True
 
 
 class ProviderOut(BaseModel):
@@ -714,6 +715,10 @@ class ModelIn(BaseModel):
     """How many tokens this model's window holds, for the composer's usage bar. Never probed —
     see ``ModelEntry.context_length``. ``gt=0`` refuses a bar that couldn't be drawn rather than
     accepting it silently."""
+
+    tool_calling: bool = True
+    """Whether this model is offered tools at all (ADR 19). Sent whole, like ``options`` above —
+    editing a model without repeating a previously-set ``False`` here puts it back to ``True``."""
 
     @field_validator("options")
     @classmethod

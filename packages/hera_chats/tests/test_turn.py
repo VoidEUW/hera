@@ -272,6 +272,25 @@ class TestTheToolLoop:
         assert provider.requests[0].tools == []
         assert "tools:available" not in provider.requests[0].messages[0].content
 
+    async def test_a_model_flagged_off_tool_calling_is_offered_none(
+        self, builder: object, router: object, tools: StubTools
+    ) -> None:
+        """A registry with tools configured changes nothing for a model that cannot reliably
+        call one (ADR 19) -- the same empty list and empty slot as no registry at all."""
+        provider = FakeProvider([text_turn("ok")])
+        orchestrator = TurnOrchestrator(
+            provider=provider,
+            builder=builder,  # type: ignore[arg-type]
+            router=router,  # type: ignore[arg-type]
+            registry=tools,
+            settings=ChatsSettings(model="fake-model", tool_calling=False),
+        )
+
+        await drain(orchestrator.begin(TurnContext(text="hi")).stream())
+
+        assert provider.requests[0].tools == []
+        assert "tools:available" not in provider.requests[0].messages[0].content
+
     async def test_a_failing_tool_is_a_result_not_an_exception(
         self, make_orchestrator: Make
     ) -> None:

@@ -165,6 +165,7 @@ async def register_model(name: str, payload: ModelIn, container: Container) -> P
             name=payload.name,
             options=payload.options,
             context_length=payload.context_length,
+            tool_calling=payload.tool_calling,
         )
     )
     return await _commit(container, config.with_provider(updated))
@@ -250,6 +251,7 @@ async def _commit(container: Container, config: HeraConfig) -> ProvidersOut:
             # The active model's request flags travel with its name, because they are a fact
             # about that model rather than about the endpoint -- see `use_provider`.
             options=active.active_options(),
+            tool_calling=active.active_tool_calling(),
         )
     return ProvidersOut(
         providers=[entry.redacted() for entry in config.providers],

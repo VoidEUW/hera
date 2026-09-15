@@ -108,7 +108,16 @@ marked.use({
 		// thoughts would silently shout whichever sentence it had just finished. Disabled, the
 		// same line falls through to a thematic break: a hairline with air around it, which
 		// reads as either a separator or a gap depending on what she meant by it.
-		lheading: () => undefined
+		lheading: () => undefined,
+		// A literal `<svg>`, `<div>`, or any other tag in her prose is not markup to run, it is
+		// text she wrote — deliberately, or leaked out of a tool call that did not parse as one.
+		// marked's defaults disagree: they tokenize a raw tag as HTML and the built-in renderer
+		// passes it through untouched, so DOMPurify's `svg: true` profile (needed below for
+		// KaTeX's own output) lets it survive as a live element instead of visible characters.
+		// Disabling both HTML tokenizers is what keeps a `<` a `<`: it falls through to plain
+		// text and is escaped like any other character, the same way a fenced block already is.
+		html: () => undefined,
+		tag: () => undefined
 	},
 	renderer: {
 		code(token: Tokens.Code) {

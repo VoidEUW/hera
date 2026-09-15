@@ -595,16 +595,21 @@ class TestWhatShePublishes:
         """The server render is authoritative: the persisted list has no `tool_call_started` in
         it, and it has to draw the same card the live stream did.
 
-        The drawer is deliberately *not* part of that. Opening one is something she does while
-        publishing, not a property of the conversation — coming back to it leaves you where you
-        left off rather than reopening a panel over the transcript you came to read."""
+        The drawer comes back with it. This reverses what this test used to pin — that returning
+        to a conversation left the drawer closed, on the reasoning that reopening puts a panel
+        over the transcript you came to read. [Issue #71](https://github.com/VoidEUW/hera/issues/71)
+        is what changed it: driven for real, the old behaviour reads as the artifact having gone
+        missing, because the card that made it is by then several turns up and the header button
+        is the only door left — one you have to already know is worth clicking. A conversation
+        that published something shows it, and closing the drawer still means closed for as long
+        as you stay (`test_the_card_opens_it_again_after_it_is_closed`)."""
         self._publish(page)
 
         page.reload(wait_until="networkidle")
 
         page.wait_for_selector("text=Theme workshop", timeout=15_000)
         assert page.get_by_role("button", name="Open").count() >= 1
-        assert self._drawer(page).count() == 0
+        assert self._drawer(page).count() == 1
 
     def test_a_figure_is_drawn_where_she_drew_it(self, page: Any) -> None:
         """`inline` is the whole distinction ADR 13 exists to make, and the drawer is where it

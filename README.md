@@ -39,9 +39,11 @@ the ecosystem.
 
 - Python 3.12+ and [uv](https://docs.astral.sh/uv/)
 - Node 20+ (for the web app)
-- A local OpenAI-compatible endpoint serving **Qwen3.6-35B** — LM Studio, vLLM or llama.cpp.
-  Hera is tuned for that model specifically; anything with working native tool calling should
-  behave.
+- A local OpenAI-compatible endpoint — LM Studio, vLLM or llama.cpp. **DeepSeek, GLM, Qwen, Kimi
+  and Gemma** are the preferred targets, and Anthropic or OpenAI models reached the same way work
+  too; anything with working native tool calling should behave. A model whose tool-calling isn't
+  reliable can be told not to use tools at all in Settings → Models, rather than attempting a
+  call it cannot make.
 
 ## Quick start
 

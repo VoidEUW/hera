@@ -5,8 +5,9 @@ The fastest way to run Hera: one Docker container on your own machine.
 ## Requirements
 
 - Docker and Docker Compose
-- A local OpenAI-compatible model endpoint (LM Studio, vLLM, llama.cpp) serving
-  **Qwen3.6-35B**, reachable from the container
+- A local OpenAI-compatible model endpoint (LM Studio, vLLM, llama.cpp), reachable from the
+  container — **DeepSeek, GLM, Qwen, Kimi and Gemma** are the preferred targets, and Anthropic
+  or OpenAI models reached the same way work too
 
 ## Install
 

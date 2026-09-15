@@ -391,7 +391,11 @@ export const t = {
 		contextLengthPlaceholder: 'e.g. 32768',
 		contextLengthHint:
 			'Tokens this model can hold, for the composer’s usage bar. Not probed — fill it in yourself; empty means no bar.',
-		contextLengthInvalid: 'This should be a whole number greater than zero, or empty.'
+		contextLengthInvalid: 'This should be a whole number greater than zero, or empty.',
+
+		toolCalling: 'Uses tools',
+		toolCallingHint:
+			'Turn off for a model that writes what looks like a tool call instead of making one for real — it will only ever answer in prose, but cleanly instead of with a broken attempt.'
 	},
 
 	profileMenu: {

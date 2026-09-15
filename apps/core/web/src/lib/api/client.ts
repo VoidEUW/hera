@@ -201,6 +201,10 @@ export interface ModelEntry {
 	 * a person fills it in, the same convention as {@link Provider.timeout_s}. `null` draws no
 	 * bar at all rather than one pinned at some guessed ceiling. */
 	context_length: number | null;
+	/** Whether this model is offered tools at all (ADR 19). `false` for a model that writes
+	 * what looks like a tool call instead of making one for real — it answers in prose alone
+	 * rather than attempting a call it cannot make. */
+	tool_calling: boolean;
 }
 
 /** A known set of {@link ModelEntry.options}, offered on Settings → Models.
@@ -393,6 +397,7 @@ export const api = {
 			name?: string;
 			options?: Record<string, unknown>;
 			context_length?: number | null;
+			tool_calling?: boolean;
 		}
 	) =>
 		request<Providers>(`/providers/${name}/models`, { method: 'POST', body: JSON.stringify(body) }),

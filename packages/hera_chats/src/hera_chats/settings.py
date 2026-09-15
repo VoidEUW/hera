@@ -16,8 +16,9 @@ class ChatsSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="HERA_CHATS_", extra="ignore")
 
     model: str = "qwen3.6-35b"
-    """The one model (ADR 2). A name rather than a choice: what varies between deployments is
-    what the local server calls it, not which family it belongs to."""
+    """The active model's name, as its own server expects it (ADR 2, widened by ADR 19). A name
+    rather than a choice: what varies between deployments is what the local server calls it, not
+    which family it belongs to."""
 
     max_iterations: int = 12
     """How many rounds of tool calls one turn may take before the budget is spent.
@@ -79,6 +80,15 @@ class ChatsSettings(BaseSettings):
     is exactly why ``ChatRequest.extra`` exists rather than a growing list of named options.
 
     Empty is the ordinary state. A model that needs nothing sends the same body it always did.
+    """
+
+    tool_calling: bool = True
+    """Whether this model is offered any tool at all (ADR 19).
+
+    ``False`` for a model that does not reliably emit a native ``tool_calls`` delta -- it
+    free-generates prose that looks like a call instead, which nothing in this package (or
+    ``hera_providers``) may try to parse back into one. ``Turn._tool_specs()`` is where this is
+    read.
     """
 
     title_length: int = 60

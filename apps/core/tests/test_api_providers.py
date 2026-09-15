@@ -274,6 +274,38 @@ class TestModels:
         )
         assert response.status_code == 422
 
+    async def test_tool_calling_defaults_to_true(self, client: AsyncClient) -> None:
+        body = (await client.post(f"{API}/providers/local/models", json={"id": "usual"})).json()
+        entry = next(p for p in body["providers"] if p["name"] == "local")
+        model = next(m for m in entry["models"] if m["id"] == "usual")
+        assert model["tool_calling"] is True
+
+    async def test_tool_calling_is_stored_and_comes_back(self, client: AsyncClient) -> None:
+        body = (
+            await client.post(
+                f"{API}/providers/local/models",
+                json={"id": "prose-only", "tool_calling": False},
+            )
+        ).json()
+        entry = next(p for p in body["providers"] if p["name"] == "local")
+        model = next(m for m in entry["models"] if m["id"] == "prose-only")
+        assert model["tool_calling"] is False
+
+    async def test_editing_a_model_without_repeating_tool_calling_resets_it(
+        self, client: AsyncClient
+    ) -> None:
+        """``tool_calling`` is sent whole, like ``options`` -- an edit that leaves it out is not
+        a partial update, it is the default coming back."""
+        await client.post(
+            f"{API}/providers/local/models",
+            json={"id": "prose-only", "tool_calling": False},
+        )
+        await client.post(f"{API}/providers/local/models", json={"id": "prose-only"})
+
+        body = (await client.get(f"{API}/providers")).json()
+        model = next(m for m in body["providers"][0]["models"] if m["id"] == "prose-only")
+        assert model["tool_calling"] is True
+
 
 class TestLogo:
     async def test_uploading_a_custom_logo_is_served_back_with_its_content_type(

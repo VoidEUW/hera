@@ -36,6 +36,12 @@ export class ChatSession {
 	pendingFiles = $state<Attachment[]>([]);
 
 	#abort: AbortController | null = null;
+	/** Which load owns the session, counted rather than named.
+	 *
+	 * A chat id is not enough: `A → B → A` gives two loads the same name, and the first one's
+	 * response would pass an id check and overwrite the newer one. A number that only goes up
+	 * tells any request whether it is still the one being waited for. */
+	#load = 0;
 
 	get turn(): Turn {
 		return reduce(this.draft);
@@ -85,14 +91,24 @@ export class ChatSession {
 		return this.busy || this.awaiting.length > 0;
 	}
 
-	async open(id: string) {
+	/** Load a conversation. `true` when this load is still the one that matters by the time it
+	 * lands -- the caller has to know, because anything it does *next* with the session (sending
+	 * the message a chat was started with, opening a drawer) would otherwise be done to whichever
+	 * chat overtook it. */
+	async open(id: string): Promise<boolean> {
+		const token = ++this.#load;
 		this.reset();
 		try {
 			const detail = await api.chat(id);
+			// A later `open()` may have started, and finished, while this fetch was in flight --
+			// landing here would overwrite that chat's state with ours.
+			if (token !== this.#load) return false;
 			this.chat = detail.chat;
 			this.messages = detail.messages;
+			return true;
 		} catch (cause) {
-			this.error = message(cause);
+			if (token === this.#load) this.error = message(cause);
+			return false;
 		}
 	}
 
@@ -197,11 +213,18 @@ export class ChatSession {
 			this.draft = [...carried.events];
 		}
 
+		// `#begin()` runs inside `start()`, not before it, so `this.#abort` only names this
+		// call's own controller once `start()` has returned -- captured here, it is the identity
+		// a later `stop()`/`reset()`/`#begin()` clears or replaces, which is what lets a
+		// straggler frame from a stream nobody wants any more recognise itself as one.
+		let owner: AbortController | null = null;
 		try {
 			const response = await start();
+			owner = this.#abort;
 			if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
 
 			for await (const frame of frames(response)) {
+				if (owner !== this.#abort) return;
 				if (frame.name === 'done') {
 					// The whole point. Everything drawn optimistically is discarded and the
 					// persisted message takes its place, so a reload cannot show something
@@ -212,14 +235,16 @@ export class ChatSession {
 				this.draft = [...this.draft, frame.data as AnyEvent];
 			}
 		} catch (cause) {
-			if (!isAbort(cause)) this.error = message(cause);
+			if (owner === this.#abort && !isAbort(cause)) this.error = message(cause);
 		} finally {
-			this.streaming = false;
-			this.#abort = null;
-			// A stream that ended without a `done` frame -- a dropped connection -- leaves the
-			// draft on screen rather than blanking the answer. Reloading will show whatever the
-			// server managed to persist.
-			if (this.draft.length === 0) this.pending = null;
+			if (owner === this.#abort) {
+				this.streaming = false;
+				this.#abort = null;
+				// A stream that ended without a `done` frame -- a dropped connection -- leaves
+				// the draft on screen rather than blanking the answer. Reloading will show
+				// whatever the server managed to persist.
+				if (this.draft.length === 0) this.pending = null;
+			}
 		}
 	}
 
@@ -236,8 +261,12 @@ export class ChatSession {
 
 	async #refresh() {
 		if (!this.chat) return;
+		// The same token the loads use: a refresh for the chat just left must not land on the
+		// one just arrived, which is the same overwrite `open` guards against by a slower route.
+		const token = this.#load;
 		try {
 			const detail = await api.chat(this.chat.id);
+			if (token !== this.#load) return;
 			this.chat = detail.chat;
 			this.messages = detail.messages;
 		} catch {

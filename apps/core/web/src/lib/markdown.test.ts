@@ -91,8 +91,27 @@ describe('markdown', () => {
 		expect(html).toContain('hello');
 	});
 
-	it('strips an event handler', () => {
-		expect(render('<img src=x onerror="alert(1)">')).not.toContain('onerror');
+	it('shows a raw tag as text instead of an element with an event handler', () => {
+		const html = render('<img src=x onerror="alert(1)">');
+		expect(html).not.toContain('<img');
+		expect(html).toContain('&lt;img');
+	});
+
+	it('shows raw SVG as text instead of a live image', () => {
+		// The bug this guards against: a tool call that leaked into prose as text, with SVG
+		// markup in its arguments, used to render as an actual inline picture partway through
+		// an otherwise plain sentence.
+		const html = render('before <svg><circle r="5"/></svg> after');
+		expect(html).not.toContain('<svg');
+		expect(html).toContain('&lt;svg&gt;');
+		expect(html).toContain('before');
+		expect(html).toContain('after');
+	});
+
+	it('shows an arbitrary raw tag as text rather than an element', () => {
+		const html = render('<div class="x">hi</div>');
+		expect(html).not.toContain('<div');
+		expect(html).toContain('&lt;div');
 	});
 
 	it('refuses a javascript: link', () => {
