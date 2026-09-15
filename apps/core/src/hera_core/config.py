@@ -101,6 +101,16 @@ class ModelEntry(BaseModel):
     ``None`` rather than ``0`` so an install that genuinely doesn't know is distinguishable from
     one that measured zero."""
 
+    tool_calling: bool = True
+    """Whether this model is offered tools at all (ADR 19).
+
+    ``False`` for a model that free-generates a description of a call instead of a native
+    ``tool_calls`` delta — set by a person after watching it happen, never guessed from the
+    model's id or name. ``Turn._tool_specs()`` returns ``([], "")`` unconditionally when this is
+    ``False``, the same values it already returns for a deployment with no tool registry
+    configured at all.
+    """
+
     @model_validator(mode="before")
     @classmethod
     def _default_name(cls, data: object) -> object:
@@ -223,6 +233,13 @@ class ProviderEntry(BaseModel):
             if model.id == self.active_model:
                 return dict(model.options)
         return {}
+
+    def active_tool_calling(self) -> bool:
+        """Whether the active model is offered tools at all (ADR 19)."""
+        for model in self.models:
+            if model.id == self.active_model:
+                return model.tool_calling
+        return True
 
     def redacted(self) -> dict[str, Any]:
         """For the API. The key never leaves the machine it was typed on.

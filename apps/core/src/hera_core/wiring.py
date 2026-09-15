@@ -107,6 +107,7 @@ class Services:
         *,
         model: str | None = None,
         options: dict[str, Any] | None = None,
+        tool_calling: bool | None = None,
     ) -> None:
         """Point her at a different endpoint, without a restart.
 
@@ -125,6 +126,10 @@ class Services:
         reason: they are that *model's* request flags, so carrying the old model's over would
         send GLM-4.7's ``chat_template_kwargs`` to a server that has never heard of it. ``{}``
         is the ordinary value and must clear.
+
+        ``tool_calling`` (ADR 19) is a fact about the same model, for the same reason -- carrying
+        a previous model's ``False`` forward would silently withhold tools from one that can
+        actually use them.
         """
         previous, owned = self.provider, self.owns_provider
         self.provider = provider
@@ -134,6 +139,8 @@ class Services:
             changes["model"] = model
         if options is not None:
             changes["extra"] = dict(options)
+        if tool_calling is not None:
+            changes["tool_calling"] = tool_calling
         if changes:
             self.orchestrator.settings = self.orchestrator.settings.model_copy(update=changes)
         self.owns_provider = True
@@ -178,6 +185,7 @@ def build_services(
     entry = load_config().active()
     provider_settings = entry.settings() if entry is not None else ProviderSettings()
     model_options = entry.active_options() if entry is not None else {}
+    model_tool_calling = entry.active_tool_calling() if entry is not None else True
     injected = provider is not None
     if provider is None:
         provider = OpenAICompatibleProvider(provider_settings)
@@ -246,6 +254,9 @@ def build_services(
                 # and replaced by `use_provider` when a person switches models on the Models
                 # screen, exactly as `model` is -- the two are one decision.
                 extra=model_options,
+                # Whether this model is offered a tool at all (ADR 19) -- the same seeded-here,
+                # replaced-by-`use_provider` treatment as `extra` above, for the same reason.
+                tool_calling=model_tool_calling,
                 # The one place her `ask` tool is named to the turn layer. `hera_chats` does
                 # not know what a Hera tool is and must not learn; it takes the qualified name
                 # and suspends on it, the way it takes a policy rather than a list of rules.

@@ -5,8 +5,9 @@ to 98 KB of accumulated history and stopped being readable. It is archived as
 `docs/prototype.md` — useful for *why* decisions were made, wrong about everything structural.
 
 Hera is a self-hosted agentic chat space: a uv workspace of small libraries, a FastAPI
-application, and a SvelteKit interface, talking to a local Qwen3.6-35B over an
-OpenAI-compatible endpoint.
+application, and a SvelteKit interface, talking to a local model over an OpenAI-compatible
+endpoint. DeepSeek, GLM, Qwen, Kimi and Gemma are the preferred targets, and Anthropic or OpenAI
+models reachable the same way work too (ADR 19).
 
 ## Read first
 
@@ -16,8 +17,9 @@ OpenAI-compatible endpoint.
   touching its packages
 - `ARCHITECTURE.md` — the packages, the layering rule, the shape of a turn
 - `docs/adr/` — why the structure looks like this; read 2 (Qwen only), 5 (deterministic skill
-  routing) and 17 (a stance is a sentence) before changing model-facing behaviour. 17 supersedes
-  3, and 3 is worth reading anyway for the rule that outlived it
+  routing), 17 (a stance is a sentence) and 19 (preferred models widen past Qwen) before changing
+  model-facing behaviour. 17 supersedes 3, and 3 is worth reading anyway for the rule that
+  outlived it. 19 narrows 2's target-model list; 2's other bets stay binding
 - `docs/tooling.md` — what she should be able to reach for and cannot. Notes, not decisions;
   read it before adding a tool, and read § 1 before concluding she has no search *on purpose*
 - `CONTRIBUTING.md` — setup, the check loop, branching

@@ -7,8 +7,9 @@ Run Hera directly from a checkout, with `uv` and Node. No container.
 - Python 3.12 or newer
 - [uv](https://docs.astral.sh/uv/)
 - Node 20 or newer, to build the web interface
-- A local OpenAI-compatible model endpoint (LM Studio, vLLM, llama.cpp) serving
-  **Qwen3.6-35B**. Any endpoint with working native tool calling should work too.
+- A local OpenAI-compatible model endpoint (LM Studio, vLLM, llama.cpp). **DeepSeek, GLM, Qwen,
+  Kimi and Gemma** are the preferred targets, and Anthropic or OpenAI models reached the same way
+  work too — any endpoint with working native tool calling should.
 
 ## Install
 

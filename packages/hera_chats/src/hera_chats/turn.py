@@ -426,9 +426,11 @@ class Turn:
 
         A deployment with no servers configured gets an empty list and an empty slot, so the
         prompt says nothing about tools at all rather than announcing an empty catalogue —
-        which reads to a model as "you have no tools" and earns a paragraph about it.
+        which reads to a model as "you have no tools" and earns a paragraph about it. A model
+        flagged `tool_calling=False` (ADR 19) gets the same treatment for a different reason: it
+        cannot use what it would be offered, so it is not offered anything.
         """
-        if self._registry is None:
+        if self._registry is None or not self._settings.tool_calling:
             return [], ""
         catalogue = await self._registry.catalogue()
         listing = "\n".join(

@@ -34,9 +34,14 @@ outside your network.
 
 ## Model endpoint
 
-Hera talks to any OpenAI-compatible endpoint — LM Studio, vLLM, llama.cpp, or similar — and is
-tuned specifically for **Qwen3.6-35B**. Any endpoint with working native tool calling should
-work.
+Hera talks to any OpenAI-compatible endpoint — LM Studio, vLLM, llama.cpp, or similar. **DeepSeek,
+GLM, Qwen, Kimi and Gemma** are the preferred model families, and Anthropic or OpenAI models
+reached the same way (a gateway, a router, or OpenAI's own API) work too. Any endpoint with
+working native tool calling should work.
+
+If a model's tool-calling isn't reliable — it writes what looks like a tool call instead of
+making one for real — turn off "Uses tools" for it on Settings → Models. It then answers in
+prose alone, cleanly, instead of attempting a call it cannot make.
 
 The endpoint can be set two ways:
 

@@ -8,7 +8,7 @@ later.
 | # | Decision | Status |
 |---|---|---|
 | [1](0001-uv-workspace-monorepo.md) | A uv-workspace monorepo, with two foundation libraries kept outside | accepted · layout superseded by [9](0009-one-application-package.md) |
-| [2](0002-qwen-only-target-model.md) | Qwen3.6-35B is the only target model | accepted |
+| [2](0002-qwen-only-target-model.md) | Qwen3.6-35B is the only target model | accepted · target list widened by [19](0019-preferred-models-widen-past-qwen.md) |
 | [3](0003-emotions-as-tool-calls.md) | Emotion cards are tool calls with an open vocabulary | **superseded by [17](0017-a-stance-is-a-sentence-and-a-question-stands-alone.md)** |
 | [4](0004-mcp-as-the-tool-layer.md) | MCP is the tool layer | accepted |
 | [5](0005-deterministic-skill-routing.md) | Skills are selected by code, not by the model | accepted |
@@ -25,3 +25,4 @@ later.
 | [16](0016-a-memory-is-a-file-and-all-of-them-are-in-the-prompt.md) | A memory is a file, and every enabled one is in the prompt | accepted |
 | [17](0017-a-stance-is-a-sentence-and-a-question-stands-alone.md) | A stance is a sentence, and a question stands on its own | accepted · supersedes [3](0003-emotions-as-tool-calls.md) |
 | [18](0018-a-model-may-carry-request-options.md) | A model may carry request options, and Hera does not know what they mean | accepted |
+| [19](0019-preferred-models-widen-past-qwen.md) | Preferred models widen past Qwen, and a model may decline tool calling | accepted |
