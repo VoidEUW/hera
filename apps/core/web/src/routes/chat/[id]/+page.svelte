@@ -42,9 +42,23 @@
 	// by giving up on rendering. Nothing displays it, so plain state is all it needs to be.
 	let pinned = true;
 
+	/** Which conversation has already been opened, so the effect below does not open it twice.
+	 *
+	 * Not a nicety. `page.params` settles in more than one step during a navigation, so the
+	 * effect can re-run with the same id — and a second `open()` calls `session.reset()`, which
+	 * aborts the turn the first one started, after `takeHandoff()` has already handed the
+	 * message over and cleared it. The sentence somebody typed on the start screen is gone and
+	 * nothing says so ([issue #122](https://github.com/VoidEUW/hera/issues/122)). It is rare and
+	 * load-dependent, which is why it surfaced as a flaky test rather than a bug report.
+	 *
+	 * `untrack` for the same reason `project/[id]` uses it: this both reads and writes state the
+	 * effect depends on, which is the shape that ends in `effect_update_depth_exceeded`. */
+	let opened = $state<string | null>(null);
+
 	$effect(() => {
 		const id = page.params.id;
-		if (!id) return;
+		if (!id || untrack(() => opened) === id) return;
+		untrack(() => (opened = id));
 		void open(id);
 	});
 
@@ -58,7 +72,13 @@
 		// Everything after this belongs to *this* conversation, and `send` goes to whichever
 		// chat the session currently holds -- so a load that was overtaken has to stop here
 		// rather than put the message a chat was started with into the one that overtook it.
-		if (!(await session.open(id))) return;
+		if (!(await session.open(id))) {
+			// Handed back rather than dropped. `takeHandoff` clears as it reads, so a load that
+			// does not finish is the one place a person's first sentence can go missing with
+			// nothing on screen to say it did. Whoever overtook this one can carry it instead.
+			if (first) workspace.handOff(first.text, first.files);
+			return;
+		}
 		if (first) await session.send(first.text, first.files);
 		await reopenIfPublished(id);
 	}
