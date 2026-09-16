@@ -363,7 +363,7 @@ export const t = {
 		modelsHeading: 'Registered models',
 		modelId: 'Model id',
 		modelName: 'Display name',
-		addModel: 'Add a model',
+		addModel: 'Add model',
 		removeModel: 'Remove',
 		setActiveModel: 'Use this model',
 		noModels: 'No models registered on this endpoint yet.',
