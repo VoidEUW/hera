@@ -18,6 +18,8 @@
 	 */
 	import { api, type BrokenSkill, type Skill } from '$lib/api/client';
 	import { t } from '$lib/i18n';
+	import { Placeholder } from '$lib/loading.svelte';
+	import Rows from './Rows.svelte';
 
 	interface Props {
 		filter?: string;
@@ -42,6 +44,17 @@
 		)
 	);
 
+	/** The same placeholder and the same beat as every other settings screen (`Rows`).
+	 *
+	 * Set where the load begins and ends rather than through an `$effect` over a flag: both
+	 * halves of a fast local fetch can happen before effects next flush, and an effect that
+	 * only ever sees the `false` draws nothing. It is never set back to `true` — a refresh
+	 * after a change made here has a list on screen already, and replacing that with grey
+	 * would say the screen is arriving when it is only catching up. */
+	const settling = new Placeholder(true);
+	$effect(() => () => settling.stop());
+	const waiting = $derived(settling.shown);
+
 	$effect(() => {
 		void load();
 	});
@@ -55,6 +68,8 @@
 			error = null;
 		} catch (cause) {
 			error = cause instanceof Error ? cause.message : String(cause);
+		} finally {
+			settling.set(false);
 		}
 	}
 
@@ -88,102 +103,106 @@
 	}
 </script>
 
-{#if error}
-	<p class="problem caption">{error}</p>
-{/if}
+{#if waiting}
+	<Rows label={t.settings.loadingSkills} />
+{:else}
+	{#if error}
+		<p class="problem caption">{error}</p>
+	{/if}
 
-{#if trustProblem}
-	<p class="problem caption">{trustProblem}</p>
-{/if}
+	{#if trustProblem}
+		<p class="problem caption">{trustProblem}</p>
+	{/if}
 
-{#each shown as skill (skill.id)}
-	<section class="row">
-		<span class="icon" class:emoji={!!skill.icon} aria-hidden="true">{mark(skill)}</span>
+	{#each shown as skill (skill.id)}
+		<section class="row">
+			<span class="icon" class:emoji={!!skill.icon} aria-hidden="true">{mark(skill)}</span>
 
-		<div class="detail">
-			<div class="head">
-				<h3>{skill.id}</h3>
-				{#if skill.trust !== 'unknown'}
-					<span class="trust" data-trust={skill.trust} title={skill.digest}>
-						<span aria-hidden="true">{skill.trust === 'verified' ? '✓' : '⚠'}</span>
-						{skill.trust === 'verified' ? t.settings.verified : t.settings.modified}
-					</span>
-				{/if}
-				<span class="right">
-					{#if skill.version}
-						<span class="version mono">{t.settings.version(skill.version)}</span>
+			<div class="detail">
+				<div class="head">
+					<h3>{skill.id}</h3>
+					{#if skill.trust !== 'unknown'}
+						<span class="trust" data-trust={skill.trust} title={skill.digest}>
+							<span aria-hidden="true">{skill.trust === 'verified' ? '✓' : '⚠'}</span>
+							{skill.trust === 'verified' ? t.settings.verified : t.settings.modified}
+						</span>
 					{/if}
-					<span class="caption used">
-						{skill.hits ? t.settings.usedTimes(skill.hits) : t.settings.never}
+					<span class="right">
+						{#if skill.version}
+							<span class="version mono">{t.settings.version(skill.version)}</span>
+						{/if}
+						<span class="caption used">
+							{skill.hits ? t.settings.usedTimes(skill.hits) : t.settings.never}
+						</span>
 					</span>
-				</span>
+				</div>
+
+				<p class="caption">{skill.description}</p>
+
+				{#if facts(skill).length}
+					<p class="facts caption">
+						<span class="author">{facts(skill)[0]}</span>
+						{#if facts(skill).length > 1}<span class="license">{facts(skill)[1]}</span>{/if}
+					</p>
+				{/if}
+
+				{#each skill.problems as problem (problem)}
+					<p class="caption problem">{problem}</p>
+				{/each}
 			</div>
+		</section>
+	{:else}
+		<p class="empty">{filter ? t.settings.noMatch : t.settings.noSkills}</p>
+	{/each}
 
-			<p class="caption">{skill.description}</p>
-
-			{#if facts(skill).length}
-				<p class="facts caption">
-					<span class="author">{facts(skill)[0]}</span>
-					{#if facts(skill).length > 1}<span class="license">{facts(skill)[1]}</span>{/if}
-				</p>
-			{/if}
-
-			{#each skill.problems as problem (problem)}
-				<p class="caption problem">{problem}</p>
-			{/each}
-		</div>
-	</section>
-{:else}
-	<p class="empty">{filter ? t.settings.noMatch : t.settings.noSkills}</p>
-{/each}
-
-{#each broken as item (item.id)}
-	<section class="row">
-		<span class="icon bad" aria-hidden="true">!</span>
-		<div class="detail">
-			<div class="head">
-				<h3>{item.id}</h3>
-				<span class="caption problem">{t.settings.broken}</span>
+	{#each broken as item (item.id)}
+		<section class="row">
+			<span class="icon bad" aria-hidden="true">!</span>
+			<div class="detail">
+				<div class="head">
+					<h3>{item.id}</h3>
+					<span class="caption problem">{t.settings.broken}</span>
+				</div>
+				<p class="caption problem">{item.reason}</p>
 			</div>
-			<p class="caption problem">{item.reason}</p>
-		</div>
-	</section>
-{/each}
+		</section>
+	{/each}
 
-{#if adding}
-	<section class="row new">
-		<span class="icon" aria-hidden="true">＋</span>
-		<div class="detail">
-			<input
-				class="id mono"
-				bind:value={fresh.id}
-				placeholder={t.settings.skillId}
-				aria-label={t.settings.skillId}
-			/>
-			<input
-				class="what"
-				bind:value={fresh.description}
-				placeholder={t.settings.skillDescription}
-				aria-label={t.settings.skillDescription}
-			/>
-			<p class="caption rule">{t.settings.skillIdRule}</p>
-			<div class="buttons">
-				<button class="ghost" type="button" onclick={() => (adding = false)}>
-					{t.settings.cancel}
-				</button>
-				<button class="primary" type="button" onclick={add}>{t.settings.create}</button>
+	{#if adding}
+		<section class="row new">
+			<span class="icon" aria-hidden="true">＋</span>
+			<div class="detail">
+				<input
+					class="id mono"
+					bind:value={fresh.id}
+					placeholder={t.settings.skillId}
+					aria-label={t.settings.skillId}
+				/>
+				<input
+					class="what"
+					bind:value={fresh.description}
+					placeholder={t.settings.skillDescription}
+					aria-label={t.settings.skillDescription}
+				/>
+				<p class="caption rule">{t.settings.skillIdRule}</p>
+				<div class="buttons">
+					<button class="ghost" type="button" onclick={() => (adding = false)}>
+						{t.settings.cancel}
+					</button>
+					<button class="primary" type="button" onclick={add}>{t.settings.create}</button>
+				</div>
 			</div>
-		</div>
-	</section>
-{:else}
-	<button class="add" type="button" onclick={() => (adding = true)}>
-		<span aria-hidden="true">＋</span>
-		{t.settings.addSkill}
-	</button>
-{/if}
+		</section>
+	{:else}
+		<button class="add" type="button" onclick={() => (adding = true)}>
+			<span aria-hidden="true">＋</span>
+			{t.settings.addSkill}
+		</button>
+	{/if}
 
-{#if skills.length || broken.length}
-	<p class="note caption">{t.settings.trustNote}</p>
+	{#if skills.length || broken.length}
+		<p class="note caption">{t.settings.trustNote}</p>
+	{/if}
 {/if}
 
 <style>

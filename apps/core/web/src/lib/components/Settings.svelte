@@ -17,8 +17,10 @@
 	 */
 	import { api, type Region, type Rule, type Server } from '$lib/api/client';
 	import { t } from '$lib/i18n';
+	import { Placeholder } from '$lib/loading.svelte';
 	import Memory from './settings/Memory.svelte';
 	import Models from './settings/Models.svelte';
+	import Rows from './settings/Rows.svelte';
 	import Skills from './settings/Skills.svelte';
 
 	export type Tab =
@@ -69,12 +71,31 @@
 		)
 	);
 
+	/** The three tabs this component fetches for itself. The other four are components of their
+	 * own and each holds its own placeholder, on the same beat. */
+	const FETCHES = new Set<Tab>(['mind', 'servers', 'permissions']);
+
+	/** Driven from `load` rather than from an `$effect` over a `loading` flag.
+	 *
+	 * A flag would be set and cleared inside one async function, and against a server on this
+	 * machine both can happen before effects next flush — so the effect would only ever see the
+	 * `false` and the placeholder would never be drawn at all. Calling it where the load begins
+	 * and ends has no such window. */
+	const settling = new Placeholder(true);
+	$effect(() => () => settling.stop());
+	const waiting = $derived(settling.shown);
+
 	$effect(() => {
 		void load(tab);
 	});
 
 	async function load(which: Tab) {
 		error = null;
+		if (!FETCHES.has(which)) {
+			settling.set(false);
+			return;
+		}
+		settling.set(true);
 		try {
 			if (which === 'mind') {
 				regions = await api.regions();
@@ -88,6 +109,8 @@
 			}
 		} catch (cause) {
 			error = cause instanceof Error ? cause.message : String(cause);
+		} finally {
+			settling.set(false);
 		}
 	}
 
@@ -155,7 +178,9 @@
 				<p class="error">{error}</p>
 			{/if}
 
-			{#if tab === 'models'}
+			{#if waiting}
+				<Rows label={t.settings.loading} />
+			{:else if tab === 'models'}
 				<Models {filter} />
 			{:else if tab === 'memory'}
 				<Memory {filter} />
@@ -244,10 +269,17 @@
 
 	.sheet {
 		position: fixed;
-		inset: 6vh 50% auto auto;
-		transform: translateX(50%);
+		/* Centred both ways. It used to hang 6vh from the top, which read as centred back when
+		   the sheet grew to fit its tab and was usually tall; now that it is one fixed height
+		   the space it left underneath was simply the sheet sitting high. */
+		inset: 50% 50% auto auto;
+		transform: translate(50%, -50%);
 		width: min(900px, 92vw);
-		max-height: 88vh;
+		/* A height, not a maximum. Every tab holds a different amount, and a sheet that resized
+		   itself around each one made switching between them the loudest thing on the screen —
+		   the close button moving under the pointer between two clicks. The panel scrolls
+		   inside it instead. */
+		height: min(88vh, 720px);
 		display: flex;
 		flex-direction: column;
 		background: var(--surface-raised);

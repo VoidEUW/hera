@@ -547,6 +547,16 @@ class TestWhatShePublishes:
     def _drawer(self, page: Any) -> Any:
         return page.locator("aside[aria-label='Artifacts']")
 
+    def _closed(self, page: Any) -> None:
+        """Gone, not going.
+
+        The panel gives its width back over a beat rather than between two frames
+        (`ArtifactDrawer`'s `reveal`), so it is still in the document for a moment after the
+        click that closed it. Against a scripted model every step after that click lands inside
+        that moment, which is why this waits instead of counting.
+        """
+        page.wait_for_selector("aside[aria-label='Artifacts']", state="detached", timeout=5_000)
+
     def test_a_page_opens_beside_the_conversation_as_she_publishes_it(self, page: Any) -> None:
         """Nothing is clicked here, and that is the assertion. A page is something you look at,
         so the drawer follows her — hunting for the **Open** on a card that is still arriving is
@@ -571,7 +581,7 @@ class TestWhatShePublishes:
         that does nothing."""
         self._publish(page)
         page.get_by_role("button", name="Close").click()
-        assert self._drawer(page).count() == 0
+        self._closed(page)
 
         # The heading is the filename humanised — there is no title field anywhere for it to
         # disagree with, which is the decision this assertion pins.
@@ -585,6 +595,8 @@ class TestWhatShePublishes:
         browser knows how to save a file and the response says `attachment`."""
         self._publish(page)
         page.get_by_role("button", name="Close").click()
+        # The drawer carries its own download link, so counting cards means waiting for it out.
+        self._closed(page)
 
         save = page.get_by_role("link", name="Download theme-workshop.html")
         assert save.count() == 1
@@ -624,7 +636,7 @@ class TestWhatShePublishes:
         # Drawn in the transcript rather than behind a card: the drawing is in the message, and
         # the panel stayed shut.
         page.locator(".hers .drawing svg").first.wait_for(timeout=15_000)
-        assert self._drawer(page).count() == 0
+        self._closed(page)
 
     def test_throwing_the_chat_away_says_what_goes_with_it(self, page: Any) -> None:
         """*A chat is a thing you throw away* and *the page I made last week* have to be
@@ -644,6 +656,7 @@ class TestWhatShePublishes:
         # Closed, so the count below is counting cards. The drawer names what it is showing, and
         # it is showing this same file.
         page.get_by_role("button", name="Close").click()
+        self._closed(page)
         self._ask(page, "Now show me the flow")
         page.wait_for_selector("text=The middle step is the slow one.", timeout=30_000)
 

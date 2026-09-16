@@ -14,7 +14,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { downloadUrl, extensionOf, kindOf, sanitiseSvg, size, titleOf } from './artifacts';
+import { downloadUrl, extensionOf, kindOf, newest, sanitiseSvg, size, titleOf } from './artifacts';
 
 describe('kindOf', () => {
 	it('reads the renderer off the extension', () => {
@@ -90,5 +90,39 @@ describe('size', () => {
 		expect(size(812)).toBe('812 B');
 		expect(size(2048)).toBe('2.0 KB');
 		expect(size(3 * 1024 * 1024)).toBe('3.0 MB');
+	});
+});
+
+describe('newest', () => {
+	const file = (name: string, modified_at: string) => ({ name, bytes: 10, modified_at });
+
+	it('opens the one she made last, not the one that sorts last', () => {
+		// The listing arrives in name order, so `aardvark.md` is first and `zebra.md` last --
+		// and neither of those facts says anything about which one is the recent one.
+		const found = [
+			file('aardvark.md', '2026-09-16T12:00:00+00:00'),
+			file('zebra.md', '2026-09-16T09:00:00+00:00')
+		];
+
+		expect(newest(found)?.name).toBe('aardvark.md');
+	});
+
+	it('breaks a tie towards the later entry in the bar', () => {
+		const found = [
+			file('one.md', '2026-09-16T12:00:00+00:00'),
+			file('two.md', '2026-09-16T12:00:00+00:00')
+		];
+
+		expect(newest(found)?.name).toBe('two.md');
+	});
+
+	it('has nothing to open when there is nothing published', () => {
+		expect(newest([])).toBeNull();
+	});
+
+	it('falls back to the last file when no stamp can be read', () => {
+		const found = [file('one.md', 'not a date'), file('two.md', '')];
+
+		expect(newest(found)?.name).toBe('two.md');
 	});
 });

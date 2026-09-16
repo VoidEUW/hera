@@ -9,6 +9,7 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
+	import Offline from '$lib/components/Offline.svelte';
 	import Rail from '$lib/components/Rail.svelte';
 	import ProfileMenu from '$lib/components/ProfileMenu.svelte';
 	import Settings from '$lib/components/Settings.svelte';
@@ -99,62 +100,71 @@
 
 <svelte:window {onkeydown} />
 
-<div class="shell">
-	<!-- Below the phone breakpoint the rail below is off-canvas by default; this is the one
+{#if workspace.unreachable}
+	<!-- Instead of the shell, not over it. Nothing below works without that first answer: no
+	     rail, no profile, no endpoint, no conversation — and drawing the chrome anyway is an
+	     invitation to click seven things that cannot work. -->
+	<Offline />
+{:else}
+	<div class="shell">
+		<!-- Below the phone breakpoint the rail below is off-canvas by default; this is the one
 	     control that brings it on screen, placed once here rather than in every route's own
 	     header because it has to reach the start screen (no header at all), the chat screen and
 	     the project screen alike. -->
-	<button
-		class="menu"
-		type="button"
-		aria-label={t.rail.openMenu}
-		onclick={() => (workspace.railOpen = true)}
-	>
-		<span aria-hidden="true">☰</span>
-	</button>
+		<button
+			class="menu"
+			type="button"
+			aria-label={t.rail.openMenu}
+			onclick={() => (workspace.railOpen = true)}
+		>
+			<span aria-hidden="true">☰</span>
+		</button>
 
-	{#if workspace.railOpen}
-		<!-- The exact scrim Settings and the profile menu already use, so a sheet reads as one
+		{#if workspace.railOpen}
+			<!-- The exact scrim Settings and the profile menu already use, so a sheet reads as one
 		     idea across the application rather than three implementations of it. -->
+			<div
+				class="scrim"
+				role="button"
+				tabindex="-1"
+				aria-label={t.rail.closeMenu}
+				onclick={() => (workspace.railOpen = false)}
+				onkeydown={(event) => event.key === 'Enter' && (workspace.railOpen = false)}
+			></div>
+		{/if}
+
 		<div
-			class="scrim"
-			role="button"
-			tabindex="-1"
-			aria-label={t.rail.closeMenu}
-			onclick={() => (workspace.railOpen = false)}
-			onkeydown={(event) => event.key === 'Enter' && (workspace.railOpen = false)}
-		></div>
-	{/if}
+			class="rail-slot"
+			class:sheet={workspace.railOpen}
+			role={workspace.railOpen ? 'dialog' : undefined}
+			aria-modal={workspace.railOpen ? 'true' : undefined}
+			aria-label={workspace.railOpen ? t.rail.title : undefined}
+		>
+			<Rail
+				chats={workspace.chats}
+				projects={workspace.projects}
+				profile={workspace.activeProfile}
+				loading={!workspace.loaded}
+				shape={workspace.shape}
+				{activeId}
+				{activeProjectId}
+				onnew={newChat}
+				onsettings={() => workspace.openSettings()}
+				onprofile={() => (profileOpen = true)}
+				onrename={(id, title) => workspace.renameChat(id, title)}
+				ondelete={removeChat}
+				onmove={(id, projectId) => workspace.moveChat(id, projectId)}
+				onnewproject={newProject}
+				onprojectrename={(id, name) => workspace.patchProject(id, { name })}
+				onprojectdelete={removeProject}
+			/>
+		</div>
 
-	<div
-		class="rail-slot"
-		class:sheet={workspace.railOpen}
-		role={workspace.railOpen ? 'dialog' : undefined}
-		aria-modal={workspace.railOpen ? 'true' : undefined}
-		aria-label={workspace.railOpen ? t.rail.title : undefined}
-	>
-		<Rail
-			chats={workspace.chats}
-			projects={workspace.projects}
-			profile={workspace.activeProfile}
-			{activeId}
-			{activeProjectId}
-			onnew={newChat}
-			onsettings={() => workspace.openSettings()}
-			onprofile={() => (profileOpen = true)}
-			onrename={(id, title) => workspace.renameChat(id, title)}
-			ondelete={removeChat}
-			onmove={(id, projectId) => workspace.moveChat(id, projectId)}
-			onnewproject={newProject}
-			onprojectrename={(id, name) => workspace.patchProject(id, { name })}
-			onprojectdelete={removeProject}
-		/>
+		<main>
+			{@render children()}
+		</main>
 	</div>
-
-	<main>
-		{@render children()}
-	</main>
-</div>
+{/if}
 
 {#if workspace.settingsOpen}
 	<Settings onclose={closeSettings} tab={workspace.settingsTab} />

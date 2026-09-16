@@ -30,6 +30,10 @@ export class ChatSession {
 	draft = $state<AnyEvent[]>([]);
 	streaming = $state(false);
 	error = $state<string | null>(null);
+	/** Whether the message list has been fetched. A conversation that has not answered yet and
+	 * one with nothing in it are both an empty `messages`, and only one of them is an invitation
+	 * to say something — the same distinction the rail draws (`Workspace.loaded`). */
+	loaded = $state(false);
 
 	/** What the person just typed, shown immediately so the interface never looks asleep. */
 	pending = $state<string | null>(null);
@@ -105,15 +109,21 @@ export class ChatSession {
 			if (token !== this.#load) return false;
 			this.chat = detail.chat;
 			this.messages = detail.messages;
+			this.loaded = true;
 			return true;
 		} catch (cause) {
-			if (token === this.#load) this.error = message(cause);
+			if (token !== this.#load) return false;
+			this.error = message(cause);
+			// Loaded, in the sense that matters to anything drawing a placeholder: this is as
+			// far as the conversation is going to get, and the error is what there is to show.
+			this.loaded = true;
 			return false;
 		}
 	}
 
 	reset() {
 		this.stop();
+		this.loaded = false;
 		this.chat = null;
 		this.messages = [];
 		this.draft = [];

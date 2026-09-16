@@ -16,11 +16,15 @@
 	 * are the same question, and answering it with two parallel sets of fields is how a project
 	 * ends up being renamed by the chat handler.
 	 */
+	import { untrack } from 'svelte';
 	import { resolve } from '$app/paths';
 	import { API, api, type Chat, type Profile, type Project } from '$lib/api/client';
 	import { t } from '$lib/i18n';
+	import { Placeholder } from '$lib/loading.svelte';
 	import { colourOf } from '$lib/projects';
+	import type { Shape } from '$lib/stores/workspace.svelte';
 	import Ocellus from './Ocellus.svelte';
+	import Skeleton from './Skeleton.svelte';
 
 	interface Props {
 		chats: Chat[];
@@ -28,6 +32,11 @@
 		profile: Profile | null;
 		activeId?: string | null;
 		activeProjectId?: string | null;
+		/** Whether the workspace is still being fetched. An empty list and a list that has not
+		 * arrived look identical from here, and only one of them is something to say out loud. */
+		loading?: boolean;
+		/** How many rows to hold space for while it is. See `Workspace.shape`. */
+		shape?: Shape;
 		onnew?: (projectId?: string) => void;
 		onsettings?: () => void;
 		onprofile?: () => void;
@@ -45,6 +54,8 @@
 		profile,
 		activeId = null,
 		activeProjectId = null,
+		loading = false,
+		shape = { chats: 3, projects: 2 },
 		onnew,
 		onsettings,
 		onprofile,
@@ -80,6 +91,23 @@
 	let creating = $state(false);
 
 	const loose = $derived(chats.filter((chat) => !chat.project_id));
+
+	/** Whether to draw the shape of the rail instead of the rail.
+	 *
+	 * It stands in front of the lists rather than inside their `{:else}` branches, which is what
+	 * makes `Placeholder`'s floor mean anything: in the `{:else}` it would be gone the instant
+	 * the first chat arrived, and against a server on the same machine that is a frame or two.
+	 * This way the rail is drawn once, as a shape, and then as itself — instead of being empty,
+	 * and then suddenly not ([issue #72](https://github.com/VoidEUW/hera/issues/72)).
+	 *
+	 * `waiting` is true for as long as `loading` is, so `!waiting` already means the load has
+	 * finished; there is no third state and the empty copy needs no further guard. */
+	// `untrack` because capturing the initial value is the whole point, and saying so here is
+	// how the compiler's warning about exactly that gets answered rather than suppressed.
+	const settling = new Placeholder(untrack(() => loading));
+	$effect(() => settling.set(loading));
+	$effect(() => () => settling.stop());
+	const waiting = $derived(settling.shown);
 
 	function inside(projectId: string): Chat[] {
 		return chats.filter((chat) => chat.project_id === projectId);
@@ -466,37 +494,49 @@
 	</div>
 
 	<ul class="list">
-		{#each projects as project (project.id)}
-			{@render projectRow(project)}
-		{/each}
-
-		{#if creating}
-			<li class="item">
-				<input
-					class="rename"
-					use:takeover
-					bind:value={draft}
-					aria-label={t.rail.newProject}
-					placeholder={t.rail.projectNamePlaceholder}
-					onblur={commitCreate}
-					onkeydown={(event) => {
-						if (event.key === 'Enter') commitCreate();
-						if (event.key === 'Escape') creating = false;
-					}}
-				/>
+		{#if waiting}
+			<li class="waiting">
+				<Skeleton rows={shape.projects} widths={[70, 52, 63]} label={t.rail.loadingProjects} />
 			</li>
-		{:else if !projects.length}
-			<li class="hint caption">{t.rail.noProjects}</li>
+		{:else}
+			{#each projects as project (project.id)}
+				{@render projectRow(project)}
+			{/each}
+
+			{#if creating}
+				<li class="item">
+					<input
+						class="rename"
+						use:takeover
+						bind:value={draft}
+						aria-label={t.rail.newProject}
+						placeholder={t.rail.projectNamePlaceholder}
+						onblur={commitCreate}
+						onkeydown={(event) => {
+							if (event.key === 'Enter') commitCreate();
+							if (event.key === 'Escape') creating = false;
+						}}
+					/>
+				</li>
+			{:else if !projects.length}
+				<li class="hint caption">{t.rail.noProjects}</li>
+			{/if}
 		{/if}
 	</ul>
 
 	<p class="heading">{t.rail.chats}</p>
 	<ul class="list scroll">
-		{#each loose as chat (chat.id)}
-			{@render row(chat)}
+		{#if waiting}
+			<li class="waiting">
+				<Skeleton rows={shape.chats} label={t.rail.loadingChats} />
+			</li>
 		{:else}
-			<li class="hint caption">{t.rail.noChats}</li>
-		{/each}
+			{#each loose as chat (chat.id)}
+				{@render row(chat)}
+			{:else}
+				<li class="hint caption">{t.rail.noChats}</li>
+			{/each}
+		{/if}
 	</ul>
 
 	<div class="foot">
@@ -505,7 +545,11 @@
 			{t.rail.settings}
 		</button>
 
-		{#if profile}
+		{#if waiting}
+			<!-- The card is the last thing in a rail that is pinned to the bottom of the window,
+			     so arriving late moves Settings out from under the pointer. Hold its height. -->
+			<div class="card-waiting"><Skeleton rows={1} height={42} widths={[100]} /></div>
+		{:else if profile}
 			<!-- Everything that is about *you* rather than about her behaviour lives behind this:
 			     appearance, which of her answers, where your data is. Settings above is the other
 			     half, and keeping them apart is why neither of them is a scroll. -->
@@ -651,6 +695,10 @@
 	   also holds the disclosed chats and is as tall as all of them. */
 	.item {
 		position: relative;
+		/* Rows fade up as they mount, which is almost always the list replacing the shape that
+		   was standing in for it. A new chat and a chat moved into a project get the same
+		   120ms, which is the right answer for those too. */
+		animation: fade var(--fade) var(--ease);
 	}
 
 	/* The project's own line. `.item` alone would be enough; the class exists so that what the
@@ -811,10 +859,23 @@
 		color: var(--text-faint);
 	}
 
+	/* `Skeleton` draws no padding of its own — it does not know where in a list its rows sit.
+	   Here that is `.entry`'s 8px across, and 8px down rather than its 6: a 15px bar every 16px
+	   of gap is a 31px row, the same as an entry, and 8px at each end makes the block exactly
+	   as many of those as it has bars. At 6 it was four pixels short and the CHATS heading
+	   moved when the projects arrived. */
+	.waiting {
+		padding: 8px;
+	}
+
 	.foot {
 		margin-top: auto;
 		padding-top: 10px;
 		border-top: 1px solid var(--line);
+	}
+
+	.card-waiting {
+		margin-top: 6px;
 	}
 
 	.card {

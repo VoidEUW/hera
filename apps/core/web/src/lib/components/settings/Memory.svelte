@@ -26,6 +26,8 @@
 	import { API, api, type MemoryBudget, type MemoryItem } from '$lib/api/client';
 	import Brain from '$lib/components/Brain.svelte';
 	import { t } from '$lib/i18n';
+	import { Placeholder } from '$lib/loading.svelte';
+	import Rows from './Rows.svelte';
 
 	interface Props {
 		filter?: string;
@@ -56,6 +58,17 @@
 	 * before the number was lowered should draw a full bar rather than one running off the end. */
 	const filled = $derived(budget && budget.limit > 0 ? Math.min(1, budget.used / budget.limit) : 0);
 
+	/** The same placeholder and the same beat as every other settings screen (`Rows`).
+	 *
+	 * Set where the load begins and ends rather than through an `$effect` over a flag: both
+	 * halves of a fast local fetch can happen before effects next flush, and an effect that
+	 * only ever sees the `false` draws nothing. It is never set back to `true` — a refresh
+	 * after a change made here has a list on screen already, and replacing that with grey
+	 * would say the screen is arriving when it is only catching up. */
+	const settling = new Placeholder(true);
+	$effect(() => () => settling.stop());
+	const waiting = $derived(settling.shown);
+
 	$effect(() => {
 		void load();
 	});
@@ -66,6 +79,8 @@
 			error = '';
 		} catch (cause) {
 			error = say(cause);
+		} finally {
+			settling.set(false);
 		}
 	}
 
@@ -126,137 +141,146 @@
 	}
 </script>
 
-<section class="memory">
-	<!-- The same mark the gutter draws beside `remember`, so the row in a conversation and the
-	     page listing what she keeps are visibly one subject. -->
-	<p class="blurb">
-		<span class="mark" aria-hidden="true"><Brain size={15} /></span>
-		{t.memory.blurb}
-	</p>
+{#if waiting}
+	<Rows label={t.settings.loadingMemory} />
+{:else}
+	<section class="memory">
+		<!-- The same mark the gutter draws beside `remember`, so the row in a conversation and the
+		     page listing what she keeps are visibly one subject. -->
+		<p class="blurb">
+			<span class="mark" aria-hidden="true"><Brain size={15} /></span>
+			{t.memory.blurb}
+		</p>
 
-	{#if budget}
-		<!-- Not a number in a corner. The one thing a person needs to know is how close they are,
-		     and a bar answers that before it is read. -->
-		<div class="gauge">
-			<div
-				class="track"
-				role="meter"
-				aria-valuenow={budget.used}
-				aria-valuemin={0}
-				aria-valuemax={budget.limit}
-				aria-label={t.memory.spaceLabel}
-			>
-				<div class="fill" class:tight={filled > 0.85} style:width={`${filled * 100}%`}></div>
+		{#if budget}
+			<!-- Not a number in a corner. The one thing a person needs to know is how close they are,
+			     and a bar answers that before it is read. -->
+			<div class="gauge">
+				<div
+					class="track"
+					role="meter"
+					aria-valuenow={budget.used}
+					aria-valuemin={0}
+					aria-valuemax={budget.limit}
+					aria-label={t.memory.spaceLabel}
+				>
+					<div class="fill" class:tight={filled > 0.85} style:width={`${filled * 100}%`}></div>
+				</div>
+				<p class="reading">
+					<strong>{t.memory.left(budget.limit - budget.used)}</strong>
+					<span class="of">{t.memory.used(budget.used, budget.limit)}</span>
+					<span class="counts">
+						{t.memory.carried(budget.count)}{#if budget.disabled}
+							· {t.memory.off(budget.disabled)}{/if}
+					</span>
+				</p>
 			</div>
-			<p class="reading">
-				<strong>{t.memory.left(budget.limit - budget.used)}</strong>
-				<span class="of">{t.memory.used(budget.used, budget.limit)}</span>
-				<span class="counts">
-					{t.memory.carried(budget.count)}{#if budget.disabled}
-						· {t.memory.off(budget.disabled)}{/if}
-				</span>
-			</p>
+		{/if}
+
+		{#if error}
+			<p class="failed">{error}</p>
+		{/if}
+
+		<div class="head">
+			<!-- A plain link at the export route. The browser knows how to save a file, and the
+			     response says `attachment` — the document is partly text a model wrote, and Hera's
+			     own origin is not where that gets rendered. -->
+			<a
+				class="action"
+				href={`${API}/memories/export/MEMORY.md`}
+				download="MEMORY.md"
+				rel="external"
+			>
+				{t.memory.export}
+			</a>
 		</div>
-	{/if}
 
-	{#if error}
-		<p class="failed">{error}</p>
-	{/if}
-
-	<div class="head">
-		<!-- A plain link at the export route. The browser knows how to save a file, and the
-		     response says `attachment` — the document is partly text a model wrote, and Hera's
-		     own origin is not where that gets rendered. -->
-		<a class="action" href={`${API}/memories/export/MEMORY.md`} download="MEMORY.md" rel="external">
-			{t.memory.export}
-		</a>
-	</div>
-
-	{#if !memories.length}
-		<p class="empty">{t.memory.none}</p>
-	{:else if !shown.length}
-		<p class="empty">{t.settings.noMatch}</p>
-	{:else}
-		<ul class="list">
-			{#each shown as memory (memory.key)}
-				<li class="item" class:off={!memory.enabled}>
-					<div class="top">
-						<span class="key">{memory.key}</span>
-						{#if memory.scope === 'chat'}<span class="tag">{t.memory.hereOnly}</span>{/if}
-						<span class="tag quiet">
-							{memory.source === 'auto' ? t.memory.hers : t.memory.yours}
-						</span>
-						<span class="cost">{t.memory.tokens(memory.tokens)}</span>
-						<label class="switch">
-							<input
-								type="checkbox"
-								checked={memory.enabled}
-								onchange={() => toggle(memory)}
-								aria-label={t.memory.useIt(memory.key)}
-							/>
-							<span class="word">{memory.enabled ? t.memory.on : t.memory.offOne}</span>
-						</label>
-					</div>
-
-					{#if editing === memory.key}
-						<div class="editor">
-							<label>
-								<span class="label">{t.memory.description}</span>
-								<input type="text" bind:value={draft.description} />
+		{#if !memories.length}
+			<p class="empty">{t.memory.none}</p>
+		{:else if !shown.length}
+			<p class="empty">{t.settings.noMatch}</p>
+		{:else}
+			<ul class="list">
+				{#each shown as memory (memory.key)}
+					<li class="item" class:off={!memory.enabled}>
+						<div class="top">
+							<span class="key">{memory.key}</span>
+							{#if memory.scope === 'chat'}<span class="tag">{t.memory.hereOnly}</span>{/if}
+							<span class="tag quiet">
+								{memory.source === 'auto' ? t.memory.hers : t.memory.yours}
+							</span>
+							<span class="cost">{t.memory.tokens(memory.tokens)}</span>
+							<label class="switch">
+								<input
+									type="checkbox"
+									checked={memory.enabled}
+									onchange={() => toggle(memory)}
+									aria-label={t.memory.useIt(memory.key)}
+								/>
+								<span class="word">{memory.enabled ? t.memory.on : t.memory.offOne}</span>
 							</label>
-							<label>
-								<span class="label">{t.memory.text}</span>
-								<textarea bind:value={draft.text} rows="4"></textarea>
-							</label>
-							<label>
-								<span class="label">{t.memory.why}</span>
-								<input type="text" bind:value={draft.why} placeholder={t.memory.whyHint} />
-							</label>
-							<p class="note">{t.memory.editNote}</p>
 						</div>
-					{:else}
-						{#if memory.description}<p class="description">{memory.description}</p>{/if}
-						<p class="text">{memory.text}</p>
-					{/if}
 
-					<div class="foot">
-						{#if memory.created}<span class="when">{memory.created}</span>{/if}
-						{#if memory.why && editing !== memory.key}
-							<span class="why">{t.memory.because(memory.why)}</span>
-						{/if}
 						{#if editing === memory.key}
-							<span class="confirm">
-								<button type="button" class="save" onclick={() => save(memory.key)}>
-									{t.memory.save}
-								</button>
-								<button type="button" onclick={() => (editing = '')}>{t.memory.cancel}</button>
-							</span>
-						{:else if confirming === memory.key}
-							<span class="confirm">
-								{t.memory.deleteAsk}
-								<button type="button" class="danger" onclick={() => remove(memory.key)}>
-									{t.memory.delete}
-								</button>
-								<button type="button" onclick={() => (confirming = '')}>{t.memory.cancel}</button>
-							</span>
+							<div class="editor">
+								<label>
+									<span class="label">{t.memory.description}</span>
+									<input type="text" bind:value={draft.description} />
+								</label>
+								<label>
+									<span class="label">{t.memory.text}</span>
+									<textarea bind:value={draft.text} rows="4"></textarea>
+								</label>
+								<label>
+									<span class="label">{t.memory.why}</span>
+									<input type="text" bind:value={draft.why} placeholder={t.memory.whyHint} />
+								</label>
+								<p class="note">{t.memory.editNote}</p>
+							</div>
 						{:else}
-							<span class="confirm">
-								<button type="button" onclick={() => edit(memory)}>{t.memory.edit}</button>
-								<button type="button" onclick={() => (confirming = memory.key)}>
-									{t.memory.delete}
-								</button>
-							</span>
+							{#if memory.description}<p class="description">{memory.description}</p>{/if}
+							<p class="text">{memory.text}</p>
 						{/if}
-					</div>
 
-					{#each memory.problems as problem (problem)}
-						<p class="problem">{problem}</p>
-					{/each}
-				</li>
-			{/each}
-		</ul>
-	{/if}
-</section>
+						<div class="foot">
+							{#if memory.created}<span class="when">{memory.created}</span>{/if}
+							{#if memory.why && editing !== memory.key}
+								<span class="why">{t.memory.because(memory.why)}</span>
+							{/if}
+							{#if editing === memory.key}
+								<span class="confirm">
+									<button type="button" class="save" onclick={() => save(memory.key)}>
+										{t.memory.save}
+									</button>
+									<button type="button" onclick={() => (editing = '')}>{t.memory.cancel}</button>
+								</span>
+							{:else if confirming === memory.key}
+								<span class="confirm">
+									{t.memory.deleteAsk}
+									<button type="button" class="danger" onclick={() => remove(memory.key)}>
+										{t.memory.delete}
+									</button>
+									<button type="button" onclick={() => (confirming = '')}>{t.memory.cancel}</button>
+								</span>
+							{:else}
+								<span class="confirm">
+									<button type="button" onclick={() => edit(memory)}>{t.memory.edit}</button>
+									<button type="button" onclick={() => (confirming = memory.key)}>
+										{t.memory.delete}
+									</button>
+								</span>
+							{/if}
+						</div>
+
+						{#each memory.problems as problem (problem)}
+							<p class="problem">{problem}</p>
+						{/each}
+					</li>
+				{/each}
+			</ul>
+		{/if}
+	</section>
+{/if}
 
 <style>
 	.memory {

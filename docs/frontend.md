@@ -325,6 +325,40 @@ replaces the rotation with a static ocellus at full opacity, leaves the tail fol
 every transition; the interface must be completely usable and completely legible with all motion
 off.
 
+## Waiting
+
+**A screen never states its empty state until it has earned it.** An empty list and a list that
+has not arrived are the same empty array in the browser, and only one of them is something to say
+out loud — the rail spent a milestone telling people with hundreds of conversations that they had
+none ([issue #72](https://github.com/VoidEUW/hera/issues/72)). What stands in meanwhile is
+`Skeleton`: bars the shape of the rows that are coming, in a step up from whatever they are lying
+on, under a slow low-contrast sweep. Height is the point. A screen that draws nothing and then
+drops a list into place has moved everything under it.
+
+**It is drawn at once and held half a second**, which is the opposite of the usual advice and is
+deliberate. The usual rule — wait 150 ms, so a fast fetch shows no grey — assumes the fetch is
+usually slow. Hers is not: she is served by the application she talks to, so the requests land in
+well under that on every ordinary load, and a delay means the placeholder never appears at all.
+What a person sees then is the thing it was meant to prevent. The floor is honestly an artificial
+delay, and it is worth it: half a second of the shape of the list is how the list gets to *arrive*
+rather than to appear.
+
+**Where the shape is known, it is used.** The rail remembers how many rows it had last time
+(`hera:rail-shape`), so what stands in for it is the right height and the headings do not move
+when the real thing lands. A placeholder sized from a guess is the same jump as no placeholder at
+all, pointed the other way.
+
+**One beat at a time.** The artifact drawer waits for the conversation and then takes its width
+over 240 ms rather than opening in the frame the transcript arrives in — a width change and a
+fade, which is the same family as the height changes above, and pointedly not a slide.
+
+**And when nothing answers at all, the application does not draw itself.** `Offline` replaces the
+whole shell rather than sitting over it: without that first load there is no rail, no profile, no
+endpoint and no conversation, and drawing the chrome anyway invites somebody to click seven things
+that cannot work. It says *she is not answering* rather than *network error*, because the request
+that failed did not cross a network — if the page loaded and `/api/v1` did not, a process is not
+running, and the next thing anybody needs is the command that starts it.
+
 ## The screen
 
 Both rooms stand in front of her. A backdrop — her silhouette, masked from
