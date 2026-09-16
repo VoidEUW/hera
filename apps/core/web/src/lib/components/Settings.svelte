@@ -85,11 +85,19 @@
 	$effect(() => () => settling.stop());
 	const waiting = $derived(settling.shown);
 
+	/** Which load owns the panel, counted rather than named — the same arrangement `ChatSession`
+	 * uses, and for the same reason. Switching tabs while a fetch is in flight leaves two of them
+	 * running: without this the older one lands, hides the placeholder the newer one is still
+	 * behind, and writes its answer into fields the newer one is about to fill. A tab id is not
+	 * enough, because *mind → servers → mind* gives two loads the same name. */
+	let generation = 0;
+
 	$effect(() => {
 		void load(tab);
 	});
 
 	async function load(which: Tab) {
+		const token = ++generation;
 		error = null;
 		if (!FETCHES.has(which)) {
 			settling.set(false);
@@ -97,20 +105,30 @@
 		}
 		settling.set(true);
 		try {
+			// Every assignment below is guarded, not just the last: a load that has been overtaken
+			// has nothing to say about the screen somebody is looking at now.
 			if (which === 'mind') {
-				regions = await api.regions();
-				drafts = Object.fromEntries(regions.map((region) => [region.id, region.text]));
+				const found = await api.regions();
+				if (token !== generation) return;
+				regions = found;
+				drafts = Object.fromEntries(found.map((region) => [region.id, region.text]));
 			} else if (which === 'servers') {
-				servers = await api.servers();
+				const found = await api.servers();
+				if (token !== generation) return;
+				servers = found;
 			} else if (which === 'permissions') {
 				const found = await api.permissions();
+				if (token !== generation) return;
 				rules = found.rules;
 				fallback = found.fallback;
 			}
 		} catch (cause) {
+			if (token !== generation) return;
 			error = cause instanceof Error ? cause.message : String(cause);
 		} finally {
-			settling.set(false);
+			// The placeholder belongs to the newest load. An older one lifting it would uncover a
+			// screen that has not been fetched yet.
+			if (token === generation) settling.set(false);
 		}
 	}
 

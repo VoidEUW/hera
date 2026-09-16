@@ -487,7 +487,7 @@ export const t = {
 	offline: {
 		/** **Hera, not she.** The rest of the interface calls her *she*, and on this one screen it
 		 * reads wrong: there is no conversation here and nothing has a voice — what has failed is
-		 * a server, and the thing you need named is the program you are about to restart. */
+		 * a server, and the thing to name is the program you are about to restart. */
 		title: 'Hera is not answering',
 		/** Deliberately about *the server* and not about *the network*: this runs on the machine
 		 * it talks to, so a failed request here almost always means a process is not running. */

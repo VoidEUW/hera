@@ -89,6 +89,21 @@ class Workspace {
 	 * everything, which is what a guess is, was the complaint. */
 	shape = $state<Shape>(FIRST_SHAPE);
 
+	constructor() {
+		// The shape follows the lists instead of being noted where they are first filled. Every
+		// create, delete and move changes a count, and a `#rememberShape()` beside each of them
+		// is a list the next one gets left off — which is how this quietly goes back to guessing.
+		//
+		// A root that is never torn down, deliberately: this store is one instance for the life
+		// of the page (`export const workspace` below), so there is no later at which cleaning it
+		// up would mean anything.
+		$effect.root(() => {
+			$effect(() => {
+				if (this.loaded) this.#rememberShape();
+			});
+		});
+	}
+
 	/** Whether the settings modal is open. Here rather than in the layout because three places
 	 * open it — the rail, ⌘K, and the composer's model and context chips — and the two of them
 	 * that are not the layout would otherwise need a callback threaded through every route. */
@@ -137,6 +152,15 @@ class Workspace {
 		// Synchronous, and before the first `await` on purpose: the placeholder is drawn on the
 		// very first frame, so a shape that arrives after it is a shape that arrives too late.
 		this.#recallShape();
+		await this.#reload();
+		// Deliberately after, and deliberately not fatal. Neither of these is needed to hold a
+		// conversation: with no endpoint the composer says so, and with no servers it shows
+		// nothing. An error here must not be what stops the rail from rendering.
+		await Promise.all([this.loadProviders(), this.loadServers(), this.loadVersion()]);
+	}
+
+	/** The three requests the rail is made of, and nothing else. */
+	async #reload() {
 		try {
 			const [chats, projects, profiles] = await Promise.all([
 				api.chats(),
@@ -147,7 +171,6 @@ class Workspace {
 			this.projects = projects;
 			this.profiles = profiles;
 			this.error = null;
-			this.#rememberShape();
 			this.#answered = true;
 			this.unreachable = false;
 		} catch (cause) {
@@ -156,10 +179,6 @@ class Workspace {
 		} finally {
 			this.loaded = true;
 		}
-		// Deliberately after, and deliberately not fatal. Neither of these is needed to hold a
-		// conversation: with no endpoint the composer says so, and with no servers it shows
-		// nothing. An error here must not be what stops the rail from rendering.
-		await Promise.all([this.loadProviders(), this.loadServers(), this.loadVersion()]);
 	}
 
 	#recallShape() {
@@ -179,6 +198,9 @@ class Workspace {
 			chats: this.chats.filter((chat) => !chat.project_id).length,
 			projects: this.projects.length
 		};
+		// A rename reassigns the list without changing a count, and there are more of those than
+		// there are creates. Nothing to write is the common case.
+		if (shape.chats === this.shape.chats && shape.projects === this.shape.projects) return;
 		this.shape = shape;
 		try {
 			localStorage.setItem(SHAPE_KEY, JSON.stringify(shape));
@@ -197,10 +219,14 @@ class Workspace {
 		if (this.retrying) return;
 		this.retrying = true;
 		try {
-			await this.load();
+			await this.#reload();
 		} finally {
 			this.retrying = false;
 		}
+		// Not awaited. The button is about whether the workspace answered; leaving it disabled
+		// while a slow *version* request finishes would refuse a second try over a question
+		// nobody asked.
+		void Promise.all([this.loadProviders(), this.loadServers(), this.loadVersion()]);
 	}
 
 	async loadVersion() {

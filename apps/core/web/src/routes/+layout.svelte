@@ -164,18 +164,22 @@
 			{@render children()}
 		</main>
 	</div>
-{/if}
 
-{#if workspace.settingsOpen}
-	<Settings onclose={closeSettings} tab={workspace.settingsTab} />
-{/if}
+	<!-- Inside the reachable branch, not beside it. ⌘K can open settings while the first request
+	     is still in flight; if that request then fails, a sheet left mounted out here would sit
+	     over the screen explaining that nothing is answering — and every control in it needs the
+	     server that is not. -->
+	{#if workspace.settingsOpen}
+		<Settings onclose={closeSettings} tab={workspace.settingsTab} />
+	{/if}
 
-{#if profileOpen}
-	<ProfileMenu
-		profiles={workspace.profiles}
-		onclose={() => (profileOpen = false)}
-		onprofiles={(found) => (workspace.profiles = found)}
-	/>
+	{#if profileOpen}
+		<ProfileMenu
+			profiles={workspace.profiles}
+			onclose={() => (profileOpen = false)}
+			onprofiles={(found) => (workspace.profiles = found)}
+		/>
+	{/if}
 {/if}
 
 <style>

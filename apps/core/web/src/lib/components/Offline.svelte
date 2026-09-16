@@ -16,7 +16,7 @@
 	 * The name rather than the pronoun, here and nowhere else. Everything in this interface calls
 	 * her *she*, which is the voice `docs/frontend.md` § *Voice* describes — and on this screen it
 	 * reads wrong. Nothing here is a conversation and nothing has a voice: what failed is a
-	 * server, and what a person needs named is the program they are about to restart.
+	 * server, and what a person needs to name is the program they are about to restart.
 	 */
 	import { t } from '$lib/i18n';
 	import { workspace } from '$lib/stores/workspace.svelte';

@@ -88,15 +88,17 @@
 			.then((found) => {
 				if (!current) return;
 				listed = found;
-				// Nothing chosen, and something to choose. An open panel showing *Nothing chosen
-				// yet* beside a bar of files is a door that led nowhere: whoever opened this
-				// wants to look at something, and the thing she made last is the best guess
-				// anybody can make about which. Every way in benefits — reopening on a reload,
-				// the count in the header, and coming back after the file on show was deleted.
+				// Two cases, one answer: nothing is chosen, or what was chosen is not in the
+				// listing any more. An open panel showing *Nothing chosen yet* beside a bar of
+				// files is a door that led nowhere, and one still pointed at a deleted file is
+				// worse — `ArtifactView` stays mounted on a name that will not fetch. What she
+				// wrote last is the best guess anybody can make about which to show instead, and
+				// `newest` of an empty listing is `null`, which is the honest empty state.
 				//
 				// Safe inside the `.then`: this runs after the effect has finished tracking, so
 				// reading `artifacts.name` here does not make the effect depend on what it sets.
-				if (artifacts.name === null && found.length) {
+				const gone = artifacts.name !== null && !found.some((file) => file.name === artifacts.name);
+				if (artifacts.name === null || gone) {
 					artifacts.show(chat, newest(found)?.name ?? null);
 				}
 			})

@@ -116,3 +116,29 @@ def test_a_project_that_really_is_missing_still_says_so(server: str, page: Any) 
     page.goto(f"{server}/project/2b0b4b4e-0000-4000-8000-000000000000", wait_until="networkidle")
 
     page.wait_for_selector("text=There is no such project.", timeout=10_000)
+
+
+def test_the_remembered_shape_follows_what_the_rail_does(server: str, page: Any) -> None:
+    """Made, not just fetched.
+
+    The count is remembered so the next cold load holds the right height. If it were only noted
+    where the lists are first filled, every project made and every chat deleted since would leave
+    it stale — and a placeholder sized from a stale count is the jump it exists to prevent,
+    arriving one reload later.
+    """
+    page.goto(server, wait_until="networkidle")
+    page.wait_for_selector("text=No projects yet.", timeout=10_000)
+
+    stored = "() => JSON.parse(localStorage.getItem('hera:rail-shape') ?? 'null')"
+    assert page.evaluate(stored) == {"chats": 0, "projects": 0}
+
+    # Made here rather than over the API, because what is being tested is that a change the rail
+    # makes to itself is noticed at all.
+    page.get_by_role("button", name="New project").click()
+    # The add button and the input it opens share an `aria-label`; this asks for the input.
+    naming = page.locator("input.rename")
+    naming.fill("Kerberos")
+    naming.press("Enter")
+    page.wait_for_selector("text=Kerberos", timeout=10_000)
+
+    assert page.evaluate(stored) == {"chats": 0, "projects": 1}

@@ -361,7 +361,7 @@ running, and the next thing anybody needs is the command that starts it.
 
 It is also the one screen that uses the **name** rather than the pronoun. Everything else in the
 interface calls her *she*, which is what § *Voice* below is about; here there is no conversation
-and nothing has a voice, and what a person needs named is the program they are about to restart.
+and nothing has a voice, and what a person needs to name is the program they are about to restart.
 
 ## The screen
 
