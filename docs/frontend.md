@@ -355,9 +355,13 @@ fade, which is the same family as the height changes above, and pointedly not a 
 **And when nothing answers at all, the application does not draw itself.** `Offline` replaces the
 whole shell rather than sitting over it: without that first load there is no rail, no profile, no
 endpoint and no conversation, and drawing the chrome anyway invites somebody to click seven things
-that cannot work. It says *she is not answering* rather than *network error*, because the request
+that cannot work. It says *Hera is not answering* rather than *network error*, because the request
 that failed did not cross a network — if the page loaded and `/api/v1` did not, a process is not
 running, and the next thing anybody needs is the command that starts it.
+
+It is also the one screen that uses the **name** rather than the pronoun. Everything else in the
+interface calls her *she*, which is what § *Voice* below is about; here there is no conversation
+and nothing has a voice, and what a person needs named is the program they are about to restart.
 
 ## The screen
 

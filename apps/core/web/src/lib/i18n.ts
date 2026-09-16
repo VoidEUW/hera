@@ -485,12 +485,15 @@ export const t = {
 	/** The screen shown when the first load never answered. Its own block rather than more keys
 	 * under `error`, because this is a whole screen with a voice and not a line of copy. */
 	offline: {
-		title: 'She is not answering',
-		/** Deliberately about *her server* and not about *the network*: this runs on the machine
+		/** **Hera, not she.** The rest of the interface calls her *she*, and on this one screen it
+		 * reads wrong: there is no conversation here and nothing has a voice — what has failed is
+		 * a server, and the thing you need named is the program you are about to restart. */
+		title: 'Hera is not answering',
+		/** Deliberately about *the server* and not about *the network*: this runs on the machine
 		 * it talks to, so a failed request here almost always means a process is not running. */
-		body: 'The interface is here, but nothing is listening behind it. If you started her yourself, check that she is still running.',
+		body: 'The interface is here, but nothing is listening behind it. If you started Hera yourself, check that the server is still running.',
 		command: 'uv run hera serve',
-		commandHint: 'The usual way to start her, from the project directory.',
+		commandHint: 'The usual way to start Hera, from the project directory.',
 		detail: 'What the browser said'
 	}
 } as const;

@@ -8,10 +8,15 @@
 	 * beside an empty list is inviting somebody to click seven things that cannot work. The one
 	 * control here is the one that can.
 	 *
-	 * It says *she is not answering* rather than *network error*. Hera is served by the
+	 * It says *Hera is not answering* rather than *network error*. Hera is served by the
 	 * application she talks to (ADR 6), so the request that failed did not cross a network: if
 	 * the page loaded and `/api/v1` did not, a process is not running, and the next thing anybody
 	 * needs is the command that starts it.
+	 *
+	 * The name rather than the pronoun, here and nowhere else. Everything in this interface calls
+	 * her *she*, which is the voice `docs/frontend.md` § *Voice* describes — and on this screen it
+	 * reads wrong. Nothing here is a conversation and nothing has a voice: what failed is a
+	 * server, and what a person needs named is the program they are about to restart.
 	 */
 	import { t } from '$lib/i18n';
 	import { workspace } from '$lib/stores/workspace.svelte';
@@ -33,7 +38,7 @@
 <div class="offline">
 	<div class="middle" role="alert">
 		<!-- Still, and dimmed to half. The mark is how the interface says *she is here*; this is
-		     the one screen where the honest thing for it to say is that she is not. -->
+		     the one screen where the honest thing for it to say is that nothing is. -->
 		<span class="mark" aria-hidden="true"><Ocellus size={34} /></span>
 
 		<h1 class="display">{t.offline.title}</h1>

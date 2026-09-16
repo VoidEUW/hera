@@ -50,7 +50,7 @@ def test_an_unreachable_server_is_not_an_empty_account(server: str, page: Any) -
     refuse(page)
     page.goto(server)
 
-    page.wait_for_selector("text=She is not answering", timeout=15_000)
+    page.wait_for_selector("text=Hera is not answering", timeout=15_000)
 
     # Not one word about there being nothing here, and no chrome to click that cannot work.
     assert page.get_by_text("No chats yet.").count() == 0
@@ -65,11 +65,11 @@ def test_an_unreachable_server_is_not_an_empty_account(server: str, page: Any) -
 def test_try_again_brings_the_application_back(server: str, page: Any) -> None:
     listening = refuse(page)
     page.goto(server)
-    page.wait_for_selector("text=She is not answering", timeout=15_000)
+    page.wait_for_selector("text=Hera is not answering", timeout=15_000)
 
     listening["on"] = True
     page.get_by_role("button", name="Try again").click()
 
     # The rail, which means the load answered -- and no reload was needed to get here.
     page.wait_for_selector("nav.rail", timeout=15_000)
-    assert page.get_by_text("She is not answering").count() == 0
+    assert page.get_by_text("Hera is not answering").count() == 0
