@@ -89,6 +89,17 @@ class Workspace {
 	 * everything, which is what a guess is, was the complaint. */
 	shape = $state<Shape>(FIRST_SHAPE);
 
+	/** The last shape written, held plainly rather than as `$state`.
+	 *
+	 * `#rememberShape` is called from an effect over the lists, and it needs to know whether the
+	 * counts have actually moved before writing. Asking `this.shape` would be *reading the thing
+	 * it is about to write*, which makes the effect a dependency of itself — the shape that ends
+	 * in `effect_update_depth_exceeded` and a blank page with nothing on it to say why, and the
+	 * one this project has now paid for four times (`+layout.svelte`, `project/[id]`, the
+	 * artifact effect in `chat/[id]`, and here). A plain field is not a signal, so nothing
+	 * observes it. */
+	#persisted: Shape = FIRST_SHAPE;
+
 	constructor() {
 		// The shape follows the lists instead of being noted where they are first filled. Every
 		// create, delete and move changes a count, and a `#rememberShape()` beside each of them
@@ -187,6 +198,7 @@ class Workspace {
 			if (stored === null) return;
 			const { chats, projects } = JSON.parse(stored) as Partial<Shape>;
 			this.shape = { chats: rows(chats), projects: rows(projects) };
+			this.#persisted = this.shape;
 		} catch {
 			/* A browser with no storage, or a key somebody edited by hand. Neither is worth an
 			   error: the guess above is what this is a refinement of, not a dependency. */
@@ -200,7 +212,10 @@ class Workspace {
 		};
 		// A rename reassigns the list without changing a count, and there are more of those than
 		// there are creates. Nothing to write is the common case.
-		if (shape.chats === this.shape.chats && shape.projects === this.shape.projects) return;
+		if (shape.chats === this.#persisted.chats && shape.projects === this.#persisted.projects) {
+			return;
+		}
+		this.#persisted = shape;
 		this.shape = shape;
 		try {
 			localStorage.setItem(SHAPE_KEY, JSON.stringify(shape));
