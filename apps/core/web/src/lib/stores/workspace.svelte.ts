@@ -17,6 +17,23 @@ import {
 import type { Attachment } from '$lib/attachments';
 import type { Tab as SettingsTab } from '$lib/components/Settings.svelte';
 
+/** How many rows the rail held, the last time anybody looked at it. */
+export interface Shape {
+	chats: number;
+	projects: number;
+}
+
+const SHAPE_KEY = 'hera:rail-shape';
+
+/** What to hold space for before there is anything to count -- a first run, or a browser that
+ * has forgotten. Small on purpose: guessing high and shrinking is the same jump as guessing
+ * nothing, pointed the other way. */
+const FIRST_SHAPE: Shape = { chats: 3, projects: 2 };
+
+/** More rows than this and the rail is scrolling anyway, so the ones past it are holding space
+ * nobody can see. */
+const MOST_ROWS = 12;
+
 class Workspace {
 	chats = $state<Chat[]>([]);
 	projects = $state<Project[]>([]);
@@ -42,6 +59,61 @@ class Workspace {
 	version = $state('');
 	error = $state<string | null>(null);
 	loaded = $state(false);
+
+	/** Whether the first load could not be answered at all.
+	 *
+	 * Separate from `error`, and the distinction is the whole point: an empty list and a list
+	 * that could not be fetched are both `chats === []`, and the rail used to say *No chats yet*
+	 * for both. One of those is a fact about the account and the other is a fact about the
+	 * server, and telling somebody their conversations are gone because a process is not running
+	 * is the worst thing this interface could say.
+	 *
+	 * Set only while nothing has ever arrived. A refresh that fails after a good load leaves what
+	 * is on screen alone — it was true a moment ago, and blanking a rail somebody is reading to
+	 * report a failed background poll helps nobody. */
+	unreachable = $state(false);
+
+	/** Whether a retry from the failure screen is in flight, so the button can say so. */
+	retrying = $state(false);
+
+	/** Whether any load has ever answered. Not `loaded`, which only means one has *finished*. */
+	#answered = false;
+
+	/** The shape the rail had last time, so what stands in for it while it loads is the right
+	 * *height*.
+	 *
+	 * Not a cache of the lists -- a cache of how much of them there was. A placeholder sized
+	 * from a guess still shoves the page around when the real thing lands; one sized from last
+	 * time does not, and a count is the only part of a chat list cheap enough to keep and
+	 * harmless enough to be wrong about. Wrong by one row is a row of movement; wrong by
+	 * everything, which is what a guess is, was the complaint. */
+	shape = $state<Shape>(FIRST_SHAPE);
+
+	/** The last shape written, held plainly rather than as `$state`.
+	 *
+	 * `#rememberShape` is called from an effect over the lists, and it needs to know whether the
+	 * counts have actually moved before writing. Asking `this.shape` would be *reading the thing
+	 * it is about to write*, which makes the effect a dependency of itself — the shape that ends
+	 * in `effect_update_depth_exceeded` and a blank page with nothing on it to say why, and the
+	 * one this project has now paid for four times (`+layout.svelte`, `project/[id]`, the
+	 * artifact effect in `chat/[id]`, and here). A plain field is not a signal, so nothing
+	 * observes it. */
+	#persisted: Shape = FIRST_SHAPE;
+
+	constructor() {
+		// The shape follows the lists instead of being noted where they are first filled. Every
+		// create, delete and move changes a count, and a `#rememberShape()` beside each of them
+		// is a list the next one gets left off — which is how this quietly goes back to guessing.
+		//
+		// A root that is never torn down, deliberately: this store is one instance for the life
+		// of the page (`export const workspace` below), so there is no later at which cleaning it
+		// up would mean anything.
+		$effect.root(() => {
+			$effect(() => {
+				if (this.loaded) this.#rememberShape();
+			});
+		});
+	}
 
 	/** Whether the settings modal is open. Here rather than in the layout because three places
 	 * open it — the rail, ⌘K, and the composer's model and context chips — and the two of them
@@ -88,6 +160,18 @@ class Workspace {
 	}
 
 	async load() {
+		// Synchronous, and before the first `await` on purpose: the placeholder is drawn on the
+		// very first frame, so a shape that arrives after it is a shape that arrives too late.
+		this.#recallShape();
+		await this.#reload();
+		// Deliberately after, and deliberately not fatal. Neither of these is needed to hold a
+		// conversation: with no endpoint the composer says so, and with no servers it shows
+		// nothing. An error here must not be what stops the rail from rendering.
+		await Promise.all([this.loadProviders(), this.loadServers(), this.loadVersion()]);
+	}
+
+	/** The three requests the rail is made of, and nothing else. */
+	async #reload() {
 		try {
 			const [chats, projects, profiles] = await Promise.all([
 				api.chats(),
@@ -98,15 +182,66 @@ class Workspace {
 			this.projects = projects;
 			this.profiles = profiles;
 			this.error = null;
+			this.#answered = true;
+			this.unreachable = false;
 		} catch (cause) {
 			this.error = cause instanceof Error ? cause.message : String(cause);
+			this.unreachable = !this.#answered;
 		} finally {
 			this.loaded = true;
 		}
-		// Deliberately after, and deliberately not fatal. Neither of these is needed to hold a
-		// conversation: with no endpoint the composer says so, and with no servers it shows
-		// nothing. An error here must not be what stops the rail from rendering.
-		await Promise.all([this.loadProviders(), this.loadServers(), this.loadVersion()]);
+	}
+
+	#recallShape() {
+		try {
+			const stored = localStorage.getItem(SHAPE_KEY);
+			if (stored === null) return;
+			const { chats, projects } = JSON.parse(stored) as Partial<Shape>;
+			this.shape = { chats: rows(chats), projects: rows(projects) };
+			this.#persisted = this.shape;
+		} catch {
+			/* A browser with no storage, or a key somebody edited by hand. Neither is worth an
+			   error: the guess above is what this is a refinement of, not a dependency. */
+		}
+	}
+
+	#rememberShape() {
+		const shape: Shape = {
+			chats: this.chats.filter((chat) => !chat.project_id).length,
+			projects: this.projects.length
+		};
+		// A rename reassigns the list without changing a count, and there are more of those than
+		// there are creates. Nothing to write is the common case.
+		if (shape.chats === this.#persisted.chats && shape.projects === this.#persisted.projects) {
+			return;
+		}
+		this.#persisted = shape;
+		this.shape = shape;
+		try {
+			localStorage.setItem(SHAPE_KEY, JSON.stringify(shape));
+		} catch {
+			/* Private browsing, a full quota. The next load guesses, which is survivable. */
+		}
+	}
+
+	/** Ask again, from the screen that says it could not be reached.
+	 *
+	 * `unreachable` deliberately stays true for the length of it. Clearing it first would drop
+	 * the failure screen, show the application for as long as the request takes, and put the
+	 * failure back — three states to read where the honest number is one. The button says it is
+	 * working instead. */
+	async retry() {
+		if (this.retrying) return;
+		this.retrying = true;
+		try {
+			await this.#reload();
+		} finally {
+			this.retrying = false;
+		}
+		// Not awaited. The button is about whether the workspace answered; leaving it disabled
+		// while a slow *version* request finishes would refuse a second try over a question
+		// nobody asked.
+		void Promise.all([this.loadProviders(), this.loadServers(), this.loadVersion()]);
 	}
 
 	async loadVersion() {
@@ -318,6 +453,13 @@ class Workspace {
 		this.#handoff = null;
 		return carried;
 	}
+}
+
+/** A stored count, clamped into something a rail can actually draw. `0` is kept: an account
+ * with no loose chats should hold no space for them. */
+function rows(count: unknown): number {
+	if (typeof count !== 'number' || !Number.isFinite(count)) return 0;
+	return Math.min(Math.max(Math.trunc(count), 0), MOST_ROWS);
 }
 
 export const workspace = new Workspace();

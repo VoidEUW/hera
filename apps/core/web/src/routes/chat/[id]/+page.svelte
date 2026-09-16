@@ -13,8 +13,10 @@
 	import Backdrop from '$lib/components/Backdrop.svelte';
 	import Composer from '$lib/components/Composer.svelte';
 	import Message from '$lib/components/Message.svelte';
+	import Skeleton from '$lib/components/Skeleton.svelte';
 	import Tray from '$lib/components/Tray.svelte';
 	import { t } from '$lib/i18n';
+	import { Placeholder } from '$lib/loading.svelte';
 	import { artifacts } from '$lib/stores/artifacts.svelte';
 	import { ChatSession } from '$lib/stores/chat.svelte';
 	import { workspace } from '$lib/stores/workspace.svelte';
@@ -24,14 +26,39 @@
 	let scroller = $state<HTMLElement | null>(null);
 	let published = $state(0);
 
+	/** The shape of a conversation while it is being fetched, on the same beat as the rail's.
+	 *
+	 * Two turns rather than a remembered count: the transcript is pinned to its own bottom and
+	 * sits between a fixed header and a fixed composer, so what it holds is the reading column,
+	 * not the page's furniture. Getting the number of turns right would buy a scroll offset
+	 * nobody is looking at yet. */
+	const settling = new Placeholder(true);
+	$effect(() => settling.set(!session.loaded));
+	$effect(() => () => settling.stop());
+	const waiting = $derived(settling.shown);
+
 	// Deliberately not $state. Assigning scrollTop fires a scroll event, which sets this, which
 	// would re-run the effect below, which assigns scrollTop again -- a loop Svelte terminates
 	// by giving up on rendering. Nothing displays it, so plain state is all it needs to be.
 	let pinned = true;
 
+	/** Which conversation has already been opened, so the effect below does not open it twice.
+	 *
+	 * Not a nicety. `page.params` settles in more than one step during a navigation, so the
+	 * effect can re-run with the same id — and a second `open()` calls `session.reset()`, which
+	 * aborts the turn the first one started, after `takeHandoff()` has already handed the
+	 * message over and cleared it. The sentence somebody typed on the start screen is gone and
+	 * nothing says so ([issue #122](https://github.com/VoidEUW/hera/issues/122)). It is rare and
+	 * load-dependent, which is why it surfaced as a flaky test rather than a bug report.
+	 *
+	 * `untrack` for the same reason `project/[id]` uses it: this both reads and writes state the
+	 * effect depends on, which is the shape that ends in `effect_update_depth_exceeded`. */
+	let opened = $state<string | null>(null);
+
 	$effect(() => {
 		const id = page.params.id;
-		if (!id) return;
+		if (!id || untrack(() => opened) === id) return;
+		untrack(() => (opened = id));
 		void open(id);
 	});
 
@@ -39,13 +66,19 @@
 		// A drawer belongs to the conversation it was opened from, so walking to another one
 		// closes it rather than leaving somebody else's page beside this transcript.
 		artifacts.leave();
-		// Taken before the load, so a slow first request cannot let a second effect run and
-		// send it twice.
-		const first = workspace.takeHandoff();
 		// Everything after this belongs to *this* conversation, and `send` goes to whichever
 		// chat the session currently holds -- so a load that was overtaken has to stop here
 		// rather than put the message a chat was started with into the one that overtook it.
 		if (!(await session.open(id))) return;
+		// Taken *after* the load, and only by the one that won it. `takeHandoff` clears as it
+		// reads, so whoever takes it owns it: a load that takes it and then loses the race has
+		// stranded somebody's first sentence in a store nobody will read again.
+		//
+		// It used to be taken before the load, guarding against a second effect run for this
+		// same id sending it twice. `opened` above now stops that run happening at all, which is
+		// what makes this order safe -- the only other caller is a navigation to a *different*
+		// chat, and that one has already made this load return false on the line above.
+		const first = workspace.takeHandoff();
 		if (first) await session.send(first.text, first.files);
 		await reopenIfPublished(id);
 	}
@@ -54,10 +87,14 @@
 	 * the same door a fresh artifact opens for itself mid-turn -- without this, the only way
 	 * back in is the header button, and the person has to already know it is worth clicking.
 	 *
+	 * It opens with no filename, which means *pick one*: the drawer chooses the most recently
+	 * written file once its own listing lands. Choosing here instead would mean fetching the same
+	 * listing twice to answer the same question.
+	 *
 	 * **Never over an open drawer.** A turn that publishes while this is in flight opens the
-	 * drawer on the file it just made (`noticed`), and this landing afterwards with no filename
-	 * would put the bar back to nothing chosen -- taking the page away the moment it arrived.
-	 * Checked on both sides of the request, because that is the gap the turn streams through. */
+	 * drawer on the file it just made (`noticed`), and this landing afterwards would hand the
+	 * choice back -- taking the page away the moment it arrived. Checked on both sides of the
+	 * request, because that is the gap the turn streams through. */
 	async function reopenIfPublished(id: string) {
 		if (artifacts.open) return;
 		try {
@@ -166,6 +203,13 @@
 	}
 </script>
 
+<!-- What a turn looks like before it arrives: her question, then her answer. The bubble is one
+     block because that is what a bubble is; the prose is lines, because that is what prose is. -->
+{#snippet waitingTurn()}
+	<div class="held-mine"><Skeleton rows={1} height={45} widths={[62]} /></div>
+	<div class="held-hers"><Skeleton rows={4} height={16} gap={9} widths={[100, 96, 100, 58]} /></div>
+{/snippet}
+
 <header class="top">
 	<h1 class="title">{session.chat?.title || t.empty.title}</h1>
 	<div class="right">
@@ -207,42 +251,51 @@
 
 		<div class="scroll" bind:this={scroller} {onscroll}>
 			<div class="column" use:follows>
-				{#if session.error}
-					<p class="error">{session.error}</p>
-				{/if}
+				{#if waiting}
+					<div class="held" role="status" aria-busy="true" aria-label={t.chat.loading}>
+						{@render waitingTurn()}
+						{@render waitingTurn()}
+					</div>
+				{:else}
+					<div class="turns">
+						{#if session.error}
+							<p class="error">{session.error}</p>
+						{/if}
 
-				{#each session.messages as message (message.id)}
-					<Message
-						role={message.role}
-						content={message.content}
-						attachments={message.attachments}
-						events={message.events}
-						chatId={session.chat?.id ?? null}
-						busy={session.busy}
-						onanswer={answer}
-						onreply={reply}
-						onredo={(text) => session.redo(message.id, text)}
-					/>
-				{/each}
+						{#each session.messages as message (message.id)}
+							<Message
+								role={message.role}
+								content={message.content}
+								attachments={message.attachments}
+								events={message.events}
+								chatId={session.chat?.id ?? null}
+								busy={session.busy}
+								onanswer={answer}
+								onreply={reply}
+								onredo={(text) => session.redo(message.id, text)}
+							/>
+						{/each}
 
-				{#if session.pending !== null}
-					<Message role="user" content={session.pending} attachments={session.pendingFiles} />
-				{/if}
+						{#if session.pending !== null}
+							<Message role="user" content={session.pending} attachments={session.pendingFiles} />
+						{/if}
 
-				{#if session.draft.length || session.streaming}
-					<Message
-						role="assistant"
-						events={session.draft}
-						chatId={session.chat?.id ?? null}
-						streaming={session.streaming}
-						busy={session.busy}
-						onanswer={answer}
-						onreply={reply}
-					/>
-				{/if}
+						{#if session.draft.length || session.streaming}
+							<Message
+								role="assistant"
+								events={session.draft}
+								chatId={session.chat?.id ?? null}
+								streaming={session.streaming}
+								busy={session.busy}
+								onanswer={answer}
+								onreply={reply}
+							/>
+						{/if}
 
-				{#if !session.messages.length && !session.draft.length && !session.pending}
-					<p class="empty">{t.empty.chat}</p>
+						{#if !session.messages.length && !session.draft.length && !session.pending}
+							<p class="empty">{t.empty.chat}</p>
+						{/if}
+					</div>
 				{/if}
 			</div>
 		</div>
@@ -272,7 +325,11 @@
 		</div>
 	</div>
 
-	{#if artifacts.open && session.chat}
+	<!-- `!waiting` as well as `open`: a panel that takes half the width away from a transcript
+	     that is still a placeholder has rearranged the screen twice before anybody has read
+	     anything on it. It opens once the conversation is there, and `ArtifactDrawer` takes its
+	     width over a beat rather than all at once. -->
+	{#if artifacts.open && session.chat && !waiting}
 		<ArtifactDrawer chatId={session.chat.id} />
 	{/if}
 </div>
@@ -403,6 +460,40 @@
 		flex: none;
 		padding: 12px 24px max(20px, env(safe-area-inset-bottom));
 		background: linear-gradient(to top, var(--ground) 70%, transparent);
+	}
+
+	/* The conversation arrives where its shape was, rather than replacing it between frames. */
+	.turns {
+		animation: fade var(--fade) var(--ease);
+	}
+
+	@keyframes fade {
+		from {
+			opacity: 0;
+		}
+	}
+
+	/* The same 22px the real messages sit in (`Message.svelte`'s `.mine`), so the conversation
+	   lands where its shape was rather than a little above or below it. */
+	.held-mine {
+		display: flex;
+		justify-content: flex-end;
+		margin: 22px 0;
+	}
+
+	/* The measure a bubble is allowed (`Message.svelte`'s `.bubble`), given explicitly: a
+	   percentage width inside a flex item that sizes to its content resolves against nothing
+	   and comes out zero, which is a bubble you cannot see. */
+	.held-mine :global(.skeleton) {
+		width: min(46ch, 100%);
+	}
+
+	.held-hers {
+		margin: 22px 0;
+	}
+
+	.held-mine :global(.bar) {
+		border-radius: var(--radius-lg);
 	}
 
 	.empty,

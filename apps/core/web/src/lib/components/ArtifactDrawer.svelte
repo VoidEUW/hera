@@ -16,8 +16,9 @@
 	 * scrolled away. Without it, `artifact_edit` in turn nine leaves you scrolling back to turn
 	 * four to find the card that opens the file it just changed.
 	 */
+	import { cubicOut } from 'svelte/easing';
 	import { api, type ArtifactSummary } from '$lib/api/client';
-	import { downloadUrl, size, titleOf } from '$lib/artifacts';
+	import { downloadUrl, newest, size, titleOf } from '$lib/artifacts';
 	import { t } from '$lib/i18n';
 	import { artifacts } from '$lib/stores/artifacts.svelte';
 	import ArtifactView from './ArtifactView.svelte';
@@ -29,6 +30,47 @@
 	}
 
 	let { chatId }: Props = $props();
+
+	/** How long the panel takes to make room for itself. Longer than `--fade`, because this is
+	 * a change to the shape of the screen rather than to the look of one thing on it. */
+	const REVEAL = 240;
+
+	/** How long it waits first, when it is opening. Just past `--fade`, so on a reload the
+	 * conversation has finished arriving before the panel starts taking width from it — two
+	 * things happening in a row, which is what *the drawer opens beside the chat* looks like,
+	 * rather than at once, which is what it looked like when they shared a frame. Closing has
+	 * no delay: that one is a click, and a control that hesitates feels broken. */
+	const AFTER = 140;
+
+	/** Take the width from the conversation over a beat instead of all at once.
+	 *
+	 * A width change and a fade — the two things `docs/frontend.md` § *Motion* allows — and
+	 * pointedly **not** a slide, which the same paragraph rules out. Written by hand rather than
+	 * taken from `svelte/transition` because none of them animates width, and the alternative is
+	 * the panel arriving with the conversation already narrowed behind it, which is what a
+	 * person coming back to a chat with artifacts used to see.
+	 *
+	 * Two cases it does not apply to. Below the phone breakpoint the panel is `position: fixed`
+	 * and full-bleed, so there is no width to give and narrowing it would squeeze the content
+	 * against the right edge; it fades instead. And with motion turned off it is instant, which
+	 * the global `prefers-reduced-motion` rule in `app.css` cannot do for a transition that
+	 * lives in JavaScript. */
+	function reveal(node: HTMLElement, { delay = 0 } = {}) {
+		const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+		if (still) return { duration: 0, css: () => '' };
+		if (matchMedia('(max-width: 780px)').matches) {
+			return { delay, duration: REVEAL, easing: cubicOut, css: (t: number) => `opacity: ${t}` };
+		}
+		const width = node.getBoundingClientRect().width;
+		return {
+			delay,
+			duration: REVEAL,
+			easing: cubicOut,
+			// `overflow: hidden` for the length of it: the body is laid out for the full width
+			// and reflowing it three times a frame on the way in is a different animation.
+			css: (t: number) => `width: ${t * width}px; opacity: ${t}; overflow: hidden`
+		};
+	}
 
 	let listed = $state<ArtifactSummary[]>([]);
 	let failure = $state('');
@@ -44,7 +86,21 @@
 		api
 			.artifacts(chat)
 			.then((found) => {
-				if (current) listed = found;
+				if (!current) return;
+				listed = found;
+				// Two cases, one answer: nothing is chosen, or what was chosen is not in the
+				// listing any more. An open panel showing *Nothing chosen yet* beside a bar of
+				// files is a door that led nowhere, and one still pointed at a deleted file is
+				// worse — `ArtifactView` stays mounted on a name that will not fetch. What she
+				// wrote last is the best guess anybody can make about which to show instead, and
+				// `newest` of an empty listing is `null`, which is the honest empty state.
+				//
+				// Safe inside the `.then`: this runs after the effect has finished tracking, so
+				// reading `artifacts.name` here does not make the effect depend on what it sets.
+				const gone = artifacts.name !== null && !found.some((file) => file.name === artifacts.name);
+				if (artifacts.name === null || gone) {
+					artifacts.show(chat, newest(found)?.name ?? null);
+				}
 			})
 			.catch((cause) => {
 				if (current) failure = cause instanceof Error ? cause.message : String(cause);
@@ -55,7 +111,7 @@
 	});
 </script>
 
-<aside class="drawer" aria-label={t.artifact.panel}>
+<aside class="drawer" in:reveal={{ delay: AFTER }} out:reveal aria-label={t.artifact.panel}>
 	<header class="top">
 		<span class="mark" aria-hidden="true"><Stele size={14} /></span>
 		<h2 class="title">{chosen ? titleOf(chosen) : t.artifact.panel}</h2>

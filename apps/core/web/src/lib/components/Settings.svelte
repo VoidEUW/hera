@@ -17,8 +17,10 @@
 	 */
 	import { api, type Region, type Rule, type Server } from '$lib/api/client';
 	import { t } from '$lib/i18n';
+	import { Placeholder } from '$lib/loading.svelte';
 	import Memory from './settings/Memory.svelte';
 	import Models from './settings/Models.svelte';
+	import Rows from './settings/Rows.svelte';
 	import Skills from './settings/Skills.svelte';
 
 	export type Tab =
@@ -69,25 +71,64 @@
 		)
 	);
 
+	/** The three tabs this component fetches for itself. The other four are components of their
+	 * own and each holds its own placeholder, on the same beat. */
+	const FETCHES = new Set<Tab>(['mind', 'servers', 'permissions']);
+
+	/** Driven from `load` rather than from an `$effect` over a `loading` flag.
+	 *
+	 * A flag would be set and cleared inside one async function, and against a server on this
+	 * machine both can happen before effects next flush — so the effect would only ever see the
+	 * `false` and the placeholder would never be drawn at all. Calling it where the load begins
+	 * and ends has no such window. */
+	const settling = new Placeholder(true);
+	$effect(() => () => settling.stop());
+	const waiting = $derived(settling.shown);
+
+	/** Which load owns the panel, counted rather than named — the same arrangement `ChatSession`
+	 * uses, and for the same reason. Switching tabs while a fetch is in flight leaves two of them
+	 * running: without this the older one lands, hides the placeholder the newer one is still
+	 * behind, and writes its answer into fields the newer one is about to fill. A tab id is not
+	 * enough, because *mind → servers → mind* gives two loads the same name. */
+	let generation = 0;
+
 	$effect(() => {
 		void load(tab);
 	});
 
 	async function load(which: Tab) {
+		const token = ++generation;
 		error = null;
+		if (!FETCHES.has(which)) {
+			settling.set(false);
+			return;
+		}
+		settling.set(true);
 		try {
+			// Every assignment below is guarded, not just the last: a load that has been overtaken
+			// has nothing to say about the screen somebody is looking at now.
 			if (which === 'mind') {
-				regions = await api.regions();
-				drafts = Object.fromEntries(regions.map((region) => [region.id, region.text]));
+				const found = await api.regions();
+				if (token !== generation) return;
+				regions = found;
+				drafts = Object.fromEntries(found.map((region) => [region.id, region.text]));
 			} else if (which === 'servers') {
-				servers = await api.servers();
+				const found = await api.servers();
+				if (token !== generation) return;
+				servers = found;
 			} else if (which === 'permissions') {
 				const found = await api.permissions();
+				if (token !== generation) return;
 				rules = found.rules;
 				fallback = found.fallback;
 			}
 		} catch (cause) {
+			if (token !== generation) return;
 			error = cause instanceof Error ? cause.message : String(cause);
+		} finally {
+			// The placeholder belongs to the newest load. An older one lifting it would uncover a
+			// screen that has not been fetched yet.
+			if (token === generation) settling.set(false);
 		}
 	}
 
@@ -155,7 +196,9 @@
 				<p class="error">{error}</p>
 			{/if}
 
-			{#if tab === 'models'}
+			{#if waiting}
+				<Rows label={t.settings.loading} />
+			{:else if tab === 'models'}
 				<Models {filter} />
 			{:else if tab === 'memory'}
 				<Memory {filter} />
@@ -244,10 +287,17 @@
 
 	.sheet {
 		position: fixed;
-		inset: 6vh 50% auto auto;
-		transform: translateX(50%);
+		/* Centred both ways. It used to hang 6vh from the top, which read as centred back when
+		   the sheet grew to fit its tab and was usually tall; now that it is one fixed height
+		   the space it left underneath was simply the sheet sitting high. */
+		inset: 50% 50% auto auto;
+		transform: translate(50%, -50%);
 		width: min(900px, 92vw);
-		max-height: 88vh;
+		/* A height, not a maximum. Every tab holds a different amount, and a sheet that resized
+		   itself around each one made switching between them the loudest thing on the screen —
+		   the close button moving under the pointer between two clicks. The panel scrolls
+		   inside it instead. */
+		height: min(88vh, 720px);
 		display: flex;
 		flex-direction: column;
 		background: var(--surface-raised);

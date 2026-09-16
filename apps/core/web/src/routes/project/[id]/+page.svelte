@@ -17,8 +17,10 @@
 	import { untrack } from 'svelte';
 	import type { Project } from '$lib/api/client';
 	import Select from '$lib/components/Select.svelte';
+	import Skeleton from '$lib/components/Skeleton.svelte';
 	import SkillPicker from '$lib/components/SkillPicker.svelte';
 	import { t } from '$lib/i18n';
+	import { Placeholder } from '$lib/loading.svelte';
 	import { PROJECT_COLOURS, colourOf } from '$lib/projects';
 	import { workspace } from '$lib/stores/workspace.svelte';
 
@@ -48,6 +50,15 @@
 
 	const dirty = $derived(project !== null && draft !== project.instructions);
 
+	/** A project the rail has not fetched yet and a project that does not exist are the same
+	 * `null` here, and only one of them is worth telling somebody about. Until the workspace has
+	 * answered, this screen has nothing to say — so it holds the page's shape and says it after.
+	 * The same arrangement as the rail, one instance each because the beats are independent. */
+	const settling = new Placeholder(untrack(() => !workspace.loaded));
+	$effect(() => settling.set(!workspace.loaded));
+	$effect(() => () => settling.stop());
+	const waiting = $derived(settling.shown);
+
 	async function saveInstructions(current: Project) {
 		const updated = await workspace.patchProject(current.id, { instructions: draft });
 		if (!updated) return;
@@ -68,12 +79,16 @@
 	}
 </script>
 
-{#if !project}
-	<div class="missing">
-		<p>{t.project.notFound}</p>
-		<button class="save" type="button" onclick={() => goto(resolve('/'))}>{t.rail.newChat}</button>
+{#if waiting}
+	<!-- The page's own shape, in the page's own wrapper, so nothing moves when the real thing
+	     lands on top of it. One region announces the wait; the bars inside it are decoration. -->
+	<div class="screen" role="status" aria-busy="true" aria-label={t.project.loading}>
+		<div class="held">
+			<Skeleton rows={1} height={26} widths={[46]} />
+			<Skeleton rows={4} height={15} widths={[100, 100, 100, 62]} />
+		</div>
 	</div>
-{:else}
+{:else if project}
 	{@const accent = colourOf(project.color)}
 	<div class="screen">
 		<header>
@@ -176,6 +191,11 @@
 			>
 		</section>
 	</div>
+{:else}
+	<div class="missing">
+		<p>{t.project.notFound}</p>
+		<button class="save" type="button" onclick={() => goto(resolve('/'))}>{t.rail.newChat}</button>
+	</div>
 {/if}
 
 {#if picking && project}
@@ -189,11 +209,26 @@
 <style>
 	.screen {
 		flex: 1;
+		animation: fade var(--fade) var(--ease);
 		overflow-y: auto;
 		width: 100%;
 		max-width: var(--column);
 		margin: 0 auto;
 		padding: 40px 24px 64px;
+	}
+
+	/* The header bar, then the instructions box, spaced the way `header`'s margin spaces the
+	   real ones — a placeholder that is the wrong height has not held anything. */
+	.held {
+		display: flex;
+		flex-direction: column;
+		gap: 28px;
+	}
+
+	@keyframes fade {
+		from {
+			opacity: 0;
+		}
 	}
 
 	.missing {

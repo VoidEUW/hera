@@ -20,9 +20,10 @@ const ARTIFACT_TOOL = 'hera__artifact_';
 class Artifacts {
 	/** The chat whose drawer is open, or `null` when it is closed. */
 	chatId = $state<string | null>(null);
-	/** Which artifact is shown. `null` with a `chatId` set means the file bar with nothing
-	 * chosen — which is what the header control opens when the last one was deleted with its
-	 * chat, and what a conversation with several of them opens into. */
+	/** Which artifact is shown. `null` with a `chatId` set means *pick one for me*: `ArtifactDrawer`
+	 * fills it in with the most recently written file as soon as its listing lands, so nobody has
+	 * to know which one that is in order to open the panel. It stays `null` only when there is
+	 * genuinely nothing published, which is the one case the empty copy is about. */
 	name = $state<string | null>(null);
 	/** Bumped whenever something published may have changed. Read by anything that fetched. */
 	version = $state(0);

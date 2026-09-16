@@ -15,7 +15,7 @@
 
 import DOMPurify from 'dompurify';
 
-import { API } from './api/client';
+import { API, type ArtifactSummary } from './api/client';
 import { humanise } from './tools';
 
 /** How one artifact is drawn. */
@@ -99,4 +99,31 @@ export function size(bytes: number): string {
 	if (bytes < 1024) return `${bytes} B`;
 	if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
 	return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+/** The one to open when nothing has been chosen: the most recently written.
+ *
+ * The listing arrives sorted by **name** — `list_artifacts` walks the directory in `sorted()`
+ * order — so *the last one in the list* is alphabetical and means nothing. What a person coming
+ * back to a conversation wants is the thing she made last, which is what `modified_at` says.
+ *
+ * Ties go to the later entry, so a conversation that published two files in the same second
+ * opens the one further down the bar rather than the one whose name happens to sort first.
+ */
+export function newest(files: readonly ArtifactSummary[]): ArtifactSummary | null {
+	let best: ArtifactSummary | null = null;
+	let at = -Infinity;
+	for (const file of files) {
+		// Parsed rather than compared as text. Two ISO 8601 stamps in the same shape do sort
+		// correctly as strings, which is exactly why it is worth not relying on: the shape is the
+		// server's to change, and a silent fallback to alphabetical is the bug this replaces.
+		const when = Date.parse(file.modified_at);
+		if (Number.isNaN(when)) continue;
+		if (when >= at) {
+			at = when;
+			best = file;
+		}
+	}
+	// Every stamp unreadable, and there are still files: the last of them beats nothing at all.
+	return best ?? files.at(-1) ?? null;
 }

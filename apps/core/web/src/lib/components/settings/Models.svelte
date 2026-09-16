@@ -31,7 +31,9 @@
 	} from '$lib/api/client';
 	import Select from '$lib/components/Select.svelte';
 	import { t } from '$lib/i18n';
+	import { Placeholder } from '$lib/loading.svelte';
 	import { kindFallbackIcon, kindIcon, PROVIDER_KINDS } from '$lib/providers';
+	import Rows from './Rows.svelte';
 
 	/** The five sampling keys offered as sliders over `ModelEntry.options` (ADR 18 — still an
 	 * opaque pass-through, just with a form over the JSON instead of a blank textarea). Bounds
@@ -113,6 +115,18 @@
 		)
 	);
 
+	/** The same placeholder and the same beat as every other settings screen (`Rows`).
+	 *
+	 * Set where the load begins and ends rather than through an `$effect` over a flag: both
+	 * halves of a fast local fetch can happen before effects next flush, and an effect that
+	 * only ever sees the `false` draws nothing. It is never set back to `true` — a refresh
+	 * after a change here has a list on screen already, and replacing that with grey would be
+	 * saying the screen is arriving when it is only catching up.
+	 */
+	const settling = new Placeholder(true);
+	$effect(() => () => settling.stop());
+	const waiting = $derived(settling.shown);
+
 	$effect(() => {
 		void load();
 	});
@@ -128,6 +142,8 @@
 			error = null;
 		} catch (cause) {
 			error = say(cause);
+		} finally {
+			settling.set(false);
 		}
 	}
 
@@ -399,477 +415,487 @@
 	}
 </script>
 
-<p class="blurb">{t.models.blurb}</p>
+{#if waiting}
+	<Rows label={t.settings.loadingModels} />
+{:else}
+	<p class="blurb">{t.models.blurb}</p>
 
-{#if error}
-	<p class="error">{error}</p>
-{/if}
+	{#if error}
+		<p class="error">{error}</p>
+	{/if}
 
-{#each shown as entry (entry.name)}
-	{@const result = probes[entry.name]}
-	{@const effectiveKind = current(entry, 'kind') as ProviderKind}
-	<section class="entry" class:current={entry.name === active}>
-		<header>
-			<div class="identity">
-				<img
-					class="logo"
-					src={logoPreview(entry) || kindIcon(effectiveKind)}
-					alt=""
-					aria-hidden="true"
-					onerror={onLogoError(effectiveKind)}
-				/>
-				<h3>{entry.name}</h3>
-			</div>
-			{#if entry.name === active}
-				<span class="badge">{t.models.active}</span>
-			{:else}
-				<button
-					class="ghost"
-					type="button"
-					onclick={async () => apply(await api.activateProvider(entry.name))}
-				>
-					{t.models.activate}
-				</button>
-			{/if}
-		</header>
-
-		<label>
-			<span>{t.models.kindLabel}</span>
-			<select
-				value={current(entry, 'kind')}
-				onchange={(e) => edit(entry.name, 'kind', e.currentTarget.value)}
-			>
-				{#each PROVIDER_KINDS as kind (kind)}
-					<option value={kind}>{t.models.kind[kind]}</option>
-				{/each}
-			</select>
-		</label>
-
-		{#if effectiveKind === 'custom'}
-			<label class="logo-field">
-				<span>{t.models.logo}</span>
-				<div class="logo-row">
-					{#if logoPreview(entry)}
-						<img class="logo-preview" src={logoPreview(entry)} alt="" />
-					{/if}
-					<input
-						type="file"
-						accept="image/png,image/jpeg,image/webp,image/gif"
-						onchange={(e) => readLogo(entry.name, e)}
+	{#each shown as entry (entry.name)}
+		{@const result = probes[entry.name]}
+		{@const effectiveKind = current(entry, 'kind') as ProviderKind}
+		<section class="entry" class:current={entry.name === active}>
+			<header>
+				<div class="identity">
+					<img
+						class="logo"
+						src={logoPreview(entry) || kindIcon(effectiveKind)}
+						alt=""
+						aria-hidden="true"
+						onerror={onLogoError(effectiveKind)}
 					/>
-					{#if logoPreview(entry)}
-						<button class="ghost tiny" type="button" onclick={() => clearLogo(entry.name)}>
-							{t.models.logoClear}
-						</button>
-					{/if}
+					<h3>{entry.name}</h3>
 				</div>
-				<small>{t.models.logoHint}</small>
+				{#if entry.name === active}
+					<span class="badge">{t.models.active}</span>
+				{:else}
+					<button
+						class="ghost"
+						type="button"
+						onclick={async () => apply(await api.activateProvider(entry.name))}
+					>
+						{t.models.activate}
+					</button>
+				{/if}
+			</header>
+
+			<label>
+				<span>{t.models.kindLabel}</span>
+				<select
+					value={current(entry, 'kind')}
+					onchange={(e) => edit(entry.name, 'kind', e.currentTarget.value)}
+				>
+					{#each PROVIDER_KINDS as kind (kind)}
+						<option value={kind}>{t.models.kind[kind]}</option>
+					{/each}
+				</select>
 			</label>
-		{/if}
 
-		<label>
-			<span>{t.models.baseUrl}</span>
-			<input
-				value={current(entry, 'base_url')}
-				oninput={(e) => edit(entry.name, 'base_url', e.currentTarget.value)}
-			/>
-		</label>
-
-		<label>
-			<span>{t.models.apiKey}</span>
-			<input
-				type="password"
-				placeholder={entry.api_key_set ? '••••••••' : ''}
-				value={drafts[entry.name]?.api_key ?? ''}
-				oninput={(e) => edit(entry.name, 'api_key', e.currentTarget.value)}
-			/>
-			<small>{entry.api_key_set ? t.models.keyStored : t.models.keyBlank}</small>
-		</label>
-
-		<label>
-			<span>{t.models.embeddingModel}</span>
-			<input
-				value={current(entry, 'embedding_model')}
-				oninput={(e) => edit(entry.name, 'embedding_model', e.currentTarget.value)}
-			/>
-			<small>{t.models.embeddingHint}</small>
-		</label>
-
-		<label>
-			<span>{t.models.timeout}</span>
-			<input
-				type="number"
-				min="1"
-				step="10"
-				value={seconds(entry)}
-				oninput={(e) => {
-					const parsed = Number(e.currentTarget.value);
-					if (Number.isFinite(parsed) && parsed > 0) edit(entry.name, 'timeout_s', parsed);
-				}}
-			/>
-			<small>{t.models.timeoutHint}</small>
-		</label>
-
-		<div class="actions">
-			<button
-				class="primary"
-				type="button"
-				disabled={Object.keys(drafts[entry.name] ?? {}).length === 0}
-				onclick={() => save(entry)}
-			>
-				{t.settings.save}
-			</button>
-			<button class="ghost" type="button" onclick={() => probe(entry.name)}>
-				{result === 'running' ? t.models.testing : t.models.test}
-			</button>
-			{#if saved === entry.name}
-				<span class="ok">{t.models.saved}</span>
+			{#if effectiveKind === 'custom'}
+				<label class="logo-field">
+					<span>{t.models.logo}</span>
+					<div class="logo-row">
+						{#if logoPreview(entry)}
+							<img class="logo-preview" src={logoPreview(entry)} alt="" />
+						{/if}
+						<input
+							type="file"
+							accept="image/png,image/jpeg,image/webp,image/gif"
+							onchange={(e) => readLogo(entry.name, e)}
+						/>
+						{#if logoPreview(entry)}
+							<button class="ghost tiny" type="button" onclick={() => clearLogo(entry.name)}>
+								{t.models.logoClear}
+							</button>
+						{/if}
+					</div>
+					<small>{t.models.logoHint}</small>
+				</label>
 			{/if}
-			<button
-				class="ghost danger"
-				type="button"
-				onclick={async () => apply(await api.deleteProvider(entry.name))}
-			>
-				{t.models.remove}
-			</button>
-		</div>
 
-		<div class="models-block">
-			<h4>{t.models.modelsHeading}</h4>
-			{#if entry.models.length}
-				<ul class="registered">
-					{#each entry.models as model (model.id)}
-						{@const key = optionsKey(entry.name, model.id)}
-						{@const draft = optionsDraft[key]}
-						{@const count = Object.keys(model.options).length}
-						<li class:on={model.id === entry.active_model}>
-							<div class="row">
-								<span class="what">
-									<span class="name">{model.name}</span>
-									{#if model.name !== model.id}<code class="hint">{model.id}</code>{/if}
-									{#if count}<span class="badge quiet">{t.models.optionsSet(count)}</span>{/if}
-								</span>
-								{#if model.id === entry.active_model}
-									<span class="badge">{t.models.active}</span>
-								{:else if entry.name === active}
+			<label>
+				<span>{t.models.baseUrl}</span>
+				<input
+					value={current(entry, 'base_url')}
+					oninput={(e) => edit(entry.name, 'base_url', e.currentTarget.value)}
+				/>
+			</label>
+
+			<label>
+				<span>{t.models.apiKey}</span>
+				<input
+					type="password"
+					placeholder={entry.api_key_set ? '••••••••' : ''}
+					value={drafts[entry.name]?.api_key ?? ''}
+					oninput={(e) => edit(entry.name, 'api_key', e.currentTarget.value)}
+				/>
+				<small>{entry.api_key_set ? t.models.keyStored : t.models.keyBlank}</small>
+			</label>
+
+			<label>
+				<span>{t.models.embeddingModel}</span>
+				<input
+					value={current(entry, 'embedding_model')}
+					oninput={(e) => edit(entry.name, 'embedding_model', e.currentTarget.value)}
+				/>
+				<small>{t.models.embeddingHint}</small>
+			</label>
+
+			<label>
+				<span>{t.models.timeout}</span>
+				<input
+					type="number"
+					min="1"
+					step="10"
+					value={seconds(entry)}
+					oninput={(e) => {
+						const parsed = Number(e.currentTarget.value);
+						if (Number.isFinite(parsed) && parsed > 0) edit(entry.name, 'timeout_s', parsed);
+					}}
+				/>
+				<small>{t.models.timeoutHint}</small>
+			</label>
+
+			<div class="actions">
+				<button
+					class="primary"
+					type="button"
+					disabled={Object.keys(drafts[entry.name] ?? {}).length === 0}
+					onclick={() => save(entry)}
+				>
+					{t.settings.save}
+				</button>
+				<button class="ghost" type="button" onclick={() => probe(entry.name)}>
+					{result === 'running' ? t.models.testing : t.models.test}
+				</button>
+				{#if saved === entry.name}
+					<span class="ok">{t.models.saved}</span>
+				{/if}
+				<button
+					class="ghost danger"
+					type="button"
+					onclick={async () => apply(await api.deleteProvider(entry.name))}
+				>
+					{t.models.remove}
+				</button>
+			</div>
+
+			<div class="models-block">
+				<h4>{t.models.modelsHeading}</h4>
+				{#if entry.models.length}
+					<ul class="registered">
+						{#each entry.models as model (model.id)}
+							{@const key = optionsKey(entry.name, model.id)}
+							{@const draft = optionsDraft[key]}
+							{@const count = Object.keys(model.options).length}
+							<li class:on={model.id === entry.active_model}>
+								<div class="row">
+									<span class="what">
+										<span class="name">{model.name}</span>
+										{#if model.name !== model.id}<code class="hint">{model.id}</code>{/if}
+										{#if count}<span class="badge quiet">{t.models.optionsSet(count)}</span>{/if}
+									</span>
+									{#if model.id === entry.active_model}
+										<span class="badge">{t.models.active}</span>
+									{:else if entry.name === active}
+										<button
+											class="ghost tiny"
+											type="button"
+											onclick={() => setActiveModel(entry.name, model.id)}
+										>
+											{t.models.setActiveModel}
+										</button>
+									{/if}
 									<button
 										class="ghost tiny"
 										type="button"
-										onclick={() => setActiveModel(entry.name, model.id)}
+										aria-expanded={draft !== undefined}
+										onclick={() => toggleOptions(entry.name, model)}
 									>
-										{t.models.setActiveModel}
+										{t.models.optionsOpen}
 									</button>
-								{/if}
-								<button
-									class="ghost tiny"
-									type="button"
-									aria-expanded={draft !== undefined}
-									onclick={() => toggleOptions(entry.name, model)}
-								>
-									{t.models.optionsOpen}
-								</button>
-								<button
-									class="ghost tiny danger"
-									type="button"
-									onclick={() => removeModel(entry.name, model.id)}
-								>
-									{t.models.removeModel}
-								</button>
-							</div>
+									<button
+										class="ghost tiny danger"
+										type="button"
+										onclick={() => removeModel(entry.name, model.id)}
+									>
+										{t.models.removeModel}
+									</button>
+								</div>
 
-							{#if draft !== undefined}
-								{@const valid = parsed(draft) !== null}
-								{@const current = parsed(draft) ?? {}}
-								{@const contextValid = contextLengthToSave(contextDraft[key] ?? '') !== undefined}
-								<div class="options">
-									<!-- Not `hint`: that class is the one-line ellipsised model id above, and
+								{#if draft !== undefined}
+									{@const valid = parsed(draft) !== null}
+									{@const current = parsed(draft) ?? {}}
+									{@const contextValid = contextLengthToSave(contextDraft[key] ?? '') !== undefined}
+									<div class="options">
+										<!-- Not `hint`: that class is the one-line ellipsised model id above, and
 									     this is a sentence that has to wrap. -->
-									<p class="explains">{t.models.optionsHint}</p>
+										<p class="explains">{t.models.optionsHint}</p>
 
-									<div class="sampling">
-										{#each SAMPLING_FIELDS as field (field.key)}
-											{@const raw = current[field.key]}
-											{@const value = typeof raw === 'number' ? raw : undefined}
-											<div class="sampling-field">
-												<span>{field.label}</span>
-												<div class="sampling-row">
-													<input
-														type="range"
-														min={field.min}
-														max={field.max}
-														step={field.step}
-														value={value ?? field.min}
-														oninput={(e) =>
-															updateOption(
-																entry.name,
-																model,
-																field.key,
-																Number(e.currentTarget.value)
-															)}
-													/>
-													<input
-														class="mono"
-														type="number"
-														step={field.step}
-														placeholder={t.models.sampling.unset}
-														value={value ?? ''}
-														oninput={(e) => {
-															const text = e.currentTarget.value;
-															updateOption(
-																entry.name,
-																model,
-																field.key,
-																text === '' ? undefined : Number(text)
-															);
-														}}
-													/>
-													{#if value !== undefined}
-														<button
-															class="clear"
-															type="button"
-															title={t.models.sampling.unset}
-															onclick={() => updateOption(entry.name, model, field.key, undefined)}
-														>
-															<span class="sr-only">{t.models.sampling.unset}</span>
-															<span aria-hidden="true">✕</span>
-														</button>
-													{/if}
+										<div class="sampling">
+											{#each SAMPLING_FIELDS as field (field.key)}
+												{@const raw = current[field.key]}
+												{@const value = typeof raw === 'number' ? raw : undefined}
+												<div class="sampling-field">
+													<span>{field.label}</span>
+													<div class="sampling-row">
+														<input
+															type="range"
+															min={field.min}
+															max={field.max}
+															step={field.step}
+															value={value ?? field.min}
+															oninput={(e) =>
+																updateOption(
+																	entry.name,
+																	model,
+																	field.key,
+																	Number(e.currentTarget.value)
+																)}
+														/>
+														<input
+															class="mono"
+															type="number"
+															step={field.step}
+															placeholder={t.models.sampling.unset}
+															value={value ?? ''}
+															oninput={(e) => {
+																const text = e.currentTarget.value;
+																updateOption(
+																	entry.name,
+																	model,
+																	field.key,
+																	text === '' ? undefined : Number(text)
+																);
+															}}
+														/>
+														{#if value !== undefined}
+															<button
+																class="clear"
+																type="button"
+																title={t.models.sampling.unset}
+																onclick={() =>
+																	updateOption(entry.name, model, field.key, undefined)}
+															>
+																<span class="sr-only">{t.models.sampling.unset}</span>
+																<span aria-hidden="true">✕</span>
+															</button>
+														{/if}
+													</div>
 												</div>
-											</div>
-										{/each}
+											{/each}
 
-										<div class="sampling-field">
-											<span>{t.models.sampling.reasoningEffort}</span>
-											<Select
-												choices={REASONING_CHOICES}
-												value={typeof current.reasoning_effort === 'string'
-													? current.reasoning_effort
-													: ''}
-												label={t.models.sampling.reasoningEffort}
-												onchange={(value) =>
-													updateOption(entry.name, model, 'reasoning_effort', value)}
+											<div class="sampling-field">
+												<span>{t.models.sampling.reasoningEffort}</span>
+												<Select
+													choices={REASONING_CHOICES}
+													value={typeof current.reasoning_effort === 'string'
+														? current.reasoning_effort
+														: ''}
+													label={t.models.sampling.reasoningEffort}
+													onchange={(value) =>
+														updateOption(entry.name, model, 'reasoning_effort', value)}
+												/>
+												<small>{t.models.sampling.reasoningEffortHint}</small>
+											</div>
+										</div>
+
+										<p class="warn note">{t.models.sampling.overrideNote}</p>
+
+										<label>
+											<span>{t.models.contextLength}</span>
+											<input
+												type="number"
+												min="1"
+												step="1"
+												placeholder={t.models.contextLengthPlaceholder}
+												value={contextDraft[key] ?? ''}
+												oninput={(e) =>
+													(contextDraft = { ...contextDraft, [key]: e.currentTarget.value })}
 											/>
-											<small>{t.models.sampling.reasoningEffortHint}</small>
+											<small>{t.models.contextLengthHint}</small>
+										</label>
+										{#if !contextValid}
+											<p class="warn">{t.models.contextLengthInvalid}</p>
+										{/if}
+
+										<label class="switch">
+											<input
+												type="checkbox"
+												checked={toolCallingDraft[key] ?? model.tool_calling}
+												onchange={(e) =>
+													(toolCallingDraft = {
+														...toolCallingDraft,
+														[key]: e.currentTarget.checked
+													})}
+											/>
+											<span class="word">{t.models.toolCalling}</span>
+										</label>
+										<small>{t.models.toolCallingHint}</small>
+
+										<label>
+											<span>{t.models.optionsPreset}</span>
+											<select
+												value=""
+												onchange={(e) => {
+													const chosen = presets.find((p) => p.id === e.currentTarget.value);
+													if (chosen)
+														optionsDraft = { ...optionsDraft, [key]: written(chosen.options) };
+													e.currentTarget.value = '';
+												}}
+											>
+												<option value="">{t.models.optionsPresetNone}</option>
+												{#each presets as preset (preset.id)}
+													<option value={preset.id} title={preset.hint}>{preset.label}</option>
+												{/each}
+											</select>
+										</label>
+										<label>
+											<span>{t.models.options}</span>
+											<textarea
+												class="mono"
+												rows="5"
+												spellcheck="false"
+												value={draft}
+												oninput={(e) =>
+													(optionsDraft = { ...optionsDraft, [key]: e.currentTarget.value })}
+											></textarea>
+											<small>{t.models.optionsRawHint}</small>
+										</label>
+										{#if !valid}
+											<p class="warn">{t.models.optionsInvalid}</p>
+										{/if}
+										<div class="options-actions">
+											<button
+												class="ghost tiny"
+												type="button"
+												disabled={!valid || !contextValid}
+												onclick={() => saveOptions(entry.name, model)}
+											>
+												{t.models.optionsSave}
+											</button>
+											<button
+												class="ghost tiny"
+												type="button"
+												onclick={() => (optionsDraft = { ...optionsDraft, [key]: '' })}
+											>
+												{t.models.optionsClear}
+											</button>
 										</div>
 									</div>
+								{/if}
+							</li>
+						{/each}
+					</ul>
+				{:else}
+					<p class="empty">{t.models.noModels}</p>
+				{/if}
 
-									<p class="warn note">{t.models.sampling.overrideNote}</p>
-
-									<label>
-										<span>{t.models.contextLength}</span>
-										<input
-											type="number"
-											min="1"
-											step="1"
-											placeholder={t.models.contextLengthPlaceholder}
-											value={contextDraft[key] ?? ''}
-											oninput={(e) =>
-												(contextDraft = { ...contextDraft, [key]: e.currentTarget.value })}
-										/>
-										<small>{t.models.contextLengthHint}</small>
-									</label>
-									{#if !contextValid}
-										<p class="warn">{t.models.contextLengthInvalid}</p>
-									{/if}
-
-									<label class="switch">
-										<input
-											type="checkbox"
-											checked={toolCallingDraft[key] ?? model.tool_calling}
-											onchange={(e) =>
-												(toolCallingDraft = {
-													...toolCallingDraft,
-													[key]: e.currentTarget.checked
-												})}
-										/>
-										<span class="word">{t.models.toolCalling}</span>
-									</label>
-									<small>{t.models.toolCallingHint}</small>
-
-									<label>
-										<span>{t.models.optionsPreset}</span>
-										<select
-											value=""
-											onchange={(e) => {
-												const chosen = presets.find((p) => p.id === e.currentTarget.value);
-												if (chosen)
-													optionsDraft = { ...optionsDraft, [key]: written(chosen.options) };
-												e.currentTarget.value = '';
-											}}
-										>
-											<option value="">{t.models.optionsPresetNone}</option>
-											{#each presets as preset (preset.id)}
-												<option value={preset.id} title={preset.hint}>{preset.label}</option>
-											{/each}
-										</select>
-									</label>
-									<label>
-										<span>{t.models.options}</span>
-										<textarea
-											class="mono"
-											rows="5"
-											spellcheck="false"
-											value={draft}
-											oninput={(e) =>
-												(optionsDraft = { ...optionsDraft, [key]: e.currentTarget.value })}
-										></textarea>
-										<small>{t.models.optionsRawHint}</small>
-									</label>
-									{#if !valid}
-										<p class="warn">{t.models.optionsInvalid}</p>
-									{/if}
-									<div class="options-actions">
-										<button
-											class="ghost tiny"
-											type="button"
-											disabled={!valid || !contextValid}
-											onclick={() => saveOptions(entry.name, model)}
-										>
-											{t.models.optionsSave}
-										</button>
-										<button
-											class="ghost tiny"
-											type="button"
-											onclick={() => (optionsDraft = { ...optionsDraft, [key]: '' })}
-										>
-											{t.models.optionsClear}
-										</button>
-									</div>
-								</div>
-							{/if}
-						</li>
-					{/each}
-				</ul>
-			{:else}
-				<p class="empty">{t.models.noModels}</p>
-			{/if}
-
-			<div class="add-model">
-				<input
-					class="mono"
-					placeholder={t.models.modelId}
-					value={newModel[entry.name]?.id ?? ''}
-					oninput={(e) =>
-						(newModel = {
-							...newModel,
-							[entry.name]: {
-								...newModel[entry.name],
-								id: e.currentTarget.value,
-								name: newModel[entry.name]?.name ?? ''
-							}
-						})}
-				/>
-				<input
-					placeholder={t.models.modelName}
-					value={newModel[entry.name]?.name ?? ''}
-					oninput={(e) =>
-						(newModel = {
-							...newModel,
-							[entry.name]: {
-								...newModel[entry.name],
-								name: e.currentTarget.value,
-								id: newModel[entry.name]?.id ?? ''
-							}
-						})}
-				/>
-				<button
-					class="ghost tiny"
-					type="button"
-					disabled={!newModel[entry.name]?.id.trim()}
-					onclick={() => addModel(entry.name)}
-				>
-					{t.models.addModel}
-				</button>
-			</div>
-		</div>
-
-		{#if result && result !== 'running'}
-			{#if result.ok}
-				<p class="ok">{t.models.reachable(result.models.length)}</p>
-				<label class="search">
-					<span class="sr-only">{t.models.search}</span>
+				<div class="add-model">
 					<input
-						type="search"
-						placeholder={t.models.search}
-						value={probeQuery[entry.name] ?? ''}
-						oninput={(e) => (probeQuery = { ...probeQuery, [entry.name]: e.currentTarget.value })}
+						class="mono"
+						placeholder={t.models.modelId}
+						value={newModel[entry.name]?.id ?? ''}
+						oninput={(e) =>
+							(newModel = {
+								...newModel,
+								[entry.name]: {
+									...newModel[entry.name],
+									id: e.currentTarget.value,
+									name: newModel[entry.name]?.name ?? ''
+								}
+							})}
 					/>
-				</label>
-				<ul class="probed">
-					{#each probeShown(entry) as id (id)}
-						{@const already = entry.models.some((m) => m.id === id)}
-						<li>
-							<button
-								class="row"
-								class:on={already}
-								type="button"
-								disabled={already}
-								onclick={() => pickFromProbe(entry.name, id)}
-							>
-								<span class="mark" aria-hidden="true">{already ? '✓' : ''}</span>
-								<code class="id">{id}</code>
-								{#if !already}<span class="add-hint">{t.models.pick}</span>{/if}
-								{#if already}<span class="caption">{t.models.alreadyAdded}</span>{/if}
-							</button>
-						</li>
-					{:else}
-						<li class="empty">{t.settings.noMatch}</li>
-					{/each}
-				</ul>
-			{:else}
-				<p class="error">{t.models.unreachable} — {result.error}</p>
-			{/if}
-		{/if}
-	</section>
-{:else}
-	<p class="empty">{t.models.none}</p>
-{/each}
+					<input
+						placeholder={t.models.modelName}
+						value={newModel[entry.name]?.name ?? ''}
+						oninput={(e) =>
+							(newModel = {
+								...newModel,
+								[entry.name]: {
+									...newModel[entry.name],
+									name: e.currentTarget.value,
+									id: newModel[entry.name]?.id ?? ''
+								}
+							})}
+					/>
+					<button
+						class="ghost tiny"
+						type="button"
+						disabled={!newModel[entry.name]?.id.trim()}
+						onclick={() => addModel(entry.name)}
+					>
+						{t.models.addModel}
+					</button>
+				</div>
+			</div>
 
-{#if adding}
-	<section class="entry adding">
-		<h3>{t.models.add}</h3>
-		<label>
-			<span>{t.models.name}</span>
-			<input bind:value={fresh.name} placeholder="studio" />
-			<small>{t.models.nameRule}</small>
-		</label>
-		<label>
-			<span>{t.models.kindLabel}</span>
-			<select bind:value={fresh.kind}>
-				{#each PROVIDER_KINDS as kind (kind)}
-					<option value={kind}>{t.models.kind[kind]}</option>
-				{/each}
-			</select>
-		</label>
-		<label>
-			<span>{t.models.baseUrl}</span>
-			<input bind:value={fresh.base_url} />
-		</label>
-		<label>
-			<span>{t.models.modelId}</span>
-			<input bind:value={fresh.model_id} placeholder="qwen3.6-35b" />
-		</label>
-		<label>
-			<span>{t.models.modelName}</span>
-			<input bind:value={fresh.model_name} placeholder={t.models.modelId} />
-		</label>
-		<label>
-			<span>{t.models.apiKey}</span>
-			<input type="password" bind:value={fresh.api_key} />
-			<small>{t.models.keyBlank}</small>
-		</label>
-		<div class="actions">
-			<button class="primary" type="button" disabled={!fresh.name || !fresh.model_id} onclick={add}>
-				{t.models.add}
-			</button>
-			<button class="ghost" type="button" onclick={() => (adding = false)}>Cancel</button>
-		</div>
-	</section>
-{:else}
-	<button class="ghost add" type="button" onclick={() => (adding = true)}>
-		<span aria-hidden="true">＋</span>
-		{t.models.add}
-	</button>
+			{#if result && result !== 'running'}
+				{#if result.ok}
+					<p class="ok">{t.models.reachable(result.models.length)}</p>
+					<label class="search">
+						<span class="sr-only">{t.models.search}</span>
+						<input
+							type="search"
+							placeholder={t.models.search}
+							value={probeQuery[entry.name] ?? ''}
+							oninput={(e) => (probeQuery = { ...probeQuery, [entry.name]: e.currentTarget.value })}
+						/>
+					</label>
+					<ul class="probed">
+						{#each probeShown(entry) as id (id)}
+							{@const already = entry.models.some((m) => m.id === id)}
+							<li>
+								<button
+									class="row"
+									class:on={already}
+									type="button"
+									disabled={already}
+									onclick={() => pickFromProbe(entry.name, id)}
+								>
+									<span class="mark" aria-hidden="true">{already ? '✓' : ''}</span>
+									<code class="id">{id}</code>
+									{#if !already}<span class="add-hint">{t.models.pick}</span>{/if}
+									{#if already}<span class="caption">{t.models.alreadyAdded}</span>{/if}
+								</button>
+							</li>
+						{:else}
+							<li class="empty">{t.settings.noMatch}</li>
+						{/each}
+					</ul>
+				{:else}
+					<p class="error">{t.models.unreachable} — {result.error}</p>
+				{/if}
+			{/if}
+		</section>
+	{:else}
+		<p class="empty">{t.models.none}</p>
+	{/each}
+
+	{#if adding}
+		<section class="entry adding">
+			<h3>{t.models.add}</h3>
+			<label>
+				<span>{t.models.name}</span>
+				<input bind:value={fresh.name} placeholder="studio" />
+				<small>{t.models.nameRule}</small>
+			</label>
+			<label>
+				<span>{t.models.kindLabel}</span>
+				<select bind:value={fresh.kind}>
+					{#each PROVIDER_KINDS as kind (kind)}
+						<option value={kind}>{t.models.kind[kind]}</option>
+					{/each}
+				</select>
+			</label>
+			<label>
+				<span>{t.models.baseUrl}</span>
+				<input bind:value={fresh.base_url} />
+			</label>
+			<label>
+				<span>{t.models.modelId}</span>
+				<input bind:value={fresh.model_id} placeholder="qwen3.6-35b" />
+			</label>
+			<label>
+				<span>{t.models.modelName}</span>
+				<input bind:value={fresh.model_name} placeholder={t.models.modelId} />
+			</label>
+			<label>
+				<span>{t.models.apiKey}</span>
+				<input type="password" bind:value={fresh.api_key} />
+				<small>{t.models.keyBlank}</small>
+			</label>
+			<div class="actions">
+				<button
+					class="primary"
+					type="button"
+					disabled={!fresh.name || !fresh.model_id}
+					onclick={add}
+				>
+					{t.models.add}
+				</button>
+				<button class="ghost" type="button" onclick={() => (adding = false)}>Cancel</button>
+			</div>
+		</section>
+	{:else}
+		<button class="ghost add" type="button" onclick={() => (adding = true)}>
+			<span aria-hidden="true">＋</span>
+			{t.models.add}
+		</button>
+	{/if}
 {/if}
 
 <style>

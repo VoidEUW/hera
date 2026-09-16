@@ -67,6 +67,10 @@ export const t = {
 		title: 'Chats and projects',
 		noChats: 'No chats yet.',
 		noProjects: 'No projects yet.',
+		// Read out, never drawn: the placeholder they stand in for is bars of grey, which say
+		// nothing to anyone who is not looking at it.
+		loadingProjects: 'Loading projects…',
+		loadingChats: 'Loading chats…',
 		chatOptions: 'Chat options',
 		projectOptions: 'Project options',
 		rename: 'Rename',
@@ -107,6 +111,7 @@ export const t = {
 		save: 'Save',
 		saved: 'Saved',
 		notFound: 'There is no such project.',
+		loading: 'Loading the project…',
 		colour: 'Colour'
 	},
 
@@ -255,6 +260,12 @@ export const t = {
 		close: 'Close',
 		search: 'Search settings',
 		noMatch: 'Nothing here matches that.',
+		// Read out, never drawn: a placeholder is bars of grey and says nothing to anybody who
+		// is not looking at it.
+		loading: 'Loading these settings…',
+		loadingModels: 'Loading models…',
+		loadingSkills: 'Loading skills…',
+		loadingMemory: 'Loading memories…',
 		models: 'Models',
 		mind: 'Mind',
 		memory: 'Memory',
@@ -455,6 +466,7 @@ export const t = {
 
 	chat: {
 		toolbar: 'Conversation tools',
+		loading: 'Loading the conversation…',
 		export: 'Export as Markdown'
 	},
 
@@ -466,7 +478,23 @@ export const t = {
 	error: {
 		load: 'Could not load that',
 		send: 'The message did not go through',
-		retry: 'Try again'
+		retry: 'Try again',
+		retrying: 'Trying…'
+	},
+
+	/** The screen shown when the first load never answered. Its own block rather than more keys
+	 * under `error`, because this is a whole screen with a voice and not a line of copy. */
+	offline: {
+		/** **Hera, not she.** The rest of the interface calls her *she*, and on this one screen it
+		 * reads wrong: there is no conversation here and nothing has a voice — what has failed is
+		 * a server, and the thing to name is the program you are about to restart. */
+		title: 'Hera is not answering',
+		/** Deliberately about *the server* and not about *the network*: this runs on the machine
+		 * it talks to, so a failed request here almost always means a process is not running. */
+		body: 'The interface is here, but nothing is listening behind it. If you started Hera yourself, check that the server is still running.',
+		command: 'uv run hera serve',
+		commandHint: 'The usual way to start Hera, from the project directory.',
+		detail: 'What the browser said'
 	}
 } as const;
 
