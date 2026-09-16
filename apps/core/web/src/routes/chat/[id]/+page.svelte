@@ -66,19 +66,19 @@
 		// A drawer belongs to the conversation it was opened from, so walking to another one
 		// closes it rather than leaving somebody else's page beside this transcript.
 		artifacts.leave();
-		// Taken before the load, so a slow first request cannot let a second effect run and
-		// send it twice.
-		const first = workspace.takeHandoff();
 		// Everything after this belongs to *this* conversation, and `send` goes to whichever
 		// chat the session currently holds -- so a load that was overtaken has to stop here
 		// rather than put the message a chat was started with into the one that overtook it.
-		if (!(await session.open(id))) {
-			// Handed back rather than dropped. `takeHandoff` clears as it reads, so a load that
-			// does not finish is the one place a person's first sentence can go missing with
-			// nothing on screen to say it did. Whoever overtook this one can carry it instead.
-			if (first) workspace.handOff(first.text, first.files);
-			return;
-		}
+		if (!(await session.open(id))) return;
+		// Taken *after* the load, and only by the one that won it. `takeHandoff` clears as it
+		// reads, so whoever takes it owns it: a load that takes it and then loses the race has
+		// stranded somebody's first sentence in a store nobody will read again.
+		//
+		// It used to be taken before the load, guarding against a second effect run for this
+		// same id sending it twice. `opened` above now stops that run happening at all, which is
+		// what makes this order safe -- the only other caller is a navigation to a *different*
+		// chat, and that one has already made this load return false on the line above.
+		const first = workspace.takeHandoff();
 		if (first) await session.send(first.text, first.files);
 		await reopenIfPublished(id);
 	}
