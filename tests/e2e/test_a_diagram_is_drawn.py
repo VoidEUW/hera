@@ -66,6 +66,26 @@ BROKEN_SCRIPT: list[Any] = [
 ]
 
 
+# Frontmatter is ordinary mermaid, not an exotic payload -- and `htmlLabels: true` is the one
+# setting that would put the labels back into a `<foreignObject>` for the sanitiser to strip.
+OVERRIDE = (
+    "---\nconfig:\n  htmlLabels: true\n---\n"
+    "flowchart TD\n  A[Client hello] --> B[Server hello]\n  B --> C[Finished]\n"
+)
+
+OVERRIDE_SCRIPT: list[Any] = [
+    [
+        TextDelta(text="Here is the handshake.\n\n"),
+        tool_call(
+            "hera__artifact_create",
+            {"name": "handshake.mmd", "content": OVERRIDE, "inline": False},
+        ),
+        TurnEnd(reason="tool_calls"),
+    ],
+    text_turn("Three messages, and the last one is the cheap one."),
+]
+
+
 @pytest.fixture
 def page(server: str) -> Any:
     with playwright.sync_playwright() as driver:
@@ -151,3 +171,33 @@ class TestADiagramThatDoesNotParse:
 
         # And mermaid's own error graphic is not on screen instead of it.
         assert page.locator("aside[aria-label='Artifacts'] .drawing svg").count() == 0
+
+
+class TestTheSourceCannotTurnTheLabelsOff:
+    """The configuration that keeps a diagram readable has to survive the file.
+
+    `htmlLabels: false` is what makes one sanitising path enough, and mermaid lets the *source*
+    override configuration through frontmatter. A `.mmd` is written by a model, so this is not an
+    attack to defend against -- it is a line a model will eventually write, and without
+    `secure` it silently wins: every label goes back into a `<foreignObject>`, the svg-only
+    profile strips it, and the diagram arrives with its boxes intact and every word gone.
+
+    Driven in a browser for the same reason the rest of this module is, and asserted on the
+    labels for the same reason too.
+    """
+
+    @pytest.fixture
+    def script(self) -> list[Any]:
+        return OVERRIDE_SCRIPT
+
+    def test_frontmatter_asking_for_html_labels_does_not_get_them(self, page: Any) -> None:
+        publish(page)
+
+        drawing = page.locator("aside[aria-label='Artifacts'] .drawing svg")
+        drawing.wait_for(timeout=30_000)
+
+        joined = " ".join(drawing.locator("text").all_text_contents())
+        assert "Client hello" in joined
+        assert "Server hello" in joined
+        assert "Finished" in joined
+        assert drawing.locator("foreignObject").count() == 0

@@ -67,11 +67,18 @@ drawing by hand.
 
 Three things worth carrying forward:
 
-- **`htmlLabels: false` is what makes one sanitising path enough.** Mermaid's default label is a
-  `<foreignObject>` full of XHTML, which `sanitiseSvg`'s svg-only profile strips — so the diagram
-  arrives with every word missing and the boxes intact, which is the failure that looks like
-  success. Turning the option off makes a label a real `<text>` element. Widening the profile to
-  `html` would have "fixed" it by handing every artifact a `<div>` and an `<iframe>` back.
+- **`htmlLabels: false` is what makes one sanitising path enough — and it has to be *locked*.**
+  Mermaid's default label is a `<foreignObject>` full of XHTML, which `sanitiseSvg`'s svg-only
+  profile strips, so the diagram arrives with every word missing and the boxes intact: the
+  failure that looks like success. Turning the option off makes a label a real `<text>` element,
+  and widening the profile to `html` would have "fixed" it by handing every artifact a `<div>`
+  and an `<iframe>` back. **The setting alone was not enough**, which is the part that was nearly
+  missed: mermaid lets the *source* override configuration through frontmatter, and a `.mmd` is
+  written by a model — `config: {htmlLabels: true}` above the diagram is ordinary syntax, not an
+  attack, and it silently won. `secure` is the list of keys only `initialize` may set; supplying
+  it *replaces* mermaid's default array rather than extending it, so the six defaults are
+  repeated alongside the one being added. Caught by a review bot on the pull request and
+  reproduced in a browser before it was believed.
 - **Lazy is load-bearing.** One `import('mermaid')` in `$lib/mermaid` splits 2.7 MB into chunks the
   entry never references. Verified against the build, not assumed.
 - **The old source view is the failure path now, not dead code.** A `.mmd` is written by a model,

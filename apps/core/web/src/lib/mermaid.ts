@@ -24,7 +24,8 @@
  *   them at all. Turning the option off makes a label a real `<text>` element, so the diagram
  *   and the sanitiser want the same thing instead of fighting over it. Widening the profile to
  *   `html` is the other way to make labels survive and it is the wrong one, because it hands
- *   every artifact a `<div>` and an `<iframe>` back.
+ *   every artifact a `<div>` and an `<iframe>` back. The setting is also *locked* — see `secure`
+ *   below, without which one line of frontmatter in a file a model wrote undoes all of this.
  *
  * **Nothing here reads her prose.** A fenced ```` ```mermaid ```` block in an answer stays a code
  * block; only a published `.mmd` artifact is drawn. That is what keeps this on the right side of
@@ -58,6 +59,23 @@ function library(): Promise<typeof import('mermaid').default> {
 				securityLevel: 'strict',
 				// Why a diagram has readable labels at all — see the note above.
 				htmlLabels: false,
+				// And why that setting *holds*. A `.mmd` is written by a model, and mermaid lets
+				// the source override configuration through frontmatter — `config: {htmlLabels:
+				// true}` above the diagram is ordinary syntax, not an exotic payload. Without
+				// this, that one line turns every label back into a `<foreignObject>`, the
+				// sanitiser strips it, and the diagram arrives with its boxes intact and every
+				// word gone. `secure` is the list of keys only `initialize` may set; supplying it
+				// *replaces* mermaid's default rather than extending it, so its six defaults are
+				// repeated here and `htmlLabels` is the one being added.
+				secure: [
+					'secure',
+					'securityLevel',
+					'startOnLoad',
+					'maxTextSize',
+					'suppressErrorRendering',
+					'maxEdges',
+					'htmlLabels'
+				],
 				// A failed parse throws and leaves nothing behind. Without this, mermaid draws its
 				// own error graphic into the page, which would put *mermaid's* idea of a failure on
 				// screen instead of the source view that lets a person see what went wrong.
