@@ -3,7 +3,7 @@
 Current state of the rebuild, so a new session can start without re-reading history. A snapshot,
 not a changelog — historical detail and full rationale live in `versions/` and the ADRs.
 
-**Updated:** 2026-09-10 · **Version:** v0.2.0 tagged, v0.2.1 in progress · **Strategy:** thin spine
+**Updated:** 2026-09-17 · **Version:** v0.2.0 tagged, v0.2.1 in progress · **Strategy:** thin spine
 first, then deepen
 
 ## Now: v0.2.1
@@ -55,13 +55,39 @@ Notes from the change:
   written, with a note: the separate-tool conclusion it reached turned out right for reasons the
   doc didn't know yet.
 
+### Mermaid artifacts are drawn ([issue #73](https://github.com/VoidEUW/hera/issues/73))
+
+Done. `.mmd` was a real artifact kind with no renderer behind it since ADR 13; it is drawn now, in
+the same box and through the same sanitiser as an `.svg`.
+
+**The point of it is the model, not the file kind.** `.svg` only covers a drawn chart if something
+can write the path data, and the models ADR 19 targets cannot — they can write six lines of mermaid.
+So `hera__artifact_create`'s description now names `.mmd` and tells her to reach for it rather than
+drawing by hand.
+
+Three things worth carrying forward:
+
+- **`htmlLabels: false` is what makes one sanitising path enough.** Mermaid's default label is a
+  `<foreignObject>` full of XHTML, which `sanitiseSvg`'s svg-only profile strips — so the diagram
+  arrives with every word missing and the boxes intact, which is the failure that looks like
+  success. Turning the option off makes a label a real `<text>` element. Widening the profile to
+  `html` would have "fixed" it by handing every artifact a `<div>` and an `<iframe>` back.
+- **Lazy is load-bearing.** One `import('mermaid')` in `$lib/mermaid` splits 2.7 MB into chunks the
+  entry never references. Verified against the build, not assumed.
+- **The old source view is the failure path now, not dead code.** A `.mmd` is written by a model,
+  so most failures here are six lines that do not parse; `suppressErrorRendering` keeps mermaid's
+  own error graphic off the screen and the source comes back with the line number over it.
+
+The e2e test asserts on the **labels** rather than on the presence of an `<svg>`, because that is
+the half that can vanish quietly.
+
 ## Timeline
 
 | Version | State | Notes |
 |---|---|---|
 | v0.1 | shipped | spine: message in → model boundary → router → mind → turn orchestrator → SSE out |
 | v0.2.0 | **tagged** | organise → produce → remember: projects, scratchpad, artifacts, memory (3 of 5 planned milestones — the other two moved, not dropped) |
-| v0.2.1 | in progress | polish: `⌘K` palette, hotkeys, `hera__read_resource`, ADR 17 |
+| v0.2.1 | in progress | polish: `⌘K` palette, hotkeys, `hera__read_resource`, ADR 17, mermaid |
 | v0.3.0 | planned | dreaming, sandbox, `hera-code` — see [versions/v0.3.0.md](versions/v0.3.0.md) |
 
 Dreaming and the redesign pass both moved out of v0.2.0 on purpose — dreaming because every

@@ -75,6 +75,21 @@ describe('sanitiseSvg', () => {
 		);
 		expect(drawn).not.toContain('<iframe');
 	});
+
+	it('takes a perfectly innocent label out with it, which is why mermaid may not use one', () => {
+		// Not a security test — a constraint, pinned where somebody would look before changing
+		// `$lib/mermaid`'s configuration. The profile cannot tell a smuggled frame from a label,
+		// so it removes both, and mermaid's *default* label is exactly this: a `<foreignObject>`
+		// full of XHTML. A diagram drawn that way arrives with every box intact and every word
+		// gone, which is the shape of failure that reads as success. `htmlLabels: false` is the
+		// answer; widening this profile to `html` is the one that hands every artifact a frame.
+		const drawn = sanitiseSvg(
+			'<svg><foreignObject><div><span>Client hello</span></div></foreignObject>' +
+				'<text>Server hello</text></svg>'
+		);
+		expect(drawn).not.toContain('Client hello');
+		expect(drawn).toContain('Server hello');
+	});
 });
 
 describe('the download link', () => {
