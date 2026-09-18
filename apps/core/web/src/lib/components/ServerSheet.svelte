@@ -27,6 +27,7 @@
 	title={t.servers.title}
 	caption={t.servers.blurb}
 	placement="docked"
+	sheetclass="server-sheet"
 	width="min(380px, 92vw)"
 	{onclose}
 >
@@ -51,6 +52,11 @@
 </Modal>
 
 <style>
+	/* The sheet's own padding: the header's is horizontal, the list's is vertical, and
+	   this fills the rest. Scoped to this sheet alone — the skill picker pads its own. */
+	:global(.sheet.server-sheet) {
+		padding: 0 18px 16px;
+	}
 	.list {
 		list-style: none;
 		margin: 10px 0 0;

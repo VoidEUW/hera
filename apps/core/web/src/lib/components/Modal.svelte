@@ -33,6 +33,10 @@
 		 * closing means; this shell only reports the intent. Optional, because a sheet whose
 		 * only exit is its own controls (the profile menu before #102) still wants the shell. */
 		onclose?: () => void;
+		/** Draw the close control when there is no title to hang it beside. A titled sheet
+		 * always has one; a bare sheet (the profile menu) draws a small floating one, because
+		 * #99's rule is that every sheet closes with a real control, not a 12px glyph. */
+		closeButton?: boolean;
 		/** Where the sheet sits. `centre` is Settings; `docked` is the composer-adjacent sheets
 		 * (ServerSheet, SkillPicker), which hang 96px from the bottom so the composer stays
 		 * visible under them; `anchored` is the profile menu, which pins to the bottom-left
@@ -56,6 +60,7 @@
 		title = '',
 		caption = '',
 		onclose,
+		closeButton = true,
 		placement = 'centre',
 		dim = true,
 		width = 'min(520px, 92vw)',
@@ -83,15 +88,42 @@
 	});
 
 	function onkeydown(event: KeyboardEvent) {
-		if (event.key !== 'Escape') return;
-		// One Escape does one thing (#112's rule, arriving early). If a Select dropdown is open
-		// inside the sheet, closing it is what this Escape is for — the modal is the layer
-		// underneath it, and closing both at once is the double-close the dropdown's own
-		// handler used to race. Select owns its Escape through `svelte:window` too, so the
-		// check is on the DOM: an open dropdown is a `role="listbox"` that Select rendered.
-		const dropdown = sheet?.querySelector('[role="listbox"]');
-		if (dropdown) return;
-		close();
+		if (event.key === 'Escape') {
+			// One Escape does one thing (#112's rule, arriving early). If a Select dropdown is open
+			// inside the sheet, closing it is what this Escape is for — the modal is the layer
+			// underneath it, and closing both at once is the double-close the dropdown's own
+			// handler used to race. Select owns its Escape through `svelte:window` too, so the
+			// check is on the DOM: an open dropdown is a `role="listbox"` that Select rendered.
+			const dropdown = sheet?.querySelector('[role="listbox"]');
+			if (dropdown) return;
+			close();
+			return;
+		}
+		if (event.key === 'Tab') {
+			// `aria-modal` is a promise that nothing outside the sheet is reachable, and Tab is
+			// where that promise is kept: forward from the last focusable wraps to the first,
+			// reverse from the first wraps to the last. Without this the browser happily tabs
+			// into the conversation behind the scrim, which is exactly what `aria-modal` said
+			// could not happen. (#121 is the same bug in the rail's sheet.)
+			const focusable = [
+				...(sheet?.querySelectorAll<HTMLElement>(
+					'input:not([disabled]), button:not([disabled]), select:not([disabled]), textarea:not([disabled]), [href], [tabindex]:not([tabindex="-1"])'
+				) ?? [])
+			].filter((el) => el.offsetParent !== null);
+			if (!focusable.length) return;
+			const first = focusable[0];
+			const last = focusable[focusable.length - 1];
+			const here = document.activeElement;
+			if (event.shiftKey) {
+				if (here === first || here === sheet) {
+					event.preventDefault();
+					last.focus();
+				}
+			} else if (here === last) {
+				event.preventDefault();
+				first.focus();
+			}
+		}
 	}
 
 	/** Every exit from the shell is this one function, so a caller overriding one behaviour
@@ -114,10 +146,10 @@
 	aria-label={label}
 	tabindex="-1"
 >
-	{#if title}
+	{#if title || caption}
 		<header>
 			<div>
-				<h2 class="display">{title}</h2>
+				{#if title}<h2 class="display">{title}</h2>{/if}
 				{#if caption}<p class="caption">{caption}</p>{/if}
 			</div>
 			<button class="close" type="button" onclick={close}>
@@ -125,6 +157,13 @@
 				<span class="glyph" aria-hidden="true"></span>
 			</button>
 		</header>
+	{:else if closeButton}
+		<!-- A sheet with no title still closes with a real control (#99): the profile menu
+	         hides its chrome but not its way out. -->
+		<button class="close floating" type="button" onclick={close}>
+			<span class="sr-only">{t.settings.close}</span>
+			<span class="glyph" aria-hidden="true"></span>
+		</button>
 	{/if}
 	{#if children}
 		{@render children()}
@@ -254,6 +293,18 @@
 
 	.close:active {
 		transform: scale(0.95);
+	}
+
+	/* A bare sheet's close control: same circle, smaller and pinned to the sheet's own
+	   top-right corner rather than sitting in a header bar that does not exist. */
+	.close.floating {
+		position: absolute;
+		top: 6px;
+		right: 6px;
+		width: 26px;
+		height: 26px;
+		z-index: 1;
+		background: var(--surface-raised);
 	}
 
 	/* Two hairlines crossing at the centre: one shape, no font, and it takes the colour of the

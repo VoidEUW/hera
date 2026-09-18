@@ -66,6 +66,7 @@
 	caption={t.skills.blurb}
 	placement="docked"
 	width="min(520px, 92vw)"
+	sheetclass="skill-picker"
 	{onclose}
 >
 	<label class="search">
@@ -101,7 +102,7 @@
 
 <style>
 	/* The Modal draws the frame and the header; this sheet owns the padding of its own body. */
-	:global(.sheet.docked) {
+	:global(.sheet.skill-picker) {
 		padding: 0 18px 16px;
 	}
 

@@ -13,6 +13,10 @@
  * the native one it replaced, and `Composer.svelte`'s CSS says the same — so JS/CSS comment
  * spans are stripped before the scan rather than pattern-matched line by line. The point is
  * that no *element* ships, and an element is what is left when the comments are gone.
+ *
+ * The match is lowercase and word-boundary aware on purpose, and not case-insensitive: a
+ * Svelte *element* is always lowercase (`<select>`), a *component* is always capitalized
+ * (`<Select`), and an `i` flag would flag all ten of the component's call sites as offenders.
  */
 
 import { describe, expect, it } from 'vitest';
@@ -43,7 +47,7 @@ describe('every selector is Select', () => {
 			// Line numbers are counted on the stripped text — they still land on the element's
 			// line, because comment removal collapses spans but never inserts newlines.
 			stripped.split('\n').forEach((line: string, index: number) => {
-				if (line.includes('<select')) {
+				if (/<select\b/.test(line)) {
 					offenders.push(`${path}:${index + 1}: ${line.trim()}`);
 				}
 			});

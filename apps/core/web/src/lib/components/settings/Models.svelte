@@ -693,10 +693,11 @@
 											<p class="warn">{t.models.contextLengthInvalid}</p>
 										{/if}
 
-										<label>
-											<span>{t.models.toolCalling}</span>
+										<div class="field">
+											<span class="label">{t.models.toolCalling}</span>
 											<Checkbox
 												checked={toolCallingDraft[key] ?? model.tool_calling}
+												ariaLabel={t.models.toolCalling}
 												onchange={(checked) =>
 													(toolCallingDraft = {
 														...toolCallingDraft,
@@ -704,7 +705,7 @@
 													})}
 											/>
 											<small>{t.models.toolCallingHint}</small>
-										</label>
+										</div>
 
 										<label>
 											<span>{t.models.optionsPreset}</span>
@@ -965,7 +966,16 @@
 		margin-bottom: 10px;
 	}
 
-	label > span {
+	/* The same shape as a `label` block, for the one control that brings its own label — a
+	   `Checkbox` rooted in a `<label>` of its own, and nested labels are invalid HTML that
+	   announce twice. The wrapper carries the layout; the text rides on the control. */
+	.field {
+		display: block;
+		margin-bottom: 10px;
+	}
+
+	label > span,
+	.field > .label {
 		display: block;
 		font-size: 12.5px;
 		color: var(--text-muted);
