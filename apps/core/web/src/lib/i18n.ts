@@ -452,6 +452,12 @@ export const t = {
 		/** The card's save control is a glyph, so its accessible name says *which* file — a turn
 		 * that published four of them otherwise offers four identical buttons. */
 		downloadOne: (name: string) => `Download ${name}`,
+		/** A diagram is saved as the page that draws it, not as its mermaid source: what somebody
+		 * saving a picture wants is the picture, and six lines of mermaid need a renderer they do
+		 * not have. The control says so, because *Download* on a diagram and *Download* on a page
+		 * would promise the same thing and give different ones. */
+		downloadDrawn: 'Download as a page',
+		downloadDrawnOne: (name: string) => `Download ${name} as a page`,
 		close: 'Close',
 		panel: 'Artifacts',
 		files: 'Everything published here',

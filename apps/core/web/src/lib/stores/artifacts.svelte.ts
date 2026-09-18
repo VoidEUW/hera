@@ -15,7 +15,10 @@
 
 import type { Artifact } from '$lib/api/events';
 
-const ARTIFACT_TOOL = 'hera__artifact_';
+/** Her tools that touch something published. Two prefixes rather than one, because drawing a
+ * diagram is its own tool and a file it made is still a file the drawer and the cards are
+ * showing — a diagram missing from this list is one whose edit nothing re-fetches. */
+const PUBLISHING_TOOLS = ['hera__artifact_', 'hera__diagram_'];
 
 class Artifacts {
 	/** The chat whose drawer is open, or `null` when it is closed. */
@@ -66,7 +69,8 @@ class Artifacts {
 	 * `published` is what she just made, when this call was the one that made it. A page opens
 	 * beside the conversation as it lands, because the next thing anybody does with a page is
 	 * look at it, and hunting for the **Open** on a card that is still arriving is a step nobody
-	 * wants. A figure she marked `inline` does **not** open: it is already on screen where she
+	 * wants. A figure marked `inline` — which a diagram is unless the call asked for it beside the
+	 * conversation — does **not** open: it is already on screen where she
 	 * drew it, and taking half the width away from the sentence it explains is the opposite of
 	 * what `inline` asked for. The caller reads the turn in flight, so this happens while she is
 	 * publishing and never on a reload — reopening for a conversation that already had published
@@ -74,7 +78,8 @@ class Artifacts {
 	 * not this method's. That one defers to this one: a drawer already open on the file she just
 	 * made is never reset to nothing chosen. */
 	noticed(chatId: string | null, callId: string, tool: string, published: Artifact | null) {
-		if (!tool.startsWith(ARTIFACT_TOOL) || this.#seen.has(callId)) return;
+		const hers = PUBLISHING_TOOLS.some((prefix) => tool.startsWith(prefix));
+		if (!hers || this.#seen.has(callId)) return;
 		this.#seen.add(callId);
 		this.version += 1;
 		if (chatId && published && !published.inline) this.show(chatId, published.name);

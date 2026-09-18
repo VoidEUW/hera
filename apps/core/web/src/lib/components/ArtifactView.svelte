@@ -46,6 +46,19 @@
 
 	let { chatId, name, height = '420px' }: Props = $props();
 
+	/** The two things a fetch is keyed on, and they are `$derived` for a reason worth keeping.
+	 *
+	 * A prop is read through a getter, so reading `name` inside an effect subscribes to whatever
+	 * the *parent* read to produce it — and the parent here is a transcript that rebuilds
+	 * `turn.blocks` from nothing on every token that arrives. `item.artifact` is a fresh object
+	 * each time with the same filename in it, so "she said another word" reached this component
+	 * as "your artifact changed": the content was refetched and a diagram redrawn from zero,
+	 * forty times over a short answer. A `$derived` propagates only when the value really
+	 * changed, which turns that back into *the file I am showing is a different file*.
+	 */
+	const wanted = $derived(name);
+	const chat = $derived(chatId);
+
 	let content = $state<ArtifactContent | null>(null);
 	let failure = $state('');
 
@@ -54,14 +67,13 @@
 	/** Why mermaid would not draw this one. Set means: show the source, with this over it. */
 	let undrawable = $state('');
 
-	const kind = $derived(kindOf(name));
+	const kind = $derived(kindOf(wanted));
 
 	$effect(() => {
-		// Re-runs when the name changes and when something published changed. Both are reads of
-		// state this effect does not write, which is what keeps it out of the loop `status.md`
-		// records — nothing here assigns to `artifacts.version`.
-		const wanted = name;
-		const chat = chatId;
+		// Re-runs when the file changes and when something published changed. `wanted` and `chat`
+		// are read by the call itself; `version` is the one nothing else here reads. All three
+		// are reads of state this effect does not write, which is what keeps it out of the loop
+		// `status.md` records — nothing here assigns to `artifacts.version`.
 		void artifacts.version;
 		let current = true;
 		content = null;
@@ -110,7 +122,7 @@
 {:else if !content}
 	<p class="waiting">{t.artifact.loading}</p>
 {:else if kind === 'html'}
-	<iframe title={name} class="frame" style:height sandbox="allow-scripts" srcdoc={content.text}
+	<iframe title={wanted} class="frame" style:height sandbox="allow-scripts" srcdoc={content.text}
 	></iframe>
 {:else if kind === 'svg'}
 	<div class="drawing" style:max-height={height}>

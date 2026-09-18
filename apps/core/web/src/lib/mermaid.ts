@@ -32,7 +32,8 @@
  * ADR 11 — it is a renderer for one artifact kind, not a second parser in the browser.
  */
 
-import { sanitiseSvg } from './artifacts';
+import { api } from './api/client';
+import { downloadUrl, sanitiseSvg, stemOf, titleOf } from './artifacts';
 
 /** The loaded library, kept as the *promise* rather than the module.
  *
@@ -117,4 +118,93 @@ export async function draw(source: string): Promise<string> {
 	const mermaid = await library();
 	const { svg } = await mermaid.render(`mermaid-drawing-${++serial}`, source);
 	return sanitiseSvg(svg);
+}
+
+/** `&`, `<` and `>`, for the one place a filename is written into markup. */
+function escaped(text: string): string {
+	return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+/**
+ * One drawn diagram as a page you can keep: a standalone HTML file with the picture in it.
+ *
+ * **Saving the `.mmd` would hand back six lines of mermaid**, which is the source of the thing
+ * rather than the thing — right for somebody who wants to edit it and wrong for everybody else,
+ * because opening it needs a renderer they do not have. So a diagram is converted on the way
+ * out, and what lands in the downloads folder opens in a browser and shows the diagram.
+ *
+ * **It is converted here rather than on the server, and that is not a preference.** Mermaid lays
+ * a diagram out by measuring its own text, so drawing one needs a browser; the only place in
+ * Hera that has one is this one. The server has the source and could serve nothing better than
+ * the source.
+ *
+ * SVG rather than a bundled copy of mermaid, for the same reason: the picture is already drawn,
+ * and a page that fetches two megabytes of library from a CDN to redraw it is a page that stops
+ * working when the network does.
+ */
+export function page(title: string, drawing: string): string {
+	// Not a flex container, and `ArtifactView`'s `.drawing` says why at length: an `<svg>` with
+	// `height: auto` is a flex item whose cross size is `auto`, so it gets stretched to the box
+	// instead of keeping its own aspect ratio.
+	return `<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>${escaped(title)}</title>
+		<style>
+			body {
+				margin: 0;
+				padding: 24px;
+				background: #fff;
+			}
+			svg {
+				display: block;
+				margin: 0 auto;
+				max-width: 100%;
+				height: auto;
+			}
+		</style>
+	</head>
+	<body>
+		${drawing}
+	</body>
+</html>
+`;
+}
+
+/** Hand the browser a file to save. It already knows how; this only says what to call it. */
+function keep(filename: string, href: string): void {
+	const link = document.createElement('a');
+	link.href = href;
+	link.download = filename;
+	link.rel = 'external';
+	link.click();
+}
+
+/**
+ * Save one mermaid artifact as the page that draws it.
+ *
+ * The card and the drawer both call this, so *what saving a diagram gives you* is decided once.
+ *
+ * A source that does not parse falls back to downloading the file itself. That is the same
+ * failure the view has a branch for — a `.mmd` is written by a model, so most of the ways this
+ * feature fails are six lines that do not parse — and the answer is the same one: there is no
+ * picture to hand over, so hand over what there is rather than nothing at all.
+ */
+export async function saveDiagram(chatId: string, name: string): Promise<void> {
+	let html: string;
+	try {
+		const { text } = await api.artifact(chatId, name);
+		html = page(titleOf(name), await draw(text));
+	} catch {
+		keep(name, downloadUrl(chatId, name));
+		return;
+	}
+	const href = URL.createObjectURL(new Blob([html], { type: 'text/html' }));
+	keep(`${stemOf(name)}.html`, href);
+	// After the download has had a moment to start, not on the next line: revoking the URL is
+	// what frees the blob, and doing it synchronously after `click()` races the browser picking
+	// the file up. A second is far longer than that takes and costs one document of memory.
+	setTimeout(() => URL.revokeObjectURL(href), 1000);
 }

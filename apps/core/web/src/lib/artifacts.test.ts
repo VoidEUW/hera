@@ -14,7 +14,16 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { downloadUrl, extensionOf, kindOf, newest, sanitiseSvg, size, titleOf } from './artifacts';
+import {
+	downloadUrl,
+	extensionOf,
+	kindOf,
+	newest,
+	sanitiseSvg,
+	size,
+	stemOf,
+	titleOf
+} from './artifacts';
 
 describe('kindOf', () => {
 	it('reads the renderer off the extension', () => {
@@ -51,6 +60,16 @@ describe('titleOf', () => {
 
 	it('leaves a name with no extension alone', () => {
 		expect(titleOf('README')).toBe('README');
+	});
+});
+
+describe('stemOf', () => {
+	it('drops the extension and keeps the name she gave it', () => {
+		// What another filename gets built out of: a diagram saved as the page that draws it
+		// changes the kind and nothing else.
+		expect(stemOf('handshake.mmd')).toBe('handshake');
+		expect(stemOf('README')).toBe('README');
+		expect(stemOf('.notes')).toBe('.notes');
 	});
 });
 
