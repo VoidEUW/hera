@@ -459,6 +459,7 @@
 					choices={PROVIDER_KINDS.map((kind) => ({ value: kind, label: t.models.kind[kind] }))}
 					value={current(entry, 'kind')}
 					label={t.models.kindLabel}
+					field
 					onchange={(value) => edit(entry.name, 'kind', value)}
 				/>
 			</label>
@@ -665,6 +666,7 @@
 														? current.reasoning_effort
 														: ''}
 													label={t.models.sampling.reasoningEffort}
+													field
 													onchange={(value) =>
 														updateOption(entry.name, model, 'reasoning_effort', value)}
 												/>
@@ -717,6 +719,7 @@
 												]}
 												value=""
 												label={t.models.optionsPreset}
+												field
 												onchange={(chosenId) => {
 													const chosen = presets.find((p) => p.id === chosenId);
 													if (chosen)
@@ -860,6 +863,7 @@
 					choices={PROVIDER_KINDS.map((kind) => ({ value: kind, label: t.models.kind[kind] }))}
 					value={fresh.kind}
 					label={t.models.kindLabel}
+					field
 					onchange={(value) => (fresh = { ...fresh, kind: value as ProviderKind })}
 				/>
 			</label>

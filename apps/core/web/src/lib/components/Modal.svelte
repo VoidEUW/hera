@@ -83,7 +83,15 @@
 	});
 
 	function onkeydown(event: KeyboardEvent) {
-		if (event.key === 'Escape') close();
+		if (event.key !== 'Escape') return;
+		// One Escape does one thing (#112's rule, arriving early). If a Select dropdown is open
+		// inside the sheet, closing it is what this Escape is for — the modal is the layer
+		// underneath it, and closing both at once is the double-close the dropdown's own
+		// handler used to race. Select owns its Escape through `svelte:window` too, so the
+		// check is on the DOM: an open dropdown is a `role="listbox"` that Select rendered.
+		const dropdown = sheet?.querySelector('[role="listbox"]');
+		if (dropdown) return;
+		close();
 	}
 
 	/** Every exit from the shell is this one function, so a caller overriding one behaviour
@@ -153,14 +161,26 @@
 		width: var(--modal-width);
 	}
 
+	/* Centred by insets and auto margins rather than by `transform: translate(...)`, because
+	 * a transform makes the sheet the containing block for its descendants' `position: fixed`
+	 * elements — and `Select.svelte`'s away-overlay is exactly that. Under a transformed sheet
+	 * the overlay covered only the sheet itself, so a click beside it fell through to the
+	 * scrim and closed the whole modal instead of the dropdown, and Escape closed both at
+	 * once. Insets and margins centre the same way and leave containing blocks where the spec
+	 * puts them.
+	 *
+	 * `centre` needs a definite height from the caller (`sheetclass`), which Settings already
+	 * gives it; without one the over-constrained insets stretch the sheet to the viewport. */
 	.sheet.centre {
-		inset: 50% 50% auto auto;
-		transform: translate(50%, -50%);
+		inset: 0;
+		margin: auto;
 	}
 
 	.sheet.docked {
-		inset: auto 50% 96px auto;
-		transform: translateX(50%);
+		left: 0;
+		right: 0;
+		bottom: 96px;
+		margin-inline: auto;
 		max-height: 60vh;
 	}
 

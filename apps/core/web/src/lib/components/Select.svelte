@@ -50,6 +50,10 @@
 		title?: string;
 		/** Shown in place of the value when nothing is chosen and nothing can be. */
 		placeholder?: string;
+		/** The settings-screen look: the same rectangle, surface, mono face and padding as the
+		 * `input` beside it, rather than the composer's pill. A selector in a form should look
+		 * like the form's fields; a pill in the composer's row should look like its chips. */
+		field?: boolean;
 		onchange?: (value: string) => void;
 	}
 
@@ -62,6 +66,7 @@
 		disabled = false,
 		title = '',
 		placeholder = '',
+		field = false,
 		onchange
 	}: Props = $props();
 
@@ -145,7 +150,7 @@
 	></div>
 {/if}
 
-<div class="select" class:disabled>
+<div class="select" class:disabled class:field>
 	<button
 		bind:this={trigger}
 		class="pill"
@@ -253,6 +258,24 @@
 		cursor: default;
 		color: var(--text-faint);
 		border-style: dashed;
+	}
+
+	/* The settings-screen look: the same rectangle, surface, mono face and padding the
+	   `input` elements beside it wear, so a form reads as one set of fields rather than a mix
+	   of pills and boxes. Only the trigger changes — the popup is the same list everywhere. */
+	.select.field .pill {
+		padding: 7px 10px;
+		background: var(--surface);
+		border-radius: var(--radius);
+		font-family: var(--font-mono);
+		font-size: 13px;
+	}
+
+	.select.field .pill:hover:not(:disabled),
+	.select.field .pill.open {
+		border-color: var(--text-faint);
+		color: var(--text);
+		background: var(--surface);
 	}
 
 	.shown {
