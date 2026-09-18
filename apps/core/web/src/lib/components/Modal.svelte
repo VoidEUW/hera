@@ -131,11 +131,34 @@
 	function close() {
 		onclose?.();
 	}
+
+	/** A click outside the sheet closes it — including the click that lands on a Select's
+	 * away-overlay, which sits above the scrim and swallows the event before the scrim's own
+	 * handler can see it. Listened on the window in the bubble phase rather than on the scrim:
+	 * the overlay is not the scrim's descendant, so an onclick on the scrim alone never fires
+	 * for those. When a dropdown is open, the click *is* the dropdown's to consume — the first
+	 * click closes the dropdown, the second closes the sheet, which is the same one-gesture-
+	 * one-effect rule Escape follows above.
+	 *
+	 * `settled` guards the click that opened the sheet: the opener sits outside the sheet, and
+	 * a listener added to the window while that very event is still bubbling does fire for it
+	 * — without the guard, every sheet would close on the click that opened it. One microtask
+	 * is enough for the event to finish dispatching. */
+	let settled = false;
+	queueMicrotask(() => (settled = true));
+
+	function onwindowclick(event: MouseEvent) {
+		if (!settled) return;
+		const target = event.target as HTMLElement;
+		if (sheet?.contains(target)) return;
+		if (sheet?.querySelector('[role="listbox"]')) return;
+		close();
+	}
 </script>
 
-<svelte:window {onkeydown} />
+<svelte:window {onkeydown} onclick={onwindowclick} />
 
-<div class="scrim" class:clear={!dim} role="presentation" onclick={close}></div>
+<div class="scrim" class:clear={!dim} role="presentation"></div>
 
 <div
 	bind:this={sheet}
