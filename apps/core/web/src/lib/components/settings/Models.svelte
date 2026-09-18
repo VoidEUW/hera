@@ -29,6 +29,7 @@
 		type Provider,
 		type ProviderKind
 	} from '$lib/api/client';
+	import Checkbox from '$lib/components/Checkbox.svelte';
 	import Select from '$lib/components/Select.svelte';
 	import { t } from '$lib/i18n';
 	import { Placeholder } from '$lib/loading.svelte';
@@ -454,14 +455,12 @@
 
 			<label>
 				<span>{t.models.kindLabel}</span>
-				<select
+				<Select
+					choices={PROVIDER_KINDS.map((kind) => ({ value: kind, label: t.models.kind[kind] }))}
 					value={current(entry, 'kind')}
-					onchange={(e) => edit(entry.name, 'kind', e.currentTarget.value)}
-				>
-					{#each PROVIDER_KINDS as kind (kind)}
-						<option value={kind}>{t.models.kind[kind]}</option>
-					{/each}
-				</select>
+					label={t.models.kindLabel}
+					onchange={(value) => edit(entry.name, 'kind', value)}
+				/>
 			</label>
 
 			{#if effectiveKind === 'custom'}
@@ -692,36 +691,38 @@
 											<p class="warn">{t.models.contextLengthInvalid}</p>
 										{/if}
 
-										<label class="switch">
-											<input
-												type="checkbox"
+										<label>
+											<span>{t.models.toolCalling}</span>
+											<Checkbox
 												checked={toolCallingDraft[key] ?? model.tool_calling}
-												onchange={(e) =>
+												onchange={(checked) =>
 													(toolCallingDraft = {
 														...toolCallingDraft,
-														[key]: e.currentTarget.checked
+														[key]: checked
 													})}
 											/>
-											<span class="word">{t.models.toolCalling}</span>
+											<small>{t.models.toolCallingHint}</small>
 										</label>
-										<small>{t.models.toolCallingHint}</small>
 
 										<label>
 											<span>{t.models.optionsPreset}</span>
-											<select
+											<Select
+												choices={[
+													{ value: '', label: t.models.optionsPresetNone },
+													...presets.map((preset) => ({
+														value: preset.id,
+														label: preset.label,
+														hint: preset.hint
+													}))
+												]}
 												value=""
-												onchange={(e) => {
-													const chosen = presets.find((p) => p.id === e.currentTarget.value);
+												label={t.models.optionsPreset}
+												onchange={(chosenId) => {
+													const chosen = presets.find((p) => p.id === chosenId);
 													if (chosen)
 														optionsDraft = { ...optionsDraft, [key]: written(chosen.options) };
-													e.currentTarget.value = '';
 												}}
-											>
-												<option value="">{t.models.optionsPresetNone}</option>
-												{#each presets as preset (preset.id)}
-													<option value={preset.id} title={preset.hint}>{preset.label}</option>
-												{/each}
-											</select>
+											/>
 										</label>
 										<label>
 											<span>{t.models.options}</span>
@@ -855,11 +856,12 @@
 			</label>
 			<label>
 				<span>{t.models.kindLabel}</span>
-				<select bind:value={fresh.kind}>
-					{#each PROVIDER_KINDS as kind (kind)}
-						<option value={kind}>{t.models.kind[kind]}</option>
-					{/each}
-				</select>
+				<Select
+					choices={PROVIDER_KINDS.map((kind) => ({ value: kind, label: t.models.kind[kind] }))}
+					value={fresh.kind}
+					label={t.models.kindLabel}
+					onchange={(value) => (fresh = { ...fresh, kind: value as ProviderKind })}
+				/>
 			</label>
 			<label>
 				<span>{t.models.baseUrl}</span>
@@ -966,8 +968,7 @@
 		margin-bottom: 3px;
 	}
 
-	input,
-	select {
+	input {
 		width: 100%;
 		padding: 7px 10px;
 		background: var(--surface);
@@ -1173,16 +1174,6 @@
 	.options-actions {
 		display: flex;
 		gap: 6px;
-	}
-
-	.switch {
-		display: flex;
-		align-items: center;
-		gap: 5px;
-		margin: 0 0 4px;
-		font-size: 12px;
-		color: var(--text-muted);
-		cursor: pointer;
 	}
 
 	.warn {

@@ -25,6 +25,7 @@
 	 */
 	import { API, api, type MemoryBudget, type MemoryItem } from '$lib/api/client';
 	import Brain from '$lib/components/Brain.svelte';
+	import Checkbox from '$lib/components/Checkbox.svelte';
 	import { t } from '$lib/i18n';
 	import { Placeholder } from '$lib/loading.svelte';
 	import Rows from './Rows.svelte';
@@ -210,15 +211,12 @@
 								{memory.source === 'auto' ? t.memory.hers : t.memory.yours}
 							</span>
 							<span class="cost">{t.memory.tokens(memory.tokens)}</span>
-							<label class="switch">
-								<input
-									type="checkbox"
-									checked={memory.enabled}
-									onchange={() => toggle(memory)}
-									aria-label={t.memory.useIt(memory.key)}
-								/>
-								<span class="word">{memory.enabled ? t.memory.on : t.memory.offOne}</span>
-							</label>
+							<Checkbox
+								checked={memory.enabled}
+								label={memory.enabled ? t.memory.on : t.memory.offOne}
+								ariaLabel={t.memory.useIt(memory.key)}
+								onchange={() => toggle(memory)}
+							/>
 						</div>
 
 						{#if editing === memory.key}
@@ -427,15 +425,6 @@
 		margin-left: auto;
 		font-size: 12px;
 		color: var(--text-faint);
-	}
-
-	.switch {
-		display: flex;
-		align-items: center;
-		gap: 5px;
-		font-size: 12px;
-		color: var(--text-muted);
-		cursor: pointer;
 	}
 
 	.description {

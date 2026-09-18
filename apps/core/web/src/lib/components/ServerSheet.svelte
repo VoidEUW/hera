@@ -10,6 +10,7 @@
 	 */
 	import type { Server } from '$lib/api/client';
 	import { t } from '$lib/i18n';
+	import Modal from './Modal.svelte';
 
 	interface Props {
 		/** The servers reported connected, in the order the tool layer listed them. */
@@ -19,35 +20,16 @@
 	}
 
 	let { servers, onclose, onsettings }: Props = $props();
-
-	function onkeydown(event: KeyboardEvent) {
-		if (event.key === 'Escape') onclose();
-	}
 </script>
 
-<svelte:window {onkeydown} />
-
-<div
-	class="scrim"
-	role="button"
-	tabindex="-1"
-	aria-label={t.servers.close}
-	onclick={onclose}
-	onkeydown={(event) => event.key === 'Enter' && onclose()}
-></div>
-
-<div class="sheet" role="dialog" aria-modal="true" aria-label={t.servers.title}>
-	<header>
-		<div>
-			<h2 class="display">{t.servers.title}</h2>
-			<p class="caption">{t.servers.blurb}</p>
-		</div>
-		<button class="close" type="button" onclick={onclose}>
-			<span class="sr-only">{t.servers.close}</span>
-			<span aria-hidden="true">✕</span>
-		</button>
-	</header>
-
+<Modal
+	label={t.servers.title}
+	title={t.servers.title}
+	caption={t.servers.blurb}
+	placement="docked"
+	width="min(380px, 92vw)"
+	{onclose}
+>
 	<ul class="list">
 		{#each servers as server (server.name)}
 			<li class="row">
@@ -66,62 +48,9 @@
 	</ul>
 
 	<button class="configure" type="button" onclick={onsettings}>{t.servers.configure}</button>
-</div>
+</Modal>
 
 <style>
-	.scrim {
-		position: fixed;
-		inset: 0;
-		background: rgb(0 0 0 / 0.45);
-		border: 0;
-		animation: fade var(--fade) var(--ease);
-		z-index: 10;
-	}
-
-	.sheet {
-		position: fixed;
-		inset: auto 50% 96px auto;
-		transform: translateX(50%);
-		width: min(380px, 92vw);
-		max-height: 50vh;
-		display: flex;
-		flex-direction: column;
-		padding: 16px 18px;
-		background: var(--surface-raised);
-		border: 1px solid var(--line);
-		border-radius: var(--radius-lg);
-		box-shadow: var(--shadow);
-		z-index: 11;
-		animation: fade var(--fade) var(--ease);
-	}
-
-	@keyframes fade {
-		from {
-			opacity: 0;
-		}
-	}
-
-	header {
-		display: flex;
-		align-items: flex-start;
-		justify-content: space-between;
-		gap: 16px;
-	}
-
-	h2 {
-		margin: 0;
-		font-size: 18px;
-	}
-
-	header .caption {
-		margin: 2px 0 0;
-		max-width: 46ch;
-	}
-
-	.close {
-		color: var(--text-muted);
-	}
-
 	.list {
 		list-style: none;
 		margin: 10px 0 0;
