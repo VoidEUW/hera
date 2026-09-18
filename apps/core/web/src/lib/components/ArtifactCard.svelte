@@ -2,8 +2,10 @@
 	/**
 	 * What she published, where she published it (ADR 13).
 	 *
-	 * Two shapes, and the model chose which when it made the file — because it is the only thing
-	 * that knows which of them it meant:
+	 * Two shapes, settled when the file was made. `artifact_create` asks the model which, because
+	 * a page and a figure are the same call there and only the model knows which it meant;
+	 * `diagram_create` does not ask — a diagram is drawn in the flow unless it explicitly said
+	 * *beside*, which is the whole reason that is a separate tool.
 	 *
 	 * - **`inline: false`** is a card: the stele, the filename humanised, the extension, and an
 	 *   **Open**. Right for a page or a document — something you go and look at, beside the
@@ -21,8 +23,9 @@
 	 * with the next.
 	 */
 	import type { Artifact } from '$lib/api/events';
-	import { downloadUrl, extensionOf, size, titleOf } from '$lib/artifacts';
+	import { downloadUrl, extensionOf, kindOf, size, titleOf } from '$lib/artifacts';
 	import { t } from '$lib/i18n';
+	import { saveDiagram } from '$lib/mermaid';
 	import { artifacts } from '$lib/stores/artifacts.svelte';
 	import ArtifactView from './ArtifactView.svelte';
 	import Stele from './Stele.svelte';
@@ -37,6 +40,7 @@
 
 	const title = $derived(titleOf(artifact.name));
 	const extension = $derived(extensionOf(artifact.name).toUpperCase());
+	const drawn = $derived(kindOf(artifact.name) === 'mermaid');
 
 	function open() {
 		if (chatId) artifacts.show(chatId, artifact.name);
@@ -60,7 +64,21 @@
 				<span class="bytes">{size(artifact.bytes)}</span>
 			</span>
 		</span>
-		{#if chatId}
+		{#if chatId && drawn}
+			<!-- A button rather than the link beside it, because what it saves is not what a link
+			     here would point at: a diagram is converted to the page that draws it on the way
+			     out, and the file at the download URL is its mermaid source. `$lib/mermaid` does
+			     the converting, and falls back to that URL when the source will not parse. -->
+			<button
+				type="button"
+				class="save"
+				title={t.artifact.downloadDrawn}
+				aria-label={t.artifact.downloadDrawnOne(artifact.name)}
+				onclick={() => saveDiagram(chatId, artifact.name)}
+			>
+				<Tray size={14} />
+			</button>
+		{:else if chatId}
 			<!-- Saving it is the other thing anybody does with a published file, and until now it
 			     meant opening the drawer to find the link. A plain `<a download>` at the download
 			     URL, the same one the drawer uses: the browser knows how to save a file, and the

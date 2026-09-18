@@ -61,6 +61,16 @@ export function kindOf(name: string): Kind {
 	return KINDS[extensionOf(name)] ?? 'file';
 }
 
+/** The name without its extension: `theme-workshop.html` → `theme-workshop`.
+ *
+ * What you build another filename out of — a diagram saved as the page that draws it keeps the
+ * name she gave it and changes only the kind.
+ */
+export function stemOf(name: string): string {
+	const extension = extensionOf(name);
+	return extension ? name.slice(0, -(extension.length + 1)) : name;
+}
+
 /** The heading a card shows: `theme-workshop.html` → `Theme workshop`.
  *
  * The same transformation `$lib/tools` applies to a tool name, for the reason written there —
@@ -68,9 +78,7 @@ export function kindOf(name: string): Kind {
  * with the next. There is deliberately no title field anywhere for this to compete with.
  */
 export function titleOf(name: string): string {
-	const extension = extensionOf(name);
-	const stem = extension ? name.slice(0, -(extension.length + 1)) : name;
-	const opened = humanise(stem);
+	const opened = humanise(stemOf(name));
 	return opened ? opened[0].toUpperCase() + opened.slice(1) : name;
 }
 

@@ -8,7 +8,7 @@
 	 * **one current state everywhere it appears**, so an edit in a later turn changes what an
 	 * earlier card draws. `artifacts.version` is what tells this to look again.
 	 *
-	 * Four renderers and a fallback, and the two interesting ones are these:
+	 * Five renderers and a fallback, and the three interesting ones are these:
 	 *
 	 * **`html` is a sandboxed frame and is not sanitised.** `allow-scripts` without
 	 * `allow-same-origin` gives the frame an opaque origin, so a page she wrote cannot reach
@@ -22,13 +22,17 @@
 	 * the svg profile only, so a `<div>` or a frame smuggled into the markup is removed rather
 	 * than rendered. A drawing is a picture; a page is a page, and it gets the frame.
 	 *
-	 * Mermaid says plainly that this build does not draw it. A `.mmd` file is still a file she
-	 * made and the source is worth reading — silently showing nothing is the one thing that makes
-	 * a missing renderer look like a broken artifact.
+	 * **`mermaid` is drawn into this document too, through the same sanitiser as `svg`** — it is
+	 * a picture by the time it gets here, so it shares that branch's box and its rules. What it
+	 * does not share is being ready: `$lib/mermaid` fetches the renderer on demand (issue #73),
+	 * so a diagram has a *drawing it* state that a drawing she wrote herself does not, and a
+	 * source that does not parse falls back to the same code figure `.mmd` used to get — with the
+	 * mermaid error over it, because one bad line is the thing a person can fix.
 	 */
 	import { api, type ArtifactContent } from '$lib/api/client';
 	import { kindOf, sanitiseSvg } from '$lib/artifacts';
 	import { t } from '$lib/i18n';
+	import { draw } from '$lib/mermaid';
 	import { artifacts } from '$lib/stores/artifacts.svelte';
 	import Prose from './Prose.svelte';
 
@@ -42,17 +46,34 @@
 
 	let { chatId, name, height = '420px' }: Props = $props();
 
+	/** The two things a fetch is keyed on, and they are `$derived` for a reason worth keeping.
+	 *
+	 * A prop is read through a getter, so reading `name` inside an effect subscribes to whatever
+	 * the *parent* read to produce it — and the parent here is a transcript that rebuilds
+	 * `turn.blocks` from nothing on every token that arrives. `item.artifact` is a fresh object
+	 * each time with the same filename in it, so "she said another word" reached this component
+	 * as "your artifact changed": the content was refetched and a diagram redrawn from zero,
+	 * forty times over a short answer. A `$derived` propagates only when the value really
+	 * changed, which turns that back into *the file I am showing is a different file*.
+	 */
+	const wanted = $derived(name);
+	const chat = $derived(chatId);
+
 	let content = $state<ArtifactContent | null>(null);
 	let failure = $state('');
 
-	const kind = $derived(kindOf(name));
+	/** The drawn diagram, sanitised — `''` while the renderer is still being fetched. */
+	let diagram = $state('');
+	/** Why mermaid would not draw this one. Set means: show the source, with this over it. */
+	let undrawable = $state('');
+
+	const kind = $derived(kindOf(wanted));
 
 	$effect(() => {
-		// Re-runs when the name changes and when something published changed. Both are reads of
-		// state this effect does not write, which is what keeps it out of the loop `status.md`
-		// records — nothing here assigns to `artifacts.version`.
-		const wanted = name;
-		const chat = chatId;
+		// Re-runs when the file changes and when something published changed. `wanted` and `chat`
+		// are read by the call itself; `version` is the one nothing else here reads. All three
+		// are reads of state this effect does not write, which is what keeps it out of the loop
+		// `status.md` records — nothing here assigns to `artifacts.version`.
 		void artifacts.version;
 		let current = true;
 		content = null;
@@ -69,6 +90,31 @@
 			current = false;
 		};
 	});
+
+	// Drawing is its own effect because it is its own wait: the content arrives over the API and
+	// then the renderer arrives over the network, and only the second one can fail in a way a
+	// person is meant to read. It reads `content` and `kind` and writes neither, which is what
+	// keeps it clear of the `effect_update_depth_exceeded` shape `status.md` records three times.
+	$effect(() => {
+		const source = kind === 'mermaid' ? (content?.text ?? null) : null;
+		diagram = '';
+		undrawable = '';
+		if (source === null) return;
+		let current = true;
+		draw(source)
+			.then((drawn) => {
+				if (current) diagram = drawn;
+			})
+			.catch((cause) => {
+				// A mermaid parse error names the line. Anything else — the chunk failing to
+				// load, say — is still worth putting on screen over the source, because the
+				// source is what a person came to look at either way.
+				if (current) undrawable = cause instanceof Error ? cause.message : String(cause);
+			});
+		return () => {
+			current = false;
+		};
+	});
 </script>
 
 {#if failure}
@@ -76,7 +122,7 @@
 {:else if !content}
 	<p class="waiting">{t.artifact.loading}</p>
 {:else if kind === 'html'}
-	<iframe title={name} class="frame" style:height sandbox="allow-scripts" srcdoc={content.text}
+	<iframe title={wanted} class="frame" style:height sandbox="allow-scripts" srcdoc={content.text}
 	></iframe>
 {:else if kind === 'svg'}
 	<div class="drawing" style:max-height={height}>
@@ -85,10 +131,21 @@
 	</div>
 {:else if kind === 'markdown'}
 	<div class="document" style:max-height={height}><Prose text={content.text} /></div>
+{:else if kind === 'mermaid' && !undrawable && !diagram}
+	<!-- Outside the box rather than inside it. The drawing's box is white whatever the theme is,
+	     and a faint caption written for the page surface is not written for that — so while the
+	     renderer is on its way this reads exactly like the line above it, and there is no empty
+	     white strip standing in for a diagram that has not been laid out yet. -->
+	<p class="waiting">{t.artifact.drawing}</p>
+{:else if kind === 'mermaid' && !undrawable}
+	<div class="drawing" style:max-height={height}>
+		<!-- eslint-disable-next-line svelte/no-at-html-tags -- sanitised in $lib/mermaid -->
+		{@html diagram}
+	</div>
 {:else}
 	<div class="source" style:max-height={height}>
-		{#if kind === 'mermaid'}
-			<p class="caption">{t.artifact.noMermaid}</p>
+		{#if undrawable}
+			<p class="caption">{t.artifact.notDrawn(undrawable)}</p>
 		{/if}
 		<pre class="mono">{content.text}</pre>
 	</div>

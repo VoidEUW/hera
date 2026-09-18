@@ -452,16 +452,26 @@ export const t = {
 		/** The card's save control is a glyph, so its accessible name says *which* file — a turn
 		 * that published four of them otherwise offers four identical buttons. */
 		downloadOne: (name: string) => `Download ${name}`,
+		/** A diagram is saved as the page that draws it, not as its mermaid source: what somebody
+		 * saving a picture wants is the picture, and six lines of mermaid need a renderer they do
+		 * not have. The control says so, because *Download* on a diagram and *Download* on a page
+		 * would promise the same thing and give different ones. */
+		downloadDrawn: 'Download as a page',
+		downloadDrawnOne: (name: string) => `Download ${name} as a page`,
 		close: 'Close',
 		panel: 'Artifacts',
 		files: 'Everything published here',
 		none: 'Nothing chosen yet.',
 		loading: 'Fetching it…',
 		count: (n: number) => (n === 1 ? '1 artifact' : `${n} artifacts`),
-		/** A `.mmd` file is still a file she made, and its source is worth reading. Showing
-		 * nothing at all is what makes a renderer this build does not have look like an artifact
-		 * that came out broken. */
-		noMermaid: 'Mermaid diagrams are not drawn in this version — the source is below.'
+		/** Mermaid is fetched on demand, so the first diagram in a session waits on a download
+		 * that later ones do not. Saying what is happening beats an empty box. */
+		drawing: 'Drawing it…',
+		/** A diagram that did not parse. The mermaid message carries the line number, which is
+		 * the part a person can act on, and the source is shown under it — a `.mmd` file is
+		 * still a file she made, and showing nothing at all is what makes one bad line look
+		 * like an artifact that came out broken. */
+		notDrawn: (why: string) => `That diagram did not come out: ${why}. The source is below.`
 	},
 
 	chat: {

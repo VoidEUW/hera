@@ -18,8 +18,9 @@
 	 */
 	import { cubicOut } from 'svelte/easing';
 	import { api, type ArtifactSummary } from '$lib/api/client';
-	import { downloadUrl, newest, size, titleOf } from '$lib/artifacts';
+	import { downloadUrl, kindOf, newest, size, titleOf } from '$lib/artifacts';
 	import { t } from '$lib/i18n';
+	import { saveDiagram } from '$lib/mermaid';
 	import { artifacts } from '$lib/stores/artifacts.svelte';
 	import ArtifactView from './ArtifactView.svelte';
 	import Stele from './Stele.svelte';
@@ -115,7 +116,21 @@
 	<header class="top">
 		<span class="mark" aria-hidden="true"><Stele size={14} /></span>
 		<h2 class="title">{chosen ? titleOf(chosen) : t.artifact.panel}</h2>
-		{#if chosen}
+		{#if chosen && kindOf(chosen) === 'mermaid'}
+			<!-- A diagram is saved as the page that draws it rather than as its mermaid source, so
+			     this one really is a fetch and a blob — the conversion needs a browser, and this is
+			     the only one in reach. `$lib/mermaid` is where that is written down, and the card
+			     in the transcript calls the same function. -->
+			<button
+				class="action save"
+				type="button"
+				onclick={() => saveDiagram(chatId, chosen)}
+				aria-label={t.artifact.downloadDrawnOne(chosen)}
+			>
+				<Tray size={13} />
+				{t.artifact.downloadDrawn}
+			</button>
+		{:else if chosen}
 			<!-- A plain link, not a fetch and a blob: the browser knows how to save a file, and the
 			     response says `attachment` with a neutral media type, so a page she wrote is never
 			     a document rendered at Hera's own origin. -->

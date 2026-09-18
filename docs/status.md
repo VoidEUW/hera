@@ -3,7 +3,7 @@
 Current state of the rebuild, so a new session can start without re-reading history. A snapshot,
 not a changelog — historical detail and full rationale live in `versions/` and the ADRs.
 
-**Updated:** 2026-09-10 · **Version:** v0.2.0 tagged, v0.2.1 in progress · **Strategy:** thin spine
+**Updated:** 2026-09-18 · **Version:** v0.2.0 tagged, v0.2.1 in progress · **Strategy:** thin spine
 first, then deepen
 
 ## Now: v0.2.1
@@ -55,13 +55,68 @@ Notes from the change:
   written, with a note: the separate-tool conclusion it reached turned out right for reasons the
   doc didn't know yet.
 
+### Diagrams are drawn ([issue #73](https://github.com/VoidEUW/hera/issues/73))
+
+Done. `.mmd` was a real artifact kind with no renderer behind it since ADR 13; it is drawn now, in
+the same box and through the same sanitiser as an `.svg` — and drawing one is
+**`hera__diagram_create`**, its own tool.
+
+**The point of it is the model, not the file kind.** `.svg` only covers a drawn chart if something
+can write the path data, and the models ADR 19 targets cannot — they can write six lines of mermaid.
+
+**The tool is separate because the first attempt was not.** Adding `.mmd` to
+`artifact_create`'s extension list left three things to a model noticing them: prefer mermaid,
+spell the extension, set `inline=true` so the picture lands in the paragraph rather than behind a
+card. ADR 5 settled that pattern once already — a mechanism that only works when the model
+volunteers is not one — so the extension is appended by the server and a diagram is drawn **in the
+flow unless the call says `beside`**. Underneath it is the same file, the same card and the same
+`artifact_edit`; what is separate is the act.
+
+Four things worth carrying forward:
+
+- **`htmlLabels: false` is what makes one sanitising path enough — and it has to be *locked*.**
+  Mermaid's default label is a `<foreignObject>` full of XHTML, which `sanitiseSvg`'s svg-only
+  profile strips, so the diagram arrives with every word missing and the boxes intact: the
+  failure that looks like success. Turning the option off makes a label a real `<text>` element,
+  and widening the profile to `html` would have "fixed" it by handing every artifact a `<div>`
+  and an `<iframe>` back. **The setting alone was not enough**, which is the part that was nearly
+  missed: mermaid lets the *source* override configuration through frontmatter, and a `.mmd` is
+  written by a model — `config: {htmlLabels: true}` above the diagram is ordinary syntax, not an
+  attack, and it silently won. `secure` is the list of keys only `initialize` may set; supplying
+  it *replaces* mermaid's default array rather than extending it, so the six defaults are
+  repeated alongside the one being added. Caught by a review bot on the pull request and
+  reproduced in a browser before it was believed.
+- **Lazy is load-bearing.** One `import('mermaid')` in `$lib/mermaid` splits 2.7 MB into chunks the
+  entry never references. Verified against the build, not assumed.
+- **The old source view is the failure path now, not dead code.** A `.mmd` is written by a model,
+  so most failures here are six lines that do not parse; `suppressErrorRendering` keeps mermaid's
+  own error graphic off the screen and the source comes back with the line number over it.
+- **Saving a diagram converts it, in the browser.** What lands in a downloads folder is a
+  standalone HTML page with the drawn SVG in it — no script, nothing fetched — because a `.mmd` is
+  the source of a picture and not one. The browser is where it happens because mermaid measures
+  its own text to lay a diagram out, so the server could only ever hand back the source.
+
+The e2e test asserts on the **labels** rather than on the presence of an `<svg>`, because that is
+the half that can vanish quietly.
+
+**What the diagram made visible was not a diagram bug.** A card on screen was refetching its
+content once per streamed fragment: `turn.blocks` is rebuilt from nothing on every token, so the
+card got a fresh artifact object each time, and a prop read through a getter subscribed
+`ArtifactView`'s effects to *the transcript re-rendering* rather than to the file changing.
+`$derived` on the two values a fetch is keyed on is the fix. It was invisible on every other
+artifact kind and glaring on a diagram, because redrawing one means laying it out again — which
+is also why nothing caught it: a scripted model answers in one piece, so the browser rendered
+once. `FakeProvider(delay=)` and the `stream_delay` fixture exist for that, and the regression
+test counts requests rather than redraws, because one fetch per token is the shape of the bug
+whatever the file turns out to be.
+
 ## Timeline
 
 | Version | State | Notes |
 |---|---|---|
 | v0.1 | shipped | spine: message in → model boundary → router → mind → turn orchestrator → SSE out |
 | v0.2.0 | **tagged** | organise → produce → remember: projects, scratchpad, artifacts, memory (3 of 5 planned milestones — the other two moved, not dropped) |
-| v0.2.1 | in progress | polish: `⌘K` palette, hotkeys, `hera__read_resource`, ADR 17 |
+| v0.2.1 | in progress | polish: `⌘K` palette, hotkeys, `hera__read_resource`, ADR 17, diagrams |
 | v0.3.0 | planned | dreaming, sandbox, `hera-code` — see [versions/v0.3.0.md](versions/v0.3.0.md) |
 
 Dreaming and the redesign pass both moved out of v0.2.0 on purpose — dreaming because every

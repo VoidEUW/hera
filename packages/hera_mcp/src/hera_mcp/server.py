@@ -123,6 +123,7 @@ TOOL_NAMES = (
     "artifact_edit",
     "artifact_read",
     "forget",
+    "diagram_create",
 )
 """What this server offers, in the order they were added. Qualified, that is ``hera__ask``
 and its siblings — the ones a catalogue reports for the ``hera`` server, which is the question
@@ -408,7 +409,9 @@ def build_builtin_server(
             "name on it, ready to read and download -- so put the work here rather than into a "
             "very long answer, and then say what you made in a sentence or two. `name` is a "
             "plain filename and its extension decides how it is drawn: `.html` renders as a "
-            "page, `.svg` draws, `.md` is typeset, anything else is shown as code. Publishing "
+            "page, `.svg` draws, `.md` is typeset, anything else is shown as code. A diagram is "
+            "the one thing this tool is not for -- `diagram_create` takes mermaid and draws it "
+            "for you, and it is far easier to get right than SVG path data. Publishing "
             "the same name again replaces what was there, so use `artifact_edit` for a change. "
             "Set `inline=true` for a figure that belongs in the middle of what you are saying -- "
             "a diagram or a chart explaining the paragraph above it -- and leave it false for a "
@@ -478,7 +481,75 @@ def build_builtin_server(
             raise ToolError(f"nothing named {name!r} has been published in this conversation")
         return body
 
+    # Diagrams, and the reason this is not a fourth artifact tool with an extension in it.
+    #
+    # A diagram is stored like a file -- same directory, same download, `artifact_edit` changes
+    # it -- but *drawing one* is not the act `artifact_create` describes. That tool is for
+    # something a person goes and opens beside the conversation; a diagram belongs in the
+    # sentence it explains, and by the time you would go and open it the paragraph it went with
+    # has scrolled away. Folded into `artifact_create` the difference was two clauses about
+    # `.mmd` and a flag, in a description already carrying four other jobs, and getting a picture
+    # into the right place meant a model noticing all of them. ADR 5 is the rule being applied:
+    # a mechanism that only works when the model volunteers is not a mechanism. So the two
+    # things that decide where a diagram lands are decided here -- the extension, which is not
+    # asked for, and being drawn in the flow, which is what happens unless `beside` says
+    # otherwise.
+
+    @server.tool(
+        name="diagram_create",
+        title="Draw a diagram",
+        description=(
+            "Draw a diagram into your answer: a flow, a sequence, a state machine, an entity "
+            "model, a tree. `mermaid` is the picture itself, written in mermaid syntax -- "
+            "`flowchart TD`, `sequenceDiagram`, `stateDiagram-v2`, `erDiagram` and the rest -- "
+            "and it is drawn where you are speaking, so introduce it in a line and let the "
+            "picture carry what would otherwise be three paragraphs. Reach for this rather than "
+            "drawing by hand with `artifact_create`: six lines of mermaid come out right where "
+            "SVG path data does not, and this is the only tool here that draws. `name` is a "
+            "short plain name with no extension -- `handshake`, `request flow` -- and drawing "
+            "the same name again replaces it; it is kept as a file either way, so it can be "
+            "saved and read again beside the conversation, and `artifact_edit` changes a line "
+            "of one without redrawing the whole picture. Set `beside=true` only for a diagram "
+            "big enough to be the thing you were asked for rather than part of what you are "
+            "saying."
+        ),
+    )
+    async def diagram_create(
+        name: str, mermaid: str, ctx: Context, beside: bool = False
+    ) -> CallToolResult:
+        if artifacts is None:
+            raise ToolError("publishing is not available in this deployment")
+        filename = _diagram_filename(name)
+        with _readable("draw that"):
+            written = await artifacts.create(_chat_of(ctx, "a diagram"), filename, mermaid)
+        # The same key and the same shape `artifact_create` answers with, because what comes back
+        # is the same thing: a file in this conversation's directory, drawn by its extension.
+        # `inline` is the interface's word for where it goes, and it is the *server* that decides
+        # it here -- `beside` is the only say the model gets.
+        return CallToolResult(
+            content=[TextContent(type="text", text=f"drew {filename} ({written} bytes)")],
+            structured_content={
+                ARTIFACT_META: {"name": filename, "inline": not beside, "bytes": written}
+            },
+        )
+
     return server
+
+
+def _diagram_filename(name: str) -> str:
+    """``handshake`` → ``handshake.mmd``, and a name that already says so is left alone.
+
+    The extension is the kind (ADR 13), so it is settled in code rather than asked for: a tool
+    whose entire subject is diagrams has nothing to gain from a model spelling `.mmd` correctly,
+    and `handshake.mmd.mmd` is what it looks like when one spells it anyway.
+
+    An empty name is passed through empty, so the refusal a person reads is the adapter's own
+    sentence about needing a filename rather than a file called ``.mmd`` nobody asked for.
+    """
+    cleaned = name.strip()
+    if not cleaned or cleaned.lower().endswith((".mmd", ".mermaid")):
+        return cleaned
+    return f"{cleaned}.mmd"
 
 
 @contextmanager
