@@ -60,8 +60,10 @@
 		color: var(--text-faint);
 	}
 
-	/* Visually hidden, functionally present: the input is what the keyboard and screen reader
-	 * reach. Sized to the box rather than 1px so the focus ring lands somewhere sensible. */
+	/* Hidden from the eye, present to the hand: the input is what the keyboard, the screen
+	 * reader *and the click* reach. It is laid exactly over the drawn box rather than
+	 * collapsed to nothing, so a pointer click lands on the control itself — a checkbox that
+	 * cannot be clicked by role is a checkbox that has traded function for looks. */
 	input {
 		position: absolute;
 		width: 18px;
@@ -69,6 +71,7 @@
 		margin: 0;
 		opacity: 0;
 		cursor: inherit;
+		z-index: 1;
 	}
 
 	.box {
@@ -85,6 +88,19 @@
 		transition:
 			border-color var(--fade) var(--ease),
 			background-color var(--fade) var(--ease);
+	}
+
+	/* The input sits over the box: the label's flex row puts the box first, and an absolutely
+	 * positioned input without inset anchors to the label's padding box — so pin it to the
+	 * box's own origin instead, via the row's leading edge. */
+	.check {
+		position: relative;
+	}
+
+	input {
+		left: 0;
+		top: 50%;
+		transform: translateY(-50%);
 	}
 
 	/* Hover, on the whole label — the text and the box are one target. */

@@ -134,29 +134,41 @@
 
 	/** A click outside the sheet closes it — including the click that lands on a Select's
 	 * away-overlay, which sits above the scrim and swallows the event before the scrim's own
-	 * handler can see it. Listened on the window in the bubble phase rather than on the scrim:
-	 * the overlay is not the scrim's descendant, so an onclick on the scrim alone never fires
-	 * for those. When a dropdown is open, the click *is* the dropdown's to consume — the first
-	 * click closes the dropdown, the second closes the sheet, which is the same one-gesture-
-	 * one-effect rule Escape follows above.
+	 * handler can see it. When a dropdown is open, the click *is* the dropdown's to consume —
+	 * the first click closes the dropdown, the second closes the sheet, which is the same
+	 * one-gesture-one-effect rule Escape follows above.
 	 *
-	 * `settled` guards the click that opened the sheet: the opener sits outside the sheet, and
-	 * a listener added to the window while that very event is still bubbling does fire for it
-	 * — without the guard, every sheet would close on the click that opened it. One microtask
-	 * is enough for the event to finish dispatching. */
-	let settled = false;
-	queueMicrotask(() => (settled = true));
-
-	function onwindowclick(event: MouseEvent) {
-		if (!settled) return;
-		const target = event.target as HTMLElement;
-		if (sheet?.contains(target)) return;
-		if (sheet?.querySelector('[role="listbox"]')) return;
-		close();
-	}
+	 * Attached with `addEventListener` in an `$effect` rather than through `<svelte:window
+	 * onclick>`: Svelte 5 routes element events through delegation at the document root, and
+	 * a window-level `onclick` compiled into the same dispatch interferes with it — observed
+	 * as the sheet that never mounts, because the click that opened it was swallowed on the
+	 * way to the delegated handlers that flip the state. A listener added after mount, in the
+	 * bubble phase, sees only clicks that happen while the sheet is on screen.
+	 *
+	 * The opener's own click is excluded by the arm frame below, not by attach order. */
+	$effect(() => {
+		// The listener is armed one frame late: Svelte 5 flushes the mount effects for an
+		// event-driven render synchronously inside that event's dispatch, so a listener attached
+		// here would already see the opener's click still bubbling and close the sheet it just
+		// opened. One animation frame is past the whole dispatch, and no human click lands in it.
+		let armed = false;
+		const arm = requestAnimationFrame(() => (armed = true));
+		const away = (event: MouseEvent) => {
+			if (!armed) return;
+			const target = event.target as HTMLElement;
+			if (sheet?.contains(target)) return;
+			if (sheet?.querySelector('[role="listbox"]')) return;
+			close();
+		};
+		window.addEventListener('click', away);
+		return () => {
+			cancelAnimationFrame(arm);
+			window.removeEventListener('click', away);
+		};
+	});
 </script>
 
-<svelte:window {onkeydown} onclick={onwindowclick} />
+<svelte:window {onkeydown} />
 
 <div class="scrim" class:clear={!dim} role="presentation"></div>
 
