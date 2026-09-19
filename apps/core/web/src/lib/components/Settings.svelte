@@ -18,6 +18,7 @@
 	import { api, type Region, type Rule, type Server } from '$lib/api/client';
 	import { t } from '$lib/i18n';
 	import { Placeholder } from '$lib/loading.svelte';
+	import Modal from './Modal.svelte';
 	import Memory from './settings/Memory.svelte';
 	import Models from './settings/Models.svelte';
 	import Rows from './settings/Rows.svelte';
@@ -142,35 +143,17 @@
 			error = cause instanceof Error ? cause.message : String(cause);
 		}
 	}
-
-	function onkeydown(event: KeyboardEvent) {
-		if (event.key === 'Escape') onclose?.();
-	}
 </script>
 
-<svelte:window {onkeydown} />
-
-<div
-	class="scrim"
-	role="button"
-	tabindex="-1"
-	aria-label={t.settings.close}
-	onclick={() => onclose?.()}
-	onkeydown={(event) => event.key === 'Enter' && onclose?.()}
-></div>
-
-<div class="sheet" role="dialog" aria-modal="true" aria-label={t.settings.title}>
-	<header>
-		<div>
-			<h2 class="display">{t.settings.title}</h2>
-			<p class="caption">{t.settings.subtitle}</p>
-		</div>
-		<button class="close" type="button" onclick={() => onclose?.()}>
-			<span class="sr-only">{t.settings.close}</span>
-			<span aria-hidden="true">✕</span>
-		</button>
-	</header>
-
+<Modal
+	label={t.settings.title}
+	title={t.settings.title}
+	caption={t.settings.subtitle}
+	placement="centre"
+	width="min(900px, 92vw)"
+	sheetclass="settings"
+	{onclose}
+>
 	<div class="body">
 		<nav class="tabs">
 			{#each TABS as entry (entry.id)}
@@ -273,69 +256,14 @@
 			{/if}
 		</div>
 	</div>
-</div>
+</Modal>
 
 <style>
-	.scrim {
-		position: fixed;
-		inset: 0;
-		background: rgb(0 0 0 / 0.45);
-		border: 0;
-		animation: fade var(--fade) var(--ease);
-		z-index: 10;
-	}
-
-	.sheet {
-		position: fixed;
-		/* Centred both ways. It used to hang 6vh from the top, which read as centred back when
-		   the sheet grew to fit its tab and was usually tall; now that it is one fixed height
-		   the space it left underneath was simply the sheet sitting high. */
-		inset: 50% 50% auto auto;
-		transform: translate(50%, -50%);
-		width: min(900px, 92vw);
-		/* A height, not a maximum. Every tab holds a different amount, and a sheet that resized
-		   itself around each one made switching between them the loudest thing on the screen —
-		   the close button moving under the pointer between two clicks. The panel scrolls
-		   inside it instead. */
+	/* The one sheet with a height of its own: every tab holds a different amount, and a sheet
+	   that resized itself around each one made switching between them the loudest thing on the
+	   screen. The panel scrolls inside it instead. */
+	:global(.sheet.settings) {
 		height: min(88vh, 720px);
-		display: flex;
-		flex-direction: column;
-		background: var(--surface-raised);
-		border: 1px solid var(--line);
-		border-radius: var(--radius-lg);
-		box-shadow: var(--shadow);
-		overflow: hidden;
-		z-index: 11;
-		animation: fade var(--fade) var(--ease);
-	}
-
-	@keyframes fade {
-		from {
-			opacity: 0;
-		}
-	}
-
-	header {
-		display: flex;
-		align-items: flex-start;
-		justify-content: space-between;
-		gap: 16px;
-		padding: 16px 20px;
-		border-bottom: 1px solid var(--line);
-	}
-
-	h2 {
-		margin: 0;
-		font-size: 20px;
-	}
-
-	header .caption {
-		margin: 2px 0 0;
-	}
-
-	.close {
-		color: var(--text-muted);
-		font-size: 15px;
 	}
 
 	.body {
@@ -401,6 +329,18 @@
 		border: 1px solid var(--line);
 		border-radius: var(--radius);
 		font-size: 13px;
+	}
+
+	.sr-only {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		padding: 0;
+		margin: -1px;
+		overflow: hidden;
+		clip-path: inset(50%);
+		white-space: nowrap;
+		border: 0;
 	}
 
 	h3 {

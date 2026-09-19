@@ -14,6 +14,7 @@
 	import { untrack } from 'svelte';
 	import { api, type Skill } from '$lib/api/client';
 	import { t } from '$lib/i18n';
+	import Modal from './Modal.svelte';
 
 	interface Props {
 		/** The names currently pinned to this chat. */
@@ -57,43 +58,20 @@
 		// switch that needs confirming is a switch you have to remember you flipped.
 		onpick(chosen);
 	}
-
-	function onkeydown(event: KeyboardEvent) {
-		if (event.key === 'Escape') onclose();
-	}
-
-	/** The dialog exists to be typed into, so the cursor starts in the field. */
-	function takeover(node: HTMLInputElement) {
-		node.focus();
-	}
 </script>
 
-<svelte:window {onkeydown} />
-
-<div
-	class="scrim"
-	role="button"
-	tabindex="-1"
-	aria-label={t.skills.close}
-	onclick={onclose}
-	onkeydown={(event) => event.key === 'Enter' && onclose()}
-></div>
-
-<div class="sheet" role="dialog" aria-modal="true" aria-label={t.skills.title}>
-	<header>
-		<div>
-			<h2 class="display">{t.skills.title}</h2>
-			<p class="caption">{t.skills.blurb}</p>
-		</div>
-		<button class="close" type="button" onclick={onclose}>
-			<span class="sr-only">{t.skills.close}</span>
-			<span aria-hidden="true">✕</span>
-		</button>
-	</header>
-
+<Modal
+	label={t.skills.title}
+	title={t.skills.title}
+	caption={t.skills.blurb}
+	placement="docked"
+	width="min(520px, 92vw)"
+	sheetclass="skill-picker"
+	{onclose}
+>
 	<label class="search">
 		<span class="sr-only">{t.skills.search}</span>
-		<input type="search" use:takeover bind:value={query} placeholder={t.skills.search} />
+		<input type="search" bind:value={query} placeholder={t.skills.search} />
 	</label>
 
 	{#if error}<p class="problem caption">{error}</p>{/if}
@@ -120,60 +98,12 @@
 			<li class="empty caption">{filter ? t.settings.noMatch : t.settings.noSkills}</li>
 		{/each}
 	</ul>
-</div>
+</Modal>
 
 <style>
-	.scrim {
-		position: fixed;
-		inset: 0;
-		background: rgb(0 0 0 / 0.45);
-		border: 0;
-		animation: fade var(--fade) var(--ease);
-		z-index: 10;
-	}
-
-	.sheet {
-		position: fixed;
-		inset: auto 50% 96px auto;
-		transform: translateX(50%);
-		width: min(520px, 92vw);
-		max-height: 60vh;
-		display: flex;
-		flex-direction: column;
-		padding: 16px 18px;
-		background: var(--surface-raised);
-		border: 1px solid var(--line);
-		border-radius: var(--radius-lg);
-		box-shadow: var(--shadow);
-		z-index: 11;
-		animation: fade var(--fade) var(--ease);
-	}
-
-	@keyframes fade {
-		from {
-			opacity: 0;
-		}
-	}
-
-	header {
-		display: flex;
-		align-items: flex-start;
-		justify-content: space-between;
-		gap: 16px;
-	}
-
-	h2 {
-		margin: 0;
-		font-size: 18px;
-	}
-
-	header .caption {
-		margin: 2px 0 0;
-		max-width: 46ch;
-	}
-
-	.close {
-		color: var(--text-muted);
+	/* The Modal draws the frame and the header; this sheet owns the padding of its own body. */
+	:global(.sheet.skill-picker) {
+		padding: 0 18px 16px;
 	}
 
 	.search input {
@@ -184,6 +114,18 @@
 		border: 1px solid var(--line);
 		border-radius: var(--radius);
 		font-size: 13px;
+	}
+
+	.sr-only {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		padding: 0;
+		margin: -1px;
+		overflow: hidden;
+		clip-path: inset(50%);
+		white-space: nowrap;
+		border: 0;
 	}
 
 	.list {
