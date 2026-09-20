@@ -74,6 +74,15 @@
 	let trigger = $state<HTMLButtonElement | null>(null);
 	let list = $state<HTMLDivElement | null>(null);
 
+	/** The instant `.away` last closed the dropdown, or `0` if it never has. A doubled native
+	 * `click` for one physical click — a worn mouse switch, some trackpad drivers — hits `.away`
+	 * first (closing it and removing it from the DOM), then lands a few ms later on the
+	 * now-exposed `.pill` underneath, whose `toggle()` would otherwise reopen what the first
+	 * event just closed. `toggle()` refuses to reopen within a short grace window of this
+	 * timestamp. */
+	let closedAt = 0;
+	const REOPEN_GUARD_MS = 300;
+
 	const current = $derived(choices.find((choice) => choice.value === value) ?? null);
 	const shown = $derived(current?.label || placeholder || t.select.none);
 
@@ -83,8 +92,14 @@
 		if (next !== value) onchange?.(next);
 	}
 
+	function closeAway() {
+		open = false;
+		closedAt = Date.now();
+	}
+
 	function toggle() {
 		if (disabled) return;
+		if (!open && Date.now() - closedAt < REOPEN_GUARD_MS) return;
 		open = !open;
 	}
 
@@ -145,8 +160,8 @@
 	<div
 		class="away"
 		role="presentation"
-		onclick={() => (open = false)}
-		onkeydown={(event) => event.key === 'Enter' && (open = false)}
+		onclick={closeAway}
+		onkeydown={(event) => event.key === 'Enter' && closeAway()}
 	></div>
 {/if}
 
