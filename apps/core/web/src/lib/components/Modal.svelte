@@ -155,8 +155,17 @@
 		const arm = requestAnimationFrame(() => (armed = true));
 		const away = (event: MouseEvent) => {
 			if (!armed) return;
-			const target = event.target as HTMLElement;
-			if (sheet?.contains(target)) return;
+			// The propagation path rather than a captured `sheet` reference: the sheet that is
+			// live at event time is the only one that can answer `contains`, and a listener that
+			// outlived its own instance (a tab switch can unmount and remount Settings within one
+			// synchronous flush) would otherwise hold a detached node and close the modal on a
+			// click that landed squarely inside the new one. Any dialog on the path means the
+			// click was consumed by a sheet — this one or a nested one.
+			const path = event.composedPath();
+			if (
+				path.some((node) => node instanceof HTMLElement && node.getAttribute('role') === 'dialog')
+			)
+				return;
 			if (sheet?.querySelector('[role="listbox"]')) return;
 			close();
 		};
