@@ -26,6 +26,7 @@
 	import { API, api, type MemoryBudget, type MemoryItem } from '$lib/api/client';
 	import Brain from '$lib/components/Brain.svelte';
 	import Checkbox from '$lib/components/Checkbox.svelte';
+	import Input from '$lib/components/Input.svelte';
 	import { t } from '$lib/i18n';
 	import { Placeholder } from '$lib/loading.svelte';
 	import Rows from './Rows.svelte';
@@ -223,7 +224,11 @@
 							<div class="editor">
 								<label>
 									<span class="label">{t.memory.description}</span>
-									<input type="text" bind:value={draft.description} />
+									<Input
+										variant="editor"
+										value={draft.description}
+										onchange={(value) => (draft.description = value)}
+									/>
 								</label>
 								<label>
 									<span class="label">{t.memory.text}</span>
@@ -231,7 +236,12 @@
 								</label>
 								<label>
 									<span class="label">{t.memory.why}</span>
-									<input type="text" bind:value={draft.why} placeholder={t.memory.whyHint} />
+									<Input
+										variant="editor"
+										value={draft.why}
+										placeholder={t.memory.whyHint}
+										onchange={(value) => (draft.why = value)}
+									/>
 								</label>
 								<p class="note">{t.memory.editNote}</p>
 							</div>
@@ -459,7 +469,8 @@
 		color: var(--text-faint);
 	}
 
-	.editor input,
+	/* `Input.svelte`'s `'editor'` variant carries the matching look for the two text fields
+	   beside this — `<textarea>` is its own native control and stays outside that component. */
 	.editor textarea {
 		width: 100%;
 		padding: 6px 8px;
@@ -472,7 +483,6 @@
 		resize: vertical;
 	}
 
-	.editor input:focus,
 	.editor textarea:focus {
 		outline: none;
 		border-color: var(--brass);

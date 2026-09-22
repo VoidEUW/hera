@@ -17,6 +17,7 @@
 	 * for.
 	 */
 	import { api, type BrokenSkill, type Skill } from '$lib/api/client';
+	import Input from '$lib/components/Input.svelte';
 	import { t } from '$lib/i18n';
 	import { Placeholder } from '$lib/loading.svelte';
 	import Rows from './Rows.svelte';
@@ -172,17 +173,18 @@
 		<section class="row new">
 			<span class="icon" aria-hidden="true">＋</span>
 			<div class="detail">
-				<input
-					class="id mono"
-					bind:value={fresh.id}
+				<Input
+					mono
+					value={fresh.id}
 					placeholder={t.settings.skillId}
-					aria-label={t.settings.skillId}
+					ariaLabel={t.settings.skillId}
+					onchange={(value) => (fresh.id = value)}
 				/>
-				<input
-					class="what"
-					bind:value={fresh.description}
+				<Input
+					value={fresh.description}
 					placeholder={t.settings.skillDescription}
-					aria-label={t.settings.skillDescription}
+					ariaLabel={t.settings.skillDescription}
+					onchange={(value) => (fresh.description = value)}
 				/>
 				<p class="caption rule">{t.settings.skillIdRule}</p>
 				<div class="buttons">
@@ -334,15 +336,6 @@
 		display: flex;
 		flex-direction: column;
 		gap: 6px;
-	}
-
-	.new input {
-		width: 100%;
-		padding: 6px 9px;
-		background: var(--surface);
-		border: 1px solid var(--line);
-		border-radius: var(--radius);
-		font-size: 13px;
 	}
 
 	.rule {

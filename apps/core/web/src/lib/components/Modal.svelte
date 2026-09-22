@@ -18,7 +18,10 @@
 	 *
 	 * What it does not own: the body. A sheet is its content; the shell only frames it.
 	 */
+	import { expoIn, expoOut } from 'svelte/easing';
+	import { fade } from 'svelte/transition';
 	import { t } from '$lib/i18n';
+	import { reveal } from '$lib/motion';
 
 	interface Props {
 		/** The accessible name of the dialog. Not drawn — the header carries a visible title. */
@@ -67,6 +70,39 @@
 		sheetclass = '',
 		children
 	}: Props = $props();
+
+	/** `centre` (Settings) has no edge of its own to travel from, so it grows into place instead
+	 * — `docked` (the composer's own sheets: skills, servers) and `anchored` (the profile menu)
+	 * slide up from the edge they're pinned to, softened by a light blur, through the same
+	 * `reveal` gesture `Select.svelte`'s popup uses. `docked` is quicker than `anchored`: it
+	 * sits right beside the composer a person is about to go back to typing in, so it should not
+	 * hold their attention as long as a menu opened from a deliberate, out-of-the-way click does.
+	 * Every sheet opens a little slower than it closes, the way a hand reaches further than it
+	 * lets go.
+	 *
+	 * `reveal` puts a `transform` on `.sheet` for the length of the animation, which is exactly
+	 * what `.sheet.centre`'s own CSS comment below says never to do, because it makes `.sheet`
+	 * the containing block for a nested `Select`'s fixed-position away-overlay — the bug that
+	 * comment is about was a *permanent* `transform` used for centring, live for as long as the
+	 * modal stayed open, so any click on any dropdown at any time could mis-hit the overlay.
+	 * This one exists only for the ~150–300ms the sheet is arriving or leaving, and the one way
+	 * to have a dropdown open across that window is to click the sheet's own close button while
+	 * one is still expanded — at which point the whole sheet is disappearing anyway, so a
+	 * mispositioned invisible catcher for a few frames has nothing left to catch. */
+	const sheetIn = $derived(
+		placement === 'centre'
+			? { scale: 0.96, duration: 490 }
+			: placement === 'docked'
+				? { y: 18, blur: 3, duration: 280 }
+				: { y: 18, blur: 3, duration: 610 }
+	);
+	const sheetOut = $derived(
+		placement === 'centre'
+			? { scale: 0.96, duration: 290 }
+			: placement === 'docked'
+				? { y: 18, blur: 3, duration: 190 }
+				: { y: 18, blur: 3, duration: 450 }
+	);
 
 	/** Where focus was when the sheet opened — the trigger that opened it, usually. Returned
 	 * on close, because a control that takes focus away and keeps it is a control that has
@@ -179,7 +215,13 @@
 
 <svelte:window {onkeydown} />
 
-<div class="scrim" class:clear={!dim} role="presentation"></div>
+<div
+	class="scrim"
+	class:clear={!dim}
+	role="presentation"
+	in:fade={{ duration: sheetIn.duration, easing: expoOut }}
+	out:fade={{ duration: sheetOut.duration, easing: expoIn }}
+></div>
 
 <div
 	bind:this={sheet}
@@ -189,6 +231,8 @@
 	aria-modal="true"
 	aria-label={label}
 	tabindex="-1"
+	in:reveal={sheetIn}
+	out:reveal={sheetOut}
 >
 	{#if title || caption}
 		<header>
@@ -222,7 +266,6 @@
 		position: fixed;
 		inset: 0;
 		background: rgb(0 0 0 / 0.45);
-		animation: fade var(--fade) var(--ease);
 		z-index: 10;
 	}
 
@@ -240,7 +283,6 @@
 		box-shadow: var(--shadow);
 		overflow: hidden;
 		z-index: 11;
-		animation: fade var(--fade) var(--ease);
 		width: var(--modal-width);
 	}
 
@@ -272,20 +314,6 @@
 		bottom: 76px;
 		max-height: 70vh;
 		overflow-y: auto;
-		animation: rise var(--fade) var(--ease);
-	}
-
-	@keyframes fade {
-		from {
-			opacity: 0;
-		}
-	}
-
-	@keyframes rise {
-		from {
-			opacity: 0;
-			transform: translateY(4px);
-		}
 	}
 
 	header {

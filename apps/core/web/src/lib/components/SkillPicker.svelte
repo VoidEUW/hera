@@ -14,6 +14,7 @@
 	import { untrack } from 'svelte';
 	import { api, type Skill } from '$lib/api/client';
 	import { t } from '$lib/i18n';
+	import Input from './Input.svelte';
 	import Modal from './Modal.svelte';
 
 	interface Props {
@@ -71,7 +72,12 @@
 >
 	<label class="search">
 		<span class="sr-only">{t.skills.search}</span>
-		<input type="search" bind:value={query} placeholder={t.skills.search} />
+		<Input
+			kind="search"
+			value={query}
+			placeholder={t.skills.search}
+			onchange={(value) => (query = value)}
+		/>
 	</label>
 
 	{#if error}<p class="problem caption">{error}</p>{/if}
@@ -106,14 +112,8 @@
 		padding: 0 18px 16px;
 	}
 
-	.search input {
-		width: 100%;
+	.search :global(.control) {
 		margin: 12px 0 8px;
-		padding: 7px 10px;
-		background: var(--surface);
-		border: 1px solid var(--line);
-		border-radius: var(--radius);
-		font-size: 13px;
 	}
 
 	.sr-only {

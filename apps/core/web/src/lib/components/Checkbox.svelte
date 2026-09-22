@@ -125,12 +125,22 @@
 		height: 5px;
 		border-left: 1.5px solid transparent;
 		border-bottom: 1.5px solid transparent;
-		transform: rotate(-45deg) translate(0, -1px);
-		transition: border-color var(--fade) var(--ease);
+		opacity: 0;
+		transform: rotate(-45deg) translate(0, -1px) scale(0.6);
+		/* 330ms rather than `--fade`'s 120ms: that duration is tuned for a hover state changing
+		   colour, and reads as a flicker rather than a pop for a mark arriving or leaving. */
+		transition:
+			border-color 330ms var(--ease),
+			opacity 330ms var(--ease),
+			transform 330ms var(--ease);
 	}
 
+	/* The mark itself pops in rather than just tinting in place — on and off both read as an
+	   event happening to the box, not a value that was quietly already there. */
 	input:checked + .box .mark {
+		opacity: 1;
 		border-color: var(--ground);
+		transform: rotate(-45deg) translate(0, -1px) scale(1);
 	}
 
 	input:checked + .box {

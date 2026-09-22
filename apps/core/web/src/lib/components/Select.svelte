@@ -18,6 +18,7 @@
 	 * not, and darkening the application to ask it would be shouting.
 	 */
 	import { t } from '$lib/i18n';
+	import { reveal } from '$lib/motion';
 
 	export interface Choice {
 		value: string;
@@ -85,6 +86,13 @@
 
 	const current = $derived(choices.find((choice) => choice.value === value) ?? null);
 	const shown = $derived(current?.label || placeholder || t.select.none);
+
+	/** The list opens away from its own edge — downwards for `below`, upwards for `above` — so
+	 * it should arrive from that same edge rather than fading in place: a `below` list drops the
+	 * last few pixels into position, an `above` one rises into it. Uses the shared `reveal`
+	 * gesture (`$lib/motion`) — the same one `Modal.svelte`'s docked and anchored sheets use —
+	 * so a popup and a sheet read as the same kind of arrival at two different scales. */
+	const revealY = $derived(placement === 'above' ? 8 : -8);
 
 	function choose(next: string) {
 		open = false;
@@ -200,6 +208,8 @@
 			aria-label={label}
 			tabindex="-1"
 			onkeydown={walk}
+			in:reveal={{ y: revealY, blur: 2, duration: 410 }}
+			out:reveal={{ y: revealY, blur: 2, duration: 290 }}
 		>
 			{#each choices as choice (choice.value)}
 				{@const on = choice.value === value}
@@ -347,13 +357,6 @@
 		border: 1px solid var(--line);
 		border-radius: var(--radius-lg);
 		box-shadow: var(--shadow);
-		animation: fade var(--fade) var(--ease);
-	}
-
-	@keyframes fade {
-		from {
-			opacity: 0;
-		}
 	}
 
 	.list.below {

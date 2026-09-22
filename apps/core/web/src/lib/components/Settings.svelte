@@ -18,6 +18,7 @@
 	import { api, type Region, type Rule, type Server } from '$lib/api/client';
 	import { t } from '$lib/i18n';
 	import { Placeholder } from '$lib/loading.svelte';
+	import Input from './Input.svelte';
 	import Modal from './Modal.svelte';
 	import Memory from './settings/Memory.svelte';
 	import Models from './settings/Models.svelte';
@@ -172,7 +173,12 @@
 		<div class="panel">
 			<label class="search">
 				<span class="sr-only">{t.settings.search}</span>
-				<input type="search" bind:value={query} placeholder={t.settings.search} />
+				<Input
+					kind="search"
+					value={query}
+					placeholder={t.settings.search}
+					onchange={(value) => (query = value)}
+				/>
 			</label>
 
 			{#if error}
@@ -320,15 +326,6 @@
 	.search {
 		display: block;
 		margin-bottom: 14px;
-	}
-
-	.search input {
-		width: 100%;
-		padding: 7px 10px;
-		background: var(--surface);
-		border: 1px solid var(--line);
-		border-radius: var(--radius);
-		font-size: 13px;
 	}
 
 	.sr-only {
