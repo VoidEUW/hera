@@ -23,6 +23,7 @@
 	import { Placeholder } from '$lib/loading.svelte';
 	import { colourOf } from '$lib/projects';
 	import type { Shape } from '$lib/stores/workspace.svelte';
+	import Input from './Input.svelte';
 	import Ocellus from './Ocellus.svelte';
 	import Skeleton from './Skeleton.svelte';
 
@@ -191,13 +192,6 @@
 		creating = false;
 	}
 
-	/** The field takes the cursor and the whole title with it. The menu item that opened it is
-	 * gone by then, so leaving focus behind would leave it nowhere. */
-	function takeover(node: HTMLInputElement) {
-		node.focus();
-		node.select();
-	}
-
 	function initials(name: string): string {
 		return name
 			.split(/\s+/)
@@ -213,11 +207,12 @@
 {#snippet row(chat: Chat)}
 	<li class="item">
 		{#if is(renaming, 'chat', chat.id)}
-			<input
-				class="rename"
-				use:takeover
-				bind:value={draft}
-				aria-label={t.rail.rename}
+			<Input
+				variant="inline"
+				autofocus
+				value={draft}
+				ariaLabel={t.rail.rename}
+				onchange={(value) => (draft = value)}
 				onblur={() => commitRename('chat', chat.id, chat.title)}
 				onkeydown={(event) => {
 					if (event.key === 'Enter') commitRename('chat', chat.id, chat.title);
@@ -349,11 +344,12 @@
 		     under the project rather than under the last chat in it. -->
 		<div class="item head">
 			{#if is(renaming, 'project', project.id)}
-				<input
-					class="rename"
-					use:takeover
-					bind:value={draft}
-					aria-label={t.rail.rename}
+				<Input
+					variant="inline"
+					autofocus
+					value={draft}
+					ariaLabel={t.rail.rename}
+					onchange={(value) => (draft = value)}
 					onblur={() => commitRename('project', project.id, project.name)}
 					onkeydown={(event) => {
 						if (event.key === 'Enter') commitRename('project', project.id, project.name);
@@ -505,12 +501,13 @@
 
 			{#if creating}
 				<li class="item">
-					<input
-						class="rename"
-						use:takeover
-						bind:value={draft}
-						aria-label={t.rail.newProject}
+					<Input
+						variant="inline"
+						autofocus
+						value={draft}
+						ariaLabel={t.rail.newProject}
 						placeholder={t.rail.projectNamePlaceholder}
+						onchange={(value) => (draft = value)}
 						onblur={commitCreate}
 						onkeydown={(event) => {
 							if (event.key === 'Enter') commitCreate();
@@ -742,19 +739,6 @@
 	.more:hover {
 		background: var(--surface);
 		color: var(--text);
-	}
-
-	.rename {
-		width: 100%;
-		padding: 6px 8px;
-		background: var(--ground);
-		border: 1px solid var(--brass);
-		border-radius: var(--radius);
-		font-size: 13.5px;
-	}
-
-	.rename:focus {
-		outline: none;
 	}
 
 	.away {

@@ -29,7 +29,10 @@
 		type Provider,
 		type ProviderKind
 	} from '$lib/api/client';
+	import Checkbox from '$lib/components/Checkbox.svelte';
+	import Input from '$lib/components/Input.svelte';
 	import Select from '$lib/components/Select.svelte';
+	import Slider from '$lib/components/Slider.svelte';
 	import { t } from '$lib/i18n';
 	import { Placeholder } from '$lib/loading.svelte';
 	import { kindFallbackIcon, kindIcon, PROVIDER_KINDS } from '$lib/providers';
@@ -454,14 +457,13 @@
 
 			<label>
 				<span>{t.models.kindLabel}</span>
-				<select
+				<Select
+					choices={PROVIDER_KINDS.map((kind) => ({ value: kind, label: t.models.kind[kind] }))}
 					value={current(entry, 'kind')}
-					onchange={(e) => edit(entry.name, 'kind', e.currentTarget.value)}
-				>
-					{#each PROVIDER_KINDS as kind (kind)}
-						<option value={kind}>{t.models.kind[kind]}</option>
-					{/each}
-				</select>
+					label={t.models.kindLabel}
+					field
+					onchange={(value) => edit(entry.name, 'kind', value)}
+				/>
 			</label>
 
 			{#if effectiveKind === 'custom'}
@@ -488,28 +490,32 @@
 
 			<label>
 				<span>{t.models.baseUrl}</span>
-				<input
+				<Input
+					kind="url"
+					mono
 					value={current(entry, 'base_url')}
-					oninput={(e) => edit(entry.name, 'base_url', e.currentTarget.value)}
+					onchange={(value) => edit(entry.name, 'base_url', value)}
 				/>
 			</label>
 
 			<label>
 				<span>{t.models.apiKey}</span>
-				<input
-					type="password"
+				<Input
+					kind="password"
+					mono
 					placeholder={entry.api_key_set ? '••••••••' : ''}
 					value={drafts[entry.name]?.api_key ?? ''}
-					oninput={(e) => edit(entry.name, 'api_key', e.currentTarget.value)}
+					onchange={(value) => edit(entry.name, 'api_key', value)}
 				/>
 				<small>{entry.api_key_set ? t.models.keyStored : t.models.keyBlank}</small>
 			</label>
 
 			<label>
 				<span>{t.models.embeddingModel}</span>
-				<input
+				<Input
+					mono
 					value={current(entry, 'embedding_model')}
-					oninput={(e) => edit(entry.name, 'embedding_model', e.currentTarget.value)}
+					onchange={(value) => edit(entry.name, 'embedding_model', value)}
 				/>
 				<small>{t.models.embeddingHint}</small>
 			</label>
@@ -612,19 +618,13 @@
 												<div class="sampling-field">
 													<span>{field.label}</span>
 													<div class="sampling-row">
-														<input
-															type="range"
+														<Slider
 															min={field.min}
 															max={field.max}
 															step={field.step}
 															value={value ?? field.min}
-															oninput={(e) =>
-																updateOption(
-																	entry.name,
-																	model,
-																	field.key,
-																	Number(e.currentTarget.value)
-																)}
+															ariaLabel={field.label}
+															onchange={(next) => updateOption(entry.name, model, field.key, next)}
 														/>
 														<input
 															class="mono"
@@ -666,6 +666,7 @@
 														? current.reasoning_effort
 														: ''}
 													label={t.models.sampling.reasoningEffort}
+													field
 													onchange={(value) =>
 														updateOption(entry.name, model, 'reasoning_effort', value)}
 												/>
@@ -692,36 +693,40 @@
 											<p class="warn">{t.models.contextLengthInvalid}</p>
 										{/if}
 
-										<label class="switch">
-											<input
-												type="checkbox"
+										<div class="field">
+											<span class="label">{t.models.toolCalling}</span>
+											<Checkbox
 												checked={toolCallingDraft[key] ?? model.tool_calling}
-												onchange={(e) =>
+												ariaLabel={t.models.toolCalling}
+												onchange={(checked) =>
 													(toolCallingDraft = {
 														...toolCallingDraft,
-														[key]: e.currentTarget.checked
+														[key]: checked
 													})}
 											/>
-											<span class="word">{t.models.toolCalling}</span>
-										</label>
-										<small>{t.models.toolCallingHint}</small>
+											<small>{t.models.toolCallingHint}</small>
+										</div>
 
 										<label>
 											<span>{t.models.optionsPreset}</span>
-											<select
+											<Select
+												choices={[
+													{ value: '', label: t.models.optionsPresetNone },
+													...presets.map((preset) => ({
+														value: preset.id,
+														label: preset.label,
+														hint: preset.hint
+													}))
+												]}
 												value=""
-												onchange={(e) => {
-													const chosen = presets.find((p) => p.id === e.currentTarget.value);
+												label={t.models.optionsPreset}
+												field
+												onchange={(chosenId) => {
+													const chosen = presets.find((p) => p.id === chosenId);
 													if (chosen)
 														optionsDraft = { ...optionsDraft, [key]: written(chosen.options) };
-													e.currentTarget.value = '';
 												}}
-											>
-												<option value="">{t.models.optionsPresetNone}</option>
-												{#each presets as preset (preset.id)}
-													<option value={preset.id} title={preset.hint}>{preset.label}</option>
-												{/each}
-											</select>
+											/>
 										</label>
 										<label>
 											<span>{t.models.options}</span>
@@ -765,29 +770,30 @@
 				{/if}
 
 				<div class="add-model">
-					<input
-						class="mono"
+					<Input
+						mono
 						placeholder={t.models.modelId}
 						value={newModel[entry.name]?.id ?? ''}
-						oninput={(e) =>
+						onchange={(value) =>
 							(newModel = {
 								...newModel,
 								[entry.name]: {
 									...newModel[entry.name],
-									id: e.currentTarget.value,
+									id: value,
 									name: newModel[entry.name]?.name ?? ''
 								}
 							})}
 					/>
-					<input
+					<Input
+						mono
 						placeholder={t.models.modelName}
 						value={newModel[entry.name]?.name ?? ''}
-						oninput={(e) =>
+						onchange={(value) =>
 							(newModel = {
 								...newModel,
 								[entry.name]: {
 									...newModel[entry.name],
-									name: e.currentTarget.value,
+									name: value,
 									id: newModel[entry.name]?.id ?? ''
 								}
 							})}
@@ -808,11 +814,12 @@
 					<p class="ok">{t.models.reachable(result.models.length)}</p>
 					<label class="search">
 						<span class="sr-only">{t.models.search}</span>
-						<input
-							type="search"
+						<Input
+							kind="search"
+							mono
 							placeholder={t.models.search}
 							value={probeQuery[entry.name] ?? ''}
-							oninput={(e) => (probeQuery = { ...probeQuery, [entry.name]: e.currentTarget.value })}
+							onchange={(value) => (probeQuery = { ...probeQuery, [entry.name]: value })}
 						/>
 					</label>
 					<ul class="probed">
@@ -850,32 +857,59 @@
 			<h3>{t.models.add}</h3>
 			<label>
 				<span>{t.models.name}</span>
-				<input bind:value={fresh.name} placeholder="studio" />
+				<Input
+					mono
+					value={fresh.name}
+					placeholder="studio"
+					onchange={(value) => (fresh = { ...fresh, name: value })}
+				/>
 				<small>{t.models.nameRule}</small>
 			</label>
 			<label>
 				<span>{t.models.kindLabel}</span>
-				<select bind:value={fresh.kind}>
-					{#each PROVIDER_KINDS as kind (kind)}
-						<option value={kind}>{t.models.kind[kind]}</option>
-					{/each}
-				</select>
+				<Select
+					choices={PROVIDER_KINDS.map((kind) => ({ value: kind, label: t.models.kind[kind] }))}
+					value={fresh.kind}
+					label={t.models.kindLabel}
+					field
+					onchange={(value) => (fresh = { ...fresh, kind: value as ProviderKind })}
+				/>
 			</label>
 			<label>
 				<span>{t.models.baseUrl}</span>
-				<input bind:value={fresh.base_url} />
+				<Input
+					kind="url"
+					mono
+					value={fresh.base_url}
+					onchange={(value) => (fresh = { ...fresh, base_url: value })}
+				/>
 			</label>
 			<label>
 				<span>{t.models.modelId}</span>
-				<input bind:value={fresh.model_id} placeholder="qwen3.6-35b" />
+				<Input
+					mono
+					value={fresh.model_id}
+					placeholder="qwen3.6-35b"
+					onchange={(value) => (fresh = { ...fresh, model_id: value })}
+				/>
 			</label>
 			<label>
 				<span>{t.models.modelName}</span>
-				<input bind:value={fresh.model_name} placeholder={t.models.modelId} />
+				<Input
+					mono
+					value={fresh.model_name}
+					placeholder={t.models.modelId}
+					onchange={(value) => (fresh = { ...fresh, model_name: value })}
+				/>
 			</label>
 			<label>
 				<span>{t.models.apiKey}</span>
-				<input type="password" bind:value={fresh.api_key} />
+				<Input
+					kind="password"
+					mono
+					value={fresh.api_key}
+					onchange={(value) => (fresh = { ...fresh, api_key: value })}
+				/>
 				<small>{t.models.keyBlank}</small>
 			</label>
 			<div class="actions">
@@ -959,15 +993,23 @@
 		margin-bottom: 10px;
 	}
 
-	label > span {
+	/* The same shape as a `label` block, for the one control that brings its own label — a
+	   `Checkbox` rooted in a `<label>` of its own, and nested labels are invalid HTML that
+	   announce twice. The wrapper carries the layout; the text rides on the control. */
+	.field {
+		display: block;
+		margin-bottom: 10px;
+	}
+
+	label > span,
+	.field > .label {
 		display: block;
 		font-size: 12.5px;
 		color: var(--text-muted);
 		margin-bottom: 3px;
 	}
 
-	input,
-	select {
+	input {
 		width: 100%;
 		padding: 7px 10px;
 		background: var(--surface);
@@ -1144,19 +1186,28 @@
 		gap: 6px;
 	}
 
-	.sampling-row input[type='range'] {
+	/* `:global` reaches past `Slider.svelte`'s own scope — its root is the `<input>` itself, with
+	   no wrapper `div` this rule could otherwise land on. */
+	.sampling-row :global(.slider) {
 		flex: 1;
-		width: auto;
-		padding: 0;
-		background: none;
-		border: none;
 	}
 
+	/* Wide enough for the `unset` placeholder to read in full rather than clip, and the native
+	   spinner is dropped — it was eating into that same width, which is what made 8ch too
+	   narrow for a five-letter word to begin with. */
 	.sampling-row input[type='number'] {
-		width: 8ch;
+		width: 10ch;
 		flex: none;
 		padding: 3px 6px;
 		font-size: 12.5px;
+		text-align: center;
+		appearance: textfield;
+	}
+
+	.sampling-row input[type='number']::-webkit-inner-spin-button,
+	.sampling-row input[type='number']::-webkit-outer-spin-button {
+		appearance: none;
+		margin: 0;
 	}
 
 	.sampling-row .clear {
@@ -1173,16 +1224,6 @@
 	.options-actions {
 		display: flex;
 		gap: 6px;
-	}
-
-	.switch {
-		display: flex;
-		align-items: center;
-		gap: 5px;
-		margin: 0 0 4px;
-		font-size: 12px;
-		color: var(--text-muted);
-		cursor: pointer;
 	}
 
 	.warn {
@@ -1229,7 +1270,9 @@
 		gap: 6px;
 	}
 
-	.add-model input {
+	/* `:global` reaches past `Input.svelte`'s own scope — its root is the `<input>` itself, with
+	   no wrapper `div` this rule could otherwise land on (same reason `Slider.svelte` needs it). */
+	.add-model :global(.control) {
 		flex: 1;
 		min-width: 0;
 	}
@@ -1250,7 +1293,7 @@
 		color: var(--danger);
 	}
 
-	.search input {
+	.search :global(.control) {
 		margin: 8px 0;
 	}
 

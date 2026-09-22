@@ -18,6 +18,7 @@
 	 * not, and darkening the application to ask it would be shouting.
 	 */
 	import { t } from '$lib/i18n';
+	import { reveal } from '$lib/motion';
 
 	export interface Choice {
 		value: string;
@@ -50,6 +51,10 @@
 		title?: string;
 		/** Shown in place of the value when nothing is chosen and nothing can be. */
 		placeholder?: string;
+		/** The settings-screen look: the same rectangle, surface, mono face and padding as the
+		 * `input` beside it, rather than the composer's pill. A selector in a form should look
+		 * like the form's fields; a pill in the composer's row should look like its chips. */
+		field?: boolean;
 		onchange?: (value: string) => void;
 	}
 
@@ -62,6 +67,7 @@
 		disabled = false,
 		title = '',
 		placeholder = '',
+		field = false,
 		onchange
 	}: Props = $props();
 
@@ -69,8 +75,24 @@
 	let trigger = $state<HTMLButtonElement | null>(null);
 	let list = $state<HTMLDivElement | null>(null);
 
+	/** The instant `.away` last closed the dropdown, or `0` if it never has. A doubled native
+	 * `click` for one physical click — a worn mouse switch, some trackpad drivers — hits `.away`
+	 * first (closing it and removing it from the DOM), then lands a few ms later on the
+	 * now-exposed `.pill` underneath, whose `toggle()` would otherwise reopen what the first
+	 * event just closed. `toggle()` refuses to reopen within a short grace window of this
+	 * timestamp. */
+	let closedAt = 0;
+	const REOPEN_GUARD_MS = 300;
+
 	const current = $derived(choices.find((choice) => choice.value === value) ?? null);
 	const shown = $derived(current?.label || placeholder || t.select.none);
+
+	/** The list opens away from its own edge — downwards for `below`, upwards for `above` — so
+	 * it should arrive from that same edge rather than fading in place: a `below` list drops the
+	 * last few pixels into position, an `above` one rises into it. Uses the shared `reveal`
+	 * gesture (`$lib/motion`) — the same one `Modal.svelte`'s docked and anchored sheets use —
+	 * so a popup and a sheet read as the same kind of arrival at two different scales. */
+	const revealY = $derived(placement === 'above' ? 8 : -8);
 
 	function choose(next: string) {
 		open = false;
@@ -78,8 +100,14 @@
 		if (next !== value) onchange?.(next);
 	}
 
+	function closeAway() {
+		open = false;
+		closedAt = Date.now();
+	}
+
 	function toggle() {
 		if (disabled) return;
+		if (!open && Date.now() - closedAt < REOPEN_GUARD_MS) return;
 		open = !open;
 	}
 
@@ -140,12 +168,12 @@
 	<div
 		class="away"
 		role="presentation"
-		onclick={() => (open = false)}
-		onkeydown={(event) => event.key === 'Enter' && (open = false)}
+		onclick={closeAway}
+		onkeydown={(event) => event.key === 'Enter' && closeAway()}
 	></div>
 {/if}
 
-<div class="select" class:disabled>
+<div class="select" class:disabled class:field>
 	<button
 		bind:this={trigger}
 		class="pill"
@@ -180,6 +208,8 @@
 			aria-label={label}
 			tabindex="-1"
 			onkeydown={walk}
+			in:reveal={{ y: revealY, blur: 2, duration: 410 }}
+			out:reveal={{ y: revealY, blur: 2, duration: 290 }}
 		>
 			{#each choices as choice (choice.value)}
 				{@const on = choice.value === value}
@@ -255,6 +285,24 @@
 		border-style: dashed;
 	}
 
+	/* The settings-screen look: the same rectangle, surface, mono face and padding the
+	   `input` elements beside it wear, so a form reads as one set of fields rather than a mix
+	   of pills and boxes. Only the trigger changes — the popup is the same list everywhere. */
+	.select.field .pill {
+		padding: 7px 10px;
+		background: var(--surface);
+		border-radius: var(--radius);
+		font-family: var(--font-mono);
+		font-size: 13px;
+	}
+
+	.select.field .pill:hover:not(:disabled),
+	.select.field .pill.open {
+		border-color: var(--text-faint);
+		color: var(--text);
+		background: var(--surface);
+	}
+
 	.shown {
 		overflow: hidden;
 		text-overflow: ellipsis;
@@ -309,13 +357,6 @@
 		border: 1px solid var(--line);
 		border-radius: var(--radius-lg);
 		box-shadow: var(--shadow);
-		animation: fade var(--fade) var(--ease);
-	}
-
-	@keyframes fade {
-		from {
-			opacity: 0;
-		}
 	}
 
 	.list.below {

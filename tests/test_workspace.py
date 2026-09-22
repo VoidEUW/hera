@@ -6,6 +6,7 @@ not wired into the type checker, or two test modules that shadow each other.
 
 from __future__ import annotations
 
+import ast
 import re
 import tomllib
 from collections import defaultdict
@@ -102,6 +103,53 @@ def test_internal_dependencies_have_a_workspace_source() -> None:
     assert not missing, (
         "add to [tool.uv.sources] in the root pyproject.toml as `{ workspace = true }`: "
         f"{missing}"
+    )
+
+
+def _hera_imports(source: Path) -> set[str]:
+    """Every top-level `hera_*` module name one file imports.
+
+    Mirrors `test_layering`'s walk of the same name — duplicated rather than imported across
+    test modules, the same way every other helper here stays private to this file.
+    """
+    tree = ast.parse(source.read_text(encoding="utf-8"), filename=str(source))
+    found: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            found.update(alias.name.split(".")[0] for alias in node.names)
+        elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
+            found.add(node.module.split(".")[0])
+    return {name for name in found if name.startswith("hera")}
+
+
+def test_declared_dependencies_cover_every_import() -> None:
+    """A member's own source is the ground truth for what it needs; `pyproject.toml` is a claim
+    about that, and the two can drift apart silently.
+
+    `uv sync --all-packages` installs every workspace member regardless of who declares needing
+    it, so a package that imports a sibling without declaring it still runs — right up until
+    something narrower (`uv run`, a published wheel, a fresh sync of just this member) builds an
+    environment scoped to what is actually declared, and an import that always worked starts
+    raising `ModuleNotFoundError` nobody touched anything to cause. This is
+    `test_internal_dependencies_have_a_workspace_source`'s check from the other side: that one
+    catches a declared dependency with no workspace source, this one catches an import with no
+    declaration at all.
+    """
+    missing: dict[str, list[str]] = {}
+    for member in _members():
+        own = _table(_config(member), "project", "name").replace("-", "_")
+        declared = {name.replace("-", "_") for name in _requirement_names(member)}
+
+        used: set[str] = set()
+        for source in sorted((member / "src").rglob("*.py")):
+            used |= _hera_imports(source)
+        used.discard(own)
+
+        if gaps := sorted(used - declared):
+            missing[own] = gaps
+
+    assert not missing, (
+        f"add to [project] dependencies in the member's own pyproject.toml: {missing}"
     )
 
 
