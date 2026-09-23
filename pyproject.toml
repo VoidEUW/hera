@@ -49,7 +49,7 @@ dev = [
     "types-PyYAML>=6.0",
     # Serves a real MCP server over HTTP in the hera_tools transport tests. It arrives with
     # the MCP SDK anyway; declared here so the suite does not depend on that staying true.
-    "uvicorn>=0.30",
+    "uvicorn>=0.53.0",
     # Drives the built interface in the end-to-end suite. CI installs the browser with
     # `uv run playwright install --with-deps chromium`; without this the command has no
     # package to come from.
