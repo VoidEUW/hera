@@ -21,7 +21,16 @@ from hera_core.wiring import Services
 from hera_home import artifacts_dir, scratch_dir
 from hera_mcp import BUILTIN_SERVER_NAME, TOOL_NAMES, build_builtin_server
 from hera_permissions import PermissionSet, Policy
-from hera_providers import FakeProvider, text_turn, thinking_turn, tool_call, tool_turn
+from hera_providers import (
+    FakeProvider,
+    ProviderUnavailable,
+    TextDelta,
+    TurnEnd,
+    text_turn,
+    thinking_turn,
+    tool_call,
+    tool_turn,
+)
 from hera_skillsets import SkillLibrary, SkillLibraryPort
 from hera_tools import ToolRegistry, ToolsSettings
 
@@ -100,8 +109,58 @@ class TestASimpleTurn:
         assert [m["role"] for m in detail["messages"]] == ["user", "assistant"]
         assert detail["messages"][0]["content"] == "Explain Kerberos"
 
-    async def test_the_first_message_names_the_chat(self, make_services: Any) -> None:
-        services = make_services(FakeProvider([text_turn("Hello.")]))
+    async def test_the_first_message_is_summarized_for_the_chat_title(
+        self, make_services: Any
+    ) -> None:
+        class ProviderWithTitle:
+            def __init__(self) -> None:
+                self.chat = FakeProvider([text_turn("Hello.")])
+
+            async def stream(self, request: Any) -> AsyncIterator[Any]:
+                if request.messages[0].role.value == "system" and "Summarize the user's" in str(
+                    request.messages[0].content
+                ):
+                    assert request.messages[1].content == "Incoming message:\nExplain Kerberos"
+                    yield TextDelta(text="Kerberos Authentication")
+                    yield TurnEnd()
+                    return
+                async for event in self.chat.stream(request):
+                    yield event
+
+            async def aclose(self) -> None:
+                await self.chat.aclose()
+
+        services = make_services(ProviderWithTitle())
+        async with _client(services) as client:
+            chat_id = await open_chat(client)
+            await talk(client, chat_id, "Explain Kerberos")
+            detail = (await client.get(f"{API}/chats/{chat_id}")).json()
+
+        assert detail["chat"]["title"] == "Kerberos Authentication"
+
+    async def test_a_failed_title_request_falls_back_to_the_raw_message(
+        self, make_services: Any
+    ) -> None:
+        """A chat that never gets a summarized title because the auxiliary call broke should
+        still get a name -- the raw-text title this feature replaces as the common case, not
+        nothing at all."""
+
+        class ProviderWhoseTitleCallBreaks:
+            def __init__(self) -> None:
+                self.chat = FakeProvider([text_turn("Hello.")])
+
+            async def stream(self, request: Any) -> AsyncIterator[Any]:
+                if request.messages[0].role.value == "system" and "Summarize the user's" in str(
+                    request.messages[0].content
+                ):
+                    raise ProviderUnavailable("the title endpoint is down")
+                async for event in self.chat.stream(request):
+                    yield event
+
+            async def aclose(self) -> None:
+                await self.chat.aclose()
+
+        services = make_services(ProviderWhoseTitleCallBreaks())
         async with _client(services) as client:
             chat_id = await open_chat(client)
             await talk(client, chat_id, "Explain Kerberos")

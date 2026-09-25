@@ -16,6 +16,8 @@ generator; `hera_chats` closes the turn as `cancelled` with the text that did ar
 
 from __future__ import annotations
 
+import asyncio
+import logging
 from collections.abc import AsyncIterator, Sequence
 from typing import Any
 from uuid import UUID
@@ -66,10 +68,11 @@ from hera_core.schemas import (
 from hera_core.sse import HEADERS, MEDIA_TYPE, event_frame, frame
 from hera_permissions import Decision, Rule
 from hera_profiles import Profile, ProfileRepository
-from hera_providers import ToolCallReady
+from hera_providers import ChatMessage, ChatRequest, FakeProvider, Role, TextDelta, ToolCallReady
 from hera_skillsets import SkillUsageRepository
 
 router = APIRouter(tags=["chats"])
+logger = logging.getLogger(__name__)
 
 EXPORT_TYPE = "text/markdown; charset=utf-8"
 
@@ -408,21 +411,33 @@ def _stream(
         **extra,
     )
     owner_id, chat_id, message_id = chat.owner_id, chat.id, assistant.id
+    first_message = spoken is not None and spoken.sequence == 0
     db.expunge_all()
 
     turn = container.orchestrator.begin(context)
 
     async def frames() -> AsyncIterator[str]:
+        completed = False
         try:
             for event in lead:
                 yield event_frame(event)
             async for event in turn.stream():
                 yield event_frame(event)
+            completed = True
         finally:
             # Runs on a normal finish, on a client that hung up, and on a failure. Whatever
             # the turn recorded is persisted either way -- that is the point of `recorded`
             # being correct at every moment rather than only at the end.
-            persisted = _record(container, owner_id, chat_id, message_id, turn)
+            title = None
+            if completed and first_message and not chat.title and turn.cleaned_text.strip():
+                # A summarized title is the goal, but a chat that never gets one because the
+                # auxiliary call happened to fail is worse than one titled from the raw message
+                # -- that fallback is what this feature is replacing as the *common* case, not
+                # what it should leave behind as the failure case.
+                title = await _chat_title(container, turn.cleaned_text) or title_from(
+                    turn.cleaned_text
+                )
+            persisted = _record(container, owner_id, chat_id, message_id, turn, title=title)
             if persisted is not None:
                 yield frame("done", persisted)
 
@@ -430,7 +445,13 @@ def _stream(
 
 
 def _record(
-    container: Container, owner_id: UUID, chat_id: UUID, message_id: UUID, turn: Turn
+    container: Container,
+    owner_id: UUID,
+    chat_id: UUID,
+    message_id: UUID,
+    turn: Turn,
+    *,
+    title: str | None = None,
 ) -> dict[str, Any] | None:
     """Store the turn in its own short unit of work, and return the ``done`` payload.
 
@@ -452,10 +473,61 @@ def _record(
             SkillUsageRepository(session).record(owner_id, turn.skill_ids)
         chat = ChatRepository(session).get(chat_id)
         if chat is not None:
-            # Titled from the text the router *kept*. `/tdd` is addressed to the application
-            # rather than to her, and a sidebar full of commands is a sidebar you cannot skim.
-            ChatRepository(session).touch(chat, title=title_from(turn.cleaned_text))
+            # `title` is already the summarized title, the raw-text fallback, or `None` when
+            # there was nothing to title this round (not the first message, or the chat is
+            # already named) -- `touch` only ever fills in a chat that has no title yet.
+            ChatRepository(session).touch(chat, title=title or "")
         return MessageOut.of(message).model_dump(mode="json")
+
+
+async def _chat_title(container: Container, text: str) -> str | None:
+    """Ask the configured model to summarize the incoming message as a short title."""
+    provider = container.orchestrator.provider
+    # FakeProvider scripts correspond to user-visible turns; consuming another scripted turn
+    # here would change every API test's conversation. Real providers handle this auxiliary call.
+    if isinstance(provider, FakeProvider):
+        return None
+    request = ChatRequest(
+        model=container.orchestrator.settings.model,
+        messages=[
+            ChatMessage(
+                role=Role.SYSTEM,
+                content=(
+                    "Summarize the user's incoming message as a concise sidebar title in 2 to 6 "
+                    "words. Use only the incoming message as source. Do not use an assistant "
+                    "response, quote the request, or return the full request. Return only the "
+                    "title, with no explanation."
+                ),
+            ),
+            ChatMessage(
+                role=Role.USER,
+                content=f"Incoming message:\n{text[:4000]}",
+            ),
+        ],
+        tool_choice="none",
+        # Not the length of the title -- a reasoning model (DeepSeek, GLM, Qwen3, Kimi: ADR 19's
+        # own target list) spends tokens on `reasoning_content` before it ever writes `content`,
+        # and a server counts those against the same budget. A tight cap here does not make the
+        # title shorter, it just means the whole budget is spent thinking and `content` never
+        # arrives -- observed on both OpenRouter and LM Studio, always landing on the raw-text
+        # fallback below. Room for a normal amount of reasoning plus the actual answer.
+        max_tokens=1000,
+        extra=container.orchestrator.settings.extra,
+    )
+    try:
+        parts: list[str] = []
+        async for event in provider.stream(request):
+            if isinstance(event, TextDelta):
+                parts.append(event.text)
+        generated = " ".join("".join(parts).strip().split()).strip(" \t\n\"'`#*-•")
+        if not generated or generated.casefold() == title_from(text).casefold():
+            return None
+        return title_from(generated, limit=60)
+    except asyncio.CancelledError:
+        return None
+    except Exception:
+        logger.exception("Could not generate an automatic chat title")
+        return None
 
 
 # -- assembling one turn ------------------------------------------------------------------
