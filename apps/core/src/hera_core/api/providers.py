@@ -16,6 +16,7 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query, status
 from fastapi.responses import Response
+from hera_providers.thinking import NOTHING, Registry, Thinking
 
 from hera_core.config import ConfigError, HeraConfig, ModelEntry, ProviderEntry
 from hera_core.config import load as load_config
@@ -30,60 +31,74 @@ from hera_core.schemas import (
     ProvidersOut,
 )
 from hera_home import logo_path
-from hera_providers import (
-    EndpointCapabilities,
-    OpenAICompatibleProvider,
-    ProviderError,
-    ReasoningEfforts,
-)
+from hera_providers import OpenAICompatibleProvider, ProviderError
 
 router = APIRouter(tags=["providers"])
 
-#: The only endpoint kind whose reasoning vocabulary we can ask for. A model id that appears in
-#: OpenRouter's catalogue says nothing about what a self-hosted llama.cpp accepts, and the id is
-#: the only thing the two would be joined on -- so this is the endpoint's declared kind deciding,
-#: which is the one judgement here that is not a guess.
-ASKABLE = {"openrouter"}
-
 
 async def _out(config: HeraConfig, active: str) -> ProvidersOut:
-    """Every endpoint, and for each of its models what it says it can be told.
+    """Every endpoint, and for each of its models what it can be told about its reasoning.
 
-    Two questions, asked of two different things, because there are two different things to ask.
-    **Which effort values exist** is only OpenRouter's to answer -- it publishes a per-model list,
-    and no other endpoint does. **Whether an effort field is honoured at all**, and whether the
-    model has a thinking switch instead, is a question for the endpoint itself, and llama.cpp
-    answers it at ``/props``.
+    Delegates to :class:`hera_providers.thinking.Registry`, which asks whichever servers an
+    endpoint might be and adds up what they say. The three short notes that matter here:
 
-    **Every endpoint is asked about itself**, whatever its declared ``kind``. A llama.cpp server
-    registered as ``openai`` is still a llama.cpp server, and gating on the label would mean the
-    answer depended on what a person typed into a form rather than on what the server is. A
-    server with no ``/props`` answers 404, which is a whole answer: it has not said anything, and
-    a control is not drawn from a silence.
+    **The kind is a hint, not a gate.** ``/props`` and ``/model_group/info`` are asked of every
+    endpoint whatever it was registered as, because a llama.cpp registered as ``openai`` is still
+    a llama.cpp server -- and that is the ordinary way somebody registers one. Both 404 in a
+    millisecond where they are absent, which is a whole answer rather than a failure.
 
-    Both are cached for an hour per endpoint and neither can fail a response. Settings has to keep
-    working with the network down, and a convenience that can turn a screen into a 500 is not one.
+    **A model's own declaration is the fallback, not an override.** ``ModelEntry.thinking`` is
+    what a person entered on Settings -> Models, for the many providers that publish their
+    vocabulary in documentation prose and nowhere else. A server that says what it accepts is
+    more reliable than anything anybody remembers, so a probe that answered wins; a probe that did
+    not leaves the declaration standing.
+
+    **The api key goes only to the endpoint it is registered against**, and only for the two
+    probes that need one (LiteLLM, Gemini). It is never sent anywhere else, and a failure sends
+    nothing at all -- a connection refused raises before a body is written.
     """
-    asks = any(entry.kind in ASKABLE for entry in config.providers)
-    catalogue = await ReasoningEfforts.load() if asks else {}
-
     providers: list[dict[str, Any]] = []
     for entry in config.providers:
         data = entry.redacted()
-        can = await EndpointCapabilities.load(entry.base_url)
         for model in data.get("models", []):
-            if entry.kind in ASKABLE:
-                efforts = ReasoningEfforts.for_model(catalogue, model.get("id", ""))
-                if efforts:
-                    model["reasoning_efforts"] = list(efforts)
-            # Only when there is no vocabulary to offer. A model with both an effort list and a
-            # thinking switch is given the list, because a list is the finer control and the
-            # switch is what it is a shorthand for.
-            if not model.get("reasoning_efforts"):
-                model["thinking_toggle"] = can.thinking_toggle
+            model_id = str(model.get("id", ""))
+            found = await Registry.resolve(
+                entry.kind,
+                entry.base_url,
+                model_id,
+                api_key=entry.api_key,
+                declared=declared_thinking(entry, model_id),
+            )
+            # Flattened, and the shape is decided here so the composer and the settings screen
+            # cannot disagree about which control a model wants. `Thinking` is a NamedTuple and
+            # the browser should not have to know that.
+            model["reasoning_efforts"] = list(found.efforts)
+            model["thinking_toggle"] = found.toggle
+            model["thinking_budget"] = found.budget
+            model["thinking_source"] = found.source
+            model["thinking_shape"] = found.shape
         providers.append(data)
 
     return ProvidersOut(providers=providers, active=active)
+
+
+def declared_thinking(entry: ProviderEntry, model_id: str) -> Thinking:
+    """What this model was declared to accept, by a person, in ``config.toml``.
+
+    Read rather than fetched, and deliberately per **model**: a per-kind table would be a lie for
+    OpenAI, where ``gpt-5-pro`` takes ``high`` and nothing else while ``gpt-5.1-codex-max`` adds
+    ``xhigh``. The file is a file a person reads and edits, which is the whole of what ADR 18 asks
+    of the presets it already describes.
+    """
+    model = next((m for m in entry.models if m.id == model_id), None)
+    if model is None or not model.thinking:
+        return NOTHING
+    return Thinking(
+        efforts=tuple(model.thinking.get("efforts", ())),
+        toggle=bool(model.thinking.get("toggle", False)),
+        budget=bool(model.thinking.get("budget", False)),
+        source="declared",
+    )
 
 
 @router.get("/providers", response_model=ProvidersOut)

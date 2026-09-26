@@ -209,13 +209,26 @@ export interface ModelEntry {
 	 * unknown, not "any"** — so a reasoning control is drawn only when this is non-empty. The
 	 * values are not a shared vocabulary (OpenRouter carries `minimal`, `none` and `xhigh`, and a
 	 * model takes a subset of even that), and a value the server refuses fails the whole request
-	 * rather than the setting. Always empty for a self-hosted endpoint. */
+	 * rather than the setting. */
 	reasoning_efforts: string[];
 	/** Whether this model reads `chat_template_kwargs.enable_thinking` — the knob most reasoning
 	 * models actually have, asked of the endpoint from the chat template it published. A boolean
 	 * and not a vocabulary, because that is the shape every model declaring it wants: MiniCPM5 is
 	 * *Think* / *No Think*, Qwen and GLM the same. `false` for an endpoint that has not said. */
 	thinking_toggle: boolean;
+	/** Whether the model wants a thinking **token budget** rather than a named level.
+	 *
+	 * A third control shape, and the one most easily mistaken for the other two: Anthropic-style
+	 * models take `max_tokens` on a thinking block, so offering `low/medium/high` to one
+	 * produces a control that does nothing. */
+	thinking_budget: boolean;
+	/** Which of the three sources answered: a server's name, `declared` for something a person
+	 * entered on the settings screen, or `none`. Shown beside the control, because somebody
+	 * looking at it is entitled to know whether the endpoint said so or they did. */
+	thinking_source: string;
+	/** Which control this model wants — `values`, `budget`, `toggle` or `none`. Decided server-side
+	 * so the composer and the settings screen cannot disagree about it. */
+	thinking_shape: string;
 }
 
 /** A known set of {@link ModelEntry.options}, offered on Settings → Models.

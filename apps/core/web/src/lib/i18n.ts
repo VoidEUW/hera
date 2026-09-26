@@ -40,6 +40,7 @@ export const t = {
 		thinking: 'Thinking',
 		thinkingOn: 'She is thinking. Click to turn it off.',
 		thinkingOff: 'Not thinking. Click to turn it on.',
+		budgetTitle: 'Thinking budget, in tokens',
 		effort: {
 			// Only "absent from options" is a phrase. The values themselves are the endpoint's own
 			// vocabulary -- `xhigh`, `minimal`, `none` are wire values a server matches on, so
@@ -403,8 +404,26 @@ export const t = {
 			repeatPenalty: 'Repeat penalty',
 			reasoningEffort: 'Reasoning effort',
 			reasoningEffortFree: 'low, high, whatever it takes',
+			/** Where the vocabulary offered for this model came from. Shown because somebody
+			 * looking at a control is entitled to know whether the endpoint said so or they did. */
+			thinkingSource: {
+				openrouter: 'Offered by OpenRouter',
+				llamacpp: 'Offered by the model server',
+				ollama: 'Offered by Ollama',
+				litellm: 'Offered by LiteLLM',
+				gemini: 'Offered by Google',
+				declared: 'Told to Hera — nobody publishes this one',
+				none: 'Nothing is known about this model yet'
+			},
 			thinking: 'Let her think',
 			thinkingToggle: 'Let the model reason before it answers',
+			thinkingBudget: 'Thinking budget (tokens)',
+			/** How a vocabulary gets declared for the ~17 providers whose effort levels are
+			 * documentation prose and no endpoint. Said plainly, because a hand-entered
+			 * vocabulary is the one kind here that can be out of date without anything failing. */
+			declare: 'Tell Hera what it accepts',
+			declareHint:
+				'Nobody publishes this, so it has to be said once. A level this model does not accept is refused by the server and fails the turn.',
 			reasoningEffortHint:
 				'A starting vocabulary — the values a server actually accepts are its own.',
 			overrideNote:

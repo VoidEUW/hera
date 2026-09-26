@@ -330,6 +330,24 @@ export class Workspace {
 		await this.#writeOptions(entry, model, options);
 	}
 
+	/** Sets a thinking token budget, for a model that takes one rather than a named level.
+	 *
+	 * Written as `thinking_budget` at the top level, because that is where an
+	 * Anthropic-style `max_tokens` budget belongs and it is the only one of the three shapes
+	 * that is a number rather than a name. Removed again when the value is not a positive
+	 * number, so "no budget" is the absence of one rather than a budget of zero, which some
+	 * servers read as *think as little as possible* rather than *do not think*.
+	 */
+	async setThinkingBudget(providerName: string, modelId: string, tokens: number) {
+		const entry = this.providers.find((provider) => provider.name === providerName);
+		const model = entry?.models.find((candidate) => candidate.id === modelId);
+		if (!entry || !model) return;
+		const options = { ...model.options };
+		if (Number.isFinite(tokens) && tokens > 0) options.thinking_budget = Math.round(tokens);
+		else delete options.thinking_budget;
+		await this.#writeOptions(entry, model, options);
+	}
+
 	async #writeOptions(
 		entry: { name: string },
 		model: { id: string; name: string; context_length: number | null },

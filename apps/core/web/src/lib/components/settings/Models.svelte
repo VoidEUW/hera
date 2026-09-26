@@ -60,10 +60,26 @@
 	// list is not written here. This screen is the one place a person sets the field by hand when
 	// the endpoint has not said what it accepts, so it has to offer the same values rather than a
 	// second, looser set: a value offered here and not there is a value that fails a turn.
-	const effortsFor = (model: { reasoning_efforts?: string[] }): SelectChoice[] => [
+	/** The three shapes, decided server-side so this screen and the composer cannot disagree.
+	 *
+	 * `values` is a picker of the levels the model accepts. `budget` is a number, because a model
+	 * that takes a thinking budget does not take `low/medium/high`. `toggle` is a switch. `none` is
+	 * the case this screen exists for: nobody publishes anything, so the person says it once.
+	 */
+	const shapeOf = (model: ModelEntry): string => model.thinking_shape ?? 'none';
+	const sourceOf = (model: ModelEntry): string => model.thinking_source ?? 'none';
+	const effortsFor = (model: ModelEntry): SelectChoice[] => [
 		{ value: '', label: t.composer.effort.default },
 		...(model.reasoning_efforts ?? []).map((effort) => ({ value: effort, label: effort }))
 	];
+
+	/** What this model reads out of its options for a thinking *budget*, or `undefined` for none.
+	 * Zero is not a budget: some servers read it as *think as little as possible* rather than
+	 * *do not think*, so it is treated as absent here too. */
+	function budgetOf(current: Record<string, unknown> | null | undefined): number | undefined {
+		const raw = current?.thinking_budget;
+		return typeof raw === 'number' && raw > 0 ? raw : undefined;
+	}
 
 	/** Whether the model is thinking, which is the *absence* of `enable_thinking: false`.
 	 *
@@ -92,6 +108,10 @@
 		if (Object.keys(bag).length) current.chat_template_kwargs = bag;
 		else delete current.chat_template_kwargs;
 		optionsDraft = { ...optionsDraft, [key]: written(current) };
+	}
+
+	function setBudget(name: string, model: ModelEntry, tokens: number) {
+		updateOption(name, model, 'thinking_budget', tokens);
 	}
 
 	interface Props {
@@ -691,16 +711,12 @@
 
 											<div class="sampling-field">
 												<span>{t.models.sampling.reasoningEffort}</span>
-												<!-- A picker where the endpoint published a
-												     vocabulary, a switch where the model's
-												     template declares `enable_thinking`, and
-												     **a field where it said neither**. A dropdown
-												     with nothing in it but "Default" is a control
-												     that cannot be used, and the three values this
-												     used to offer regardless were worse than
-												     useless: one of them (`high`) is rejected
-												     outright by a model that takes `xhigh`. -->
-												{#if model.reasoning_efforts?.length}
+												<!-- Whichever of the three shapes this model has,
+								     decided server-side. And where nobody publishes
+								     anything, a field to say it once -- which is the
+								     only way the ~17 prose-only providers are
+								     reachable at all. -->
+												{#if shapeOf(model) === 'values'}
 													<Select
 														choices={effortsFor(model)}
 														value={typeof current.reasoning_effort === 'string'
@@ -716,13 +732,35 @@
 																value
 															)}
 													/>
-												{:else if model.thinking_toggle}
+												{:else if shapeOf(model) === 'toggle'}
 													<Checkbox
 														checked={thinkingOn(current)}
 														label={t.models.sampling.thinking}
 														ariaLabel={t.models.sampling.thinkingToggle}
 														onchange={(on) => setThinking(entry.name, model, on)}
 													/>
+												{:else if shapeOf(model) === 'budget'}
+													<!-- A raw number input rather than `Input`, whose
+													     `kind` is a closed set of *text* kinds on
+													     purpose. Matches the context-length field
+													     below it. -->
+													<div class="sampling-row">
+														<input
+															type="number"
+															min="256"
+															max="32768"
+															step="256"
+															aria-label={t.models.sampling.thinkingBudget}
+															value={budgetOf(current) ?? 1024}
+															onchange={(event) =>
+																setBudget(
+																	entry.name,
+																	model,
+																	Number(event.currentTarget.value) || 1024
+																)}
+														/>
+														<span class="caption">tokens</span>
+													</div>
 												{:else}
 													<Input
 														mono
@@ -740,7 +778,15 @@
 															)}
 													/>
 												{/if}
-												<small>{t.models.sampling.reasoningEffortHint}</small>
+												<!-- Where the offered vocabulary came from. Said on
+												     the screen rather than assumed, because a
+												     hand-entered one can be out of date with
+												     nothing failing until a turn is refused. -->
+												<small>
+													{t.models.sampling.thinkingSource[
+														sourceOf(model) as keyof typeof t.models.sampling.thinkingSource
+													] ?? t.models.sampling.thinkingSource.none}
+												</small>
 											</div>
 										</div>
 

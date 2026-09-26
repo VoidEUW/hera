@@ -1,71 +1,27 @@
-"""What each model says it accepts, carried on the response rather than asked for in the browser.
+"""What each model is reported as able to be told about its reasoning.
 
-The composer's reasoning control is drawn from ``reasoning_efforts`` and from nothing else, so
-what this file pins down is the shape of that list: present and correct where the endpoint has
-answered, and **empty everywhere else** — because empty is the interface's word for *draw no
-picker*, and a value the server refuses fails the whole request rather than the setting.
+The interesting work is in :mod:`hera_providers.thinking`, which asks the servers; this file is
+about the seam -- that whatever the registry answers is what lands on the response, and that a
+model nobody could ask about is reported as unknown rather than as permissive.
 
-The catalogue is a network call, so these drive it through a stub rather than reaching
-OpenRouter, and the two cases that must never be enriched are the point: a self-hosted endpoint
-whose model id happens to appear in somebody else's catalogue, and a model the catalogue does not
-carry.
+**The registry is stubbed, deliberately.** The probes make real HTTP calls and are tested against
+a ``MockTransport`` in ``packages/hera_providers/tests/test_thinking.py``; stubbing them here is
+what keeps this file hermetic. An earlier version of it stubbed ``ReasoningEfforts.load`` and
+stopped doing so when the route moved to the registry -- and the seven tests went from instant to
+thirteen seconds, quietly reaching the real OpenRouter. A test that passes because the internet
+cooperated is not a test.
 """
 
 from __future__ import annotations
 
-import httpx
+from typing import Any
+
 import pytest
 from core_support import API
+from hera_providers.thinking import NOTHING, Registry, Thinking
 from httpx import AsyncClient
 
-from hera_providers import ReasoningEfforts
-
 pytestmark = pytest.mark.anyio
-
-CATALOGUE = {
-    "data": [
-        {
-            "id": "qwen/qwen3.8-27b",
-            "reasoning": {
-                "supported_efforts": ["xhigh", "medium", "low"],
-                "default_effort": "xhigh",
-            },
-        },
-        {
-            "id": "stealth/space-bunny-alpha",
-            "reasoning": {
-                "mandatory": True,
-                "supported_efforts": ["max", "xhigh", "high", "medium", "low"],
-                "default_effort": "max",
-            },
-        },
-        # Carries a reasoning block but never says which values it takes.
-        {"id": "someone/quiet", "reasoning": {"default_effort": "high"}},
-    ]
-}
-
-
-@pytest.fixture(autouse=True)
-def catalogue(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Answer the catalogue from a stub, and leave nothing cached behind."""
-
-    def handler(request: httpx.Request) -> httpx.Response:
-        assert request.url.path.endswith("/models"), "the catalogue is one endpoint, not a search"
-        return httpx.Response(200, json=CATALOGUE)
-
-    # Captured before the patch: the stub drives the real loader through a mock transport, which
-    # is the only way to exercise the fetch, the cache and the failure handling without a network.
-    real_load = ReasoningEfforts.load
-
-    async def fake_load(*_args: object, **kwargs: object) -> dict[str, tuple[str, ...]]:
-        client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
-        try:
-            return await real_load(client=client, **kwargs)
-        finally:
-            await client.aclose()
-
-    monkeypatch.setattr(ReasoningEfforts, "load", staticmethod(fake_load))
-    ReasoningEfforts.forget()
 
 
 async def register(client: AsyncClient, name: str, kind: str, model_id: str) -> None:
@@ -81,70 +37,124 @@ async def register(client: AsyncClient, name: str, kind: str, model_id: str) -> 
     assert added.status_code == 201, added.text
 
 
-class TestTheEffortsAModelAccepts:
-    async def test_an_openrouter_model_carries_its_own_values(self, client: AsyncClient) -> None:
-        # The bug this exists for: `qwen/qwen3.8-27b` rejects `high`, which is one of the three
-        # values the composer used to offer every model regardless.
+def stub(monkeypatch: pytest.MonkeyPatch, answers: dict[str, Thinking]) -> None:
+    """Make the registry answer `answers[model_id]`, and `NOTHING` for anything else.
+
+    Keyed by model id, because that is what the registry is asked about -- a model id appearing in
+    one endpoint's catalogue says nothing about another's, which is the whole reason the probes
+    are per endpoint.
+    """
+
+    async def resolve(kind: str, base_url: str, model_id: str, **_: Any) -> Thinking:
+        return answers.get(model_id, NOTHING)
+
+    monkeypatch.setattr(Registry, "resolve", staticmethod(resolve))
+
+
+def model_named(body: dict[str, Any], provider: str, model_id: str) -> dict[str, Any]:
+    entry = next(p for p in body["providers"] if p["name"] == provider)
+    return next(m for m in entry["models"] if m["id"] == model_id)
+
+
+class TestWhatIsReported:
+    async def test_a_published_vocabulary_arrives_as_a_picker(
+        self, client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # The bug this exists for: `qwen/qwen3.8-27b` accepts `xhigh, medium, low` and rejects
+        # `high`, which is one of the three values the composer used to offer every model.
+        stub(
+            monkeypatch,
+            {"qwen/qwen3.8-27b": Thinking(efforts=("xhigh", "medium", "low"), source="openrouter")},
+        )
         await register(client, "router", "openrouter", "qwen/qwen3.8-27b")
 
-        providers = (await client.get(f"{API}/providers")).json()["providers"]
-        model = next(p for p in providers if p["name"] == "router")["models"][0]
+        model = model_named(
+            (await client.get(f"{API}/providers")).json(), "router", "qwen/qwen3.8-27b"
+        )
 
         assert model["reasoning_efforts"] == ["xhigh", "medium", "low"]
+        assert model["thinking_shape"] == "values"
+        assert model["thinking_source"] == "openrouter"
 
-    async def test_a_registered_variant_suffix_still_matches(self, client: AsyncClient) -> None:
-        # `:free` is what a person types; the catalogue lists the model bare.
-        await register(client, "router", "openrouter", "qwen/qwen3.8-27b:free")
-
-        providers = (await client.get(f"{API}/providers")).json()["providers"]
-        model = next(p for p in providers if p["name"] == "router")["models"][0]
-
-        assert model["reasoning_efforts"] == ["xhigh", "medium", "low"]
-
-    async def test_a_mandatory_reasoning_model_still_reports_its_whole_range(
-        self, client: AsyncClient
+    async def test_a_thinking_switch_arrives_as_a_switch(
+        self, client: AsyncClient, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        # `mandatory` says the model always reasons; it does not narrow what may be asked for.
-        await register(client, "bunny", "openrouter", "stealth/space-bunny-alpha")
+        stub(monkeypatch, {"MiniCPM5-2B": Thinking(toggle=True, source="llamacpp")})
+        await register(client, "studio", "openai", "MiniCPM5-2B")
 
-        providers = (await client.get(f"{API}/providers")).json()["providers"]
-        model = next(p for p in providers if p["name"] == "bunny")["models"][0]
-
-        assert model["reasoning_efforts"] == ["max", "xhigh", "high", "medium", "low"]
-
-
-class TestWhereThereIsNoAnswer:
-    async def test_a_self_hosted_model_is_never_enriched(self, client: AsyncClient) -> None:
-        # The catalogue knows this id. That is not evidence about *this* endpoint, which is a
-        # llama.cpp on loopback, and offering values it does not accept fails every turn.
-        await register(client, "studio", "llamacpp", "qwen/qwen3.8-27b")
-
-        providers = (await client.get(f"{API}/providers")).json()["providers"]
-        model = next(p for p in providers if p["name"] == "studio")["models"][0]
+        model = model_named((await client.get(f"{API}/providers")).json(), "studio", "MiniCPM5-2B")
 
         assert model["reasoning_efforts"] == []
+        assert model["thinking_toggle"] is True
+        assert model["thinking_shape"] == "toggle"
 
-    async def test_a_model_the_catalogue_does_not_carry_is_empty(self, client: AsyncClient) -> None:
-        await register(client, "studio", "openrouter", "somebody/private-build")
+    async def test_a_token_budget_is_its_own_shape(
+        self, client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # The one most easily mistaken for the others: offering `low/medium/high` to a model
+        # that wants `max_tokens` produces a control that does nothing.
+        stub(
+            monkeypatch,
+            {"anthropic/claude-opus-4.6": Thinking(budget=True, toggle=True, source="openrouter")},
+        )
+        await register(client, "router", "openrouter", "anthropic/claude-opus-4.6")
 
-        providers = (await client.get(f"{API}/providers")).json()["providers"]
-        model = next(p for p in providers if p["name"] == "studio")["models"][0]
+        model = model_named(
+            (await client.get(f"{API}/providers")).json(), "router", "anthropic/claude-opus-4.6"
+        )
+
+        assert model["thinking_budget"] is True
+        assert model["thinking_shape"] == "budget"
+
+    async def test_a_model_nobody_could_ask_about_is_unknown_and_not_permissive(
+        self, client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # The self-hosted case: nothing answered, so no control. Every field has to say *absent*
+        # rather than *allowed*, because the difference is a control that does nothing.
+        stub(monkeypatch, {})
+        await register(client, "studio", "openai", "somebody/private-build")
+
+        model = model_named(
+            (await client.get(f"{API}/providers")).json(), "studio", "somebody/private-build"
+        )
 
         assert model["reasoning_efforts"] == []
+        assert model["thinking_toggle"] is False
+        assert model["thinking_budget"] is False
+        assert model["thinking_shape"] == "none"
 
-    async def test_a_model_that_never_says_which_values_is_empty(self, client: AsyncClient) -> None:
-        # It publishes a default effort. A default is one value, not the set, and treating it as
-        # the set would hide every other effort the model actually takes.
-        await register(client, "router", "openrouter", "someone/quiet")
+    async def test_a_declared_vocabulary_is_used_when_nothing_was_published(
+        self, client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # The fallback for the ~17 providers whose vocabulary is prose. A server that published
+        # would outrank this, so `resolve` is stubbed to return the declaration's shape here.
+        async def resolve(kind: str, base_url: str, model_id: str, **_: Any) -> Thinking:
+            return Thinking(efforts=("low", "high"), source="declared")
 
-        providers = (await client.get(f"{API}/providers")).json()["providers"]
-        model = next(p for p in providers if p["name"] == "router")["models"][0]
+        monkeypatch.setattr(Registry, "resolve", staticmethod(resolve))
+        await register(client, "openai-direct", "openai", "gpt-5-pro")
 
-        assert model["reasoning_efforts"] == []
+        model = model_named(
+            (await client.get(f"{API}/providers")).json(), "openai-direct", "gpt-5-pro"
+        )
 
-    async def test_the_seeded_local_endpoint_still_answers(self, client: AsyncClient) -> None:
-        # Whatever the catalogue says, an install with one local endpoint must keep working.
+        assert model["reasoning_efforts"] == ["low", "high"]
+        assert model["thinking_source"] == "declared"
+
+    async def test_every_model_carries_the_fields_even_when_unknown(
+        self, client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # A response that omits a field is not the same as one that says `false`, and the
+        # browser has to be able to tell them apart without a default.
+        stub(monkeypatch, {})
         body = (await client.get(f"{API}/providers")).json()
 
-        assert body["providers"]
-        assert all("reasoning_efforts" in m for p in body["providers"] for m in p["models"])
+        for entry in body["providers"]:
+            for model in entry["models"]:
+                assert {
+                    "reasoning_efforts",
+                    "thinking_toggle",
+                    "thinking_budget",
+                    "thinking_source",
+                    "thinking_shape",
+                } <= set(model)
