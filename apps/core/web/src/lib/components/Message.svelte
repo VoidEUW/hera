@@ -110,7 +110,24 @@
 	});
 
 	const note = $derived.by(() => {
-		if (!closed || closed.reason === 'completed') return '';
+		if (!closed) {
+			// A turn that recorded *nothing at all* -- no prose, no gutter, no terminator. The
+			// server closes the record on every path now, so this should not happen; it is here
+			// for the turns already persisted without one, and for any path that manages to miss.
+			//
+			// Without it the message drew as an empty bubble with a *Try again* and no reason, which
+			// reads as *she had nothing to say* rather than *she never got to answer* -- and a
+			// person retries that by rewording the question, which is the wrong response to a
+			// provider that refused the request. The same failure mode as an empty list that has
+			// not arrived, one level up (#72).
+			//
+			// `streaming` is excluded because a turn that has *begun* also has nothing in it yet,
+			// and the ocellus beside it is already saying so. Only a turn that has stopped without
+			// a terminator is the case this is for.
+			const said = turn.inline.length > 0 || turn.activity.length > 0;
+			return !streaming && !said ? t.turn.silent : '';
+		}
+		if (closed.reason === 'completed') return '';
 		if (closed.reason === 'failed') return closed.error || t.turn.failed;
 		return t.turn[closed.reason] ?? '';
 	});

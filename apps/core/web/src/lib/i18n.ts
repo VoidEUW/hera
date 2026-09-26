@@ -187,6 +187,13 @@ export const t = {
 	turn: {
 		cancelled: 'Interrupted',
 		failed: 'This turn failed',
+		/** A turn that stopped without ever recording anything, and so has no reason to give.
+		 * It is not a blank answer: the server closes the record on every path now, so reaching
+		 * this means the turn was persisted before that, or by something that missed it. Said
+		 * rather than left blank, because an empty bubble reads as *she had nothing to say* and
+		 * invites a rewording of the question, which is the wrong response to a request the
+		 * provider refused. */
+		silent: 'This turn stopped without an answer',
 		max_iterations: 'She ran out of tool calls and answered with what she had',
 		awaiting_permission: 'Waiting for you',
 		awaiting_answer: 'Waiting for your answer',

@@ -435,6 +435,15 @@ def _stream(
             # Runs on a normal finish, on a client that hung up, and on a failure. Whatever
             # the turn recorded is persisted either way -- that is the point of `recorded`
             # being correct at every moment rather than only at the end.
+            #
+            # `close()` first, and it is not redundant. `Turn.stream` closes on every exception
+            # it knows about, but a turn abandoned without ever being entered -- or a failure path
+            # added later that nobody remembered to handle -- would be persisted here with no
+            # outcome at all, which is a conversation row the interface cannot say anything about
+            # and draws as an empty bubble. Idempotent, so a turn that closed itself keeps the
+            # outcome it actually had; `cancelled` is the honest word for one that did not,
+            # because this block runs when the generator ended without the turn finishing.
+            turn.close("cancelled")
             persisted = _record(container, owner_id, chat_id, message_id, turn)
             if persisted is not None:
                 yield frame("done", persisted)
