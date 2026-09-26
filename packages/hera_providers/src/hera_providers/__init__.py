@@ -8,6 +8,7 @@ see :mod:`hera_providers.events`, which is the contract the rest of the system i
 from __future__ import annotations
 
 from hera_providers.base import EmbeddingProvider, Provider, StreamAdapter
+from hera_providers.catalogue import ReasoningEfforts, catalogue_id
 from hera_providers.errors import (
     MalformedResponse,
     ProviderError,
@@ -70,6 +71,7 @@ __all__ = [
     "ProviderTimeout",
     "ProviderUnavailable",
     "QwenAdapter",
+    "ReasoningEfforts",
     "Role",
     "StreamAdapter",
     "StreamInterrupted",
@@ -83,6 +85,7 @@ __all__ = [
     "TurnEnd",
     "Usage",
     "build_client",
+    "catalogue_id",
     "chat_payload",
     "pseudo_embedding",
     "text_turn",

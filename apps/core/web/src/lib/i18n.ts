@@ -38,10 +38,11 @@ export const t = {
 		 * model's `options.reasoning_effort` applies to every chat from the next message on. */
 		reasoning: 'Reasoning',
 		effort: {
-			default: 'Default',
-			low: 'Low',
-			medium: 'Medium',
-			high: 'High'
+			// Only "absent from options" is a phrase. The values themselves are the endpoint's own
+			// vocabulary -- `xhigh`, `minimal`, `none` are wire values a server matches on, so
+			// translating one would change what is sent rather than what is read. They come from
+			// `ModelOut.reasoning_efforts` and are drawn as they arrive.
+			default: 'Default'
 		},
 		contextLabel: 'Context window',
 		contextUsed: (used: number, limit: number) =>

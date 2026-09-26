@@ -31,7 +31,7 @@
 	} from '$lib/api/client';
 	import Checkbox from '$lib/components/Checkbox.svelte';
 	import Input from '$lib/components/Input.svelte';
-	import Select from '$lib/components/Select.svelte';
+	import Select, { type Choice as SelectChoice } from '$lib/components/Select.svelte';
 	import Slider from '$lib/components/Slider.svelte';
 	import { t } from '$lib/i18n';
 	import { Placeholder } from '$lib/loading.svelte';
@@ -56,11 +56,13 @@
 		{ key: 'repeat_penalty', label: t.models.sampling.repeatPenalty, min: 0.5, max: 2, step: 0.01 }
 	];
 
-	const REASONING_CHOICES = [
+	// The values this model accepts, asked of the endpoint — see `Composer.svelte` for why the
+	// list is not written here. This screen is the one place a person sets the field by hand when
+	// the endpoint has not said what it accepts, so it has to offer the same values rather than a
+	// second, looser set: a value offered here and not there is a value that fails a turn.
+	const effortsFor = (model: { reasoning_efforts?: string[] }): SelectChoice[] => [
 		{ value: '', label: t.composer.effort.default },
-		{ value: 'low', label: t.composer.effort.low },
-		{ value: 'medium', label: t.composer.effort.medium },
-		{ value: 'high', label: t.composer.effort.high }
+		...(model.reasoning_efforts ?? []).map((effort) => ({ value: effort, label: effort }))
 	];
 
 	interface Props {
@@ -661,7 +663,7 @@
 											<div class="sampling-field">
 												<span>{t.models.sampling.reasoningEffort}</span>
 												<Select
-													choices={REASONING_CHOICES}
+													choices={effortsFor(model)}
 													value={typeof current.reasoning_effort === 'string'
 														? current.reasoning_effort
 														: ''}

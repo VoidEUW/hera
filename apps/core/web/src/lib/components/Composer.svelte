@@ -164,13 +164,22 @@
 		activeEntry && activeModel ? `${activeEntry.name}::${activeModel.id}` : ''
 	);
 
-	// Fixed, not read from the server: there is no catalogue of valid values for a field Hera
-	// does not interpret (ADR 18). `''` means "absent from options" rather than a chosen value.
+	// **The values the active model accepts, asked of the endpoint** rather than a list written
+	// here. They are not a shared vocabulary: OpenRouter's set carries `minimal`, `none` and
+	// `xhigh`, and a model takes a subset of even that — `qwen/qwen3.8-27b` accepts `xhigh`,
+	// `medium` and `low` and *rejects* `high`, which is one of the three this used to offer.
+	// Sending a value a server refuses fails the whole request rather than the setting, so the
+	// control is drawn from what the endpoint said and from nothing else.
+	//
+	// **Empty means draw nothing.** That covers a self-hosted endpoint, a model the catalogue does
+	// not carry, and a catalogue that could not be fetched — three cases that mean the same thing,
+	// which is that nobody has said what this model accepts and the browser is not going to guess.
+	// `reasoning_effort` stays settable by hand on the Models screen, which is where ADR 18 puts
+	// it. `''` remains "absent from options" rather than a chosen value.
+	const efforts = $derived(activeModel?.reasoning_efforts ?? []);
 	const reasoningChoices = $derived([
 		{ value: '', label: t.composer.effort.default },
-		{ value: 'low', label: t.composer.effort.low },
-		{ value: 'medium', label: t.composer.effort.medium },
-		{ value: 'high', label: t.composer.effort.high }
+		...efforts.map((effort) => ({ value: effort, label: effort }))
 	]);
 	const reasoningValue = $derived(
 		typeof activeModel?.options.reasoning_effort === 'string'
@@ -362,16 +371,22 @@
 		{/if}
 
 		{#if modelChoices.length}
-			<div class="effort">
-				<Select
-					choices={reasoningChoices}
-					value={reasoningValue}
-					label={t.composer.reasoning}
-					placement="above"
-					align="end"
-					onchange={chooseReasoning}
-				/>
-			</div>
+			<!-- Only where the endpoint has said what it accepts. A control offering a value the
+			     server refuses turns a setting into a failed turn, so an unknown model gets no
+			     control rather than a guess -- the field is still reachable on Settings -> Models,
+			     which is where ADR 18 puts it. -->
+			{#if efforts.length}
+				<div class="effort">
+					<Select
+						choices={reasoningChoices}
+						value={reasoningValue}
+						label={t.composer.reasoning}
+						placement="above"
+						align="end"
+						onchange={chooseReasoning}
+					/>
+				</div>
+			{/if}
 			<div class="model">
 				<Select
 					choices={modelChoices}

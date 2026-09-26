@@ -205,6 +205,12 @@ export interface ModelEntry {
 	 * what looks like a tool call instead of making one for real — it answers in prose alone
 	 * rather than attempting a call it cannot make. */
 	tool_calling: boolean;
+	/** The `reasoning_effort` values this model accepts, asked of the endpoint. **Empty means
+	 * unknown, not "any"** — so a reasoning control is drawn only when this is non-empty. The
+	 * values are not a shared vocabulary (OpenRouter carries `minimal`, `none` and `xhigh`, and a
+	 * model takes a subset of even that), and a value the server refuses fails the whole request
+	 * rather than the setting. Always empty for a self-hosted endpoint. */
+	reasoning_efforts: string[];
 }
 
 /** A known set of {@link ModelEntry.options}, offered on Settings → Models.

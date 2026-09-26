@@ -590,6 +590,18 @@ class ModelOut(BaseModel):
     options: dict[str, Any] = Field(default_factory=dict)
     context_length: int | None = None
     tool_calling: bool = True
+    reasoning_efforts: list[str] = Field(default_factory=list)
+    """The ``reasoning_effort`` values this model accepts, asked of the endpoint rather than
+    guessed from the id — and **empty means unknown, not "any"**.
+
+    A reasoning control is only drawn when this is non-empty, because the values are not a shared
+    vocabulary: OpenRouter's set includes ``minimal``, ``none`` and ``xhigh``, and individual
+    models take a subset of even that (``qwen/qwen3.8-27b`` accepts ``xhigh``, ``medium`` and
+    ``low`` and rejects ``high``). Offering a value the server refuses fails the whole request,
+    not just the setting, so an endpoint that has not said what it accepts gets no control and the
+    field stays hand-written on the Models screen. Always empty for a self-hosted endpoint: a
+    model id that appears in somebody else's catalogue says nothing about what this one accepts.
+    """
 
 
 class ProviderOut(BaseModel):

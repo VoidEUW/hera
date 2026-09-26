@@ -30,20 +30,47 @@ from hera_core.schemas import (
     ProvidersOut,
 )
 from hera_home import logo_path
-from hera_providers import OpenAICompatibleProvider, ProviderError
+from hera_providers import OpenAICompatibleProvider, ProviderError, ReasoningEfforts
 
 router = APIRouter(tags=["providers"])
 
+#: The only endpoint kind whose reasoning vocabulary we can ask for. A model id that appears in
+#: OpenRouter's catalogue says nothing about what a self-hosted llama.cpp accepts, and the id is
+#: the only thing the two would be joined on -- so this is the endpoint's declared kind deciding,
+#: which is the one judgement here that is not a guess.
+ASKABLE = {"openrouter"}
+
+
+async def _out(config: HeraConfig, active: str) -> ProvidersOut:
+    """Every endpoint, and for each of its models what reasoning efforts it accepts.
+
+    The catalogue is fetched once an hour for the whole process and never blocks a failure: a
+    model whose efforts could not be learned comes back with an empty list, which the interface
+    reads as *draw no picker*. Settings has to keep working with the network down, and a
+    convenience that can turn a screen into a 500 is not one.
+    """
+    asks = any(entry.kind in ASKABLE for entry in config.providers)
+    catalogue = await ReasoningEfforts.load() if asks else {}
+
+    providers: list[dict[str, Any]] = []
+    for entry in config.providers:
+        data = entry.redacted()
+        if entry.kind in ASKABLE:
+            for model in data.get("models", []):
+                efforts = ReasoningEfforts.for_model(catalogue, model.get("id", ""))
+                if efforts:
+                    model["reasoning_efforts"] = list(efforts)
+        providers.append(data)
+
+    return ProvidersOut(providers=providers, active=active)
+
 
 @router.get("/providers", response_model=ProvidersOut)
-def list_providers() -> ProvidersOut:
+async def list_providers() -> ProvidersOut:
     """Every endpoint she can be pointed at, and which one she is pointed at now."""
     config = _read()
     active = config.active()
-    return ProvidersOut(
-        providers=[entry.redacted() for entry in config.providers],
-        active=active.name if active is not None else "",
-    )
+    return await _out(config, active.name if active is not None else "")
 
 
 @router.post("/providers", response_model=ProvidersOut, status_code=status.HTTP_201_CREATED)
@@ -253,7 +280,4 @@ async def _commit(container: Container, config: HeraConfig) -> ProvidersOut:
             options=active.active_options(),
             tool_calling=active.active_tool_calling(),
         )
-    return ProvidersOut(
-        providers=[entry.redacted() for entry in config.providers],
-        active=active.name if active is not None else "",
-    )
+    return await _out(config, active.name if active is not None else "")
