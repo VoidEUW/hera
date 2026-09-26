@@ -333,6 +333,7 @@
 					onstop={() => session.stop()}
 					onmodel={(name, modelId) => workspace.useProvider(name, modelId)}
 					onreasoning={(name, modelId, value) => workspace.setReasoningEffort(name, modelId, value)}
+				onthinking={(name, modelId, on) => void workspace.setThinking(name, modelId, on)}
 					onsettings={(section) => workspace.openSettings(section)}
 					onskills={(names) => session.pinSkills(names)}
 					usage={session.usage}

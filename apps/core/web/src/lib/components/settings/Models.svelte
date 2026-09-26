@@ -65,6 +65,35 @@
 		...(model.reasoning_efforts ?? []).map((effort) => ({ value: effort, label: effort }))
 	];
 
+	/** Whether the model is thinking, which is the *absence* of `enable_thinking: false`.
+	 *
+	 * A boolean knob has no third state, so the model's own default -- which for MiniCPM5 is to
+	 * think -- is what an untouched configuration gets, and the switch shows that rather than an
+	 * "off" that was never set. */
+	function thinkingOn(current: Record<string, unknown> | null | undefined): boolean {
+		const bag = current?.chat_template_kwargs;
+		if (typeof bag !== 'object' || bag === null || Array.isArray(bag)) return true;
+		return (bag as Record<string, unknown>).enable_thinking !== false;
+	}
+
+	/** Merged, never replaced. `chat_template_kwargs` is a bag of template variables that belongs
+	 * to somebody else -- the GLM-4.7 preset lives in it as `clear_thinking` -- so this reaches
+	 * into it and touches one key, and an emptied bag is removed rather than left as `{}`. */
+	function setThinking(name: string, model: ModelEntry, on: boolean) {
+		const key = optionsKey(name, model.id);
+		const current = { ...(parsed(optionsDraft[key] ?? '') ?? {}) };
+		const existing = current.chat_template_kwargs;
+		const bag =
+			typeof existing === 'object' && existing !== null && !Array.isArray(existing)
+				? { ...(existing as Record<string, unknown>) }
+				: {};
+		if (on) bag.enable_thinking = true;
+		else delete bag.enable_thinking;
+		if (Object.keys(bag).length) current.chat_template_kwargs = bag;
+		else delete current.chat_template_kwargs;
+		optionsDraft = { ...optionsDraft, [key]: written(current) };
+	}
+
 	interface Props {
 		filter?: string;
 	}
@@ -662,16 +691,55 @@
 
 											<div class="sampling-field">
 												<span>{t.models.sampling.reasoningEffort}</span>
-												<Select
-													choices={effortsFor(model)}
-													value={typeof current.reasoning_effort === 'string'
-														? current.reasoning_effort
-														: ''}
-													label={t.models.sampling.reasoningEffort}
-													field
-													onchange={(value) =>
-														updateOption(entry.name, model, 'reasoning_effort', value)}
-												/>
+												<!-- A picker where the endpoint published a
+												     vocabulary, a switch where the model's
+												     template declares `enable_thinking`, and
+												     **a field where it said neither**. A dropdown
+												     with nothing in it but "Default" is a control
+												     that cannot be used, and the three values this
+												     used to offer regardless were worse than
+												     useless: one of them (`high`) is rejected
+												     outright by a model that takes `xhigh`. -->
+												{#if model.reasoning_efforts?.length}
+													<Select
+														choices={effortsFor(model)}
+														value={typeof current.reasoning_effort === 'string'
+															? current.reasoning_effort
+															: ''}
+														label={t.models.sampling.reasoningEffort}
+														field
+														onchange={(value) =>
+															updateOption(
+																entry.name,
+																model,
+																'reasoning_effort',
+																value
+															)}
+													/>
+												{:else if model.thinking_toggle}
+													<Checkbox
+														checked={thinkingOn(current)}
+														label={t.models.sampling.thinking}
+														ariaLabel={t.models.sampling.thinkingToggle}
+														onchange={(on) => setThinking(entry.name, model, on)}
+													/>
+												{:else}
+													<Input
+														mono
+														value={typeof current.reasoning_effort === 'string'
+															? current.reasoning_effort
+															: ''}
+														ariaLabel={t.models.sampling.reasoningEffort}
+														placeholder={t.models.sampling.reasoningEffortFree}
+														onchange={(value) =>
+															updateOption(
+																entry.name,
+																model,
+																'reasoning_effort',
+																value
+															)}
+													/>
+												{/if}
 												<small>{t.models.sampling.reasoningEffortHint}</small>
 											</div>
 										</div>

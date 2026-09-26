@@ -37,6 +37,9 @@ export const t = {
 		 * global, the same reach as the model picker beside it: the value written to the active
 		 * model's `options.reasoning_effort` applies to every chat from the next message on. */
 		reasoning: 'Reasoning',
+		thinking: 'Thinking',
+		thinkingOn: 'She is thinking. Click to turn it off.',
+		thinkingOff: 'Not thinking. Click to turn it on.',
 		effort: {
 			// Only "absent from options" is a phrase. The values themselves are the endpoint's own
 			// vocabulary -- `xhigh`, `minimal`, `none` are wire values a server matches on, so
@@ -392,6 +395,9 @@ export const t = {
 			minP: 'Min P',
 			repeatPenalty: 'Repeat penalty',
 			reasoningEffort: 'Reasoning effort',
+			reasoningEffortFree: 'low, high, whatever it takes',
+			thinking: 'Let her think',
+			thinkingToggle: 'Let the model reason before it answers',
 			reasoningEffortHint:
 				'A starting vocabulary — the values a server actually accepts are its own.',
 			overrideNote:

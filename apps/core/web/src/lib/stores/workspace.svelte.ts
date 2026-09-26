@@ -298,8 +298,45 @@ export class Workspace {
 		const options = { ...model.options };
 		if (value) options.reasoning_effort = value;
 		else delete options.reasoning_effort;
+		await this.#writeOptions(entry, model, options);
+	}
+
+	/** Think / No Think, for a model whose template declares `enable_thinking`.
+	 *
+	 * **The toggle is the value.** `enable_thinking` is a boolean, so there is no third state
+	 * and no "default": absent from options means the server's own default, which for MiniCPM5 is
+	 * to think. Only `false` is written, and only that removes it again -- a person who switches it
+	 * off and back on gets the model's own default back rather than a setting this interface
+	 * invented.
+	 *
+	 * **Merged, not replaced.** `chat_template_kwargs` is a bag of template variables and is
+	 * somebody else's: the GLM-4.7 preset lives in it (`clear_thinking`), and a Qwen deployment
+	 * may carry others. Writing the whole object would drop every one of them, so this reaches
+	 * into it and touches one key.
+	 */
+	async setThinking(providerName: string, modelId: string, on: boolean) {
+		const entry = this.providers.find((provider) => provider.name === providerName);
+		const model = entry?.models.find((candidate) => candidate.id === modelId);
+		if (!entry || !model) return;
+		const options = { ...model.options };
+		const existing = options.chat_template_kwargs;
+		const bag = typeof existing === 'object' && existing !== null && !Array.isArray(existing)
+			? { ...(existing as Record<string, unknown>) }
+			: {};
+		if (on) bag.enable_thinking = true;
+		else delete bag.enable_thinking;
+		if (Object.keys(bag).length) options.chat_template_kwargs = bag;
+		else delete options.chat_template_kwargs;
+		await this.#writeOptions(entry, model, options);
+	}
+
+	async #writeOptions(
+		entry: { name: string },
+		model: { id: string; name: string; context_length: number | null },
+		options: Record<string, unknown>
+	) {
 		try {
-			const found = await api.addModel(providerName, {
+			const found = await api.addModel(entry.name, {
 				id: model.id,
 				name: model.name,
 				options,

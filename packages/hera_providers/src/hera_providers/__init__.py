@@ -8,6 +8,7 @@ see :mod:`hera_providers.events`, which is the contract the rest of the system i
 from __future__ import annotations
 
 from hera_providers.base import EmbeddingProvider, Provider, StreamAdapter
+from hera_providers.capabilities import Capabilities, EndpointCapabilities
 from hera_providers.catalogue import ReasoningEfforts, catalogue_id
 from hera_providers.errors import (
     MalformedResponse,
@@ -53,10 +54,12 @@ from hera_providers.settings import ProviderSettings
 
 __all__ = [
     "EVENT_ADAPTER",
+    "Capabilities",
     "ChatMessage",
     "ChatRequest",
     "ContentPart",
     "EmbeddingProvider",
+    "EndpointCapabilities",
     "Event",
     "FakeProvider",
     "FakeProviderExhausted",

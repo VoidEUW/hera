@@ -30,7 +30,12 @@ from hera_core.schemas import (
     ProvidersOut,
 )
 from hera_home import logo_path
-from hera_providers import OpenAICompatibleProvider, ProviderError, ReasoningEfforts
+from hera_providers import (
+    EndpointCapabilities,
+    OpenAICompatibleProvider,
+    ProviderError,
+    ReasoningEfforts,
+)
 
 router = APIRouter(tags=["providers"])
 
@@ -42,12 +47,22 @@ ASKABLE = {"openrouter"}
 
 
 async def _out(config: HeraConfig, active: str) -> ProvidersOut:
-    """Every endpoint, and for each of its models what reasoning efforts it accepts.
+    """Every endpoint, and for each of its models what it says it can be told.
 
-    The catalogue is fetched once an hour for the whole process and never blocks a failure: a
-    model whose efforts could not be learned comes back with an empty list, which the interface
-    reads as *draw no picker*. Settings has to keep working with the network down, and a
-    convenience that can turn a screen into a 500 is not one.
+    Two questions, asked of two different things, because there are two different things to ask.
+    **Which effort values exist** is only OpenRouter's to answer -- it publishes a per-model list,
+    and no other endpoint does. **Whether an effort field is honoured at all**, and whether the
+    model has a thinking switch instead, is a question for the endpoint itself, and llama.cpp
+    answers it at ``/props``.
+
+    **Every endpoint is asked about itself**, whatever its declared ``kind``. A llama.cpp server
+    registered as ``openai`` is still a llama.cpp server, and gating on the label would mean the
+    answer depended on what a person typed into a form rather than on what the server is. A
+    server with no ``/props`` answers 404, which is a whole answer: it has not said anything, and
+    a control is not drawn from a silence.
+
+    Both are cached for an hour per endpoint and neither can fail a response. Settings has to keep
+    working with the network down, and a convenience that can turn a screen into a 500 is not one.
     """
     asks = any(entry.kind in ASKABLE for entry in config.providers)
     catalogue = await ReasoningEfforts.load() if asks else {}
@@ -55,11 +70,17 @@ async def _out(config: HeraConfig, active: str) -> ProvidersOut:
     providers: list[dict[str, Any]] = []
     for entry in config.providers:
         data = entry.redacted()
-        if entry.kind in ASKABLE:
-            for model in data.get("models", []):
+        can = await EndpointCapabilities.load(entry.base_url)
+        for model in data.get("models", []):
+            if entry.kind in ASKABLE:
                 efforts = ReasoningEfforts.for_model(catalogue, model.get("id", ""))
                 if efforts:
                     model["reasoning_efforts"] = list(efforts)
+            # Only when there is no vocabulary to offer. A model with both an effort list and a
+            # thinking switch is given the list, because a list is the finer control and the
+            # switch is what it is a shorthand for.
+            if not model.get("reasoning_efforts"):
+                model["thinking_toggle"] = can.thinking_toggle
         providers.append(data)
 
     return ProvidersOut(providers=providers, active=active)

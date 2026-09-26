@@ -602,6 +602,17 @@ class ModelOut(BaseModel):
     field stays hand-written on the Models screen. Always empty for a self-hosted endpoint: a
     model id that appears in somebody else's catalogue says nothing about what this one accepts.
     """
+    thinking_toggle: bool = False
+    """Whether this model reads ``chat_template_kwargs.enable_thinking`` — the knob most reasoning
+    models actually have.
+
+    Asked of the endpoint, from the chat template it published. It is a boolean and not a
+    vocabulary because that is the shape every model declaring it wants: MiniCPM5 is
+    *Think* / *No Think*, Qwen and GLM the same, and a model that has an effort enum says so in
+    its template too. Drawing this where the effort picker would be is the point — a person whose
+    model has one of the two gets the one it has, and a person whose model has neither gets
+    neither.
+    """
 
 
 class ProviderOut(BaseModel):

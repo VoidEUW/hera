@@ -68,6 +68,13 @@
 		/** Changes `options.reasoning_effort` on the active model — global and immediate, the
 		 * same reach as `onmodel`, not scoped to this chat or this message. */
 		onreasoning?: (providerName: string, modelId: string, value: string) => void;
+		/** Turns reasoning on or off for the active model, by writing
+		 * `chat_template_kwargs.enable_thinking` — the knob a model whose template declares it
+		 * actually has, as against the effort enum the other kind declares. A callback because
+		 * the composer is handed what it may change and nothing else, which is the same bargain
+		 * `onreasoning` makes, and it carries the same two arguments for the same reason. Only
+		 * called for a model the endpoint has said declares it. */
+		onthinking?: (providerName: string, modelId: string, on: boolean) => void;
 		onsettings?: (section?: SettingsTab) => void;
 		onskills?: (names: string[]) => void;
 		/** The last exchange's token usage, for the context-window bar. `null` draws no bar. */
@@ -90,6 +97,7 @@
 		onprofile,
 		onmodel,
 		onreasoning,
+		onthinking,
 		onsettings,
 		onskills,
 		usage = null
@@ -177,6 +185,14 @@
 	// `reasoning_effort` stays settable by hand on the Models screen, which is where ADR 18 puts
 	// it. `''` remains "absent from options" rather than a chosen value.
 	const efforts = $derived(activeModel?.reasoning_efforts ?? []);
+	// The toggle is the value, so there are only two of them and no third state: absent from the
+	// model's options means the server's own default, which for MiniCPM5 is to think. Read from
+	// options rather than from a local flag so the composer's bar and Settings -> Models are
+	// always showing the same thing.
+	const thinkingOn = $derived(
+		(activeModel?.options.chat_template_kwargs as { enable_thinking?: unknown } | undefined)
+			?.enable_thinking !== false
+	);
 	const reasoningChoices = $derived([
 		{ value: '', label: t.composer.effort.default },
 		...efforts.map((effort) => ({ value: effort, label: effort }))
@@ -200,6 +216,11 @@
 	function chooseReasoning(value: string) {
 		if (!activeEntry || !activeModel) return;
 		onreasoning?.(activeEntry.name, activeModel.id, value);
+	}
+
+	function setThinking(on: boolean) {
+		if (!activeEntry || !activeModel) return;
+		onthinking?.(activeEntry.name, activeModel.id, on);
 	}
 
 	function submit() {
@@ -371,10 +392,12 @@
 		{/if}
 
 		{#if modelChoices.length}
-			<!-- Only where the endpoint has said what it accepts. A control offering a value the
-			     server refuses turns a setting into a failed turn, so an unknown model gets no
-			     control rather than a guess -- the field is still reachable on Settings -> Models,
-			     which is where ADR 18 puts it. -->
+			<!-- **One slot, whichever control this model actually has.** A model with a published
+			     vocabulary gets the effort picker; a model whose template declares a thinking
+			     switch gets that instead, in the same place, because both are answering "how much
+			     should she think about this" and only one of them would do anything. A model with
+			     neither gets nothing -- there is no third control to fall back on, and a dropdown
+			     that does nothing is worse than an absent one. -->
 			{#if efforts.length}
 				<div class="effort">
 					<Select
@@ -386,6 +409,18 @@
 						onchange={chooseReasoning}
 					/>
 				</div>
+			{:else if activeModel?.thinking_toggle}
+				<button
+					class="context thinking"
+					class:on={thinkingOn}
+					type="button"
+					aria-pressed={thinkingOn}
+					title={thinkingOn ? t.composer.thinkingOn : t.composer.thinkingOff}
+					onclick={() => setThinking(!thinkingOn)}
+				>
+					<span class="dot" class:idle={!thinkingOn} aria-hidden="true"></span>
+					{thinkingOn ? t.composer.thinking : t.composer.thinkingOff}
+				</button>
 			{/if}
 			<div class="model">
 				<Select
@@ -719,7 +754,18 @@
 			display: none;
 		}
 
-		.effort {
+	/* The thinking switch, wearing the same pill as the skills and servers dots beside it, because
+	   it is the same kind of fact: something switched on for the next thing you type. Laurel for
+	   on, faint for off, and no colour of its own — the dot already says it. */
+	.context.thinking {
+		flex: none;
+	}
+
+	.context.thinking.on {
+		color: var(--text-muted);
+	}
+
+	.effort {
 			display: none;
 		}
 

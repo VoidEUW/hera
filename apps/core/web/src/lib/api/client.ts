@@ -211,6 +211,11 @@ export interface ModelEntry {
 	 * model takes a subset of even that), and a value the server refuses fails the whole request
 	 * rather than the setting. Always empty for a self-hosted endpoint. */
 	reasoning_efforts: string[];
+	/** Whether this model reads `chat_template_kwargs.enable_thinking` — the knob most reasoning
+	 * models actually have, asked of the endpoint from the chat template it published. A boolean
+	 * and not a vocabulary, because that is the shape every model declaring it wants: MiniCPM5 is
+	 * *Think* / *No Think*, Qwen and GLM the same. `false` for an endpoint that has not said. */
+	thinking_toggle: boolean;
 }
 
 /** A known set of {@link ModelEntry.options}, offered on Settings → Models.
