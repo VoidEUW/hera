@@ -451,8 +451,7 @@
 						max={BUDGET_MAX}
 						step={256}
 						value={budget ?? BUDGET_MIN}
-						onchange={(event) =>
-							setBudget(Number(event.currentTarget.value) || BUDGET_MIN)}
+						onchange={(event) => setBudget(Number(event.currentTarget.value) || BUDGET_MIN)}
 					/>
 				</label>
 			{/if}
@@ -788,41 +787,41 @@
 			display: none;
 		}
 
-	/* The thinking switch and the budget, wearing the same pill as the skills and servers dots
+		/* The thinking switch and the budget, wearing the same pill as the skills and servers dots
 	   beside it, because it is the same kind of fact: something switched on for the next thing
 	   you type. Laurel for on, faint for off, and no colour of its own — the dot already says it. */
-	.context.thinking {
-		flex: none;
-	}
+		.context.thinking {
+			flex: none;
+		}
 
-	.context.thinking.on {
-		color: var(--text-muted);
-	}
+		.context.thinking.on {
+			color: var(--text-muted);
+		}
 
-	/* The budget is a number inside the pill, so the input has to give up the pill's own
+		/* The budget is a number inside the pill, so the input has to give up the pill's own
 	   typography and padding without the pill losing its shape. */
-	.context.budget {
-		flex: none;
-		gap: 7px;
-	}
+		.context.budget {
+			flex: none;
+			gap: 7px;
+		}
 
-	.context.budget input {
-		width: 5.5ch;
-		padding: 0;
-		border: 0;
-		background: none;
-		font-family: var(--font-mono);
-		font-size: 12px;
-		color: var(--text);
-	}
+		.context.budget input {
+			width: 5.5ch;
+			padding: 0;
+			border: 0;
+			background: none;
+			font-family: var(--font-mono);
+			font-size: 12px;
+			color: var(--text);
+		}
 
-	.context.budget input:focus-visible {
-		outline: 2px solid var(--laurel);
-		outline-offset: 2px;
-		border-radius: 4px;
-	}
+		.context.budget input:focus-visible {
+			outline: 2px solid var(--laurel);
+			outline-offset: 2px;
+			border-radius: 4px;
+		}
 
-	.effort {
+		.effort {
 			display: none;
 		}
 

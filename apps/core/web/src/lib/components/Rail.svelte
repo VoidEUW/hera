@@ -447,11 +447,7 @@
 			     row that was under the pointer is no longer under it.
 
 			     Opens a little slower than it closes, for the reason `reveal` gives. -->
-			<ul
-				class="list nested"
-				in:disclose={{ duration: 180 }}
-				out:disclose={{ duration: 120 }}
-			>
+			<ul class="list nested" in:disclose={{ duration: 180 }} out:disclose={{ duration: 120 }}>
 				{#each inside(project.id) as chat (chat.id)}
 					{@render row(chat)}
 				{:else}

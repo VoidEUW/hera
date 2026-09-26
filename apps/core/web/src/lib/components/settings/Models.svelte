@@ -725,12 +725,7 @@
 														label={t.models.sampling.reasoningEffort}
 														field
 														onchange={(value) =>
-															updateOption(
-																entry.name,
-																model,
-																'reasoning_effort',
-																value
-															)}
+															updateOption(entry.name, model, 'reasoning_effort', value)}
 													/>
 												{:else if shapeOf(model) === 'toggle'}
 													<Checkbox
@@ -770,12 +765,7 @@
 														ariaLabel={t.models.sampling.reasoningEffort}
 														placeholder={t.models.sampling.reasoningEffortFree}
 														onchange={(value) =>
-															updateOption(
-																entry.name,
-																model,
-																'reasoning_effort',
-																value
-															)}
+															updateOption(entry.name, model, 'reasoning_effort', value)}
 													/>
 												{/if}
 												<!-- Where the offered vocabulary came from. Said on

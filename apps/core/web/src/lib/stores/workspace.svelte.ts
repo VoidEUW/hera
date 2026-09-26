@@ -320,9 +320,10 @@ export class Workspace {
 		if (!entry || !model) return;
 		const options = { ...model.options };
 		const existing = options.chat_template_kwargs;
-		const bag = typeof existing === 'object' && existing !== null && !Array.isArray(existing)
-			? { ...(existing as Record<string, unknown>) }
-			: {};
+		const bag =
+			typeof existing === 'object' && existing !== null && !Array.isArray(existing)
+				? { ...(existing as Record<string, unknown>) }
+				: {};
 		if (on) bag.enable_thinking = true;
 		else delete bag.enable_thinking;
 		if (Object.keys(bag).length) options.chat_template_kwargs = bag;
