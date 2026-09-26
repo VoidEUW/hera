@@ -34,7 +34,9 @@ const FIRST_SHAPE: Shape = { chats: 3, projects: 2 };
  * nobody can see. */
 const MOST_ROWS = 12;
 
-class Workspace {
+/** Exported so a test can hold a store of its own, exactly as `ChatSession` is: the singleton
+ *  below has no way to put a handoff back, so tests that shared it would inherit each other's. */
+export class Workspace {
 	chats = $state<Chat[]>([]);
 	projects = $state<Project[]>([]);
 	profiles = $state<Profile[]>([]);
@@ -441,17 +443,41 @@ class Workspace {
 	 * Held here rather than in history state: `goto`'s `state` option does not reliably reach
 	 * `page.state`, and a first message quietly lost to a navigation is the worst possible
 	 * first impression. A field is also honest about the lifetime -- it is read once and
-	 * cleared, and a refresh must not send it again. */
-	#handoff: { text: string; files: Attachment[] } | null = null;
+	 * cleared, and a refresh must not send it again.
+	 *
+	 * **It remembers which chat it is for**, and that is the whole of
+	 * [#136](https://github.com/VoidEUW/hera/issues/136). A load can fail after this is set --
+	 * `create_chat` and the `GET` that follows it race the server's own commit, and about one
+	 * time in eight the chat is not readable yet. A load that fails must not consume the
+	 * message, so the field outlives the failure; but a field that outlives a failure and
+	 * carries no owner is a sentence waiting to be delivered to whichever conversation is
+	 * opened next. Keyed by chat, a stranded handoff is inert: it cannot be taken by another
+	 * chat, and it is still there if this one is opened again, which is the correct recovery
+	 * for a chat that did exist all along. */
+	#handoff: { chatId: string; text: string; files: Attachment[] } | null = null;
 
-	handOff(text: string, files: Attachment[] = []) {
-		this.#handoff = { text, files };
+	/** The chat id is known here, not later: the start screen creates the chat first and
+	 *  navigates second, so the id exists before there is anything to hand off. */
+	handOff(chatId: string, text: string, files: Attachment[] = []) {
+		this.#handoff = { chatId, text, files };
 	}
 
-	takeHandoff(): { text: string; files: Attachment[] } | null {
+	/** Takes the message **only** if it belongs to the chat being opened, and clears it only
+	 *  when it does. A handoff belonging to some other chat is left exactly where it is: it
+	 *  may still be delivered, to the conversation it was written for. */
+	takeHandoff(chatId: string): { text: string; files: Attachment[] } | null {
 		const carried = this.#handoff;
+		if (!carried || carried.chatId !== chatId) return null;
 		this.#handoff = null;
 		return carried;
+	}
+
+	/** Give up on a message that cannot be sent -- the chat does not exist, or is not one this
+	 *  person may open, and waiting for it to resolve would mean holding a sentence forever.
+	 *  Keyed the same way, so clearing a chat that failed cannot discard a message another
+	 *  chat is still waiting on. */
+	discardHandoff(chatId: string) {
+		if (this.#handoff?.chatId === chatId) this.#handoff = null;
 	}
 }
 

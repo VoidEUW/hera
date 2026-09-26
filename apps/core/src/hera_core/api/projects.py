@@ -21,6 +21,12 @@ def list_projects(owner: Owner, db: Db, include_archived: bool = False) -> list[
 
 @router.post("/projects", response_model=ProjectOut, status_code=status.HTTP_201_CREATED)
 def create_project(payload: ProjectIn, owner: Owner, db: Db) -> ProjectOut:
+    """A new project, opened on the screen that explains what one is for.
+
+    Committed before the response for the reason `create_chat` gives
+    ([#136](https://github.com/VoidEUW/hera/issues/136)): this returns a slug and an id, and
+    the rail navigates straight to the project, which reads them back.
+    """
     project = ProjectRepository(db).create(
         owner,
         payload.name,
@@ -29,6 +35,7 @@ def create_project(payload: ProjectIn, owner: Owner, db: Db) -> ProjectOut:
         default_profile_id=payload.default_profile_id,
         color=payload.color,
     )
+    db.commit()
     return ProjectOut.of(project)
 
 

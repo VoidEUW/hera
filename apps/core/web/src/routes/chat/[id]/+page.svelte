@@ -69,7 +69,19 @@
 		// Everything after this belongs to *this* conversation, and `send` goes to whichever
 		// chat the session currently holds -- so a load that was overtaken has to stop here
 		// rather than put the message a chat was started with into the one that overtook it.
-		if (!(await session.open(id))) return;
+		if (!(await session.open(id))) {
+			// A load that did not finish must not leave somebody's first sentence in the store
+			// for a later conversation to pick up (#136). `discardHandoff` is keyed by chat, so
+			// this can only ever discard a message written for *this* conversation, and one
+			// belonging to another chat is untouched.
+			//
+			// Discarding rather than holding it is the deliberate choice. Holding would mean
+			// carrying a sentence for a chat that cannot be read, and `opened` above means no
+			// retry is coming; the honest outcome is that the person is told the chat did not
+			// open, and gets to type it again.
+			workspace.discardHandoff(id);
+			return;
+		}
 		// Taken *after* the load, and only by the one that won it. `takeHandoff` clears as it
 		// reads, so whoever takes it owns it: a load that takes it and then loses the race has
 		// stranded somebody's first sentence in a store nobody will read again.
@@ -78,7 +90,11 @@
 		// same id sending it twice. `opened` above now stops that run happening at all, which is
 		// what makes this order safe -- the only other caller is a navigation to a *different*
 		// chat, and that one has already made this load return false on the line above.
-		const first = workspace.takeHandoff();
+		//
+		// Keyed by chat, so a message written for this conversation is the only one it can take
+		// (#136). That is what makes the failure path above safe to reach: the handoff cannot
+		// outlive its chat and land in the next one.
+		const first = workspace.takeHandoff(id);
 		if (first) await session.send(first.text, first.files);
 		await reopenIfPublished(id);
 	}

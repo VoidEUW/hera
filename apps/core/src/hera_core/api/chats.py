@@ -93,6 +93,18 @@ def create_chat(payload: ChatIn, owner: Owner, db: Db) -> ChatOut:
     A chat with no profile falls back to the owner's default at the moment it is created, not
     at the moment it is answered — so changing the default later does not retroactively change
     who answered an old conversation.
+
+    **Committed here rather than left to the session's teardown**
+    ([#136](https://github.com/VoidEUW/hera/issues/136)). The teardown of a `yield` dependency
+    runs *after* the response is sent, so a `201` carrying a freshly minted id could reach the
+    browser before the row behind it was durable — and the browser's very next move is to read
+    that id back. Measured at roughly one request in eight failing, which showed up as a new
+    chat opening empty with `no such chat` above it. A response that names a row is a claim
+    about the database, so this route makes it true before answering.
+
+    Deliberately *only* here, and not in the shared dependency: the turn endpoint below opens
+    its own units of work on purpose, and a blanket early commit would end the transaction
+    those two are built to keep apart.
     """
     profile_id = payload.profile_id
     if profile_id is None:
@@ -104,6 +116,7 @@ def create_chat(payload: ChatIn, owner: Owner, db: Db) -> ChatOut:
         project_id=payload.project_id,
         profile_id=profile_id,
     )
+    db.commit()
     return ChatOut.of(chat)
 
 

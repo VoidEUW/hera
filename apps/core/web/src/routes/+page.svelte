@@ -32,8 +32,9 @@
 			return;
 		}
 		// Handed over through the store rather than a query string: a message is not a URL, and
-		// a refresh must not send it a second time.
-		workspace.handOff(text, files);
+		// a refresh must not send it a second time. Keyed by the chat it was typed for, so a
+		// conversation opened later cannot pick it up by accident (#136).
+		workspace.handOff(chat.id, text, files);
 		await goto(resolve('/chat/[id]', { id: chat.id }));
 	}
 </script>
