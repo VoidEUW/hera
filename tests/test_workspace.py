@@ -53,14 +53,23 @@ def test_workspace_members_resolve() -> None:
 
 
 def _uncovered_by(entries: list[str]) -> list[str]:
-    """Workspace members no entry in `entries` refers to."""
+    """Workspace members no entry in `entries` refers to.
+
+    **Both sides are compared as POSIX paths.** A `pyproject.toml` writes
+    ``packages/hera_chats/src`` with a forward slash, on every platform, because that is what a
+    TOML file contains; ``str(Path.relative_to(...))`` renders ``packages\\hera_chats`` on
+    Windows. Comparing the two directly meant nothing ever matched there, so every member read
+    as uncovered and both gates below failed on a correctly configured workspace -- while still
+    passing on Linux and macOS, where the separators happen to agree. A guard that cannot fail
+    usefully is worse than no guard, because it looks like it is watching.
+    """
     return [
-        str(member.relative_to(ROOT))
+        member.relative_to(ROOT).as_posix()
         for member in _members()
         if not any(
-            entry == str(member.relative_to(ROOT))
-            or entry.startswith(f"{member.relative_to(ROOT)}/")
-            or str(member.relative_to(ROOT)).startswith(f"{entry}/")
+            entry == member.relative_to(ROOT).as_posix()
+            or entry.startswith(f"{member.relative_to(ROOT).as_posix()}/")
+            or member.relative_to(ROOT).as_posix().startswith(f"{entry}/")
             for entry in entries
         )
     ]
@@ -76,6 +85,33 @@ def test_mypy_checks_every_package() -> None:
     assert not missing, (
         f"add to [tool.mypy] files in pyproject.toml: {[f'{m}/src' for m in missing]}"
     )
+
+
+def test_the_coverage_gate_can_still_fail() -> None:
+    """The gate above, checked against a workspace it is meant to reject.
+
+    A guard that cannot fail is worse than no guard, because it looks like it is watching -- and
+    this one *was* unwatching: comparing ``packages\\hera_chats`` against a ``pyproject.toml``
+    that says ``packages/hera_chats/src`` matched nothing on Windows, so every member read as
+    uncovered and the two gates failed constantly on a correct workspace. Both were equally
+    broken in the other direction: the same comparison that made them cry wolf would have let a
+    genuinely forgotten member through, which is the only thing they exist to catch.
+
+    So: a member no entry refers to is reported, and one that is covered is not. Synthetic inputs,
+    because the point is the comparison and not any particular workspace.
+    """
+    everything = _uncovered_by([])
+    assert everything, "an empty list covers nothing, so everything must be reported"
+    assert not _uncovered_by(everything), "naming every member must cover every member"
+
+
+def test_a_parent_entry_covers_the_members_under_it() -> None:
+    """`[tool.coverage.run] source` says ``packages``, not twelve paths -- the parent is the
+    entry, and the gate has to read it as covering everything beneath rather than as covering
+    nothing.
+    """
+    assert not _uncovered_by(["packages", "apps/core/src"]), "a parent entry covers its members"
+    assert _uncovered_by(["apps/core/src"]), "and dropping it uncovers every packages/* member"
 
 
 def test_coverage_measures_every_package() -> None:
