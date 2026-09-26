@@ -1,10 +1,21 @@
 name: Preview
 
 # What a change looks like, on the request itself. Builds the real interface, serves it from a
-# real server with a scripted model behind it, and walks a browser through the scenes a
-# reviewer would walk to -- start page, the waiting mark mid-breath, answers, a long trace,
-# the phone -- and attaches screenshots and a video to the run. No live endpoint, nothing
-# deployed, everything disposable.
+# real server with a scripted model behind it, and walks a browser through every state a reviewer
+# would want to see -- the start page, the waiting mark mid-breath, answers, a long tool trace, a
+# turn that could not start, a turn cut off part way through, the question card, the rail, the
+# composer's controls, all seven Settings tabs, the profile menu, light and dark, reduced motion,
+# and the phone -- filming the desktop and the phone and screenshotting each state.
+#
+# It also records what the browser said: console messages, uncaught page errors, and any request
+# that failed or came back 4xx/5xx. A screenshot cannot show a message, and a request that 404s
+# looks exactly like a request that never happened, so without this the capture cannot tell a
+# reviewer that something went wrong. All of it lands in preview-media/manifest.json and
+# preview-media/console.log, and the summary below puts the counts on the run page.
+#
+# No live endpoint, nothing deployed, everything disposable. A scene that fails is recorded and
+# stepped over rather than failing the job: a missing frame is worth knowing about, and it is not a
+# reason to throw away the other thirty.
 #
 # This job only films and uploads; preview-comment.yml (workflow_run) publishes the media to
 # the previews-media branch and comments on the pull request. Keeping the two apart is what
@@ -68,12 +79,45 @@ jobs:
       - name: Film the walkthrough
         run: uv run python tests/e2e/capture_preview.py preview-media
 
+      # The counts on the run page itself, so a reviewer learns that a scene was missed without
+      # downloading an artifact. `continue-on-error` because the job's verdict belongs to the
+      # checks: a summary that cannot be written is not a failed capture.
+      - name: Summarise what was filmed
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          python - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json, pathlib
+          report = json.loads(pathlib.Path("preview-media/manifest.json").read_text("utf-8"))
+          print("### Preview walkthrough\n")
+          print(
+              f"{report['ran']}/{report['scenes']} scenes, "
+              f"{len(report['screenshots'])} screenshots, "
+              f"{len(report['videos'])} videos"
+          )
+          print(
+              f"\nBrowser console: {report['console_messages']} messages, "
+              f"{report['page_errors']} uncaught page errors, "
+              f"{report['failed_requests']} failed requests"
+          )
+          broken = [s for s in report["detail"] if not s["ok"]]
+          if broken:
+              print("\n#### Scenes that did not run\n")
+              print("| Scene | What went wrong |")
+              print("| --- | --- |")
+              for scene in broken:
+                  print(f"| `{scene['name']}` | {scene['problem']} |")
+          PY
+
       # Dispatched runs carry the default branch's identity, so the follow-up comment job
       # cannot learn which pull request to report on from the run itself. Leave the number
       # inside the artifact instead.
       - name: Note which pull request this is
         run: echo "${{ github.event.pull_request.number || inputs.pr_number || '' }}" > preview-media/pr-number
 
+      # The whole directory, so manifest.json and console.log travel with the pictures: the
+      # pictures are what a reviewer looks at, and these two are what they ask for when a picture
+      # is not enough.
       - name: Upload the media
         uses: actions/upload-artifact@v4
         with:
