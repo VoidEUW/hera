@@ -51,49 +51,49 @@
       "name": "01-start",
       "group": "conversation",
       "ok": true,
-      "seconds": 1.35,
+      "seconds": 1.29,
       "problem": ""
     },
     {
       "name": "02-waiting-mark",
       "group": "conversation",
       "ok": true,
-      "seconds": 4.79,
+      "seconds": 4.71,
       "problem": ""
     },
     {
       "name": "03-first-answer",
       "group": "conversation",
       "ok": true,
-      "seconds": 1.05,
+      "seconds": 0.52,
       "problem": ""
     },
     {
       "name": "04-long-trace",
       "group": "conversation",
       "ok": true,
-      "seconds": 12.14,
+      "seconds": 11.02,
       "problem": ""
     },
     {
       "name": "05-a-turn-that-cannot-start",
       "group": "conversation",
       "ok": true,
-      "seconds": 0.44,
+      "seconds": 0.35,
       "problem": ""
     },
     {
       "name": "06-a-turn-cut-off-mid-answer",
       "group": "conversation",
       "ok": true,
-      "seconds": 5.57,
+      "seconds": 5.52,
       "problem": ""
     },
     {
       "name": "07-the-answer-after-both",
       "group": "conversation",
       "ok": true,
-      "seconds": 4.78,
+      "seconds": 4.6,
       "problem": ""
     },
     {
@@ -107,56 +107,56 @@
       "name": "11-the-reply-resumes-the-turn",
       "group": "cards",
       "ok": true,
-      "seconds": 4.62,
+      "seconds": 4.64,
       "problem": ""
     },
     {
       "name": "rail-row-menu",
       "group": "rail",
       "ok": true,
-      "seconds": 1.68,
+      "seconds": 1.74,
       "problem": ""
     },
     {
       "name": "rail-new-chat-and-projects",
       "group": "rail",
       "ok": true,
-      "seconds": 0.68,
+      "seconds": 0.73,
       "problem": ""
     },
     {
       "name": "composer-model-dropdown",
       "group": "composer",
       "ok": true,
-      "seconds": 1.47,
+      "seconds": 1.51,
       "problem": ""
     },
     {
       "name": "composer-servers-sheet",
       "group": "composer",
       "ok": true,
-      "seconds": 1.17,
+      "seconds": 1.24,
       "problem": ""
     },
     {
       "name": "composer-skills-sheet",
       "group": "composer",
       "ok": true,
-      "seconds": 1.23,
+      "seconds": 1.24,
       "problem": ""
     },
     {
       "name": "composer-typed-and-growing",
       "group": "composer",
       "ok": true,
-      "seconds": 0.66,
+      "seconds": 0.65,
       "problem": ""
     },
     {
       "name": "settings-open",
       "group": "settings",
       "ok": true,
-      "seconds": 1.7,
+      "seconds": 1.62,
       "problem": ""
     },
     {
@@ -170,14 +170,14 @@
       "name": "settings-servers",
       "group": "settings",
       "ok": true,
-      "seconds": 1.82,
+      "seconds": 1.83,
       "problem": ""
     },
     {
       "name": "settings-permissions",
       "group": "settings",
       "ok": true,
-      "seconds": 1.78,
+      "seconds": 1.76,
       "problem": ""
     },
     {
@@ -191,14 +191,14 @@
       "name": "settings-mind",
       "group": "settings",
       "ok": true,
-      "seconds": 1.87,
+      "seconds": 1.8,
       "problem": ""
     },
     {
       "name": "settings-dreaming",
       "group": "settings",
       "ok": true,
-      "seconds": 1.03,
+      "seconds": 0.99,
       "problem": ""
     },
     {
@@ -212,14 +212,14 @@
       "name": "profile-menu",
       "group": "theme",
       "ok": true,
-      "seconds": 1.75,
+      "seconds": 1.76,
       "problem": ""
     },
     {
       "name": "light-theme",
       "group": "theme",
       "ok": true,
-      "seconds": 1.48,
+      "seconds": 1.5,
       "problem": ""
     },
     {
@@ -240,7 +240,7 @@
       "name": "phone-start",
       "group": "phone",
       "ok": true,
-      "seconds": 1.32,
+      "seconds": 1.34,
       "problem": ""
     },
     {
@@ -254,14 +254,14 @@
       "name": "phone-answer",
       "group": "phone",
       "ok": true,
-      "seconds": 1.82,
+      "seconds": 1.33,
       "problem": ""
     },
     {
       "name": "phone-settings",
       "group": "phone",
       "ok": true,
-      "seconds": 1.27,
+      "seconds": 1.28,
       "problem": ""
     }
   ]
