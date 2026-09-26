@@ -33,8 +33,10 @@
 		type ToolResultEvent
 	} from '$lib/api/events';
 	import { duration, t } from '$lib/i18n';
+	import { disclose } from '$lib/motion';
 	import { markOf, subject, toolName } from '$lib/tools';
 	import type { Activity } from '$lib/turn';
+	import { fade } from 'svelte/transition';
 	import Brain from './Brain.svelte';
 	import Globe from './Globe.svelte';
 	import Ocellus from './Ocellus.svelte';
@@ -206,15 +208,30 @@
 	     Anchored to the bottom rather than truncated at the top: the box is three lines tall, the
 	     prose inside it is however long it is, and `justify-content: flex-end` pushes the end of
 	     it into view. Taking the last N characters in JavaScript would have to guess how many
-	     fit, and would guess wrong at every window width. -->
-	<div class="body">
+	     fit, and would guess wrong at every window width.
+
+	     **Enter only, deliberately.** It comes and goes on its own — the block it belongs to closed,
+	     the turn ended — and nothing a person pressed to dismiss it, so a fade on the way out would
+	     only delay a preview that has already stopped being about anything. It also has to be gone
+	     the instant the turn is: `tests/e2e/test_a_turn_in_the_browser.py` asserts the tail is not
+	     on screen once a turn has finished, and an `out:` would keep it in the document for the
+	     length of the animation. -->
+	<div class="body" in:fade={{ duration: 120 }}>
 		<span class="gutter hairline"></span>
 		<p class="tail" aria-hidden="true">{thought}</p>
 	</div>
 {/if}
 
 {#if open}
-	<div class="body">
+	<!-- A disclosure, because a row's detail is something you open rather than something that
+	     arrives: the column of rows and the sentence below it rearrange themselves as the panel
+	     grows, and the height change is the whole of what says so. This can be a whole skill
+	     document — `LONG_TRACE` and `.result`'s scrolling frame both exist because it can be — so
+	     it is the largest thing in the interface that appears with no warning at all, and a fade
+	     alone would leave the column snapping under a panel that had already finished arriving.
+
+	     Closes quicker than it opens, for the reason `reveal` gives. -->
+	<div class="body" in:disclose={{ duration: 180 }} out:disclose={{ duration: 120 }}>
 		<span class="gutter hairline"></span>
 		<div class="detail">
 			{#if thought}

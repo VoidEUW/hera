@@ -532,6 +532,15 @@
 		line-height: 1.55;
 		max-height: 260px;
 		overflow-y: auto;
+		/* The grow effect above assigns `height` on every keystroke, so without this the whole
+		   composer jumps a line at a time while you are still reading what you are typing. This
+		   is the disclosure height `--disclose` is named for, applied to the one place it happens
+		   continuously rather than on a click — a person watching their own sentence push the
+		   button bar down is the same event as a panel opening, and it deserves the same gesture.
+
+		   `--disclose` and not `--fade`: this is a height, and a height measured in 120ms reads as
+		   a twitch next to one measured in 160. */
+		transition: height var(--disclose) var(--ease);
 	}
 
 	textarea:focus {

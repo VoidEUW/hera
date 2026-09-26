@@ -1153,7 +1153,7 @@
 	.options textarea {
 		width: 100%;
 		padding: 7px 10px;
-		background: var(--bg);
+		background: var(--ground);
 		border: 1px solid var(--line);
 		border-radius: var(--radius);
 		font-family: var(--font-mono);
@@ -1168,7 +1168,7 @@
 		gap: 10px;
 		margin-bottom: 10px;
 		padding: 10px;
-		background: var(--bg);
+		background: var(--ground);
 		border: 1px solid var(--line);
 		border-radius: var(--radius);
 	}

@@ -342,6 +342,16 @@
 		flex-direction: column;
 		align-items: flex-end;
 		margin: 22px 0;
+		/* A message arriving, which for the user's own bubble is the moment they pressed send.
+		   `--fade` rather than something slower, because this is the plainest gesture the
+		   interface has and the conversation is doing the rest of the work. */
+		animation: fade var(--fade) var(--ease);
+	}
+
+	@keyframes fade {
+		from {
+			opacity: 0;
+		}
 	}
 
 	/* Quiet until you go looking for them: a row of actions under every message would compete
@@ -479,12 +489,32 @@
 
 	.hers {
 		margin: 22px 0 30px;
+		/* The turn arriving. This is the moment the interface is actually about, and it was the
+		   one thing with no gesture at all: the transcript's own `.turns` fade covers the skeleton
+		   being replaced on load, which is a different event and fires once, so an answer landing
+		   used to appear between two frames with nothing acknowledging it.
+
+		   Slower than `.mine` on purpose, and it is the one place in the interface where that is
+		   true. A person has just sent something and is waiting; the answer beginning is the
+		   event, and a turn's arriving fade that is over before it registers is a wasted gesture. */
+		animation: arrive 220ms var(--ease);
+	}
+
+	@keyframes arrive {
+		from {
+			opacity: 0;
+		}
 	}
 
 	/* Space on both sides now: a gutter block can sit between two things she said, where it
 	   used to only ever sit above all of them. */
 	.gutter {
 		margin: 12px 0;
+		/* A block arriving mid-answer, which happens constantly — she thinks again after speaking
+		   and a second block appears between two sentences. Faded rather than disclosed: it grows
+		   downwards as its rows stream in, so there is no final height to measure, and a height
+		   animation against a container still being written would be chasing it. */
+		animation: fade var(--fade) var(--ease);
 	}
 
 	.gutter:first-child {
@@ -539,10 +569,16 @@
 		margin: 0;
 	}
 
+	/* The turn's own outcome, and the only sentence in a message that can be bad news. It arrives
+	   after the answer rather than with it — a turn that failed says so at the end, and that
+	   ordering is the point — so it is a separate arrival and gets its own gesture. `.bad` is a
+	   class rather than a colour so a failure reads as louder than a truncation, not as a
+	   different kind of thing to look at. */
 	.note {
 		margin: 12px 0 0;
 		font-size: 12.5px;
 		color: var(--text-muted);
+		animation: fade var(--fade) var(--ease);
 	}
 
 	.note.bad {

@@ -21,6 +21,7 @@
 	import { API, api, type Chat, type Profile, type Project } from '$lib/api/client';
 	import { t } from '$lib/i18n';
 	import { Placeholder } from '$lib/loading.svelte';
+	import { disclose } from '$lib/motion';
 	import { colourOf } from '$lib/projects';
 	import type { Shape } from '$lib/stores/workspace.svelte';
 	import Input from './Input.svelte';
@@ -439,7 +440,18 @@
 		</div>
 
 		{#if open}
-			<ul class="list nested">
+			<!-- A disclosure, and the reason `--disclose` exists: expanding a project rearranges
+			     every row below it, so what a person needs to see is the list making room rather
+			     than a panel arriving on top of it. A project with thirty chats in it moves the
+			     loose-chat list clean off the bottom of the rail in one frame otherwise, and the
+			     row that was under the pointer is no longer under it.
+
+			     Opens a little slower than it closes, for the reason `reveal` gives. -->
+			<ul
+				class="list nested"
+				in:disclose={{ duration: 180 }}
+				out:disclose={{ duration: 120 }}
+			>
 				{#each inside(project.id) as chat (chat.id)}
 					{@render row(chat)}
 				{:else}

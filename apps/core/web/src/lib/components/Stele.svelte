@@ -49,6 +49,11 @@
 	.stele {
 		display: block;
 		color: var(--brass);
+		/* A tool finishing is a state change, and this is the mark that reports it: the row goes
+		   from saying *she is doing this* to saying *she did this* and the only thing on screen
+		   that says so is this colour. Without the transition the whole gutter report lands as a
+		   single frame, once per tool call, which is the loudest way to say something quiet. */
+		transition: color var(--fade) var(--ease);
 	}
 
 	.muted {
