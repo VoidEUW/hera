@@ -210,6 +210,7 @@
 		{#if is(renaming, 'chat', chat.id)}
 			<Input
 				variant="inline"
+				class="rename"
 				autofocus
 				value={draft}
 				ariaLabel={t.rail.rename}
@@ -347,6 +348,7 @@
 			{#if is(renaming, 'project', project.id)}
 				<Input
 					variant="inline"
+					class="rename"
 					autofocus
 					value={draft}
 					ariaLabel={t.rail.rename}
@@ -511,6 +513,7 @@
 				<li class="item">
 					<Input
 						variant="inline"
+						class="rename"
 						autofocus
 						value={draft}
 						ariaLabel={t.rail.newProject}

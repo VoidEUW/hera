@@ -29,6 +29,12 @@
 		variant?: 'field' | 'inline' | 'editor';
 		/** The monospace face — an id or a URL, not a sentence. */
 		mono?: boolean;
+		/** Appended to the component's own class list, so a caller can put a name on the field.
+		 *  A name rather than a style: the look is this component's job, and the note on `.control`
+		 *  below is about exactly the collisions an open class list invites. What this is for is a
+		 *  handle — the rail's three in-place fields were `input.rename` before they came here, and
+		 *  an end-to-end test needs one selector that says which field it means. */
+		class?: string;
 		ariaLabel?: string;
 		disabled?: boolean;
 		/** Takes focus and selects its contents the instant it mounts — the rail's rename field
@@ -45,6 +51,7 @@
 		placeholder = '',
 		variant = 'field',
 		mono = false,
+		class: extra = '',
 		ariaLabel = '',
 		disabled = false,
 		autofocus = false,
@@ -65,7 +72,7 @@
 </script>
 
 <input
-	class="control {variant}"
+	class="control {variant} {extra}"
 	class:mono
 	type={kind}
 	{value}
