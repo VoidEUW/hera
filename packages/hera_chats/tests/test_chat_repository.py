@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+from datetime import timedelta
 from uuid import UUID, uuid4
 
 from hera_chats.models import Message
+from hera_storage.base import utcnow
 from sqlmodel import Session
 
 from hera_chats import (
@@ -120,12 +122,66 @@ class TestChats:
     def test_the_sidebar_orders_by_last_activity(
         self, chats: ChatRepository, owner_id: UUID
     ) -> None:
+        """Stated times rather than whatever the clock said.
+
+        This used to call ``touch`` twice and read the order back, which is a coin flip on
+        Windows: ``utcnow()`` is ``datetime.now(UTC)`` and that clock ticks about every 15.6 ms,
+        so two touches inside one tick write *identical* timestamps and the database returns the
+        rows in whatever order it likes. It failed roughly one run in three, and it was never
+        testing the ordering.
+
+        Stating the times is what makes it a test of the ordering. The tie itself is
+        ``_by_activity``'s problem and has its own test below.
+        """
         old = chats.create(owner_id, title="Old")
         fresh = chats.create(owner_id, title="Fresh")
-        chats.touch(old)
-        chats.touch(fresh)
+        old.last_message_at = utcnow() - timedelta(seconds=60)
+        chats.save(old)
+        fresh.last_message_at = utcnow()
+        chats.save(fresh)
 
         assert [c.title for c in chats.for_owner(owner_id)] == ["Fresh", "Old"]
+
+    def test_two_chats_used_in_the_same_instant_still_come_back_in_one_order(
+        self, chats: ChatRepository, owner_id: UUID
+    ) -> None:
+        """The tie the clock cannot avoid, which is the one a person can also hit.
+
+        Two chats written inside one Windows tick carry identical ``last_message_at`` values, so
+        without a second term the sidebar is free to reorder itself between two reads of the same
+        data. The tiebreak is the newer chat, because that is the one being looked at.
+        """
+        old = chats.create(owner_id, title="Old")
+        fresh = chats.create(owner_id, title="Fresh")
+        moment = utcnow()
+        old.created_at = moment - timedelta(seconds=60)
+        old.last_message_at = moment
+        chats.save(old)
+        fresh.created_at = moment
+        fresh.last_message_at = moment
+        chats.save(fresh)
+
+        assert [c.title for c in chats.for_owner(owner_id)] == ["Fresh", "Old"]
+
+    def test_the_order_does_not_depend_on_how_many_times_it_is_read(
+        self, chats: ChatRepository, owner_id: UUID
+    ) -> None:
+        """A sort with a residual tie is a sort that can disagree with itself.
+
+        Everything tied *including* creation, which leaves only the id -- meaningless, and
+        deliberately so: its only job is to make the order total, so that reading the list twice
+        gives the same answer rather than shuffling rows under the pointer.
+        """
+        moment = utcnow()
+        for title in ("A", "B", "C", "D"):
+            chat = chats.create(owner_id, title=title)
+            chat.created_at = moment
+            chat.last_message_at = moment
+            chats.save(chat)
+
+        reads = {tuple(c.id for c in chats.for_owner(owner_id)) for _ in range(5)}
+
+        assert len(reads) == 1, f"the sidebar order is not stable across reads: {reads}"
 
     def test_a_chat_that_was_never_written_in_still_has_a_place(
         self, chats: ChatRepository, owner_id: UUID
