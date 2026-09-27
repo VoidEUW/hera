@@ -298,7 +298,7 @@ class Report:
         try:
             yield
         except Exception as problem:  # a scene is never worth losing the run over
-            record.problem = f"{type(problem).__name__}: {str(problem).splitlines()[0][:200]}"
+            record.problem = describe(problem)
             with suppress(PlaywrightError):
                 page.screenshot(path=shots / f"FAILED-{name}.png", full_page=False)
         else:
@@ -341,6 +341,20 @@ class Report:
         if not self.page_errors and not self.failed_requests:
             lines.append("(none)")
         (out / "console.log").write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def describe(problem: BaseException) -> str:
+    """One line about an exception, safe for an exception with nothing to say.
+
+    ``str(exc).splitlines()[0]`` is the obvious way to take the first line, and it raises
+    ``IndexError`` on an exception whose message is the empty string -- ``KeyError()`` and
+    ``TimeoutError()`` both do it. That is a crash *inside the handler that exists so a run
+    survives*, so the run does not survive it, and the report is never written. The type name
+    alone is worth more than losing all of it.
+    """
+    lines = str(problem).splitlines()
+    first = lines[0][:200] if lines else ""
+    return f"{type(problem).__name__}: {first}" if first else type(problem).__name__
 
 
 def shoot(page: Page, directory: Path, name: str, *, full: bool = False) -> None:

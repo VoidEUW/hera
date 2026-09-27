@@ -351,7 +351,7 @@ export class Workspace {
 
 	async #writeOptions(
 		entry: { name: string },
-		model: { id: string; name: string; context_length: number | null },
+		model: { id: string; name: string; context_length: number | null; tool_calling: boolean },
 		options: Record<string, unknown>
 	) {
 		try {
@@ -359,7 +359,13 @@ export class Workspace {
 				id: model.id,
 				name: model.name,
 				options,
-				context_length: model.context_length
+				context_length: model.context_length,
+				// Repeated on purpose. `addModel` replaces the whole model and `tool_calling`
+				// defaults to true, so a write that omits it turns tools back on for a model
+				// somebody deliberately turned them off -- and the only thing that has changed
+				// for them is a reasoning effort or a thinking budget. The schema says this in
+				// so many words; this is that sentence being honoured.
+				tool_calling: model.tool_calling
 			});
 			this.providers = found.providers;
 			this.activeProvider = found.active;
