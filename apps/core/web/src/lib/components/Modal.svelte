@@ -21,7 +21,7 @@
 	import { expoIn, expoOut } from 'svelte/easing';
 	import { fade } from 'svelte/transition';
 	import { t } from '$lib/i18n';
-	import { reveal } from '$lib/motion';
+	import { reveal, still } from '$lib/motion';
 
 	interface Props {
 		/** The accessible name of the dialog. Not drawn — the header carries a visible title. */
@@ -103,6 +103,13 @@
 				? { y: 18, blur: 3, duration: 190 }
 				: { y: 18, blur: 3, duration: 450 }
 	);
+
+	/** The scrim is a `svelte/transition` fade rather than a `reveal`, so `motion.ts` does not
+	 *  reach it, and it is the longest motion on the screen: a centred sheet's scrim runs for
+	 *  `sheetIn.duration`, which is 490 ms. With motion off it gets no duration at all, for the
+	 *  reason `reveal` and `disclose` give. */
+	const scrimIn = $derived({ duration: still() ? 0 : sheetIn.duration, easing: expoOut });
+	const scrimOut = $derived({ duration: still() ? 0 : sheetOut.duration, easing: expoIn });
 
 	/** Where focus was when the sheet opened — the trigger that opened it, usually. Returned
 	 * on close, because a control that takes focus away and keeps it is a control that has
@@ -219,8 +226,8 @@
 	class="scrim"
 	class:clear={!dim}
 	role="presentation"
-	in:fade={{ duration: sheetIn.duration, easing: expoOut }}
-	out:fade={{ duration: sheetOut.duration, easing: expoIn }}
+	in:fade={scrimIn}
+	out:fade={scrimOut}
 ></div>
 
 <div

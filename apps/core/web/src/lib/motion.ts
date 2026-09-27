@@ -52,6 +52,13 @@ export function reveal(
 	params: RevealParams = {},
 	options: { direction?: 'in' | 'out' | 'both' } = {}
 ) {
+	// `0` for the reason `disclose` gives, and because this is the one the CSS override cannot
+	// reach: a `transition:` is turned off by `prefers-reduced-motion` for free, and a Svelte
+	// transition is a rAF loop that never asks. `reveal` backs `Modal` and `Select`, so without
+	// this every sheet and every dropdown in the interface still slid for 220 ms with motion off,
+	// against what `docs/frontend.md` says in as many words.
+	if (still()) return { duration: 0 };
+
 	const {
 		y = 0,
 		scale = 1,

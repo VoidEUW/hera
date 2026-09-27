@@ -33,7 +33,7 @@
 		type ToolResultEvent
 	} from '$lib/api/events';
 	import { duration, t } from '$lib/i18n';
-	import { disclose } from '$lib/motion';
+	import { disclose, still } from '$lib/motion';
 	import { markOf, subject, toolName } from '$lib/tools';
 	import type { Activity } from '$lib/turn';
 	import { fade } from 'svelte/transition';
@@ -216,7 +216,7 @@
 	     the instant the turn is: `tests/e2e/test_a_turn_in_the_browser.py` asserts the tail is not
 	     on screen once a turn has finished, and an `out:` would keep it in the document for the
 	     length of the animation. -->
-	<div class="body" in:fade={{ duration: 120 }}>
+	<div class="body" in:fade={{ duration: still() ? 0 : 120 }}>
 		<span class="gutter hairline"></span>
 		<p class="tail" aria-hidden="true">{thought}</p>
 	</div>
