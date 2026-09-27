@@ -34,7 +34,9 @@ const FIRST_SHAPE: Shape = { chats: 3, projects: 2 };
  * nobody can see. */
 const MOST_ROWS = 12;
 
-class Workspace {
+/** Exported so a test can hold a store of its own, exactly as `ChatSession` is: the singleton
+ *  below has no way to put a handoff back, so tests that shared it would inherit each other's. */
+export class Workspace {
 	chats = $state<Chat[]>([]);
 	projects = $state<Project[]>([]);
 	profiles = $state<Profile[]>([]);
@@ -296,12 +298,74 @@ class Workspace {
 		const options = { ...model.options };
 		if (value) options.reasoning_effort = value;
 		else delete options.reasoning_effort;
+		await this.#writeOptions(entry, model, options);
+	}
+
+	/** Think / No Think, for a model whose template declares `enable_thinking`.
+	 *
+	 * **The toggle is the value.** `enable_thinking` is a boolean, so there is no third state
+	 * and no "default": absent from options means the server's own default, which for MiniCPM5 is
+	 * to think. Only `false` is written, and only that removes it again -- a person who switches it
+	 * off and back on gets the model's own default back rather than a setting this interface
+	 * invented.
+	 *
+	 * **Merged, not replaced.** `chat_template_kwargs` is a bag of template variables and is
+	 * somebody else's: the GLM-4.7 preset lives in it (`clear_thinking`), and a Qwen deployment
+	 * may carry others. Writing the whole object would drop every one of them, so this reaches
+	 * into it and touches one key.
+	 */
+	async setThinking(providerName: string, modelId: string, on: boolean) {
+		const entry = this.providers.find((provider) => provider.name === providerName);
+		const model = entry?.models.find((candidate) => candidate.id === modelId);
+		if (!entry || !model) return;
+		const options = { ...model.options };
+		const existing = options.chat_template_kwargs;
+		const bag =
+			typeof existing === 'object' && existing !== null && !Array.isArray(existing)
+				? { ...(existing as Record<string, unknown>) }
+				: {};
+		if (on) bag.enable_thinking = true;
+		else delete bag.enable_thinking;
+		if (Object.keys(bag).length) options.chat_template_kwargs = bag;
+		else delete options.chat_template_kwargs;
+		await this.#writeOptions(entry, model, options);
+	}
+
+	/** Sets a thinking token budget, for a model that takes one rather than a named level.
+	 *
+	 * Written as `thinking_budget` at the top level, because that is where an
+	 * Anthropic-style `max_tokens` budget belongs and it is the only one of the three shapes
+	 * that is a number rather than a name. Removed again when the value is not a positive
+	 * number, so "no budget" is the absence of one rather than a budget of zero, which some
+	 * servers read as *think as little as possible* rather than *do not think*.
+	 */
+	async setThinkingBudget(providerName: string, modelId: string, tokens: number) {
+		const entry = this.providers.find((provider) => provider.name === providerName);
+		const model = entry?.models.find((candidate) => candidate.id === modelId);
+		if (!entry || !model) return;
+		const options = { ...model.options };
+		if (Number.isFinite(tokens) && tokens > 0) options.thinking_budget = Math.round(tokens);
+		else delete options.thinking_budget;
+		await this.#writeOptions(entry, model, options);
+	}
+
+	async #writeOptions(
+		entry: { name: string },
+		model: { id: string; name: string; context_length: number | null; tool_calling: boolean },
+		options: Record<string, unknown>
+	) {
 		try {
-			const found = await api.addModel(providerName, {
+			const found = await api.addModel(entry.name, {
 				id: model.id,
 				name: model.name,
 				options,
-				context_length: model.context_length
+				context_length: model.context_length,
+				// Repeated on purpose. `addModel` replaces the whole model and `tool_calling`
+				// defaults to true, so a write that omits it turns tools back on for a model
+				// somebody deliberately turned them off -- and the only thing that has changed
+				// for them is a reasoning effort or a thinking budget. The schema says this in
+				// so many words; this is that sentence being honoured.
+				tool_calling: model.tool_calling
 			});
 			this.providers = found.providers;
 			this.activeProvider = found.active;
@@ -441,17 +505,41 @@ class Workspace {
 	 * Held here rather than in history state: `goto`'s `state` option does not reliably reach
 	 * `page.state`, and a first message quietly lost to a navigation is the worst possible
 	 * first impression. A field is also honest about the lifetime -- it is read once and
-	 * cleared, and a refresh must not send it again. */
-	#handoff: { text: string; files: Attachment[] } | null = null;
+	 * cleared, and a refresh must not send it again.
+	 *
+	 * **It remembers which chat it is for**, and that is the whole of
+	 * [#136](https://github.com/VoidEUW/hera/issues/136). A load can fail after this is set --
+	 * `create_chat` and the `GET` that follows it race the server's own commit, and about one
+	 * time in eight the chat is not readable yet. A load that fails must not consume the
+	 * message, so the field outlives the failure; but a field that outlives a failure and
+	 * carries no owner is a sentence waiting to be delivered to whichever conversation is
+	 * opened next. Keyed by chat, a stranded handoff is inert: it cannot be taken by another
+	 * chat, and it is still there if this one is opened again, which is the correct recovery
+	 * for a chat that did exist all along. */
+	#handoff: { chatId: string; text: string; files: Attachment[] } | null = null;
 
-	handOff(text: string, files: Attachment[] = []) {
-		this.#handoff = { text, files };
+	/** The chat id is known here, not later: the start screen creates the chat first and
+	 *  navigates second, so the id exists before there is anything to hand off. */
+	handOff(chatId: string, text: string, files: Attachment[] = []) {
+		this.#handoff = { chatId, text, files };
 	}
 
-	takeHandoff(): { text: string; files: Attachment[] } | null {
+	/** Takes the message **only** if it belongs to the chat being opened, and clears it only
+	 *  when it does. A handoff belonging to some other chat is left exactly where it is: it
+	 *  may still be delivered, to the conversation it was written for. */
+	takeHandoff(chatId: string): { text: string; files: Attachment[] } | null {
 		const carried = this.#handoff;
+		if (!carried || carried.chatId !== chatId) return null;
 		this.#handoff = null;
 		return carried;
+	}
+
+	/** Give up on a message that cannot be sent -- the chat does not exist, or is not one this
+	 *  person may open, and waiting for it to resolve would mean holding a sentence forever.
+	 *  Keyed the same way, so clearing a chat that failed cannot discard a message another
+	 *  chat is still waiting on. */
+	discardHandoff(chatId: string) {
+		if (this.#handoff?.chatId === chatId) this.#handoff = null;
 	}
 }
 

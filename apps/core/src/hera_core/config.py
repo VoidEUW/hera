@@ -111,6 +111,32 @@ class ModelEntry(BaseModel):
     configured at all.
     """
 
+    thinking: dict[str, Any] = Field(default_factory=dict)
+    """What this model can be told about its reasoning, **as declared by a person**.
+
+    For the many providers that publish their reasoning vocabulary in documentation prose and
+    nowhere else: OpenAI, Anthropic, xAI, DeepSeek, Groq, Perplexity, Meta, Mistral, Fireworks,
+    Baseten, Cerebras, Azure, Cohere, AI21, Alibaba, Z.ai, Moonshot. One of them publishes it over
+    HTTP -- OpenRouter, because a gateway is the only kind of server that validates against many
+    vendors' schemas at once -- and a self-hosted llama.cpp answers at ``/props``. For the rest
+    there is no endpoint to ask, and a docs scraper would be worse than a table: a silently
+    mis-parsed table is indistinguishable from a correct one.
+
+    So the person states it once, here, and it is remembered. Three keys, and any of them absent:
+
+    ``efforts``  named levels, e.g. ``["low", "medium", "high"]`` -- drawn as a picker
+    ``toggle``   the model has an on/off thinking switch -- drawn as a switch
+    ``budget``   the model wants a thinking *token budget* -- drawn as a stepper
+
+    **Per model, never per kind.** A per-kind table would be a lie for OpenAI, where ``gpt-5-pro``
+    accepts ``high`` and nothing else while ``gpt-5.1-codex-max`` adds ``xhigh``. An id is a
+    string somebody typed, and three spellings of one model are three chances to be wrong in a
+    way that only shows up as a rejected request.
+
+    **A fallback, not an override.** A server that publishes what it accepts outranks this; a
+    probe that answered is believed over anything written here.
+    """
+
     @model_validator(mode="before")
     @classmethod
     def _default_name(cls, data: object) -> object:

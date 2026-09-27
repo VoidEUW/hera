@@ -32,8 +32,9 @@
 			return;
 		}
 		// Handed over through the store rather than a query string: a message is not a URL, and
-		// a refresh must not send it a second time.
-		workspace.handOff(text, files);
+		// a refresh must not send it a second time. Keyed by the chat it was typed for, so a
+		// conversation opened later cannot pick it up by accident (#136).
+		workspace.handOff(chat.id, text, files);
 		await goto(resolve('/chat/[id]', { id: chat.id }));
 	}
 </script>
@@ -59,6 +60,8 @@
 			onsend={start}
 			onmodel={(name, modelId) => workspace.useProvider(name, modelId)}
 			onreasoning={(name, modelId, value) => workspace.setReasoningEffort(name, modelId, value)}
+			onthinking={(name, modelId, on) => void workspace.setThinking(name, modelId, on)}
+			onbudget={(name, modelId, tokens) => void workspace.setThinkingBudget(name, modelId, tokens)}
 			onsettings={(section) => workspace.openSettings(section)}
 			onskills={(names) => (workspace.pendingSkills = names)}
 		/>

@@ -89,6 +89,13 @@
 		border: 1px solid var(--line);
 		border-left: 3px solid var(--brass);
 		border-radius: var(--radius);
+		/* Answering is the card settling: the three buttons leave and the card takes on the quieter
+		   surface it keeps for the rest of the conversation's life. Both halves of that used to
+		   happen in one frame, so the decision read as the card being replaced rather than as the
+		   card being answered. */
+		transition:
+			background-color var(--fade) var(--ease),
+			opacity var(--fade) var(--ease);
 	}
 
 	.settled {
@@ -127,10 +134,20 @@
 		color: var(--text-muted);
 	}
 
+	/* What was decided, said once and kept. It replaces the buttons, so it is the half of the
+	   answer that arrives — faded rather than instant, so the card is seen to change its mind
+	   about asking. */
 	.outcome {
 		margin: 10px 0 0;
 		font-size: 12.5px;
 		color: var(--brass);
+		animation: fade var(--fade) var(--ease);
+	}
+
+	@keyframes fade {
+		from {
+			opacity: 0;
+		}
 	}
 
 	.actions {

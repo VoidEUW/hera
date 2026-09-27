@@ -124,8 +124,9 @@
 				{t.artifact.download}
 			</a>
 		{/if}
-		<button class="action" type="button" onclick={() => artifacts.close()}>
-			{t.artifact.close}
+		<button class="close" type="button" onclick={() => artifacts.close()}>
+			<span class="sr-only">{t.artifact.close}</span>
+			<span class="glyph" aria-hidden="true"></span>
 		</button>
 	</header>
 
@@ -238,6 +239,74 @@
 		display: flex;
 		align-items: center;
 		gap: 6px;
+	}
+
+	/* The same close control the modal shell carries (#99): a hairline circle with a 32px hit
+	   area, drawn here rather than imported because a drawer is not a modal and the shell's
+	   scrim and focus handling would be wrong in it. */
+	.close {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		flex: none;
+		width: 32px;
+		height: 32px;
+		padding: 0;
+		background: none;
+		border: 1px solid var(--line);
+		border-radius: 50%;
+		color: var(--text-muted);
+		transition:
+			border-color var(--fade) var(--ease),
+			color var(--fade) var(--ease);
+	}
+
+	.close:hover,
+	.close:focus-visible {
+		border-color: var(--brass);
+		color: var(--brass);
+	}
+
+	.close:active {
+		transform: scale(0.95);
+	}
+
+	.glyph {
+		position: relative;
+		width: 10px;
+		height: 10px;
+	}
+
+	.glyph::before,
+	.glyph::after {
+		content: '';
+		position: absolute;
+		top: 50%;
+		left: 50%;
+		width: 12px;
+		height: 1.5px;
+		background: currentcolor;
+		border-radius: 1px;
+	}
+
+	.glyph::before {
+		transform: translate(-50%, -50%) rotate(45deg);
+	}
+
+	.glyph::after {
+		transform: translate(-50%, -50%) rotate(-45deg);
+	}
+
+	.sr-only {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		padding: 0;
+		margin: -1px;
+		overflow: hidden;
+		clip-path: inset(50%);
+		white-space: nowrap;
+		border: 0;
 	}
 
 	/* The body owns the height it is given, so an HTML artifact's frame fills the panel rather

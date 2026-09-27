@@ -155,6 +155,49 @@ button {
 	border-radius: 4px;
 }
 
+/* Scrollbars are chrome, and the interface draws its own chrome (#99). The rail, the
+   transcript, the settings panel, the drawer's file bar, code and tables in prose — every
+   one of them is a scrolling surface inside her room, and a platform scrollbar in default
+   grey is the operating system walking through it. So the track is the ground the surface
+   already sits on and the thumb is a line of the theme's own hairline colour, slightly
+   warmer when hovered; never a rounded pill on a visible track, which is somebody else's
+   style of room.
+
+   Two spellings of the same thing: `scrollbar-width`/`scrollbar-color` for the Firefox
+   rendering, and the `::-webkit-scrollbar` pseudos for Chromium and Safari, which do not
+   read the standard ones. Firefox's `auto` width and the 10px here land close enough that
+   the two renderings do not argue with each other. */
+* {
+	scrollbar-width: thin;
+	scrollbar-color: var(--line) transparent;
+}
+
+::-webkit-scrollbar {
+	width: 10px;
+	height: 10px;
+}
+
+::-webkit-scrollbar-track {
+	background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+	background: var(--line);
+	border: 2px solid transparent;
+	border-radius: 5px;
+	background-clip: padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+	background: var(--text-faint);
+	border: 2px solid transparent;
+	background-clip: padding-box;
+}
+
+::-webkit-scrollbar-corner {
+	background: transparent;
+}
+
 a {
 	color: inherit;
 }

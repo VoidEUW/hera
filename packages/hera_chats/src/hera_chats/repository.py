@@ -111,11 +111,27 @@ def _by_activity() -> object:
     """Newest activity first, counting creation as activity.
 
     One expression rather than two ordering terms, because ``last_message_at`` is null until
-    something is said and a null sorts to whichever end the backend prefers — so a chat you
+    something is said and a null sorts to whichever end the backend prefers - so a chat you
     just opened would appear at the bottom of the list you opened it from. Coalescing says
     what is actually meant: when it was last used, or when it was made.
+
+    **Then two more terms, because one is not a total order.** ``utcnow()`` is
+    ``datetime.now(UTC)``, and on Windows that clock has about 15.6 ms of granularity - so two
+    chats touched inside the same tick carry *identical* timestamps, and the database is then
+    free to return them in any order it likes. That is not only a flaky test: the sidebar itself
+    reorders itself when two chats are written in the same tick, which is what
+    ``test_the_sidebar_orders_by_last_activity`` caught.
+
+    ``created_at`` breaks the tie the way a person would - of two chats used at the same instant,
+    the newer one is the one you are looking at. ``id`` is the last resort and carries no meaning
+    at all; it is here so the order is *total*, because a sort with a residual tie is a sort that
+    can disagree with itself between two reads of the same data.
     """
-    return desc(func.coalesce(col(Chat.last_message_at), col(Chat.created_at)))
+    return (
+        desc(func.coalesce(col(Chat.last_message_at), col(Chat.created_at))),
+        desc(Chat.created_at),
+        desc(Chat.id),
+    )
 
 
 class ChatRepository(Repository[Chat]):
