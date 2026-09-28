@@ -278,11 +278,6 @@ class TestWhileSheIsStillTalking:
         A small number rather than exactly one: the card and the panel are two views of the same
         file, and publishing bumps the counter that tells both to look again. What is being
         pinned is the difference between *a handful* and *one per fragment*."""
-        composer = page.locator("textarea:not([disabled])").first
-        composer.fill("Draw me the handshake")
-        composer.press("Enter")
-        page.wait_for_url("**/chat/**", timeout=15_000)
-
         fetched: list[str] = []
         page.on(
             "request",
@@ -291,10 +286,16 @@ class TestWhileSheIsStillTalking:
             ),
         )
 
+        composer = page.locator("textarea:not([disabled])").first
+        composer.fill("Draw me the handshake")
+        composer.press("Enter")
+        page.wait_for_url("**/chat/**", timeout=15_000)
+
         page.locator("figure.artifact.inline .drawing svg").first.wait_for(timeout=30_000)
         page.wait_for_selector("text=THE LAST WORD", timeout=60_000)
         page.wait_for_timeout(500)
 
+        assert fetched, "the diagram was never fetched -- the listener is watching the wrong thing"
         assert len(fetched) <= 4, f"the diagram was fetched {len(fetched)} times while she talked"
 
 
