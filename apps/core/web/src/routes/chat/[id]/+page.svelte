@@ -7,12 +7,14 @@
 	 */
 	import { page } from '$app/state';
 	import { untrack } from 'svelte';
-	import { API, api } from '$lib/api/client';
+	import { API, api, type ArtifactSummary } from '$lib/api/client';
 	import { artifactOf } from '$lib/api/events';
+	import { titleOf } from '$lib/artifacts';
 	import ArtifactDrawer from '$lib/components/ArtifactDrawer.svelte';
 	import Backdrop from '$lib/components/Backdrop.svelte';
 	import Composer from '$lib/components/Composer.svelte';
 	import Message from '$lib/components/Message.svelte';
+	import Select from '$lib/components/Select.svelte';
 	import Skeleton from '$lib/components/Skeleton.svelte';
 	import Tray from '$lib/components/Tray.svelte';
 	import { t } from '$lib/i18n';
@@ -24,7 +26,8 @@
 	const session = new ChatSession();
 
 	let scroller = $state<HTMLElement | null>(null);
-	let published = $state(0);
+	let listing = $state<ArtifactSummary[]>([]);
+	const published = $derived(listing.length);
 
 	/** The shape of a conversation while it is being fetched, on the same beat as the rail's.
 	 *
@@ -131,14 +134,14 @@
 		const id = session.chat?.id;
 		void artifacts.version;
 		if (!id) {
-			published = 0;
+			listing = [];
 			return;
 		}
 		let current = true;
 		api
 			.artifacts(id)
 			.then((found) => {
-				if (current) published = found.length;
+				if (current) listing = found;
 			})
 			.catch(() => {
 				/* the transcript is what matters; a count that could not be read is not an error */
@@ -230,14 +233,18 @@
 	<h1 class="title">{session.chat?.title || t.empty.title}</h1>
 	<div class="right">
 		{#if published && session.chat}
-			<button
-				class="published"
-				type="button"
-				onclick={() =>
-					artifacts.open ? artifacts.close() : artifacts.show(session.chat!.id, artifacts.name)}
-			>
-				{t.artifact.count(published)}
-			</button>
+			<!-- The count is what it says while the drawer is shut; open, it names the file being
+			     shown, and the list is the way to another one. -->
+			<div class="published">
+				<Select
+					choices={listing.map((file) => ({ value: file.name, label: titleOf(file.name) }))}
+					value={artifacts.open ? (artifacts.name ?? '') : ''}
+					label={t.artifact.panel}
+					placeholder={t.artifact.count(published)}
+					align="end"
+					onchange={(name) => session.chat && artifacts.show(session.chat.id, name)}
+				/>
+			</div>
 		{/if}
 		<!-- The first tool, and likely not the last -- a home for anything else that acts on the
 		     conversation as a whole rather than on one message in it. -->
@@ -391,19 +398,6 @@
 	   for the thing you just changed. */
 	.published {
 		flex: none;
-		padding: 3px 9px;
-		border: 1px solid var(--line);
-		border-radius: var(--radius);
-		font-size: 12.5px;
-		color: var(--text-muted);
-		transition:
-			color var(--fade) var(--ease),
-			border-color var(--fade) var(--ease);
-	}
-
-	.published:hover {
-		color: var(--text);
-		border-color: var(--brass);
 	}
 
 	.toolbar {

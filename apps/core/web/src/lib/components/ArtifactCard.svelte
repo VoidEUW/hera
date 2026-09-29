@@ -23,7 +23,7 @@
 	 * with the next.
 	 */
 	import type { Artifact } from '$lib/api/events';
-	import { downloadUrl, extensionOf, kindOf, size, titleOf } from '$lib/artifacts';
+	import { downloadUrl, extensionOf, hasSource, kindOf, size, titleOf } from '$lib/artifacts';
 	import { t } from '$lib/i18n';
 	import { saveDiagram } from '$lib/mermaid';
 	import { artifacts } from '$lib/stores/artifacts.svelte';
@@ -41,6 +41,8 @@
 	const title = $derived(titleOf(artifact.name));
 	const extension = $derived(extensionOf(artifact.name).toUpperCase());
 	const drawn = $derived(kindOf(artifact.name) === 'mermaid');
+	/** Showing the code instead of the drawing, for this card only. */
+	let source = $state(false);
 
 	function open() {
 		if (chatId) artifacts.show(chatId, artifact.name);
@@ -52,7 +54,7 @@
 		<!-- The figure first and its caption under it, which is the order a figure is read in.
 		     Drawn at a height that leaves the answer on screen; the drawer is where it gets the
 		     room. -->
-		<ArtifactView {chatId} name={artifact.name} height="360px" />
+		<ArtifactView {chatId} name={artifact.name} height="360px" {source} />
 	{/if}
 
 	<figcaption class="bar">
@@ -64,6 +66,21 @@
 				<span class="bytes">{size(artifact.bytes)}</span>
 			</span>
 		</span>
+		{#if artifact.inline && chatId && hasSource(artifact.name)}
+			<!-- Only where the thing itself is drawn here: a card that is just a strip has no
+			     picture to swap for its code. -->
+			<button
+				type="button"
+				class="open"
+				aria-pressed={source}
+				aria-label={source
+					? t.artifact.showDrawnOf(artifact.name)
+					: t.artifact.showSourceOf(artifact.name)}
+				onclick={() => (source = !source)}
+			>
+				{source ? t.artifact.showDrawn : t.artifact.showSource}
+			</button>
+		{/if}
 		{#if chatId && drawn}
 			<!-- A button rather than the link beside it, because what it saves is not what a link
 			     here would point at: a diagram is converted to the page that draws it on the way

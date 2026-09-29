@@ -17,8 +17,8 @@
 	 * four to find the card that opens the file it just changed.
 	 */
 	import { cubicOut } from 'svelte/easing';
-	import { api, type ArtifactSummary } from '$lib/api/client';
-	import { downloadUrl, kindOf, newest, size, titleOf } from '$lib/artifacts';
+	import { api } from '$lib/api/client';
+	import { downloadUrl, hasSource, kindOf, newest, titleOf } from '$lib/artifacts';
 	import { t } from '$lib/i18n';
 	import { saveDiagram } from '$lib/mermaid';
 	import { artifacts } from '$lib/stores/artifacts.svelte';
@@ -73,10 +73,17 @@
 		};
 	}
 
-	let listed = $state<ArtifactSummary[]>([]);
 	let failure = $state('');
 
 	const chosen = $derived(artifacts.name);
+
+	/** Showing the code instead of the drawn thing. Each file opens drawn: the choice belongs to
+	 * the file being looked at, not to the panel. */
+	let source = $state(false);
+	$effect(() => {
+		void chosen;
+		source = false;
+	});
 
 	$effect(() => {
 		// The listing is re-read when something published changes, so a file created in the turn
@@ -88,7 +95,6 @@
 			.artifacts(chat)
 			.then((found) => {
 				if (!current) return;
-				listed = found;
 				// Two cases, one answer: nothing is chosen, or what was chosen is not in the
 				// listing any more. An open panel showing *Nothing chosen yet* beside a bar of
 				// files is a door that led nowhere, and one still pointed at a deleted file is
@@ -116,6 +122,17 @@
 	<header class="top">
 		<span class="mark" aria-hidden="true"><Stele size={14} /></span>
 		<h2 class="title">{chosen ? titleOf(chosen) : t.artifact.panel}</h2>
+		{#if chosen && hasSource(chosen)}
+			<button
+				class="action"
+				type="button"
+				aria-pressed={source}
+				aria-label={source ? t.artifact.showDrawnOf(chosen) : t.artifact.showSourceOf(chosen)}
+				onclick={() => (source = !source)}
+			>
+				{source ? t.artifact.showDrawn : t.artifact.showSource}
+			</button>
+		{/if}
 		{#if chosen && kindOf(chosen) === 'mermaid'}
 			<!-- A diagram is saved as the page that draws it rather than as its mermaid source, so
 			     this one really is a fetch and a blob — the conversion needs a browser, and this is
@@ -148,7 +165,7 @@
 	<div class="body">
 		{#if chosen}
 			{#key chosen}
-				<ArtifactView {chatId} name={chosen} height="100%" />
+				<ArtifactView {chatId} name={chosen} height="100%" {source} />
 			{/key}
 		{:else if failure}
 			<p class="failed">{failure}</p>
@@ -156,25 +173,6 @@
 			<p class="empty">{t.artifact.none}</p>
 		{/if}
 	</div>
-
-	{#if listed.length}
-		<nav class="files" aria-label={t.artifact.files}>
-			<ul>
-				{#each listed as file (file.name)}
-					<li>
-						<button
-							type="button"
-							class:current={file.name === chosen}
-							onclick={() => artifacts.show(chatId, file.name)}
-						>
-							<span class="name">{file.name}</span>
-							<span class="bytes">{size(file.bytes)}</span>
-						</button>
-					</li>
-				{/each}
-			</ul>
-		</nav>
-	{/if}
 </aside>
 
 <style>
@@ -339,52 +337,23 @@
 		min-height: 0;
 	}
 
-	.files {
-		flex: none;
-		max-height: 24vh;
-		overflow: auto;
-		border-top: 1px solid var(--line);
+	/* Code runs to the edges of the panel: the header above draws the line a frame would, so a
+	   border and a margin here would be a box in a box. The padding goes from the body rather
+	   than being cancelled with a negative margin on the child, because the child's own
+	   `max-height: 100%` is measured inside the padding and would stop short of the bottom. */
+	.body:has(:global(.source)) {
+		padding: 0;
 	}
 
-	.files ul {
-		margin: 0;
-		padding: 6px;
-		list-style: none;
+	.body :global(.source) {
+		border: 0;
+		border-radius: 0;
 	}
 
-	.files button {
-		display: flex;
-		align-items: baseline;
-		gap: 10px;
-		width: 100%;
-		padding: 5px 8px;
-		border-radius: var(--radius);
-		font-size: 12.5px;
-		color: var(--text-muted);
-		text-align: left;
-	}
-
-	.files button:hover {
-		background: var(--surface);
-		color: var(--text);
-	}
-
-	.files button.current {
-		color: var(--text);
-		background: var(--surface-raised);
-	}
-
-	.name {
-		font-family: var(--font-mono);
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-	}
-
-	.bytes {
-		margin-left: auto;
-		flex: none;
-		color: var(--text-faint);
+	.body :global(.drawing),
+	.body :global(.source) {
+		flex: 1;
+		min-height: 0;
 	}
 
 	.empty,

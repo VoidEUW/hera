@@ -61,6 +61,16 @@ export function kindOf(name: string): Kind {
 	return KINDS[extensionOf(name)] ?? 'file';
 }
 
+/** Whether this one is *made of* text worth reading — a page, a drawing, a document, a diagram.
+ *
+ * What a toggle between the drawn thing and its code is offered for. A `code` artifact is already
+ * shown as its source and a `file` is not one, so neither has anything to switch to.
+ */
+export function hasSource(name: string): boolean {
+	const kind = kindOf(name);
+	return kind === 'html' || kind === 'svg' || kind === 'markdown' || kind === 'mermaid';
+}
+
 /** The name without its extension: `theme-workshop.html` → `theme-workshop`.
  *
  * What you build another filename out of — a diagram saved as the page that draws it keeps the

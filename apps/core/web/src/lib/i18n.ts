@@ -480,6 +480,12 @@ export const t = {
 		open: 'Open',
 		/** The same button under something already drawn in the flow, where *Open* would read as
 		 * an offer to show what is plainly already there. */
+		copyCode: 'Copy code',
+		copiedCode: 'Copied',
+		showSource: 'Code',
+		showDrawn: 'Preview',
+		showSourceOf: (name: string) => `Show the code of ${name}`,
+		showDrawnOf: (name: string) => `Show ${name} as drawn`,
 		openFull: 'Full size',
 		download: 'Download',
 		/** The card's save control is a glyph, so its accessible name says *which* file — a turn
