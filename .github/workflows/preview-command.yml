@@ -11,6 +11,13 @@ name: Preview command
 # wake. A rerun of an existing pull_request run is a fresh execution of the same event and
 # cascades normally. Runs are only rerun when their head SHA is the pull request's current
 # head, so an outdated capture never overwrites a newer one.
+#
+# The run is looked up by `head_sha` rather than by paging through recent `pull_request` runs
+# and comparing. The windowed version asked for the twenty most recent across the whole
+# repository, which is a limit no single pull request controls: on a busy repository -- and
+# dependabot opens a new run on every merged one -- a pull request's own capture slides out of
+# the top twenty and `/preview` reports that there is nothing to re-film for a pull request
+# that has one. The API filters on `head_sha`, so there is no window to fall out of.
 
 on:
   issue_comment:
@@ -48,13 +55,45 @@ jobs:
               --jq '"\(.head.sha) \(.head.ref)"'
           )
 
-          runs_json="$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/preview.yml/runs?event=pull_request&per_page=20")"
-          run_id="$(printf '%s' "$runs_json" | jq -r --arg sha "$head_sha" '[.workflow_runs[] | select(.head_sha == $sha)] | .[0].id // ""')"
+          # **A push and a `/preview` are four seconds apart, and that is not an edge case.**
+          # Somebody pushes, reads the URL, and types the command; GitHub has not created the
+          # `pull_request` run yet, and the honest answer at that moment is "in a moment" rather
+          # than "there is nothing to re-film". A capture is created within a second or two of
+          # the push, so a short bounded wait turns the common case into a rerun. The previous
+          # version asked once and exited non-zero, which made the ordinary race look like a
+          # broken workflow -- and then died trying to say so, because posting a comment is a
+          # permission this workflow may not have (see the note below).
+          #
+          # The window is 3 minutes across 12 polls, and it stops as soon as a run appears.
+          run_id=""
+          for attempt in $(seq 1 12); do
+            run_id="$(
+              gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/preview.yml/runs?head_sha=${head_sha}&per_page=1" \
+                --jq '.workflow_runs[0].id // ""'
+            )"
+            [ -n "$run_id" ] && break
+            [ "$attempt" -lt 12 ] && sleep 15
+          done
 
           if [ -z "$run_id" ]; then
-            gh api "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" -f \
-              body="No push-triggered capture exists for the current head of this pull request to rerun, so \`/preview\` has nothing to re-film. Push a commit (even an empty one) to create one."
-            exit 1
+            message="No push-triggered capture exists for the current head of \`${head_branch}\` to rerun. \`/preview\` has nothing to re-film yet: GitHub may still be creating one, and if not, push a commit (even an empty one) to make it."
+            # Said in the step summary as well as the comment, because the comment is the thing
+            # that has been failing: if the token cannot write to the issue, the run summary is
+            # the only place the reason survives, and a red run that says nothing is the worst of
+            # the three outcomes.
+            {
+              echo "### /preview had nothing to rerun"
+              echo
+              echo "$message"
+            } >> "$GITHUB_STEP_SUMMARY"
+            # Best effort, and deliberately not fatal. A 403 here must not become the failure the
+            # person has to read, because the request failing is already reported above.
+            gh api "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" -f body="$message" \
+              || echo "::warning::Could not comment on the pull request; the reason is in the job summary."
+            # Zero rather than one: nothing is broken. The pipeline did not fail and neither did
+            # this workflow -- there was simply nothing yet to re-film, and saying so is a
+            # successful answer to the question that was asked.
+            exit 0
           fi
 
           status="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}" --jq '.status')"
