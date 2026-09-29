@@ -6,6 +6,7 @@ not wired into the type checker, or two test modules that shadow each other.
 
 from __future__ import annotations
 
+import ast
 import re
 import tomllib
 from collections import defaultdict
@@ -52,14 +53,23 @@ def test_workspace_members_resolve() -> None:
 
 
 def _uncovered_by(entries: list[str]) -> list[str]:
-    """Workspace members no entry in `entries` refers to."""
+    """Workspace members no entry in `entries` refers to.
+
+    **Both sides are compared as POSIX paths.** A `pyproject.toml` writes
+    ``packages/hera_chats/src`` with a forward slash, on every platform, because that is what a
+    TOML file contains; ``str(Path.relative_to(...))`` renders ``packages\\hera_chats`` on
+    Windows. Comparing the two directly meant nothing ever matched there, so every member read
+    as uncovered and both gates below failed on a correctly configured workspace -- while still
+    passing on Linux and macOS, where the separators happen to agree. A guard that cannot fail
+    usefully is worse than no guard, because it looks like it is watching.
+    """
     return [
-        str(member.relative_to(ROOT))
+        member.relative_to(ROOT).as_posix()
         for member in _members()
         if not any(
-            entry == str(member.relative_to(ROOT))
-            or entry.startswith(f"{member.relative_to(ROOT)}/")
-            or str(member.relative_to(ROOT)).startswith(f"{entry}/")
+            entry == member.relative_to(ROOT).as_posix()
+            or entry.startswith(f"{member.relative_to(ROOT).as_posix()}/")
+            or member.relative_to(ROOT).as_posix().startswith(f"{entry}/")
             for entry in entries
         )
     ]
@@ -75,6 +85,33 @@ def test_mypy_checks_every_package() -> None:
     assert not missing, (
         f"add to [tool.mypy] files in pyproject.toml: {[f'{m}/src' for m in missing]}"
     )
+
+
+def test_the_coverage_gate_can_still_fail() -> None:
+    """The gate above, checked against a workspace it is meant to reject.
+
+    A guard that cannot fail is worse than no guard, because it looks like it is watching -- and
+    this one *was* unwatching: comparing ``packages\\hera_chats`` against a ``pyproject.toml``
+    that says ``packages/hera_chats/src`` matched nothing on Windows, so every member read as
+    uncovered and the two gates failed constantly on a correct workspace. Both were equally
+    broken in the other direction: the same comparison that made them cry wolf would have let a
+    genuinely forgotten member through, which is the only thing they exist to catch.
+
+    So: a member no entry refers to is reported, and one that is covered is not. Synthetic inputs,
+    because the point is the comparison and not any particular workspace.
+    """
+    everything = _uncovered_by([])
+    assert everything, "an empty list covers nothing, so everything must be reported"
+    assert not _uncovered_by(everything), "naming every member must cover every member"
+
+
+def test_a_parent_entry_covers_the_members_under_it() -> None:
+    """`[tool.coverage.run] source` says ``packages``, not twelve paths -- the parent is the
+    entry, and the gate has to read it as covering everything beneath rather than as covering
+    nothing.
+    """
+    assert not _uncovered_by(["packages", "apps/core/src"]), "a parent entry covers its members"
+    assert _uncovered_by(["apps/core/src"]), "and dropping it uncovers every packages/* member"
 
 
 def test_coverage_measures_every_package() -> None:
@@ -102,6 +139,53 @@ def test_internal_dependencies_have_a_workspace_source() -> None:
     assert not missing, (
         "add to [tool.uv.sources] in the root pyproject.toml as `{ workspace = true }`: "
         f"{missing}"
+    )
+
+
+def _hera_imports(source: Path) -> set[str]:
+    """Every top-level `hera_*` module name one file imports.
+
+    Mirrors `test_layering`'s walk of the same name — duplicated rather than imported across
+    test modules, the same way every other helper here stays private to this file.
+    """
+    tree = ast.parse(source.read_text(encoding="utf-8"), filename=str(source))
+    found: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            found.update(alias.name.split(".")[0] for alias in node.names)
+        elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
+            found.add(node.module.split(".")[0])
+    return {name for name in found if name.startswith("hera")}
+
+
+def test_declared_dependencies_cover_every_import() -> None:
+    """A member's own source is the ground truth for what it needs; `pyproject.toml` is a claim
+    about that, and the two can drift apart silently.
+
+    `uv sync --all-packages` installs every workspace member regardless of who declares needing
+    it, so a package that imports a sibling without declaring it still runs — right up until
+    something narrower (`uv run`, a published wheel, a fresh sync of just this member) builds an
+    environment scoped to what is actually declared, and an import that always worked starts
+    raising `ModuleNotFoundError` nobody touched anything to cause. This is
+    `test_internal_dependencies_have_a_workspace_source`'s check from the other side: that one
+    catches a declared dependency with no workspace source, this one catches an import with no
+    declaration at all.
+    """
+    missing: dict[str, list[str]] = {}
+    for member in _members():
+        own = _table(_config(member), "project", "name").replace("-", "_")
+        declared = {name.replace("-", "_") for name in _requirement_names(member)}
+
+        used: set[str] = set()
+        for source in sorted((member / "src").rglob("*.py")):
+            used |= _hera_imports(source)
+        used.discard(own)
+
+        if gaps := sorted(used - declared):
+            missing[own] = gaps
+
+    assert not missing, (
+        f"add to [project] dependencies in the member's own pyproject.toml: {missing}"
     )
 
 

@@ -239,6 +239,20 @@ class Turn:
             # worth naming: part of the answer did arrive, and it is worth keeping.
             reason: CloseReason = "cancelled" if isinstance(exc, StreamInterrupted) else "failed"
             yield self._close(reason, error=str(exc))
+        except Exception as exc:
+            # **Everything else.** A turn is not only the provider: the tool catalogue, the prompt
+            # build, a malformed frame the adapter did not recognise, a plain bug in this file --
+            # and every one of those escaped unhandled, which left `recorded` with no terminator
+            # at all. The caller still persists whatever is in there, so the turn was saved as a
+            # message with *zero* events, and the transcript drew an empty bubble with nothing to
+            # explain it and a *Try again* that looked like the answer had simply been blank.
+            #
+            # Closed here, where the invariant is kept, and re-raised: the record is what a person
+            # reads, and a swallowed traceback is how the next one of these ships. The `finally`
+            # in the caller's generator persists the closed list either way, and its `done` frame
+            # carries it, so closing this costs the client nothing.
+            self._close("failed", error=f"{type(exc).__name__}: {exc}")
+            raise
 
     async def _run(self) -> AsyncIterator[ChatEvent]:
         # The catalogue is fetched first: its rendered form is bound into the prompt, so the
@@ -632,6 +646,18 @@ class Turn:
     def _record(self, event: ChatEvent) -> ChatEvent:
         self._recorded.append(event)
         return event
+
+    def close(self, reason: CloseReason = "cancelled", *, error: str = "") -> ChatEvent:
+        """Close the record unless it is already closed. Idempotent, like :meth:`_close`.
+
+        Public because the caller that *persists* the record is the only place that can guarantee
+        the guarantee: ``stream`` closes on every exception it knows about, and a caller that
+        abandons the generator without ever entering it -- or a path added later that nobody
+        remembered to handle -- would otherwise persist a turn with no terminator at all. A
+        conversation row with no outcome is a row the interface cannot explain, so this is called
+        immediately before the record is written, and an already-closed turn is left alone.
+        """
+        return self._close(reason, error=error)
 
     def _close(
         self,

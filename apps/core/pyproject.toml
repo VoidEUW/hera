@@ -24,6 +24,7 @@ dependencies = [
     "hera-chats",
     "hera-home",
     "hera-mcp",
+    "hera-memories",
     "hera-permissions",
     "hera-profiles",
     "hera-prompts",

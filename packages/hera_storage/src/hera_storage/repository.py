@@ -80,6 +80,12 @@ class Repository(Generic[T]):
 
         An explicit ``order_by`` replaces the default entirely, tiebreaker included. Models
         that do not inherit :class:`~hera_storage.Entity` have no default order.
+
+        ``order_by`` takes one expression or several: a list or tuple is unpacked into
+        ``order_by()``'s own varargs, which is what a tiebreak needs -- and SQLAlchemy raises
+        ``ArgumentError`` rather than quietly ignoring a second term, so a caller that meant to
+        add a tiebreak and passed a tuple used to get a hard failure instead of an order that
+        silently had none. The default branch below has always passed two this way.
         """
         statement = select(self.model)
         if self._hides_revoked(include_revoked):
@@ -87,7 +93,8 @@ class Repository(Generic[T]):
         for condition in where:
             statement = statement.where(condition)
         if order_by is not None:
-            statement = statement.order_by(order_by)
+            terms = tuple(order_by) if isinstance(order_by, (builtins.list, tuple)) else (order_by,)
+            statement = statement.order_by(*terms)
         elif self._has_default_order:
             statement = statement.order_by(
                 _column(self.model, "created_at"), _column(self.model, "id")

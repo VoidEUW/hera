@@ -110,6 +110,13 @@
 		border: 1px solid var(--line);
 		border-left: 3px solid var(--laurel);
 		border-radius: var(--radius);
+		/* Answering is the card settling: the field leaves and the card takes on the quieter
+		   surface it keeps for the rest of the conversation's life. Both halves of that used to
+		   happen in one frame, so the reply read as the card being replaced rather than as the
+		   card being answered. */
+		transition:
+			background-color var(--fade) var(--ease),
+			opacity var(--fade) var(--ease);
 	}
 
 	.settled {
@@ -214,7 +221,9 @@
 		cursor: default;
 	}
 
-	/* What they answered, once they have. Indented under the question the way a reply is. */
+	/* What they answered, once they have. Indented under the question the way a reply is, and
+	   faded in because it replaces the field — the card is seen to have been answered rather than
+	   to have been swapped. */
 	.reply {
 		margin: 10px 0 0;
 		padding-left: 12px;
@@ -222,5 +231,12 @@
 		font-family: var(--font-body);
 		font-size: 15px;
 		color: var(--text-muted);
+		animation: fade var(--fade) var(--ease);
+	}
+
+	@keyframes fade {
+		from {
+			opacity: 0;
+		}
 	}
 </style>

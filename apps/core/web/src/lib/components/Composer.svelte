@@ -68,6 +68,15 @@
 		/** Changes `options.reasoning_effort` on the active model — global and immediate, the
 		 * same reach as `onmodel`, not scoped to this chat or this message. */
 		onreasoning?: (providerName: string, modelId: string, value: string) => void;
+		/** Turns reasoning on or off for the active model, by writing
+		 * `chat_template_kwargs.enable_thinking` — the knob a model whose template declares it
+		 * actually has, as against the effort enum the other kind declares. A callback because
+		 * the composer is handed what it may change and nothing else, which is the same bargain
+		 * `onreasoning` makes, and it carries the same two arguments for the same reason. Only
+		 * called for a model the endpoint has said declares it. */
+		onthinking?: (providerName: string, modelId: string, on: boolean) => void;
+		/** Sets a thinking token budget, for a model that takes one rather than a named level. */
+		onbudget?: (providerName: string, modelId: string, tokens: number) => void;
 		onsettings?: (section?: SettingsTab) => void;
 		onskills?: (names: string[]) => void;
 		/** The last exchange's token usage, for the context-window bar. `null` draws no bar. */
@@ -90,6 +99,8 @@
 		onprofile,
 		onmodel,
 		onreasoning,
+		onthinking,
+		onbudget,
 		onsettings,
 		onskills,
 		usage = null
@@ -164,14 +175,33 @@
 		activeEntry && activeModel ? `${activeEntry.name}::${activeModel.id}` : ''
 	);
 
-	// Fixed, not read from the server: there is no catalogue of valid values for a field Hera
-	// does not interpret (ADR 18). `''` means "absent from options" rather than a chosen value.
+	// **One slot, whichever control this model actually has.** The server decides which, in
+	// `thinking_shape`, so the composer and the settings screen cannot disagree:
+	//
+	//   values  a published vocabulary      -> a picker of the levels it accepts
+	//   budget  it wants a thinking budget  -> a stepper of tokens
+	//   toggle  it has a thinking switch     -> a switch
+	//   none    nobody has said             -> nothing at all
+	//
+	// There is deliberately no fifth option. A model nobody could ask about gets no control, and
+	// the field stays writable on Settings -> Models — which is where a person states a
+	// vocabulary once, for the providers that publish it in prose and nowhere else.
+	const shape = $derived(activeModel?.thinking_shape ?? 'none');
+	const efforts = $derived(activeModel?.reasoning_efforts ?? []);
 	const reasoningChoices = $derived([
 		{ value: '', label: t.composer.effort.default },
-		{ value: 'low', label: t.composer.effort.low },
-		{ value: 'medium', label: t.composer.effort.medium },
-		{ value: 'high', label: t.composer.effort.high }
+		...efforts.map((effort) => ({ value: effort, label: effort }))
 	]);
+	// The toggle is the value, so there are only two of them and no third state: absent from the
+	// model's options means the server's own default, which for MiniCPM5 is to think. Read from
+	// options rather than a local flag so this bar and Settings -> Models always show the same.
+	const thinkingOn = $derived(
+		(activeModel?.options.chat_template_kwargs as { enable_thinking?: unknown } | undefined)
+			?.enable_thinking !== false
+	);
+	// A budget is a number, and there is no absent: `undefined` means the model reasons and this
+	// one has not been given a budget, which is not the same as a budget of zero.
+	const budget = $derived(activeModel?.options.thinking_budget);
 	const reasoningValue = $derived(
 		typeof activeModel?.options.reasoning_effort === 'string'
 			? activeModel.options.reasoning_effort
@@ -191,6 +221,23 @@
 	function chooseReasoning(value: string) {
 		if (!activeEntry || !activeModel) return;
 		onreasoning?.(activeEntry.name, activeModel.id, value);
+	}
+
+	function setThinking(on: boolean) {
+		if (!activeEntry || !activeModel) return;
+		onthinking?.(activeEntry.name, activeModel.id, on);
+	}
+
+	/** A thinking *budget*, which is a number of tokens rather than a named level.
+	 *
+	 * Clamped to something a request can carry: 0 is "do not think" and is left to the switch,
+	 * and the ceiling is a number a person can read rather than one that has to be looked up. */
+	const BUDGET_MIN = 256;
+	const BUDGET_MAX = 32768;
+
+	function setBudget(value: number) {
+		if (!activeEntry || !activeModel) return;
+		onbudget?.(activeEntry.name, activeModel.id, Math.min(BUDGET_MAX, Math.max(BUDGET_MIN, value)));
 	}
 
 	function submit() {
@@ -362,16 +409,52 @@
 		{/if}
 
 		{#if modelChoices.length}
-			<div class="effort">
-				<Select
-					choices={reasoningChoices}
-					value={reasoningValue}
-					label={t.composer.reasoning}
-					placement="above"
-					align="end"
-					onchange={chooseReasoning}
-				/>
-			</div>
+			<!-- **One slot, whichever of the three controls this model has.** The server decided
+			     which, in `thinking_shape`, so this and Settings -> Models cannot disagree. A
+			     model nobody could ask about gets nothing: a control whose only setting cannot be
+			     expressed is the inert control, and the field stays writable on the settings
+			     screen, which is where a person states a vocabulary once. -->
+			{#if shape === 'values'}
+				<div class="effort">
+					<Select
+						choices={reasoningChoices}
+						value={reasoningValue}
+						label={t.composer.reasoning}
+						placement="above"
+						align="end"
+						onchange={chooseReasoning}
+					/>
+				</div>
+			{:else if shape === 'toggle'}
+				<button
+					class="context thinking"
+					class:on={thinkingOn}
+					type="button"
+					aria-pressed={thinkingOn}
+					title={thinkingOn ? t.composer.thinkingOn : t.composer.thinkingOff}
+					onclick={() => setThinking(!thinkingOn)}
+				>
+					<span class="dot" class:idle={!thinkingOn} aria-hidden="true"></span>
+					{thinkingOn ? t.composer.thinking : t.composer.thinkingOff}
+				</button>
+			{:else if shape === 'budget'}
+				<!-- A number, not a level. `inputmode=numeric` so a phone opens the keypad rather
+				     than the keyboard, and the value is only sent on change rather than on every
+				     keystroke -- a budget is a setting, not a search. -->
+				<label class="context budget" title={t.composer.budgetTitle}>
+					<span class="dot" aria-hidden="true"></span>
+					<span class="sr-only">{t.composer.budgetTitle}</span>
+					<input
+						type="number"
+						inputmode="numeric"
+						min={BUDGET_MIN}
+						max={BUDGET_MAX}
+						step={256}
+						value={budget ?? BUDGET_MIN}
+						onchange={(event) => setBudget(Number(event.currentTarget.value) || BUDGET_MIN)}
+					/>
+				</label>
+			{/if}
 			<div class="model">
 				<Select
 					choices={modelChoices}
@@ -532,6 +615,15 @@
 		line-height: 1.55;
 		max-height: 260px;
 		overflow-y: auto;
+		/* The grow effect above assigns `height` on every keystroke, so without this the whole
+		   composer jumps a line at a time while you are still reading what you are typing. This
+		   is the disclosure height `--disclose` is named for, applied to the one place it happens
+		   continuously rather than on a click — a person watching their own sentence push the
+		   button bar down is the same event as a panel opening, and it deserves the same gesture.
+
+		   `--disclose` and not `--fade`: this is a height, and a height measured in 120ms reads as
+		   a twitch next to one measured in 160. */
+		transition: height var(--disclose) var(--ease);
 	}
 
 	textarea:focus {
@@ -693,6 +785,40 @@
 	@media (max-width: 640px) {
 		.hint {
 			display: none;
+		}
+
+		/* The thinking switch and the budget, wearing the same pill as the skills and servers dots
+	   beside it, because it is the same kind of fact: something switched on for the next thing
+	   you type. Laurel for on, faint for off, and no colour of its own — the dot already says it. */
+		.context.thinking {
+			flex: none;
+		}
+
+		.context.thinking.on {
+			color: var(--text-muted);
+		}
+
+		/* The budget is a number inside the pill, so the input has to give up the pill's own
+	   typography and padding without the pill losing its shape. */
+		.context.budget {
+			flex: none;
+			gap: 7px;
+		}
+
+		.context.budget input {
+			width: 5.5ch;
+			padding: 0;
+			border: 0;
+			background: none;
+			font-family: var(--font-mono);
+			font-size: 12px;
+			color: var(--text);
+		}
+
+		.context.budget input:focus-visible {
+			outline: 2px solid var(--laurel);
+			outline-offset: 2px;
+			border-radius: 4px;
 		}
 
 		.effort {

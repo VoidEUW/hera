@@ -21,8 +21,10 @@
 	import { API, api, type Chat, type Profile, type Project } from '$lib/api/client';
 	import { t } from '$lib/i18n';
 	import { Placeholder } from '$lib/loading.svelte';
+	import { disclose } from '$lib/motion';
 	import { colourOf } from '$lib/projects';
 	import type { Shape } from '$lib/stores/workspace.svelte';
+	import Input from './Input.svelte';
 	import Ocellus from './Ocellus.svelte';
 	import Skeleton from './Skeleton.svelte';
 
@@ -191,13 +193,6 @@
 		creating = false;
 	}
 
-	/** The field takes the cursor and the whole title with it. The menu item that opened it is
-	 * gone by then, so leaving focus behind would leave it nowhere. */
-	function takeover(node: HTMLInputElement) {
-		node.focus();
-		node.select();
-	}
-
 	function initials(name: string): string {
 		return name
 			.split(/\s+/)
@@ -213,11 +208,13 @@
 {#snippet row(chat: Chat)}
 	<li class="item">
 		{#if is(renaming, 'chat', chat.id)}
-			<input
+			<Input
+				variant="inline"
 				class="rename"
-				use:takeover
-				bind:value={draft}
-				aria-label={t.rail.rename}
+				autofocus
+				value={draft}
+				ariaLabel={t.rail.rename}
+				onchange={(value) => (draft = value)}
 				onblur={() => commitRename('chat', chat.id, chat.title)}
 				onkeydown={(event) => {
 					if (event.key === 'Enter') commitRename('chat', chat.id, chat.title);
@@ -349,11 +346,13 @@
 		     under the project rather than under the last chat in it. -->
 		<div class="item head">
 			{#if is(renaming, 'project', project.id)}
-				<input
+				<Input
+					variant="inline"
 					class="rename"
-					use:takeover
-					bind:value={draft}
-					aria-label={t.rail.rename}
+					autofocus
+					value={draft}
+					ariaLabel={t.rail.rename}
+					onchange={(value) => (draft = value)}
 					onblur={() => commitRename('project', project.id, project.name)}
 					onkeydown={(event) => {
 						if (event.key === 'Enter') commitRename('project', project.id, project.name);
@@ -443,7 +442,14 @@
 		</div>
 
 		{#if open}
-			<ul class="list nested">
+			<!-- A disclosure, and the reason `--disclose` exists: expanding a project rearranges
+			     every row below it, so what a person needs to see is the list making room rather
+			     than a panel arriving on top of it. A project with thirty chats in it moves the
+			     loose-chat list clean off the bottom of the rail in one frame otherwise, and the
+			     row that was under the pointer is no longer under it.
+
+			     Opens a little slower than it closes, for the reason `reveal` gives. -->
+			<ul class="list nested" in:disclose={{ duration: 180 }} out:disclose={{ duration: 120 }}>
 				{#each inside(project.id) as chat (chat.id)}
 					{@render row(chat)}
 				{:else}
@@ -505,12 +511,14 @@
 
 			{#if creating}
 				<li class="item">
-					<input
+					<Input
+						variant="inline"
 						class="rename"
-						use:takeover
-						bind:value={draft}
-						aria-label={t.rail.newProject}
+						autofocus
+						value={draft}
+						ariaLabel={t.rail.newProject}
 						placeholder={t.rail.projectNamePlaceholder}
+						onchange={(value) => (draft = value)}
 						onblur={commitCreate}
 						onkeydown={(event) => {
 							if (event.key === 'Enter') commitCreate();
@@ -742,19 +750,6 @@
 	.more:hover {
 		background: var(--surface);
 		color: var(--text);
-	}
-
-	.rename {
-		width: 100%;
-		padding: 6px 8px;
-		background: var(--ground);
-		border: 1px solid var(--brass);
-		border-radius: var(--radius);
-		font-size: 13.5px;
-	}
-
-	.rename:focus {
-		outline: none;
 	}
 
 	.away {

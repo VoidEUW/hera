@@ -130,11 +130,22 @@
 		stroke: var(--brass);
 		stroke-width: 1.6;
 		opacity: 0.95;
+		/* A tool finishing is a state change, and the ring is what reports it: the row goes from
+		   saying *she is doing this* to saying *she did this*, and the only thing on screen that
+		   says so is these two colours. Without the transition the whole gutter report lands as a
+		   single frame, once per tool call, which is the loudest way to say something quiet.
+
+		   On `stroke` here and `fill` on the iris below rather than on a `color` the six other
+		   gutter marks transition, because an SVG's `fill` and `stroke` do not read `currentColor`
+		   here — the ring and iris are set explicitly so that `.muted` can move them to colours of
+		   their own. */
+		transition: stroke var(--fade) var(--ease);
 	}
 
 	.iris {
 		fill: var(--laurel);
 		transform-origin: 50% 50%;
+		transition: fill var(--fade) var(--ease);
 	}
 
 	.pupil {

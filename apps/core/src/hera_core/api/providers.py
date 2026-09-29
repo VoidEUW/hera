@@ -16,6 +16,7 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query, status
 from fastapi.responses import Response
+from hera_providers.thinking import NOTHING, Registry, Thinking
 
 from hera_core.config import ConfigError, HeraConfig, ModelEntry, ProviderEntry
 from hera_core.config import load as load_config
@@ -35,15 +36,77 @@ from hera_providers import OpenAICompatibleProvider, ProviderError
 router = APIRouter(tags=["providers"])
 
 
+async def _out(config: HeraConfig, active: str) -> ProvidersOut:
+    """Every endpoint, and for each of its models what it can be told about its reasoning.
+
+    Delegates to :class:`hera_providers.thinking.Registry`, which asks whichever servers an
+    endpoint might be and adds up what they say. The three short notes that matter here:
+
+    **The kind is a hint, not a gate.** ``/props`` and ``/model_group/info`` are asked of every
+    endpoint whatever it was registered as, because a llama.cpp registered as ``openai`` is still
+    a llama.cpp server -- and that is the ordinary way somebody registers one. Both 404 in a
+    millisecond where they are absent, which is a whole answer rather than a failure.
+
+    **A model's own declaration is the fallback, not an override.** ``ModelEntry.thinking`` is
+    what a person entered on Settings -> Models, for the many providers that publish their
+    vocabulary in documentation prose and nowhere else. A server that says what it accepts is
+    more reliable than anything anybody remembers, so a probe that answered wins; a probe that did
+    not leaves the declaration standing.
+
+    **The api key goes only to the endpoint it is registered against**, and only for the two
+    probes that need one (LiteLLM, Gemini). It is never sent anywhere else, and a failure sends
+    nothing at all -- a connection refused raises before a body is written.
+    """
+    providers: list[dict[str, Any]] = []
+    for entry in config.providers:
+        data = entry.redacted()
+        for model in data.get("models", []):
+            model_id = str(model.get("id", ""))
+            found = await Registry.resolve(
+                entry.kind,
+                entry.base_url,
+                model_id,
+                api_key=entry.api_key,
+                declared=declared_thinking(entry, model_id),
+            )
+            # Flattened, and the shape is decided here so the composer and the settings screen
+            # cannot disagree about which control a model wants. `Thinking` is a NamedTuple and
+            # the browser should not have to know that.
+            model["reasoning_efforts"] = list(found.efforts)
+            model["thinking_toggle"] = found.toggle
+            model["thinking_budget"] = found.budget
+            model["thinking_source"] = found.source
+            model["thinking_shape"] = found.shape
+        providers.append(data)
+
+    return ProvidersOut(providers=providers, active=active)
+
+
+def declared_thinking(entry: ProviderEntry, model_id: str) -> Thinking:
+    """What this model was declared to accept, by a person, in ``config.toml``.
+
+    Read rather than fetched, and deliberately per **model**: a per-kind table would be a lie for
+    OpenAI, where ``gpt-5-pro`` takes ``high`` and nothing else while ``gpt-5.1-codex-max`` adds
+    ``xhigh``. The file is a file a person reads and edits, which is the whole of what ADR 18 asks
+    of the presets it already describes.
+    """
+    model = next((m for m in entry.models if m.id == model_id), None)
+    if model is None or not model.thinking:
+        return NOTHING
+    return Thinking(
+        efforts=tuple(model.thinking.get("efforts", ())),
+        toggle=bool(model.thinking.get("toggle", False)),
+        budget=bool(model.thinking.get("budget", False)),
+        source="declared",
+    )
+
+
 @router.get("/providers", response_model=ProvidersOut)
-def list_providers() -> ProvidersOut:
+async def list_providers() -> ProvidersOut:
     """Every endpoint she can be pointed at, and which one she is pointed at now."""
     config = _read()
     active = config.active()
-    return ProvidersOut(
-        providers=[entry.redacted() for entry in config.providers],
-        active=active.name if active is not None else "",
-    )
+    return await _out(config, active.name if active is not None else "")
 
 
 @router.post("/providers", response_model=ProvidersOut, status_code=status.HTTP_201_CREATED)
@@ -253,7 +316,4 @@ async def _commit(container: Container, config: HeraConfig) -> ProvidersOut:
             options=active.active_options(),
             tool_calling=active.active_tool_calling(),
         )
-    return ProvidersOut(
-        providers=[entry.redacted() for entry in config.providers],
-        active=active.name if active is not None else "",
-    )
+    return await _out(config, active.name if active is not None else "")

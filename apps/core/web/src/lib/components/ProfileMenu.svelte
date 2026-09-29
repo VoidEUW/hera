@@ -13,6 +13,7 @@
 	import { api, type Health, type Preferences, type Profile } from '$lib/api/client';
 	import { t } from '$lib/i18n';
 	import { theme, type Appearance } from '$lib/theme.svelte';
+	import Modal from './Modal.svelte';
 	import Select from './Select.svelte';
 
 	interface Props {
@@ -84,24 +85,9 @@
 			/* the menu is not the place to explain a failed write; Settings is */
 		}
 	}
-
-	function onkeydown(event: KeyboardEvent) {
-		if (event.key === 'Escape') onclose?.();
-	}
 </script>
 
-<svelte:window {onkeydown} />
-
-<div
-	class="scrim"
-	role="button"
-	tabindex="-1"
-	aria-label={t.settings.close}
-	onclick={() => onclose?.()}
-	onkeydown={(event) => event.key === 'Enter' && onclose?.()}
-></div>
-
-<div class="menu" role="dialog" aria-modal="true" aria-label={t.profileMenu.open}>
+<Modal label={t.profileMenu.open} placement="anchored" dim={false} width="288px" {onclose}>
 	<section>
 		<p class="heading">{t.profileMenu.appearance}</p>
 		<div class="segments">
@@ -173,38 +159,12 @@
 			<p class="note">{t.profileMenu.checking}</p>
 		{/if}
 	</section>
-</div>
+</Modal>
 
 <style>
-	.scrim {
-		position: fixed;
-		inset: 0;
-		border: 0;
-		background: none;
-		z-index: 10;
-	}
-
-	.menu {
-		position: fixed;
-		left: 12px;
-		bottom: 76px;
-		width: 288px;
-		max-height: 70vh;
-		overflow-y: auto;
+	/* The popover's own padding, now the Modal owns the frame. */
+	:global(.sheet.anchored) {
 		padding: 6px;
-		background: var(--surface-raised);
-		border: 1px solid var(--line);
-		border-radius: var(--radius-lg);
-		box-shadow: var(--shadow);
-		z-index: 11;
-		animation: rise var(--fade) var(--ease);
-	}
-
-	@keyframes rise {
-		from {
-			opacity: 0;
-			transform: translateY(4px);
-		}
 	}
 
 	section {

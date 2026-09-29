@@ -37,11 +37,16 @@ export const t = {
 		 * global, the same reach as the model picker beside it: the value written to the active
 		 * model's `options.reasoning_effort` applies to every chat from the next message on. */
 		reasoning: 'Reasoning',
+		thinking: 'Thinking',
+		thinkingOn: 'She is thinking. Click to turn it off.',
+		thinkingOff: 'Not thinking. Click to turn it on.',
+		budgetTitle: 'Thinking budget, in tokens',
 		effort: {
-			default: 'Default',
-			low: 'Low',
-			medium: 'Medium',
-			high: 'High'
+			// Only "absent from options" is a phrase. The values themselves are the endpoint's own
+			// vocabulary -- `xhigh`, `minimal`, `none` are wire values a server matches on, so
+			// translating one would change what is sent rather than what is read. They come from
+			// `ModelOut.reasoning_efforts` and are drawn as they arrive.
+			default: 'Default'
 		},
 		contextLabel: 'Context window',
 		contextUsed: (used: number, limit: number) =>
@@ -183,6 +188,13 @@ export const t = {
 	turn: {
 		cancelled: 'Interrupted',
 		failed: 'This turn failed',
+		/** A turn that stopped without ever recording anything, and so has no reason to give.
+		 * It is not a blank answer: the server closes the record on every path now, so reaching
+		 * this means the turn was persisted before that, or by something that missed it. Said
+		 * rather than left blank, because an empty bubble reads as *she had nothing to say* and
+		 * invites a rewording of the question, which is the wrong response to a request the
+		 * provider refused. */
+		silent: 'This turn stopped without an answer',
 		max_iterations: 'She ran out of tool calls and answered with what she had',
 		awaiting_permission: 'Waiting for you',
 		awaiting_answer: 'Waiting for your answer',
@@ -391,6 +403,27 @@ export const t = {
 			minP: 'Min P',
 			repeatPenalty: 'Repeat penalty',
 			reasoningEffort: 'Reasoning effort',
+			reasoningEffortFree: 'low, high, whatever it takes',
+			/** Where the vocabulary offered for this model came from. Shown because somebody
+			 * looking at a control is entitled to know whether the endpoint said so or they did. */
+			thinkingSource: {
+				openrouter: 'Offered by OpenRouter',
+				llamacpp: 'Offered by the model server',
+				ollama: 'Offered by Ollama',
+				litellm: 'Offered by LiteLLM',
+				gemini: 'Offered by Google',
+				declared: 'Told to Hera — nobody publishes this one',
+				none: 'Nothing is known about this model yet'
+			},
+			thinking: 'Let her think',
+			thinkingToggle: 'Let the model reason before it answers',
+			thinkingBudget: 'Thinking budget (tokens)',
+			/** How a vocabulary gets declared for the ~17 providers whose effort levels are
+			 * documentation prose and no endpoint. Said plainly, because a hand-entered
+			 * vocabulary is the one kind here that can be out of date without anything failing. */
+			declare: 'Tell Hera what it accepts',
+			declareHint:
+				'Nobody publishes this, so it has to be said once. A level this model does not accept is refused by the server and fails the turn.',
 			reasoningEffortHint:
 				'A starting vocabulary — the values a server actually accepts are its own.',
 			overrideNote:

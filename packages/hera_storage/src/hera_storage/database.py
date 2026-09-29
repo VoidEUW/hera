@@ -68,8 +68,16 @@ class Database:
     def session(self) -> Iterator[Session]:
         """A unit of work: commits on success, rolls back on any exception, always closes.
 
-        This is the only place that commits. Repositories merely flush, so several writes
-        -- across several repositories -- form one atomic transaction.
+        The commit here is the backstop, not the only one. Repositories merely flush, so several
+        writes -- across several repositories -- form one atomic transaction, and nothing
+        commits until the unit ends.
+
+        **A route whose response names a row may commit before it returns**, and the two that
+        mint an id do ([#136](https://github.com/VoidEUW/hera/issues/136)). Teardown runs after
+        the response is sent, so a `201` could otherwise reach the browser before the row behind
+        it was durable -- and reading that id back is the browser's next move. Committing early
+        keeps one write as one transaction; it is reaching *between* units of work early that
+        this does not license, which is why the turn endpoint opens its own and keeps them apart.
         """
         session = Session(self._engine)
         try:

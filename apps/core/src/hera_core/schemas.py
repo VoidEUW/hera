@@ -590,6 +590,41 @@ class ModelOut(BaseModel):
     options: dict[str, Any] = Field(default_factory=dict)
     context_length: int | None = None
     tool_calling: bool = True
+    reasoning_efforts: list[str] = Field(default_factory=list)
+    """The ``reasoning_effort`` values this model accepts, asked of the endpoint rather than
+    guessed from the id — and **empty means unknown, not "any"**.
+
+    A reasoning control is only drawn when this is non-empty, because the values are not a shared
+    vocabulary: OpenRouter's set includes ``minimal``, ``none`` and ``xhigh``, and individual
+    models take a subset of even that (``qwen/qwen3.8-27b`` accepts ``xhigh``, ``medium`` and
+    ``low`` and rejects ``high``). Offering a value the server refuses fails the whole request,
+    not just the setting.
+    """
+    thinking_toggle: bool = False
+    """Whether this model reads ``chat_template_kwargs.enable_thinking`` — the knob most reasoning
+    models actually have.
+
+    Asked of the endpoint, from the chat template it published. It is a boolean and not a
+    vocabulary because that is the shape every model declaring it wants: MiniCPM5 is
+    *Think* / *No Think*, Qwen and GLM the same. ``false`` for an endpoint that has not said.
+    """
+    thinking_budget: bool = False
+    """Whether the model wants a thinking **token budget** rather than a named level.
+
+    A third control shape and the one most easily mistaken for the other two: Anthropic-style
+    models take ``max_tokens`` on a thinking block, and offering ``low/medium/high`` to one
+    produces a control that does nothing. OpenRouter signals it per model with
+    ``reasoning.supports_max_tokens``.
+    """
+    thinking_source: str = "none"
+    """Which of the three sources answered: a server's name, ``"declared"`` for something a person
+    entered on this screen, or ``"none"``. Shown beside the control, because a person looking at it
+    is entitled to know whether the endpoint said so or they did."""
+    thinking_shape: str = "none"
+    """Which control this model wants — ``values``, ``budget``, ``toggle`` or ``none``. Decided
+    server-side so that the browser and the settings screen cannot disagree about it, and so that
+    a model wanting both a list and a switch gets one control rather than two that contradict
+    each other."""
 
 
 class ProviderOut(BaseModel):
