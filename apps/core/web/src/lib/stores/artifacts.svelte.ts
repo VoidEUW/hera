@@ -28,6 +28,9 @@ class Artifacts {
 	 * to know which one that is in order to open the panel. It stays `null` only when there is
 	 * genuinely nothing published, which is the one case the empty copy is about. */
 	name = $state<string | null>(null);
+	/** Showing the code of the open artifact instead of the drawn thing. Belongs to the file: it
+	 * is cleared whenever another one is chosen, so every file opens drawn. */
+	source = $state(false);
 	/** Bumped whenever something published may have changed. Read by anything that fetched. */
 	version = $state(0);
 
@@ -37,12 +40,14 @@ class Artifacts {
 
 	show(chatId: string, name: string | null = null) {
 		this.chatId = chatId;
+		if (name !== this.name) this.source = false;
 		this.name = name;
 	}
 
 	close() {
 		this.chatId = null;
 		this.name = null;
+		this.source = false;
 	}
 
 	/** Forget an open drawer that belongs to a conversation nobody is looking at any more.

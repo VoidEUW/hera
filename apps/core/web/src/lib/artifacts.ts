@@ -81,6 +81,18 @@ export function stemOf(name: string): string {
 	return extension ? name.slice(0, -(extension.length + 1)) : name;
 }
 
+/** The same words with each one capitalised: `top gdp economies` → `Top Gdp Economies`.
+ *
+ * What a heading is called wherever an artifact is *named* — the card, the selector, the panel —
+ * so they cannot disagree about it.
+ */
+export function headingOf(name: string): string {
+	return titleOf(name).replace(
+		/(^|\s)(\p{L})/gu,
+		(_, gap: string, letter: string) => gap + letter.toUpperCase()
+	);
+}
+
 /** The heading a card shows: `theme-workshop.html` → `Theme workshop`.
  *
  * The same transformation `$lib/tools` applies to a tool name, for the reason written there —
@@ -100,6 +112,21 @@ export function titleOf(name: string): string {
  */
 export function sanitiseSvg(source: string): string {
 	return DOMPurify.sanitize(source, { USE_PROFILES: { svg: true, svgFilters: true } });
+}
+
+/** Why this text is not an SVG, or `null` if it is one.
+ *
+ * The browser's own XML parser is the judge — the same one that would draw it — and its message
+ * names the line. Sanitising alone hides the problem: a broken drawing is stripped to whatever
+ * survived and arrives as a blank box with nothing to say why.
+ */
+export function svgProblem(source: string): string | null {
+	const parsed = new DOMParser().parseFromString(source, 'image/svg+xml');
+	const failure = parsed.querySelector('parsererror');
+	if (failure) return failure.textContent?.trim() || 'the file is not well-formed SVG';
+	return parsed.documentElement.nodeName.toLowerCase() === 'svg'
+		? null
+		: 'the root element is not <svg>';
 }
 
 /** Where the file itself is, for a `download` link.

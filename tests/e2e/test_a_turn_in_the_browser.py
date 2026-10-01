@@ -189,26 +189,6 @@ def test_a_chat_can_be_exported_from_the_rail(page: Any) -> None:
     assert "/export.md" in (export.get_attribute("href") or "")
 
 
-def test_a_chat_can_be_exported_from_the_header_toolbar(page: Any) -> None:
-    """The other door to the same route: a toolbar above the conversation itself, for anything
-    that acts on the whole chat rather than on one row in the rail. Export is the first tool in
-    it — worth its own control here because it should not cost opening the `⋯` menu on a chat
-    you are already reading."""
-    composer = page.locator("textarea").first
-    composer.fill("Explain Kerberos")
-    composer.press("Enter")
-    page.wait_for_url("**/chat/**", timeout=15_000)
-    page.wait_for_selector("text=ticket-granting ticket", timeout=30_000)
-
-    toolbar = page.get_by_role("toolbar", name="Conversation tools")
-    assert toolbar.count() == 1
-
-    export = toolbar.get_by_role("link", name="Export as Markdown")
-    assert export.count() == 1
-    assert export.get_attribute("download") is not None
-    assert "/export.md" in (export.get_attribute("href") or "")
-
-
 def test_the_composer_says_what_she_runs_on(page: Any) -> None:
     """The model is a control beside send rather than a setting two screens away, and the
     Enter hint gets out of the way as soon as there is something to send.
@@ -572,8 +552,11 @@ class TestWhatShePublishes:
         assert "allow-same-origin" not in sandbox
         assert "Theme workshop" in (frame.get_attribute("srcdoc") or "")
 
-        # And the file bar, which is what makes it reachable once the turn has scrolled away.
-        assert page.locator("nav[aria-label='Everything published here']").count() == 1
+        # And the selector in the header, which is what makes it reachable once the turn has
+        # scrolled away: it names the file being shown.
+        assert (
+            page.get_by_role("button", name="Artifacts").get_by_text("Theme Workshop").count() == 1
+        )
 
     def test_the_card_opens_it_again_after_it_is_closed(self, page: Any) -> None:
         """The drawer opening by itself is a convenience and the card is the door. Closing it
@@ -585,7 +568,7 @@ class TestWhatShePublishes:
 
         # The heading is the filename humanised — there is no title field anywhere for it to
         # disagree with, which is the decision this assertion pins.
-        assert page.get_by_text("Theme workshop", exact=True).count() == 1
+        assert page.get_by_text("Theme Workshop", exact=True).count() == 1
         page.get_by_role("button", name="Open").first.click()
         page.locator("iframe[title='theme-workshop.html']").wait_for(timeout=15_000)
 
@@ -665,7 +648,7 @@ class TestWhatShePublishes:
 
         # The row says what she did: `artifact edit` is the verb and the filename is the target.
         assert page.locator("text=artifact edit").count() >= 1
-        assert page.get_by_text("Theme workshop", exact=True).count() == 1
+        assert page.get_by_text("Theme Workshop", exact=True).count() == 1
 
 
 TALL_SCRIPT: list[Any] = [

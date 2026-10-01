@@ -313,7 +313,7 @@ class TestADiagramThatDoesNotParse:
     def test_it_falls_back_to_the_source_and_says_why(self, page: Any) -> None:
         publish(page)
 
-        source = page.locator(".hers .source pre")
+        source = page.locator(".hers .source code")
         source.wait_for(timeout=30_000)
         assert "steps: hello, hello back, done" in (source.inner_text() or "")
 

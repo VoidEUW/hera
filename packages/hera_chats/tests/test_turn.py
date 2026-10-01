@@ -98,6 +98,17 @@ class TestASimpleTurn:
         assert "Hera" in request.messages[0].content
         assert request.messages[-1].content == "Explain Kerberos"
 
+    async def test_what_the_browser_could_not_draw_reaches_the_prompt(
+        self, make_orchestrator: Make
+    ) -> None:
+        """The whole point of the ``problems`` slot: a bad diagram she cannot see is one she
+        writes again, so the report has to arrive in the system prompt or nowhere."""
+        provider = FakeProvider([text_turn("ok")])
+        context = TurnContext(text="hi", problems="- `gdp.mmd`: Lexical error on line 2")
+        await drain(make_orchestrator(provider).begin(context).stream())
+
+        assert "Lexical error on line 2" in provider.requests[0].messages[0].content
+
     async def test_history_sits_between_the_frame_and_the_question(
         self, make_orchestrator: Make
     ) -> None:

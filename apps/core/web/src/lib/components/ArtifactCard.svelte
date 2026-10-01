@@ -23,12 +23,12 @@
 	 * with the next.
 	 */
 	import type { Artifact } from '$lib/api/events';
-	import { downloadUrl, extensionOf, hasSource, kindOf, size, titleOf } from '$lib/artifacts';
+	import { downloadUrl, extensionOf, hasSource, kindOf, size, headingOf } from '$lib/artifacts';
 	import { t } from '$lib/i18n';
 	import { saveDiagram } from '$lib/mermaid';
 	import { artifacts } from '$lib/stores/artifacts.svelte';
 	import ArtifactView from './ArtifactView.svelte';
-	import Stele from './Stele.svelte';
+	import Paper from './Paper.svelte';
 	import Tray from './Tray.svelte';
 
 	interface Props {
@@ -38,7 +38,7 @@
 
 	let { chatId, artifact }: Props = $props();
 
-	const title = $derived(titleOf(artifact.name));
+	const title = $derived(headingOf(artifact.name));
 	const extension = $derived(extensionOf(artifact.name).toUpperCase());
 	const drawn = $derived(kindOf(artifact.name) === 'mermaid');
 	/** Showing the code instead of the drawing, for this card only. */
@@ -58,7 +58,7 @@
 	{/if}
 
 	<figcaption class="bar">
-		<span class="mark" aria-hidden="true"><Stele size={14} muted={artifact.inline} /></span>
+		<span class="mark" aria-hidden="true"><Paper size={14} muted={artifact.inline} /></span>
 		<span class="named">
 			<span class="title">{title}</span>
 			<span class="about">

@@ -17,11 +17,13 @@ import { describe, expect, it } from 'vitest';
 import {
 	downloadUrl,
 	extensionOf,
+	headingOf,
 	kindOf,
 	newest,
 	sanitiseSvg,
 	size,
 	stemOf,
+	svgProblem,
 	titleOf
 } from './artifacts';
 
@@ -60,6 +62,12 @@ describe('titleOf', () => {
 
 	it('leaves a name with no extension alone', () => {
 		expect(titleOf('README')).toBe('README');
+	});
+});
+
+describe('headingOf', () => {
+	it('capitalises every word', () => {
+		expect(headingOf('top-gdp-economies.mmd')).toBe('Top Gdp Economies');
 	});
 });
 
@@ -108,6 +116,22 @@ describe('sanitiseSvg', () => {
 		);
 		expect(drawn).not.toContain('Client hello');
 		expect(drawn).toContain('Server hello');
+	});
+});
+
+describe('svgProblem', () => {
+	it('accepts a drawing', () => {
+		expect(svgProblem('<svg xmlns="http://www.w3.org/2000/svg"><circle r="4"/></svg>')).toBeNull();
+	});
+
+	it('says why markup that is not well-formed is refused', () => {
+		expect(svgProblem('<svg xmlns="http://www.w3.org/2000/svg"><circle></svg>')).toEqual(
+			expect.any(String)
+		);
+	});
+
+	it('refuses a document that is not an svg', () => {
+		expect(svgProblem('<html xmlns="http://www.w3.org/1999/xhtml"></html>')).toMatch(/svg/);
 	});
 });
 

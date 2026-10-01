@@ -7,16 +7,16 @@
 	 */
 	import { page } from '$app/state';
 	import { untrack } from 'svelte';
-	import { API, api, type ArtifactSummary } from '$lib/api/client';
+	import { api, type ArtifactSummary } from '$lib/api/client';
 	import { artifactOf } from '$lib/api/events';
-	import { titleOf } from '$lib/artifacts';
+	import { headingOf } from '$lib/artifacts';
 	import ArtifactDrawer from '$lib/components/ArtifactDrawer.svelte';
+	import ArtifactTools from '$lib/components/ArtifactTools.svelte';
 	import Backdrop from '$lib/components/Backdrop.svelte';
 	import Composer from '$lib/components/Composer.svelte';
 	import Message from '$lib/components/Message.svelte';
 	import Select from '$lib/components/Select.svelte';
 	import Skeleton from '$lib/components/Skeleton.svelte';
-	import Tray from '$lib/components/Tray.svelte';
 	import { t } from '$lib/i18n';
 	import { Placeholder } from '$lib/loading.svelte';
 	import { artifacts } from '$lib/stores/artifacts.svelte';
@@ -233,11 +233,14 @@
 	<h1 class="title">{session.chat?.title || t.empty.title}</h1>
 	<div class="right">
 		{#if published && session.chat}
+			{#if artifacts.open && artifacts.name}
+				<ArtifactTools chatId={session.chat.id} name={artifacts.name} />
+			{/if}
 			<!-- The count is what it says while the drawer is shut; open, it names the file being
 			     shown, and the list is the way to another one. -->
 			<div class="published">
 				<Select
-					choices={listing.map((file) => ({ value: file.name, label: titleOf(file.name) }))}
+					choices={listing.map((file) => ({ value: file.name, label: headingOf(file.name) }))}
 					value={artifacts.open ? (artifacts.name ?? '') : ''}
 					label={t.artifact.panel}
 					placeholder={t.artifact.count(published)}
@@ -246,22 +249,6 @@
 				/>
 			</div>
 		{/if}
-		<!-- The first tool, and likely not the last -- a home for anything else that acts on the
-		     conversation as a whole rather than on one message in it. -->
-		<div class="toolbar" role="toolbar" aria-label={t.chat.toolbar}>
-			{#if session.chat}
-				<a
-					class="tool"
-					aria-label={t.chat.export}
-					title={t.chat.export}
-					href={`${API}/chats/${session.chat.id}/export.md`}
-					download
-					rel="external"
-				>
-					<Tray size={15} />
-				</a>
-			{/if}
-		</div>
 	</div>
 </header>
 
@@ -384,8 +371,8 @@
 	}
 
 	/* Everything that is not the title, pinned to the far edge as one group -- the artifact
-	   count and the toolbar read as a pair rather than as two things that happen to have
-	   ended up on the same side. */
+	   tools and the selector read as one group rather than as separate things that happen to
+	   have ended up on the same side. */
 	.right {
 		display: flex;
 		align-items: center;
@@ -398,32 +385,6 @@
 	   for the thing you just changed. */
 	.published {
 		flex: none;
-	}
-
-	.toolbar {
-		display: flex;
-		align-items: center;
-		gap: 4px;
-	}
-
-	.tool {
-		display: grid;
-		place-items: center;
-		width: 28px;
-		height: 28px;
-		flex: none;
-		border-radius: 50%;
-		color: var(--text-muted);
-		transition:
-			color var(--fade) var(--ease),
-			background var(--fade) var(--ease);
-	}
-
-	.tool:hover,
-	.tool:focus-visible {
-		color: var(--brass);
-		background: var(--surface);
-		outline: none;
 	}
 
 	/* The conversation keeps its own column and its own scrolling; the drawer takes width from

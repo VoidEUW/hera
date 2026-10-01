@@ -88,7 +88,14 @@ function library(): Promise<typeof import('mermaid').default> {
 				fontFamily: "'Figtree Variable', system-ui, sans-serif",
 				// A drawing sits on white whatever the theme is (`ArtifactView`), so the renderer is
 				// never told about dark mode and never has to be re-run when the theme changes.
-				theme: 'default'
+				theme: 'default',
+				// Bar and line charts (`xychart-beta`) take their series colours from a palette
+				// whose first entry in the default theme is #ECECFF — a lavender that is close to
+				// invisible on the white a drawing sits on, so a chart arrived with its axes and no
+				// data. Pie charts were unaffected because they colour their slices differently.
+				themeVariables: {
+					xyChart: { plotColorPalette: '#3b6fd4,#e08a2c,#2f9e6e,#c2455f,#7a5cc8,#3aa6b8' }
+				}
 			});
 			return mermaid;
 		})

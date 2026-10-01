@@ -501,7 +501,8 @@ def build_builtin_server(
         description=(
             "Draw a diagram into your answer: a flow, a sequence, a state machine, an entity "
             "model, a tree. `mermaid` is the picture itself, written in mermaid syntax -- "
-            "`flowchart TD`, `sequenceDiagram`, `stateDiagram-v2`, `erDiagram` and the rest -- "
+            "`flowchart TD`, `sequenceDiagram`, `stateDiagram-v2`, `erDiagram`, `pie` and "
+            "`xychart-beta` (bar and line charts) and the rest -- "
             "and it is drawn where you are speaking, so introduce it in a line and let the "
             "picture carry what would otherwise be three paragraphs. Reach for this rather than "
             "drawing by hand with `artifact_create`: six lines of mermaid come out right where "
@@ -511,7 +512,11 @@ def build_builtin_server(
             "saved and read again beside the conversation, and `artifact_edit` changes a line "
             "of one without redrawing the whole picture. Set `beside=true` only for a diagram "
             "big enough to be the thing you were asked for rather than part of what you are "
-            "saying."
+            'saying. A bar chart looks like `xychart-beta`, then `title "GDP"`, then '
+            '`x-axis ["US", "China"]`, then `bar [26940, 18340]` (`line [...]` for a line) '
+            "-- each on its own line, with the labels in `x-axis` and only numbers in `bar`. "
+            "If a diagram does not parse, you are told on the next turn which one and why; "
+            "fix it with `artifact_edit` or draw it again."
         ),
     )
     async def diagram_create(

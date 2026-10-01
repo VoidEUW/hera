@@ -30,7 +30,7 @@
 	 * mermaid error over it, because one bad line is the thing a person can fix.
 	 */
 	import { api, type ArtifactContent } from '$lib/api/client';
-	import { extensionOf, hasSource, kindOf, sanitiseSvg } from '$lib/artifacts';
+	import { extensionOf, hasSource, kindOf, sanitiseSvg, svgProblem } from '$lib/artifacts';
 	import { escape, highlight } from '$lib/highlight';
 	import { t } from '$lib/i18n';
 	import { draw } from '$lib/mermaid';
@@ -137,6 +137,20 @@
 		};
 	});
 
+	/** Tell the server this one would not draw. The person can see it — the source is on screen
+	 * with the reason over it — and she cannot, which is why a syntax she keeps getting wrong
+	 * stays wrong. Best effort: a report that did not arrive costs one more redraw. */
+	function report(message: string) {
+		void api.reportArtifactProblem(chat, wanted, message).catch(() => {});
+	}
+
+	// An SVG she wrote by hand can be broken too, and sanitising it would only hide that.
+	$effect(() => {
+		if (kind !== 'svg' || !content) return;
+		const problem = svgProblem(content.text);
+		if (problem) report(problem);
+	});
+
 	// Drawing is its own effect because it is its own wait: the content arrives over the API and
 	// then the renderer arrives over the network, and only the second one can fail in a way a
 	// person is meant to read. It reads `content` and `kind` and writes neither, which is what
@@ -155,7 +169,9 @@
 				// A mermaid parse error names the line. Anything else — the chunk failing to
 				// load, say — is still worth putting on screen over the source, because the
 				// source is what a person came to look at either way.
-				if (current) undrawable = cause instanceof Error ? cause.message : String(cause);
+				if (!current) return;
+				undrawable = cause instanceof Error ? cause.message : String(cause);
+				report(undrawable);
 			});
 		return () => {
 			current = false;

@@ -18,13 +18,11 @@
 	 */
 	import { cubicOut } from 'svelte/easing';
 	import { api } from '$lib/api/client';
-	import { downloadUrl, hasSource, kindOf, newest, titleOf } from '$lib/artifacts';
+	import { headingOf, newest } from '$lib/artifacts';
 	import { t } from '$lib/i18n';
-	import { saveDiagram } from '$lib/mermaid';
 	import { artifacts } from '$lib/stores/artifacts.svelte';
 	import ArtifactView from './ArtifactView.svelte';
-	import Stele from './Stele.svelte';
-	import Tray from './Tray.svelte';
+	import Paper from './Paper.svelte';
 
 	interface Props {
 		chatId: string;
@@ -77,14 +75,6 @@
 
 	const chosen = $derived(artifacts.name);
 
-	/** Showing the code instead of the drawn thing. Each file opens drawn: the choice belongs to
-	 * the file being looked at, not to the panel. */
-	let source = $state(false);
-	$effect(() => {
-		void chosen;
-		source = false;
-	});
-
 	$effect(() => {
 		// The listing is re-read when something published changes, so a file created in the turn
 		// you are watching appears in the bar without a reload.
@@ -120,42 +110,8 @@
 
 <aside class="drawer" in:reveal={{ delay: AFTER }} out:reveal aria-label={t.artifact.panel}>
 	<header class="top">
-		<span class="mark" aria-hidden="true"><Stele size={14} /></span>
-		<h2 class="title">{chosen ? titleOf(chosen) : t.artifact.panel}</h2>
-		{#if chosen && hasSource(chosen)}
-			<button
-				class="action"
-				type="button"
-				aria-pressed={source}
-				aria-label={source ? t.artifact.showDrawnOf(chosen) : t.artifact.showSourceOf(chosen)}
-				onclick={() => (source = !source)}
-			>
-				{source ? t.artifact.showDrawn : t.artifact.showSource}
-			</button>
-		{/if}
-		{#if chosen && kindOf(chosen) === 'mermaid'}
-			<!-- A diagram is saved as the page that draws it rather than as its mermaid source, so
-			     this one really is a fetch and a blob — the conversion needs a browser, and this is
-			     the only one in reach. `$lib/mermaid` is where that is written down, and the card
-			     in the transcript calls the same function. -->
-			<button
-				class="action save"
-				type="button"
-				onclick={() => saveDiagram(chatId, chosen)}
-				aria-label={t.artifact.downloadDrawnOne(chosen)}
-			>
-				<Tray size={13} />
-				{t.artifact.downloadDrawn}
-			</button>
-		{:else if chosen}
-			<!-- A plain link, not a fetch and a blob: the browser knows how to save a file, and the
-			     response says `attachment` with a neutral media type, so a page she wrote is never
-			     a document rendered at Hera's own origin. -->
-			<a class="action save" href={downloadUrl(chatId, chosen)} download={chosen} rel="external">
-				<Tray size={13} />
-				{t.artifact.download}
-			</a>
-		{/if}
+		<span class="mark" aria-hidden="true"><Paper size={14} /></span>
+		<h2 class="title">{chosen ? headingOf(chosen) : t.artifact.panel}</h2>
 		<button class="close" type="button" onclick={() => artifacts.close()}>
 			<span class="sr-only">{t.artifact.close}</span>
 			<span class="glyph" aria-hidden="true"></span>
@@ -165,7 +121,7 @@
 	<div class="body">
 		{#if chosen}
 			{#key chosen}
-				<ArtifactView {chatId} name={chosen} height="100%" {source} />
+				<ArtifactView {chatId} name={chosen} height="100%" source={artifacts.source} />
 			{/key}
 		{:else if failure}
 			<p class="failed">{failure}</p>
@@ -227,31 +183,6 @@
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
-	}
-
-	.action {
-		flex: none;
-		padding: 4px 9px;
-		border: 1px solid var(--line);
-		border-radius: var(--radius);
-		font-size: 12.5px;
-		color: var(--text-muted);
-		text-decoration: none;
-		transition:
-			color var(--fade) var(--ease),
-			border-color var(--fade) var(--ease);
-	}
-
-	.action:hover {
-		color: var(--text);
-		border-color: var(--brass);
-	}
-
-	/* The same glyph the card carries, so *save this* is one mark wherever it appears. */
-	.save {
-		display: flex;
-		align-items: center;
-		gap: 6px;
 	}
 
 	/* The same close control the modal shell carries (#99): a hairline circle with a 32px hit
@@ -327,33 +258,28 @@
 	.body {
 		flex: 1;
 		min-height: 0;
-		padding: 14px;
 		display: flex;
 		flex-direction: column;
 	}
 
-	.body :global(.frame) {
+	/* Whatever is shown runs to the edges of the panel. The header above draws the line a frame
+	   would, so a border, a radius or a margin here is a box in a box — and the padding is gone
+	   from the body rather than cancelled with a negative margin on the child, because the
+	   child's own `max-height: 100%` is measured inside the padding and would stop short of the
+	   bottom. */
+	.body :global(.frame),
+	.body :global(.drawing),
+	.body :global(.document),
+	.body :global(.source) {
 		flex: 1;
 		min-height: 0;
-	}
-
-	/* Code runs to the edges of the panel: the header above draws the line a frame would, so a
-	   border and a margin here would be a box in a box. The padding goes from the body rather
-	   than being cancelled with a negative margin on the child, because the child's own
-	   `max-height: 100%` is measured inside the padding and would stop short of the bottom. */
-	.body:has(:global(.source)) {
-		padding: 0;
-	}
-
-	.body :global(.source) {
 		border: 0;
 		border-radius: 0;
 	}
 
-	.body :global(.drawing),
-	.body :global(.source) {
-		flex: 1;
-		min-height: 0;
+	/* The one-line states are text, not a surface, so they keep their own margin. */
+	.body > :global(p) {
+		padding: 14px;
 	}
 
 	.empty,

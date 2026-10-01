@@ -54,7 +54,16 @@ A slot rather than a mind region: it is a *fact about this moment*, not a behavi
 should be able to edit. A region saying "it is Tuesday" would be wrong by Wednesday.
 """
 
-SLOTS: frozenset[str] = frozenset({SLOT_TOOLS, SLOT_SKILLS, SLOT_MEMORIES, SLOT_PROJECT, SLOT_NOW})
+SLOT_PROBLEMS = "problems"
+"""What the person's browser reported it could not draw, rendered by the application.
+
+A slot for the same reason as ``now``: a fact about this moment, not a behaviour. Empty — and so
+absent — almost always.
+"""
+
+SLOTS: frozenset[str] = frozenset(
+    {SLOT_TOOLS, SLOT_SKILLS, SLOT_MEMORIES, SLOT_PROJECT, SLOT_NOW, SLOT_PROBLEMS}
+)
 """Every slot the skeleton offers.
 
 Named constants rather than string literals at the call site: a typo in a binding key is
@@ -173,6 +182,9 @@ LAYOUT: tuple[Node, ...] = (
             # does not know the date answers "what is current" from its training data — a whole
             # class of confidently stale answers for thirty tokens.
             Node(key="context.now", title="Right now", priority=68, slot=SLOT_NOW),
+            # Kept when the window is short: it is a correction to something she just made, and
+            # the one thing here she cannot look up again.
+            Node(key="context.problems", title="Did not draw", priority=90, slot=SLOT_PROBLEMS),
             Node(key="context.project", title="This project", priority=70, slot=SLOT_PROJECT),
             Node(key="context.user", title="About this person", priority=71, region="user_prefs"),
         ),
