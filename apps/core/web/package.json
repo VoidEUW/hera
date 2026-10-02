@@ -42,7 +42,7 @@
 		"dompurify": "^3.4.15",
 		"highlight.js": "^11.12.0",
 		"katex": "^0.18.9",
-		"marked": "^18.0.11",
+		"marked": "^18.0.14",
 		"marked-katex-extension": "^5.1.12",
 		"mermaid": "^12.0.0"
 	}
