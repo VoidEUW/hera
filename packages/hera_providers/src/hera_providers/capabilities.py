@@ -48,17 +48,27 @@ THINKING_KWARG = "enable_thinking"
 #: ``http://host:8080/v1`` has to lose the ``/v1`` before it can be asked anything.
 _API_SUFFIXES = ("/v1", "/api/v1", "/openai/v1")
 
-#: How a tool call is expected to arrive. ``native`` means the inference engine's tool parser
-#: recognises the model's wire format and re-exposes it as OpenAI-shaped ``tool_calls``, which is
-#: every mainstream engine against every mainstream model. ``textual`` means the model writes the
-#: call into its own prose -- ``<tool_call>{...}</tool_call>`` and its relatives -- and
-#: nothing is lifting it out, so a call arrives as an assistant message rather than as a call.
-#: ``unknown`` means the endpoint did not say, which is the ordinary case.
+#: Whether this endpoint's *chat template* can put a tool declaration in front of the model.
+#: ``template`` means it has a tools path -- it loops over ``tools``, or calls a macro that does.
+#: ``none`` means it has none, so nothing was ever offered. ``unknown`` means the endpoint did not
+#: publish a template, which is most of them.
 #:
-#: This is a *reporting* shape and not a switch. Detection tells a person what their endpoint can
-#: do; it never changes what is sent, because silently reformatting a model's calls would be the
-#: ADR 18 failure with extra steps.
-ToolCallShape = Literal["native", "textual", "unknown"]
+#: **This is a fact about the template and nothing else.** It is not a claim that a call will come
+#: back. That needs a second thing -- an inference engine with a parser for the model's dialect --
+#: and no endpoint publishes it over ``/props``. The gap is not hypothetical:
+#:
+#: * ``openbmb/MiniCPM5-2B`` has a real tools path and reads ``template``. Its calls are XML
+#:   (``<function name=...><param name=...>``). SGLang converts those natively
+#:   (``--tool-call-parser minicpm5``); **vLLM has no parser for them yet** (vllm#43175 is an open
+#:   PR), **Ollama returns ``tool_calls: null`` with the markup left in ``content``**
+#:   (ollama#18483), and llama.cpp does not support the dialect at all. So on three of the four
+#:   engines a call arrives as prose and ``finish_reason`` is ``stop``.
+#:
+#: Naming this ``native`` said all of that was fine, and it was not. It is ``template`` now, which
+#: is the only thing being measured, and the follow-up that would make an end-to-end claim needs
+#: the engine's dialect support -- a property of engine times model family that has to come from
+#: somewhere other than ``/props`` (#145).
+ToolCallShape = Literal["template", "none", "unknown"]
 
 #: The honest answer for an endpoint that published nothing.
 UNKNOWN: ToolCallShape = "unknown"
@@ -88,10 +98,13 @@ class Capabilities(NamedTuple):
     boolean, not a vocabulary."""
 
     tool_call_shape: ToolCallShape = UNKNOWN
-    """How this endpoint can be expected to deliver a tool call, and the reason it is allowed to
-    say so. ``unknown`` is the default and is not a failure to be worked around -- it is the
-    honest answer for an endpoint that published nothing, which is most of them, and a control is
-    never drawn from a silence."""
+    """Whether this endpoint's template can render a tool declaration -- and nothing more.
+
+    Read the name carefully, because the obvious reading of it is wrong. ``template`` means the
+    template has a tools path; it does **not** mean a call will come back as a call. That needs an
+    engine with a parser for this model's dialect, which no endpoint publishes, and which for
+    MiniCPM5-2B differs across the four engines its users actually run.
+    """
 
 
 NOTHING = Capabilities()
@@ -147,36 +160,50 @@ def template_capabilities(props: object) -> Capabilities:
 
 
 def tool_call_shape(props: object) -> ToolCallShape:
-    """How this endpoint says it will deliver a tool call, or ``unknown`` if it does not say.
+    """Whether this endpoint's chat template can render a tool declaration, or ``unknown``.
 
-    The question has two halves and only the second is answerable from ``/props``:
+    One half of a two-part question, and deliberately the half that can actually be answered from
+    ``/props``: a template with no tools path -- no ``tools`` in its loop, no ``render_tools``
+    call -- has never put a tool in front of the model, so there is nothing for it to call. That
+    is the same evidence :data:`THINKING_KWARG` is read from, asked about a different word.
 
-    * **Can the template render tools at all?** A template with no tools path -- no ``tools`` in
-      its loop, no ``render_tools`` call -- cannot put a declaration in front of the model, so a
-      call is not something it has been taught to make. That is the same evidence
-      :data:`THINKING_KWARG` is read from, asked about a different word.
-    * **Will something lift the call out afterwards?** That is the engine's tool parser, not the
-      model, and no engine publishes it over ``/props``. So the honest answer here is almost always
-      ``native`` -- which is the truth for vLLM, SGLang, llama.cpp and Ollama against every model
-      they ship a parser for -- rather than a guess that the wrong answer quietly degrades.
+    The other half is deliberately **not** answered here, because answering it from a template
+    would be a lie with a confident name on it. Whether a call comes back as a structured
+    ``tool_calls`` entry or as mangled prose is the *engine's* parser, and it varies by dialect:
+    MiniCPM5's XML is SGLang-native, unparsed by vLLM and Ollama, and unsupported by llama.cpp --
+    four engines, one template, three different outcomes. So:
 
-    ``textual`` is therefore *not* inferred here. It is what a caller reports after watching a turn
-    arrive with the call written into the prose, which is the only place that can actually see it.
-    Deciding it from a template would mean claiming a model cannot call tools properly on the
-    strength of a substring, and the failure that follows -- she stops calling tools and nothing
-    says why -- is the thing ADR 18 exists to prevent.
+    * ``template`` -- the template can render tools. **Not** a claim that calls will come back.
+    * ``none`` -- the server declared it cannot, or the template has no tools path.
+    * ``unknown`` -- nobody said.
+
+    A server that explicitly declares ``supports_tool_calls: false`` is believed, because that is
+    the server talking about its own behaviour. Everything else waits for the engine half, which
+    has to come from somewhere other than ``/props`` (#145).
     """
     if not isinstance(props, dict):
         return UNKNOWN
     if _cap_flag(props, "supports_tool_calls") is False:
-        # The server said no, which is a real answer and the only one that can move the shape off
-        # `unknown` from here.
-        return "textual"
-    return "native" if _mentions_any(props, _TOOL_MARKERS) else UNKNOWN
+        return "none"
+    if _mentions_any(props, _TOOL_MARKERS):
+        return "template"
+    # No template published *and* nothing said is not evidence that tools cannot be rendered, so it
+    # stays unknown rather than becoming `none`. Only a published template with no tools path is.
+    return "none" if _published(props) else UNKNOWN
 
 
 def _mentions_any(props: object, names: Sequence[str]) -> bool:
     return any(_mentions(props, name) for name in names)
+
+
+def _published(props: object) -> bool:
+    """Whether this endpoint published a chat template at all.
+
+    The difference between "the template has no tools path" and "there is no template to ask", which
+    are not the same claim: the first is evidence and the second is silence.
+    """
+    template = props.get("chat_template") if isinstance(props, dict) else None
+    return isinstance(template, str) and bool(template.strip())
 
 
 def _mentions(props: object, name: str) -> bool:
