@@ -69,6 +69,10 @@ UNKNOWN: ToolCallShape = "unknown"
 #: which is not a Jinja parse.
 _TOOL_MARKERS = ("tools", "tool_calls", "render_tools")
 
+#: A Jinja comment, ``{# ... #}``, matched with DOTALL because they wrap. Replaced with a space
+#: rather than removed so that two words either side of a comment do not become one word.
+_JINJA_COMMENT = re.compile(r"{#.*?#}", re.DOTALL)
+
 
 class Capabilities(NamedTuple):
     """What one endpoint says about the model it is serving."""
@@ -176,17 +180,29 @@ def _mentions_any(props: object, names: Sequence[str]) -> bool:
 
 
 def _mentions(props: object, name: str) -> bool:
-    """Whether the published chat template refers to ``name`` at all.
+    """Whether the published chat template refers to ``name`` as code.
 
-    A whole-word match on purpose. ``enable_thinking`` and ``reasoning_effort`` are long enough
-    that a substring test would not confuse them with each other, but a template that merely
-    *mentions* ``supports_reasoning_effort`` in a comment should not be read as honouring the
-    field, and ``some_other_reasoning_effort`` is a different name.
+    Two things are excluded, and the first is the one that is easy to miss:
+
+    * **Comments.** Jinja's ``{# ... #}`` is stripped first. A template's header routinely explains
+      what it does -- "tools are rendered by ``render_tools`` upstream" -- and a template that
+      *describes* a tools path has no tools path. Without this a well-documented template reports a
+      capability it does not have, which is worse than reporting none: the control goes up and does
+      nothing. The reasoning fields happened to be protected by the rule below, because
+      ``supports_reasoning_effort`` cannot match ``\\breasoning_effort\\b`` (an underscore is a word
+      character, so there is no boundary before it) -- but ``tools`` on its own in a comment is a
+      plain match, and nothing else would have caught it.
+    * **Longer names containing the field.** A whole-word match, so ``my_reasoning_effort_setting``
+      is a different name.
+
+    Neither is a Jinja parse. The question is *would this do anything*, which is all that is being
+    decided.
     """
     template = props.get("chat_template") if isinstance(props, dict) else None
     if not isinstance(template, str) or not template:
         return False
-    return re.search(rf"\b{re.escape(name)}\b", template) is not None
+    code = _JINJA_COMMENT.sub(" ", template)
+    return re.search(rf"\b{re.escape(name)}\b", code) is not None
 
 
 class EndpointCapabilities:
