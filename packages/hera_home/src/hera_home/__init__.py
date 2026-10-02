@@ -26,11 +26,13 @@ CHATS_DIRNAME = "chats"
 SCRATCH_DIRNAME = "scratch"
 ARTIFACTS_DIRNAME = "artifacts"
 LOGOS_DIRNAME = "logos"
+ACCOUNT_DIRNAME = "account"
 DATABASE_FILENAME = "hera.sqlite3"
 MCP_FILENAME = "mcp.json"
 CONFIG_FILENAME = "config.toml"
 
 __all__ = [
+    "ACCOUNT_DIRNAME",
     "ARTIFACTS_DIRNAME",
     "CHATS_DIRNAME",
     "CONFIG_FILENAME",
@@ -43,7 +45,9 @@ __all__ = [
     "MIND_DIRNAME",
     "SCRATCH_DIRNAME",
     "SKILLS_DIRNAME",
+    "account_dir",
     "artifacts_dir",
+    "avatar_path",
     "chat_dir",
     "chats_dir",
     "config_path",
@@ -120,6 +124,17 @@ def artifacts_dir(chat_id: str) -> Path:
     directory a person browses for the deliverable is one she has a reason to be tidy in.
     """
     return chat_dir(chat_id) / ARTIFACTS_DIRNAME
+
+
+def account_dir() -> Path:
+    """What belongs to the person rather than to a conversation — today, one avatar."""
+    return home() / ACCOUNT_DIRNAME
+
+
+def avatar_path() -> Path:
+    """The owner's avatar. One file with no extension: the media type is stored beside the
+    account row, and a name with no extension is one nothing can be tricked into running."""
+    return account_dir() / "avatar"
 
 
 def logos_dir() -> Path:

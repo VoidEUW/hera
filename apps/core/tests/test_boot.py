@@ -156,7 +156,7 @@ class TestMigrations:
             mapper.class_.__tablename__
             for mapper in SQLModel._sa_registry.mappers
             if str(mapper.class_.__tablename__).split("_")[0]
-            in {"chat", "profile", "skill", "mem", "evo"}
+            in {"chat", "profile", "skill", "mem", "evo", "core"}
         }
         assert registered == set(TABLE_NAMES)
 

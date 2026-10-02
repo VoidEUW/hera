@@ -283,6 +283,14 @@ export interface Probe {
 	error: string;
 }
 
+export interface Account {
+	name: string;
+	email: string;
+	/** Zero when there is no picture; otherwise a version for {@link api.avatarUrl}, so a
+	 * replaced picture is a new address and a cached one cannot outlive it. */
+	avatar_version: number;
+}
+
 export interface Preferences {
 	/** IANA name, or empty for UTC alone. */
 	timezone: string;
@@ -467,6 +475,15 @@ export const api = {
 	 * keeps the file — nothing a person told her is discarded without a person present. */
 	deleteMemory: (key: string) =>
 		request<void>(`/memories/${encodeURIComponent(key)}`, { method: 'DELETE' }),
+
+	account: () => request<Account>('/account'),
+	updateAccount: (patch: { name?: string; email?: string }) =>
+		request<Account>('/account', { method: 'PATCH', body: JSON.stringify(patch) }),
+	setAvatar: (data_url: string) =>
+		request<Account>('/account/avatar', { method: 'PUT', body: JSON.stringify({ data_url }) }),
+	removeAvatar: () => request<Account>('/account/avatar', { method: 'DELETE' }),
+	/** Where the avatar is served from — an `<img src>`, not fetched through `request`. */
+	avatarUrl: (version: number) => `${API}/account/avatar?v=${version}`,
 
 	preferences: () => request<Preferences>('/preferences'),
 	setTimezone: (timezone: string) =>

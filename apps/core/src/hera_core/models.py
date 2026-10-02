@@ -17,7 +17,9 @@ from hera_profiles.models import Profile
 from hera_skillsets.models import SkillUsage
 from sqlmodel import SQLModel
 
-ALL_TABLES: tuple[type[SQLModel], ...] = (Profile, SkillUsage, Project, Chat, Message)
+from hera_core.account import Account
+
+ALL_TABLES: tuple[type[SQLModel], ...] = (Profile, SkillUsage, Project, Chat, Message, Account)
 """Every table, in dependency-free order. Cross-package references are bare UUIDs, so there is
 no ordering constraint to respect — which is exactly why that rule exists."""
 

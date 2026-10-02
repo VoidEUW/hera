@@ -7,6 +7,7 @@
 
 import {
 	api,
+	type Account,
 	type Chat,
 	type Profile,
 	type Project,
@@ -59,6 +60,8 @@ export class Workspace {
 	 * nothing: a version is not worth a spinner, and `Hera v…` flickering into `Hera v0.1.0`
 	 * is worse than it arriving. */
 	version = $state('');
+	/** Who the owner is — the rail card and the greeting read this. Null until it answers. */
+	account = $state<Account | null>(null);
 	error = $state<string | null>(null);
 	loaded = $state(false);
 
@@ -123,7 +126,7 @@ export class Workspace {
 	settingsOpen = $state(false);
 	/** Which tab settings lands on when it opens next. Set by `openSettings`, so a caller
 	 * already talking about servers or skills can land there instead of always on models. */
-	settingsTab = $state<SettingsTab>('models');
+	settingsTab = $state<SettingsTab>('account');
 
 	/** Whether the rail is open as a sheet, below the phone breakpoint. Same reasoning as
 	 * `settingsOpen`: the control that opens it lives in the layout, but it has to be reachable
@@ -147,7 +150,7 @@ export class Workspace {
 	 * re-enact a decision somebody has walked away from. */
 	pendingProject = $state<string | null>(null);
 
-	openSettings(section: SettingsTab = 'models') {
+	openSettings(section: SettingsTab = 'account') {
 		this.settingsTab = section;
 		this.settingsOpen = true;
 	}
@@ -169,7 +172,12 @@ export class Workspace {
 		// Deliberately after, and deliberately not fatal. Neither of these is needed to hold a
 		// conversation: with no endpoint the composer says so, and with no servers it shows
 		// nothing. An error here must not be what stops the rail from rendering.
-		await Promise.all([this.loadProviders(), this.loadServers(), this.loadVersion()]);
+		await Promise.all([
+			this.loadAccount(),
+			this.loadProviders(),
+			this.loadServers(),
+			this.loadVersion()
+		]);
 	}
 
 	/** The three requests the rail is made of, and nothing else. */
@@ -244,6 +252,14 @@ export class Workspace {
 		// while a slow *version* request finishes would refuse a second try over a question
 		// nobody asked.
 		void Promise.all([this.loadProviders(), this.loadServers(), this.loadVersion()]);
+	}
+
+	async loadAccount() {
+		try {
+			this.account = await api.account();
+		} catch {
+			/* the rail card says "Account" until this answers, and still opens Settings */
+		}
 	}
 
 	async loadVersion() {
