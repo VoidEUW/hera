@@ -65,6 +65,7 @@ export const t = {
 		newProject: 'New project',
 		chats: 'Chats',
 		settings: 'Settings',
+		account: (name: string) => `${name} — Settings`,
 		collapse: 'Collapse the sidebar',
 		expand: 'Expand the sidebar',
 		openMenu: 'Open menu',
@@ -278,6 +279,7 @@ export const t = {
 		loadingModels: 'Loading models…',
 		loadingSkills: 'Loading skills…',
 		loadingMemory: 'Loading memories…',
+		general: 'General',
 		models: 'Models',
 		mind: 'Mind',
 		memory: 'Memory',
@@ -285,6 +287,20 @@ export const t = {
 		servers: 'Servers',
 		permissions: 'Permissions',
 		dreaming: 'Dreaming',
+		groupApp: 'App',
+		groupHera: 'Hera',
+		groupAdjust: 'Adjust',
+		// One line under each screen's heading: what it is for, not how to use it.
+		blurbGeneral: 'This browser and this machine: appearance, language, time zone, notifications.',
+		blurbMind: 'The text that shapes how she thinks and speaks, one region at a time.',
+		blurbMemory: 'What she knows about you, and how much room it takes.',
+		blurbModels: 'Where she runs. Any OpenAI-compatible endpoint.',
+		blurbDreaming: 'How she will reflect on herself — not built yet.',
+		blurbSkills: 'Packages of instructions she can be given for a kind of task.',
+		blurbServers: 'The MCP servers she can reach, and the tools each one brings.',
+		blurbPermissions: 'What she may do without asking.',
+		permissionsFallback: 'Anything not matched below:',
+		toolCount: (n: number) => `${n} ${n === 1 ? 'tool' : 'tools'}`,
 		soon: 'v0.3',
 		dreamingSoon:
 			'Dreaming and experience training arrive in v0.3. She will propose changes to her own evolvable mind regions, and nothing is written without you accepting it. Memory comes first, in v0.2 — she has to have something to reflect on.',
@@ -440,6 +456,26 @@ export const t = {
 		toolCalling: 'Uses tools',
 		toolCallingHint:
 			'Turn off for a model that writes what looks like a tool call instead of making one for real — it will only ever answer in prose, but cleanly instead of with a broken attempt.'
+	},
+
+	notifications: {
+		finished: 'Hera has finished',
+		heading: 'Notifications',
+		toggle: 'Notify me when a turn finishes while this tab is hidden',
+		denied: 'The browser has blocked notifications for this site. Allow them in its site settings.',
+		unsupported: 'This browser cannot show notifications.'
+	},
+
+	general: {
+		language: 'Language',
+		languageNote:
+			'The language of this interface. Which language she answers in is the language region under Mind.',
+		timezoneNote: 'What she is told the date and time are. She is always told UTC as well.',
+		aboutHeading: 'About',
+		version: 'Version',
+		dataFolder: 'Data folder',
+		model: 'Model',
+		english: 'English'
 	},
 
 	profileMenu: {

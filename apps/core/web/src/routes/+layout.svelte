@@ -11,21 +11,21 @@
 	import { page } from '$app/state';
 	import Offline from '$lib/components/Offline.svelte';
 	import Rail from '$lib/components/Rail.svelte';
-	import ProfileMenu from '$lib/components/ProfileMenu.svelte';
 	import Settings from '$lib/components/Settings.svelte';
 	import { t } from '$lib/i18n';
+	import { notifications } from '$lib/notifications.svelte';
 	import { workspace } from '$lib/stores/workspace.svelte';
 	import { theme } from '$lib/theme.svelte';
 	import '../app.css';
 
 	let { children } = $props();
-	let profileOpen = $state(false);
 
 	// Called directly rather than from an $effect. `ssr = false`, so this only ever runs in the
 	// browser -- and `theme.load()` both reads and writes the appearance, which inside an effect
 	// is a dependency it also invalidates: Svelte answers that with effect_update_depth_exceeded
 	// and stops rendering the page entirely.
 	theme.load();
+	notifications.load();
 	void workspace.load();
 
 	// Scoped to the chat route, not just `page.params.id`. `/project/<uuid>` fills the same
@@ -150,7 +150,7 @@
 				{activeProjectId}
 				onnew={newChat}
 				onsettings={() => workspace.openSettings()}
-				onprofile={() => (profileOpen = true)}
+				settingsOpen={workspace.settingsOpen}
 				onrename={(id, title) => workspace.renameChat(id, title)}
 				ondelete={removeChat}
 				onmove={(id, projectId) => workspace.moveChat(id, projectId)}
@@ -171,14 +171,6 @@
 	     server that is not. -->
 	{#if workspace.settingsOpen}
 		<Settings onclose={closeSettings} tab={workspace.settingsTab} />
-	{/if}
-
-	{#if profileOpen}
-		<ProfileMenu
-			profiles={workspace.profiles}
-			onclose={() => (profileOpen = false)}
-			onprofiles={(found) => (workspace.profiles = found)}
-		/>
 	{/if}
 {/if}
 

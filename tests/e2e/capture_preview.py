@@ -520,7 +520,16 @@ def act_composer(page: Page, base: str, shots: Path, report: Report) -> None:
 #: The nav in the order the interface puts it, which `test_settings_is_one_size` asserts
 #: separately. Filmed by position rather than by name, because a name is a string in a
 #: translation file and a position is not.
-SETTINGS_TABS = ("Models", "Skills", "Servers", "Permissions", "Memory", "Mind", "Dreaming")
+SETTINGS_TABS = (
+    "Models",
+    "General",
+    "Skills",
+    "Servers",
+    "Permissions",
+    "Memory",
+    "Mind",
+    "Dreaming",
+)
 
 
 def settled(page: Page) -> None:
@@ -573,16 +582,16 @@ def act_settings(page: Page, base: str, shots: Path, report: Report) -> None:
 
 
 def act_profile(page: Page, base: str, shots: Path, report: Report) -> None:
-    """The profile menu, and the light theme it carries.
+    """Settings → General, and the light theme it carries.
 
     Light is a whole palette rather than an inversion, and the control for it is not in Settings:
-    it is here, on the card at the bottom of the rail, which is why the rail has to be on screen to
-    reach it.
+    it is on the General screen, reached through the card at the bottom of the rail.
     """
     with report.scene("profile-menu", "theme", page, shots):
         page.goto(base, wait_until="networkidle")
         page.locator("nav.rail button.card").first.click(timeout=5_000)
         page.wait_for_selector("[role='dialog']", timeout=10_000)
+        page.get_by_role("button", name="General", exact=True).click(timeout=5_000)
         page.wait_for_timeout(500)
         shoot(page, shots, "40-profile-menu")
 
@@ -601,6 +610,7 @@ def act_profile(page: Page, base: str, shots: Path, report: Report) -> None:
     with report.scene("back-to-dark", "theme", page, shots):
         page.locator("nav.rail button.card").first.click(timeout=5_000)
         page.wait_for_selector("[role='dialog']", timeout=10_000)
+        page.get_by_role("button", name="General", exact=True).click(timeout=5_000)
         page.get_by_role("button", name="Dark", exact=True).first.click(timeout=5_000)
         page.wait_for_timeout(500)
         page.keyboard.press("Escape")
