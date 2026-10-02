@@ -52,6 +52,7 @@ from hera_core.clock import render as render_now
 from hera_core.config import ConfigError
 from hera_core.config import load as load_config
 from hera_core.deps import Container, Db, Owner, not_found, require_chat
+from hera_core.problems import problems
 from hera_core.schemas import (
     ChatDetail,
     ChatIn,
@@ -418,6 +419,9 @@ def _stream(
         # after a restart. It is every enabled memory, whole -- there is no retrieval here, and
         # the ceiling is what keeps that affordable (ADR 16).
         memories=container.memories.recall(chat_id=str(chat.id)),
+        # What the browser reported it could not draw, until the file changes -- see
+        # `hera_core.problems`. Read here because only the browser can tell, and only she can fix.
+        problems=problems.recall(str(chat.id)),
         **extra,
     )
     owner_id, chat_id, message_id = chat.owner_id, chat.id, assistant.id

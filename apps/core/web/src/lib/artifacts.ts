@@ -61,6 +61,38 @@ export function kindOf(name: string): Kind {
 	return KINDS[extensionOf(name)] ?? 'file';
 }
 
+/** Whether this one is *made of* text worth reading — a page, a drawing, a document, a diagram.
+ *
+ * What a toggle between the drawn thing and its code is offered for. A `code` artifact is already
+ * shown as its source and a `file` is not one, so neither has anything to switch to.
+ */
+export function hasSource(name: string): boolean {
+	const kind = kindOf(name);
+	return kind === 'html' || kind === 'svg' || kind === 'markdown' || kind === 'mermaid';
+}
+
+/** The name without its extension: `theme-workshop.html` → `theme-workshop`.
+ *
+ * What you build another filename out of — a diagram saved as the page that draws it keeps the
+ * name she gave it and changes only the kind.
+ */
+export function stemOf(name: string): string {
+	const extension = extensionOf(name);
+	return extension ? name.slice(0, -(extension.length + 1)) : name;
+}
+
+/** The same words with each one capitalised: `top gdp economies` → `Top Gdp Economies`.
+ *
+ * What a heading is called wherever an artifact is *named* — the card, the selector, the panel —
+ * so they cannot disagree about it.
+ */
+export function headingOf(name: string): string {
+	return titleOf(name).replace(
+		/(^|\s)(\p{L})/gu,
+		(_, gap: string, letter: string) => gap + letter.toUpperCase()
+	);
+}
+
 /** The heading a card shows: `theme-workshop.html` → `Theme workshop`.
  *
  * The same transformation `$lib/tools` applies to a tool name, for the reason written there —
@@ -68,9 +100,7 @@ export function kindOf(name: string): Kind {
  * with the next. There is deliberately no title field anywhere for this to compete with.
  */
 export function titleOf(name: string): string {
-	const extension = extensionOf(name);
-	const stem = extension ? name.slice(0, -(extension.length + 1)) : name;
-	const opened = humanise(stem);
+	const opened = humanise(stemOf(name));
 	return opened ? opened[0].toUpperCase() + opened.slice(1) : name;
 }
 
@@ -82,6 +112,21 @@ export function titleOf(name: string): string {
  */
 export function sanitiseSvg(source: string): string {
 	return DOMPurify.sanitize(source, { USE_PROFILES: { svg: true, svgFilters: true } });
+}
+
+/** Why this text is not an SVG, or `null` if it is one.
+ *
+ * The browser's own XML parser is the judge — the same one that would draw it — and its message
+ * names the line. Sanitising alone hides the problem: a broken drawing is stripped to whatever
+ * survived and arrives as a blank box with nothing to say why.
+ */
+export function svgProblem(source: string): string | null {
+	const parsed = new DOMParser().parseFromString(source, 'image/svg+xml');
+	const failure = parsed.querySelector('parsererror');
+	if (failure) return failure.textContent?.trim() || 'the file is not well-formed SVG';
+	return parsed.documentElement.nodeName.toLowerCase() === 'svg'
+		? null
+		: 'the root element is not <svg>';
 }
 
 /** Where the file itself is, for a `download` link.

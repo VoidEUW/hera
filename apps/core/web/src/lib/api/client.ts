@@ -378,6 +378,13 @@ export const api = {
 	 * earlier card draws, which ADR 13 makes deliberate. */
 	artifact: (chatId: string, name: string) =>
 		request<ArtifactContent>(`/chats/${chatId}/artifacts/${encodeURIComponent(name)}`),
+	/** Tell the server this artifact would not draw, so she hears about it on her next turn.
+	 * Only a browser can know: mermaid lays a diagram out by measuring text. */
+	reportArtifactProblem: (chatId: string, name: string, message: string) =>
+		request<void>(`/chats/${chatId}/artifacts/${encodeURIComponent(name)}/problem`, {
+			method: 'PUT',
+			body: JSON.stringify({ message })
+		}),
 
 	providers: () => request<Providers>('/providers'),
 	addProvider: (body: {

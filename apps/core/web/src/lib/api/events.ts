@@ -184,6 +184,11 @@ export const SKILL_TOOL = 'hera__skill';
  */
 export const ARTIFACT_CREATE_TOOL = 'hera__artifact_create';
 
+/** The other tool whose result carries a card: a diagram is drawn rather than published, and it
+ * is its own tool for that reason, but what comes back is the same file in the same directory
+ * under the same key — so this side reads one shape and not two. */
+export const DIAGRAM_CREATE_TOOL = 'hera__diagram_create';
+
 /** Where the server puts what a card is drawn from, mirroring `hera_mcp.ARTIFACT_META`. */
 export const ARTIFACT_KEY = 'artifact';
 
@@ -205,7 +210,8 @@ export interface Artifact {
 export function artifactOf(event: AnyEvent): Artifact | null {
 	if (event.type !== 'tool_result') return null;
 	const result = event as ToolResultEvent;
-	if (result.tool !== ARTIFACT_CREATE_TOOL || !result.ok) return null;
+	const published = result.tool === ARTIFACT_CREATE_TOOL || result.tool === DIAGRAM_CREATE_TOOL;
+	if (!published || !result.ok) return null;
 	const carried = (result.structured as Record<string, unknown> | null)?.[ARTIFACT_KEY];
 	if (!carried || typeof carried !== 'object') return null;
 	const { name, inline, bytes } = carried as Partial<Artifact>;

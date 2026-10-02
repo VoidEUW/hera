@@ -48,8 +48,8 @@ domain concept at all and must stay liftable into an unrelated project.
 
 **Two MCP packages, and the difference matters.** `hera_mcp` is the server she *is* —
 `hera__ask`, `hera__remember`, `hera__forget`, `hera__note`, `hera__skill`, `hera__search`, the
-three `hera__scratch_*`, the three `hera__artifact_*`, and the ports they take. `hera__ask` is the
-one that is never *run*:
+three `hera__scratch_*`, the three `hera__artifact_*`, `hera__diagram_create`, and the ports they
+take. `hera__ask` is the one that is never *run*:
 `hera_chats` recognises it by name (`ChatsSettings.asking_tools`, filled in by the application)
 and suspends the turn the way a permission card does, so a person's reply becomes that call's
 result. `hera_tools` is the client she *has*, and it does not know the other exists: it mounts
@@ -60,6 +60,13 @@ descriptions are prompt text; edit them in `hera_mcp` and her behaviour changes.
 nobody reads it, which is what lets her think out loud in it; `artifacts/` is what she publishes,
 and a person browses it. Same guard, same cleanup, opposite promises — `hera_core.chat_files` owns
 both adapters so the name check exists once.
+
+**A diagram is drawn, not published.** `hera__diagram_create` takes mermaid and a name, decides
+the `.mmd` extension itself, and puts the picture in the flow of the answer unless the call says
+`beside` — three things `artifact_create` left to a model that does not reliably notice them
+(ADR 5). It writes into the same `artifacts/` directory and `artifact_edit` changes it; what is
+separate is the *act*. Saving one converts it to a standalone HTML page, in the browser, because
+mermaid lays a diagram out by measuring its own text and the server cannot.
 
 **A tool learns which chat it is in from `_meta`, never from an argument** — [ADR 12](docs/adr/0012-a-chat-has-a-scratchpad.md).
 The model chooses arguments, so a `chat_id` field is one it would invent; a `ctx: Context`

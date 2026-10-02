@@ -17,6 +17,19 @@ Towards [v0.2.1](docs/versions/v0.2.1.md), the polish pass.
 
 ### Added
 
+- **She can draw you a diagram** ([issue #73](https://github.com/VoidEUW/hera/issues/73)).
+  `hera__diagram_create` takes mermaid — a flow, a sequence, a state machine, an entity model —
+  and the picture appears in the answer where she drew it. Its own tool rather than an extension
+  on `artifact_create`, because where a figure belongs is not a judgment to leave to a model call
+  by call ([ADR 5](docs/adr/0005-skills-are-selected-by-code-not-by-the-model.md)): the `.mmd` is
+  named by the server and a diagram lands in the flow unless the call asks for it beside the
+  conversation. It is a file like any other underneath — it appears in the drawer, `artifact_edit`
+  changes a line of it, and deleting the chat deletes it. **Saving one gives you a page**: a
+  standalone HTML document with the drawing in it, no script and nothing fetched, since a `.mmd`
+  on its own is six lines nothing on an ordinary machine can draw. The renderer is fetched the
+  first time a diagram is on screen and never before, so a conversation without one pays nothing
+  for it. A source that does not parse shows the source with mermaid's own message over it, which
+  is the ordinary way this fails.
 - **Her waiting ocellus fans its tail** ([issue #44](https://github.com/VoidEUW/hera/issues/44)).
   Before her first word the thinking mark displays: the eye swells, eight peacock feathers throw
   outward in every direction, hold, and spring back behind it, over a 2.4-second beat instead of
@@ -79,6 +92,20 @@ Towards [v0.2.1](docs/versions/v0.2.1.md), the polish pass.
 
 ### Fixed
 
+- **An artifact on screen was refetched once for every word she said after it.** The transcript
+  rebuilds its blocks from the event list on every fragment that arrives, so a card was handed a
+  new artifact object each time with the same filename in it — and because a prop is read through
+  a getter, the view that draws the file was subscribed to *the transcript re-rendering* rather
+  than to the file changing. On a `.svg` this was invisible and merely wasteful; on a diagram it
+  meant mermaid laying the picture out again dozens of times while she talked, so a chart above
+  the text visibly flickered for the rest of the answer. Nothing caught it because a scripted
+  model answers in one piece: `FakeProvider` now takes a `delay`, and the browser test drives a
+  turn that really does arrive a fragment at a time.
+- **A block's key changed the moment a turn finished.** `tool_call_started` is streamed and never
+  recorded, so every key built from a position in the live event list pointed one place further
+  along than the same block in the persisted list that replaces it at `done`. Keys are counted
+  over the recorded events now, which is what the reducer's own stated property — the live stream
+  and the stored list reduce to the same thing — already claimed.
 - **Your question was sent to the model twice, one copy after the other**
   ([issue #63](https://github.com/VoidEUW/hera/issues/63)). The user message is written to the
   database before the turn starts, so the history rebuilt from the message list already contained

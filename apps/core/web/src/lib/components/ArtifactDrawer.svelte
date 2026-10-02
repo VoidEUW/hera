@@ -17,13 +17,12 @@
 	 * four to find the card that opens the file it just changed.
 	 */
 	import { cubicOut } from 'svelte/easing';
-	import { api, type ArtifactSummary } from '$lib/api/client';
-	import { downloadUrl, newest, size, titleOf } from '$lib/artifacts';
+	import { api } from '$lib/api/client';
+	import { headingOf, newest } from '$lib/artifacts';
 	import { t } from '$lib/i18n';
 	import { artifacts } from '$lib/stores/artifacts.svelte';
 	import ArtifactView from './ArtifactView.svelte';
-	import Stele from './Stele.svelte';
-	import Tray from './Tray.svelte';
+	import Paper from './Paper.svelte';
 
 	interface Props {
 		chatId: string;
@@ -72,7 +71,6 @@
 		};
 	}
 
-	let listed = $state<ArtifactSummary[]>([]);
 	let failure = $state('');
 
 	const chosen = $derived(artifacts.name);
@@ -87,7 +85,6 @@
 			.artifacts(chat)
 			.then((found) => {
 				if (!current) return;
-				listed = found;
 				// Two cases, one answer: nothing is chosen, or what was chosen is not in the
 				// listing any more. An open panel showing *Nothing chosen yet* beside a bar of
 				// files is a door that led nowhere, and one still pointed at a deleted file is
@@ -113,17 +110,8 @@
 
 <aside class="drawer" in:reveal={{ delay: AFTER }} out:reveal aria-label={t.artifact.panel}>
 	<header class="top">
-		<span class="mark" aria-hidden="true"><Stele size={14} /></span>
-		<h2 class="title">{chosen ? titleOf(chosen) : t.artifact.panel}</h2>
-		{#if chosen}
-			<!-- A plain link, not a fetch and a blob: the browser knows how to save a file, and the
-			     response says `attachment` with a neutral media type, so a page she wrote is never
-			     a document rendered at Hera's own origin. -->
-			<a class="action save" href={downloadUrl(chatId, chosen)} download={chosen} rel="external">
-				<Tray size={13} />
-				{t.artifact.download}
-			</a>
-		{/if}
+		<span class="mark" aria-hidden="true"><Paper size={14} /></span>
+		<h2 class="title">{chosen ? headingOf(chosen) : t.artifact.panel}</h2>
 		<button class="close" type="button" onclick={() => artifacts.close()}>
 			<span class="sr-only">{t.artifact.close}</span>
 			<span class="glyph" aria-hidden="true"></span>
@@ -133,7 +121,7 @@
 	<div class="body">
 		{#if chosen}
 			{#key chosen}
-				<ArtifactView {chatId} name={chosen} height="100%" />
+				<ArtifactView {chatId} name={chosen} height="100%" source={artifacts.source} />
 			{/key}
 		{:else if failure}
 			<p class="failed">{failure}</p>
@@ -141,25 +129,6 @@
 			<p class="empty">{t.artifact.none}</p>
 		{/if}
 	</div>
-
-	{#if listed.length}
-		<nav class="files" aria-label={t.artifact.files}>
-			<ul>
-				{#each listed as file (file.name)}
-					<li>
-						<button
-							type="button"
-							class:current={file.name === chosen}
-							onclick={() => artifacts.show(chatId, file.name)}
-						>
-							<span class="name">{file.name}</span>
-							<span class="bytes">{size(file.bytes)}</span>
-						</button>
-					</li>
-				{/each}
-			</ul>
-		</nav>
-	{/if}
 </aside>
 
 <style>
@@ -214,31 +183,6 @@
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
-	}
-
-	.action {
-		flex: none;
-		padding: 4px 9px;
-		border: 1px solid var(--line);
-		border-radius: var(--radius);
-		font-size: 12.5px;
-		color: var(--text-muted);
-		text-decoration: none;
-		transition:
-			color var(--fade) var(--ease),
-			border-color var(--fade) var(--ease);
-	}
-
-	.action:hover {
-		color: var(--text);
-		border-color: var(--brass);
-	}
-
-	/* The same glyph the card carries, so *save this* is one mark wherever it appears. */
-	.save {
-		display: flex;
-		align-items: center;
-		gap: 6px;
 	}
 
 	/* The same close control the modal shell carries (#99): a hairline circle with a 32px hit
@@ -314,62 +258,28 @@
 	.body {
 		flex: 1;
 		min-height: 0;
-		padding: 14px;
 		display: flex;
 		flex-direction: column;
 	}
 
-	.body :global(.frame) {
+	/* Whatever is shown runs to the edges of the panel. The header above draws the line a frame
+	   would, so a border, a radius or a margin here is a box in a box — and the padding is gone
+	   from the body rather than cancelled with a negative margin on the child, because the
+	   child's own `max-height: 100%` is measured inside the padding and would stop short of the
+	   bottom. */
+	.body :global(.frame),
+	.body :global(.drawing),
+	.body :global(.document),
+	.body :global(.source) {
 		flex: 1;
 		min-height: 0;
+		border: 0;
+		border-radius: 0;
 	}
 
-	.files {
-		flex: none;
-		max-height: 24vh;
-		overflow: auto;
-		border-top: 1px solid var(--line);
-	}
-
-	.files ul {
-		margin: 0;
-		padding: 6px;
-		list-style: none;
-	}
-
-	.files button {
-		display: flex;
-		align-items: baseline;
-		gap: 10px;
-		width: 100%;
-		padding: 5px 8px;
-		border-radius: var(--radius);
-		font-size: 12.5px;
-		color: var(--text-muted);
-		text-align: left;
-	}
-
-	.files button:hover {
-		background: var(--surface);
-		color: var(--text);
-	}
-
-	.files button.current {
-		color: var(--text);
-		background: var(--surface-raised);
-	}
-
-	.name {
-		font-family: var(--font-mono);
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-	}
-
-	.bytes {
-		margin-left: auto;
-		flex: none;
-		color: var(--text-faint);
+	/* The one-line states are text, not a surface, so they keep their own margin. */
+	.body > :global(p) {
+		padding: 14px;
 	}
 
 	.empty,

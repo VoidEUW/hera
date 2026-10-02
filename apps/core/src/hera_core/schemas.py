@@ -263,6 +263,12 @@ class ArtifactOut(BaseModel):
     modified_at: datetime
 
 
+class ArtifactProblem(BaseModel):
+    """The browser saying it could not draw an artifact — see :mod:`hera_core.problems`."""
+
+    message: str = Field(min_length=1, max_length=2000)
+
+
 class ArtifactContent(BaseModel):
     """One artifact's current content, for the panel that draws it.
 

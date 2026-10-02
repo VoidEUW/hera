@@ -48,6 +48,7 @@ from hera_profiles import (
     BEHAVIOUR_TRAITS,
     SLOT_MEMORIES,
     SLOT_NOW,
+    SLOT_PROBLEMS,
     SLOT_PROJECT,
     SLOT_SKILLS,
     SLOT_TOOLS,
@@ -142,6 +143,13 @@ class TurnContext:
 
     memories: str = ""
     """Pre-rendered recall for the ``memories`` slot. Empty until v0.2."""
+
+    problems: str = ""
+    """Pre-rendered account of what the person's browser could not draw, for the ``problems`` slot.
+
+    Only a browser can tell whether a diagram parses, so this arrives from the application
+    rather than from anything this package can check. Empty leaves the section out.
+    """
 
     now: str = ""
     """Pre-rendered date and time for the ``now`` slot.
@@ -398,6 +406,7 @@ class Turn:
             SLOT_PROJECT: context.project.instructions if context.project is not None else "",
             SLOT_TOOLS: catalogue_text,
             SLOT_NOW: context.now,
+            SLOT_PROBLEMS: context.problems,
         }
         frame = prompt.render(
             bindings={key: value for key, value in bindings.items() if value},

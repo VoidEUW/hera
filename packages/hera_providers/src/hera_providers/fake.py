@@ -25,6 +25,7 @@ and is worth persisting.
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import math
 from collections.abc import AsyncIterator, Callable, Mapping, Sequence
@@ -71,12 +72,14 @@ class FakeProvider:
         embeddings: Mapping[str, Sequence[float]] | None = None,
         dimensions: int = 8,
         models: Sequence[str] = ("fake-model",),
+        delay: float = 0.0,
     ) -> None:
         self._make_turn = script if callable(script) else None
         self._turns: list[Turn] = [] if callable(script) else list(script)
         self._pinned = {text: [float(v) for v in vec] for text, vec in (embeddings or {}).items()}
         self._dimensions = dimensions
         self._models = list(models)
+        self._delay = delay
 
         self.requests: list[ChatRequest] = []
         """Every request received, in order. Assert against this instead of mocking."""
@@ -93,6 +96,14 @@ class FakeProvider:
         if isinstance(turn, Exception):
             raise turn
         for event in turn:
+            # A scripted turn arrives in one go, which is the wrong shape for anything watching
+            # a *consumer* rather than this class: a browser given a whole answer at once
+            # renders it once, and a bug that only appears while an answer is still arriving
+            # cannot happen. ``delay`` buys that back -- a real endpoint puts tens of fragments
+            # a second on the wire, and something reading them has to survive being asked to
+            # draw that many times. Left at zero, because every other test wants the fast path.
+            if self._delay:
+                await asyncio.sleep(self._delay)
             if isinstance(event, Exception):
                 # Reached rather than raised up front, so whatever came before it has already
                 # been yielded -- which is the whole difference between "the endpoint is down"

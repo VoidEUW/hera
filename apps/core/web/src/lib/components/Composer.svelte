@@ -408,6 +408,11 @@
 			</div>
 		{/if}
 
+		<!-- Takes the room the left-hand controls leave, so what follows — the model, whatever
+		     reasoning control it has, and Send — sits at the right end. It was an auto margin on
+		     the reasoning control, which a model without one does not have. -->
+		<span class="spacer" aria-hidden="true"></span>
+
 		{#if modelChoices.length}
 			<!-- **One slot, whichever of the three controls this model has.** The server decided
 			     which, in `thinking_shape`, so this and Settings -> Models cannot disagree. A
@@ -713,11 +718,9 @@
 		min-width: 0;
 	}
 
-	/* Only the first of a trailing group needs the auto margin — it pushes itself and everything
-	   after it to the end of the bar, which is what keeps `.effort` and `.model` adjacent. */
-	.effort,
-	.nomodel {
-		margin-left: auto;
+	.spacer {
+		flex: 1;
+		min-width: 0;
 	}
 
 	.effort {
