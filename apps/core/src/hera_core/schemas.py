@@ -621,10 +621,18 @@ class ModelOut(BaseModel):
     entered on this screen, or ``"none"``. Shown beside the control, because a person looking at it
     is entitled to know whether the endpoint said so or they did."""
     thinking_shape: str = "none"
-    """Which control this model wants — ``values``, ``budget``, ``toggle`` or ``none``. Decided
+    """Which control this model wants - ``values``, ``budget``, ``toggle`` or ``none``. Decided
     server-side so that the browser and the settings screen cannot disagree about it, and so that
     a model wanting both a list and a switch gets one control rather than two that contradict
     each other."""
+
+    tool_call_shape: str = "unknown"
+    """How this endpoint delivers a tool call - ``native``, ``textual`` or ``unknown``.
+
+    ``unknown`` is the ordinary answer and not a complaint: most endpoints publish nothing about
+    it. Reported rather than acted on -- nothing is reformatted on the strength of this field,
+    because silently changing how a model is asked to call a tool is the guessing ADR 18 exists
+    to stop (#145)."""
 
 
 class ProviderOut(BaseModel):

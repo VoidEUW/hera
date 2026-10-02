@@ -28,7 +28,8 @@ from __future__ import annotations
 import asyncio
 import re
 import time
-from typing import ClassVar, NamedTuple
+from collections.abc import Sequence
+from typing import ClassVar, Literal, NamedTuple
 
 import httpx
 
@@ -47,6 +48,27 @@ THINKING_KWARG = "enable_thinking"
 #: ``http://host:8080/v1`` has to lose the ``/v1`` before it can be asked anything.
 _API_SUFFIXES = ("/v1", "/api/v1", "/openai/v1")
 
+#: How a tool call is expected to arrive. ``native`` means the inference engine's tool parser
+#: recognises the model's wire format and re-exposes it as OpenAI-shaped ``tool_calls``, which is
+#: every mainstream engine against every mainstream model. ``textual`` means the model writes the
+#: call into its own prose -- ``<tool_call>{...}</tool_call>`` and its relatives -- and
+#: nothing is lifting it out, so a call arrives as an assistant message rather than as a call.
+#: ``unknown`` means the endpoint did not say, which is the ordinary case.
+#:
+#: This is a *reporting* shape and not a switch. Detection tells a person what their endpoint can
+#: do; it never changes what is sent, because silently reformatting a model's calls would be the
+#: ADR 18 failure with extra steps.
+ToolCallShape = Literal["native", "textual", "unknown"]
+
+#: The honest answer for an endpoint that published nothing.
+UNKNOWN: ToolCallShape = "unknown"
+
+#: The dialect markers a chat template or a server's answer has to mention for a call to be
+#: possible at all. Matched as whole words inside the Jinja source, the same way
+#: :data:`THINKING_KWARG` is, and for the same reason: the question is *would this do anything*,
+#: which is not a Jinja parse.
+_TOOL_MARKERS = ("tools", "tool_calls", "render_tools")
+
 
 class Capabilities(NamedTuple):
     """What one endpoint says about the model it is serving."""
@@ -60,6 +82,12 @@ class Capabilities(NamedTuple):
     """Whether ``chat_template_kwargs.enable_thinking`` would reach the template. Offered as an
     on/off control, because that is the shape every model declaring it actually wants -- a
     boolean, not a vocabulary."""
+
+    tool_call_shape: ToolCallShape = UNKNOWN
+    """How this endpoint can be expected to deliver a tool call, and the reason it is allowed to
+    say so. ``unknown`` is the default and is not a failure to be worked around -- it is the
+    honest answer for an endpoint that published nothing, which is most of them, and a control is
+    never drawn from a silence."""
 
 
 NOTHING = Capabilities()
@@ -110,7 +138,41 @@ def template_capabilities(props: object) -> Capabilities:
     return Capabilities(
         supports_reasoning_effort=effort,
         thinking_toggle=_mentions(props, THINKING_KWARG),
+        tool_call_shape=tool_call_shape(props),
     )
+
+
+def tool_call_shape(props: object) -> ToolCallShape:
+    """How this endpoint says it will deliver a tool call, or ``unknown`` if it does not say.
+
+    The question has two halves and only the second is answerable from ``/props``:
+
+    * **Can the template render tools at all?** A template with no tools path -- no ``tools`` in
+      its loop, no ``render_tools`` call -- cannot put a declaration in front of the model, so a
+      call is not something it has been taught to make. That is the same evidence
+      :data:`THINKING_KWARG` is read from, asked about a different word.
+    * **Will something lift the call out afterwards?** That is the engine's tool parser, not the
+      model, and no engine publishes it over ``/props``. So the honest answer here is almost always
+      ``native`` -- which is the truth for vLLM, SGLang, llama.cpp and Ollama against every model
+      they ship a parser for -- rather than a guess that the wrong answer quietly degrades.
+
+    ``textual`` is therefore *not* inferred here. It is what a caller reports after watching a turn
+    arrive with the call written into the prose, which is the only place that can actually see it.
+    Deciding it from a template would mean claiming a model cannot call tools properly on the
+    strength of a substring, and the failure that follows -- she stops calling tools and nothing
+    says why -- is the thing ADR 18 exists to prevent.
+    """
+    if not isinstance(props, dict):
+        return UNKNOWN
+    if _cap_flag(props, "supports_tool_calls") is False:
+        # The server said no, which is a real answer and the only one that can move the shape off
+        # `unknown` from here.
+        return "textual"
+    return "native" if _mentions_any(props, _TOOL_MARKERS) else UNKNOWN
+
+
+def _mentions_any(props: object, names: Sequence[str]) -> bool:
+    return any(_mentions(props, name) for name in names)
 
 
 def _mentions(props: object, name: str) -> bool:
