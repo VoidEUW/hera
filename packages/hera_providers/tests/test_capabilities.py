@@ -18,10 +18,12 @@ import httpx
 import pytest
 from hera_providers.capabilities import (
     NOTHING,
+    UNKNOWN,
     Capabilities,
     EndpointCapabilities,
     props_url,
     template_capabilities,
+    tool_call_shape,
 )
 
 Handler = Callable[[httpx.Request], httpx.Response]
@@ -47,6 +49,17 @@ QWEN_TEMPLATE = (
     "{{- raise_exception('Unexpected reasoning effort') }}"
     "{%- endif %}"
 )
+
+
+QWEN_TOOLS_TEMPLATE = (
+    "{%- if tools %}"
+    "{{- '<|im_start|>system\n' + '<tools>' + (tools | tojson) + '</tools>\n' }}"
+    "{%- endif %}"
+    "{%- if message.tool_calls %}"
+    "{{- '<|im_start|>assistant\n<tool_call>' }}"
+)
+"""A Hermes-style template: it loops over ``tools`` to render the catalogue and renders
+``tool_calls`` back out of history. Trimmed, but the two names are the whole of the question."""
 
 
 def props(**extra: object) -> dict[str, object]:
@@ -131,6 +144,69 @@ class TestTemplateCapabilities:
         )
 
         assert found.supports_reasoning_effort is True, "falls through to the template"
+
+
+class TestToolCallShape:
+    """How an endpoint says it will deliver a tool call, and what it refuses to guess.
+
+    The shape is *reported*, never acted on, so the failure this class is about is a wrong answer
+    rather than a broken turn -- and the difference matters: a model wrongly reported as unable to
+    call tools is a person told her tools do not work (#145).
+    """
+
+    def test_a_template_that_can_render_tools_answers_native(self) -> None:
+        found = tool_call_shape(props(chat_template=QWEN_TOOLS_TEMPLATE))
+
+        assert found == "native"
+
+    def test_a_render_tools_macro_counts(self) -> None:
+        found = tool_call_shape(props(chat_template="{{ render_tools(tools) }}"))
+
+        assert found == "native"
+
+    def test_a_template_with_no_tools_path_is_unknown_not_textual(self) -> None:
+        # The whole point: a template that cannot render a tool declaration is evidence that
+        # nothing was offered, not evidence that the model writes calls as prose. Only a turn that
+        # actually arrives that way can say that, and only a caller watching one does.
+        found = tool_call_shape(props(chat_template="{{ messages[0].content }}"))
+
+        assert found == "unknown"
+
+    def test_a_server_that_declares_no_is_the_one_way_to_textual(self) -> None:
+        found = tool_call_shape(props(chat_template_caps={"supports_tool_calls": False}))
+
+        assert found == "textual"
+
+    def test_an_omitted_flag_falls_through_to_the_template(self) -> None:
+        # `True` says nothing useful -- it does not say the engine has a parser -- so it is not a
+        # reason to believe anything a template has not also said.
+        found = tool_call_shape(
+            props(chat_template="{{ messages[0].content }}", chat_template_caps={})
+        )
+
+        assert found == "unknown"
+
+    def test_a_whole_word_is_required(self) -> None:
+        found = tool_call_shape(props(chat_template="{{ some_tool_settings_v2 and tools_legacy }}"))
+
+        assert found == "unknown"
+
+    def test_silence_is_unknown(self) -> None:
+        assert tool_call_shape(props()) == UNKNOWN
+        assert tool_call_shape({}) == UNKNOWN
+        assert tool_call_shape(None) == UNKNOWN
+        assert NOTHING.tool_call_shape == UNKNOWN
+
+    def test_rubbish_is_unknown_rather_than_an_exception(self) -> None:
+        rubbish: list[object] = [[], "nonsense", None, 7]
+        for payload in rubbish:
+            assert tool_call_shape(payload) == UNKNOWN
+
+    def test_it_travels_with_the_capabilities(self) -> None:
+        found = template_capabilities(props(chat_template=QWEN_TOOLS_TEMPLATE))
+
+        assert found.tool_call_shape == "native"
+        assert template_capabilities(props(chat_template="")).tool_call_shape == UNKNOWN
 
 
 class TestLoading:
