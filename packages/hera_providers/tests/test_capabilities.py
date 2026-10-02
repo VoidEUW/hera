@@ -146,7 +146,9 @@ class TestTemplateCapabilities:
             )
         )
 
-        assert found == Capabilities(supports_reasoning_effort=False, thinking_toggle=True)
+        assert found == Capabilities(
+            supports_reasoning_effort=False, thinking_toggle=True, tool_call_shape="none"
+        )
 
     def test_a_capability_the_server_omits_falls_back_to_the_template(self) -> None:
         # No caps object at all. A template that *reads* reasoning_effort is one that honours it.
@@ -158,13 +160,15 @@ class TestTemplateCapabilities:
     def test_a_template_with_neither_means_neither_control(self) -> None:
         found = template_capabilities(props(chat_template="{{ messages[0].content }}"))
 
-        assert found == NOTHING
+        # `NO_TOOLS` and not `NOTHING`: a template *was* published and it has no tools path, which
+        # is evidence. `NOTHING` is an endpoint that said nothing, which is silence.
+        assert found == NO_TOOLS
 
     def test_a_whole_word_is_required(self) -> None:
         # `supports_reasoning_effort` in a comment is not a declaration, and a longer name
         # containing the field is a different name.
         template = "{# supports_reasoning_effort is not read #} {{ my_reasoning_effort_setting }}"
-        assert template_capabilities(props(chat_template=template)) == NOTHING
+        assert template_capabilities(props(chat_template=template)) == NO_TOOLS
 
     def test_an_empty_template_is_not_a_template(self) -> None:
         assert template_capabilities(props(chat_template="")) == NOTHING
@@ -186,56 +190,96 @@ class TestTemplateCapabilities:
         assert found.supports_reasoning_effort is True, "falls through to the template"
 
 
-class TestToolCallShape:
-    """How an endpoint says it will deliver a tool call, and what it refuses to guess.
+MINICPM5_TOOLS_TEMPLATE = (
+    # The tools branch of openbmb/MiniCPM5-2B's real `chat_template.jinja`, trimmed. It renders
+    # function signatures inside <tools></tools> and then inlines its own usage guidelines,
+    # telling the model the shape to answer in: `<function name=...><param name=...>`.
+    "{{- bos_token }}{%- if tools %}"
+    "{%- set tool_definitions %}"
+    "{{- '# Tools\\n\\nYou are provided with function signatures within "
+    "<tools></tools> XML tags:\\n<tools>' }}"
+    "{%- for tool in tools %}"
+    "{{- tool | tojson(ensure_ascii=False) }}"
+    "{{- '\\n</tools>\\n\\nTool usage guidelines:\\n"
+    "- When calling a function, return an XML object within "
+    "<function ... </function> using:\\n"
+    '<function name="function-name">'
+    '<param name="param-name">param-value</param></function>\' }}'
+)
+"""Real, and the reason this module says less than it might. MiniCPM5-2B has an unambiguous tools
+path, so this reads ``template``. It does **not** follow that calls will come back: SGLang converts
+this dialect natively, vLLM has no parser for it yet (vllm#43175), Ollama returns
+``tool_calls: null`` with the markup left in ``content`` (ollama#18483), and llama.cpp does not
+support it. Four engines, one template, three different outcomes -- which is why the field records
+the template and stops there (#145)."""
 
-    The shape is *reported*, never acted on, so the failure this class is about is a wrong answer
-    rather than a broken turn -- and the difference matters: a model wrongly reported as unable to
-    call tools is a person told her tools do not work (#145).
+#: A published template with no tools path. Distinct from :data:`NOTHING`, which is an endpoint that
+#: published nothing at all: the first is evidence and the second is silence.
+NO_TOOLS = Capabilities(tool_call_shape="none")
+
+
+class TestToolCallShape:
+    """Whether this endpoint's *template* can render a tool declaration.
+
+    The name is deliberately not ``native``. ``native`` read as "tool calls will work here", and for
+    MiniCPM5-2B -- which this class has a fixture for -- that is false on three of the four engines
+    it runs on. The gap between "the template offers tools" and "a call comes back" is the engine's
+    dialect parser, and no endpoint publishes it. So this answers the half that can be answered,
+    under a name that does not overclaim the other half.
     """
 
-    def test_a_template_that_can_render_tools_answers_native(self) -> None:
-        found = tool_call_shape(props(chat_template=QWEN_TOOLS_TEMPLATE))
-
-        assert found == "native"
+    def test_a_template_that_loops_over_tools_is_template(self) -> None:
+        assert tool_call_shape(props(chat_template=QWEN_TOOLS_TEMPLATE)) == "template"
 
     def test_a_render_tools_macro_counts(self) -> None:
-        found = tool_call_shape(props(chat_template="{{ render_tools(tools) }}"))
+        assert tool_call_shape(props(chat_template="{{ render_tools(tools) }}")) == "template"
 
-        assert found == "native"
+    def test_minicpm5_is_template_which_is_not_a_claim_about_calls(self) -> None:
+        # The case that forced the rename. Its template is unambiguous, and every engine but
+        # SGLang either has no parser for its dialect or is waiting on one.
+        assert tool_call_shape(props(chat_template=MINICPM5_TOOLS_TEMPLATE)) == "template"
 
-    def test_a_template_with_no_tools_path_is_unknown_not_textual(self) -> None:
-        # The whole point: a template that cannot render a tool declaration is evidence that
-        # nothing was offered, not evidence that the model writes calls as prose. Only a turn that
-        # actually arrives that way can say that, and only a caller watching one does.
-        found = tool_call_shape(props(chat_template="{{ messages[0].content }}"))
+    def test_the_mimo_template_is_template(self) -> None:
+        assert tool_call_shape(props(chat_template=MIMO_TOOL_MACROS)) == "template"
 
-        assert found == "unknown"
+    def test_a_published_template_with_no_tools_path_is_none(self) -> None:
+        # Evidence, not silence: this template was served to us and it cannot offer a tool.
+        assert tool_call_shape(props(chat_template="{{ messages[0].content }}")) == "none"
 
-    def test_a_server_that_declares_no_is_the_one_way_to_textual(self) -> None:
-        found = tool_call_shape(props(chat_template_caps={"supports_tool_calls": False}))
-
-        assert found == "textual"
-
-    def test_an_omitted_flag_falls_through_to_the_template(self) -> None:
-        # `True` says nothing useful -- it does not say the engine has a parser -- so it is not a
-        # reason to believe anything a template has not also said.
-        found = tool_call_shape(
-            props(chat_template="{{ messages[0].content }}", chat_template_caps={})
-        )
-
-        assert found == "unknown"
-
-    def test_a_whole_word_is_required(self) -> None:
-        found = tool_call_shape(props(chat_template="{{ some_tool_settings_v2 and tools_legacy }}"))
-
-        assert found == "unknown"
-
-    def test_silence_is_unknown(self) -> None:
+    def test_no_template_at_all_is_unknown_not_none(self) -> None:
+        # The distinction the whole thing turns on. Nothing published is not the same as something
+        # published that has no tools, and collapsing them would report an absence of information
+        # as an absence of capability.
         assert tool_call_shape(props()) == UNKNOWN
         assert tool_call_shape({}) == UNKNOWN
         assert tool_call_shape(None) == UNKNOWN
         assert NOTHING.tool_call_shape == UNKNOWN
+
+    def test_an_empty_template_is_not_a_template(self) -> None:
+        assert tool_call_shape(props(chat_template="")) == UNKNOWN
+        assert tool_call_shape(props(chat_template=None)) == UNKNOWN
+
+    def test_a_server_that_declares_no_is_none(self) -> None:
+        assert tool_call_shape(props(chat_template_caps={"supports_tool_calls": False})) == "none"
+
+    def test_an_omitted_flag_falls_through_to_the_template(self) -> None:
+        # `True` says nothing useful -- not whether the engine has a parser -- so it is no reason to
+        # believe anything a template has not also said.
+        found = tool_call_shape(props(chat_template="{{ m.content }}", chat_template_caps={}))
+
+        assert found == "none"
+
+    def test_a_whole_word_is_required(self) -> None:
+        found = tool_call_shape(props(chat_template="{{ some_tool_settings_v2 and tools_legacy }}"))
+
+        assert found == "none"
+
+    def test_a_tools_path_named_only_in_a_prose_comment_is_not_one(self) -> None:
+        # The false positive this exists for: a template whose header explains what it does has no
+        # tools path, and reporting `template` for it would put a control up that does nothing.
+        assert (
+            tool_call_shape(props(chat_template="{# see render_tools #} {{ m.content }}")) == "none"
+        )
 
     def test_rubbish_is_unknown_rather_than_an_exception(self) -> None:
         rubbish: list[object] = [[], "nonsense", None, 7]
@@ -245,42 +289,26 @@ class TestToolCallShape:
     def test_it_travels_with_the_capabilities(self) -> None:
         found = template_capabilities(props(chat_template=QWEN_TOOLS_TEMPLATE))
 
-        assert found.tool_call_shape == "native"
-        assert template_capabilities(props(chat_template="")).tool_call_shape == UNKNOWN
-
-    def test_the_mimo_template_is_native(self) -> None:
-        # XiaomiMiMo/MiMo-V2.6-Distill-Qwen-9B, whose real `chat_template.jinja` renders calls as
-        # `<tool_call><function=NAME><parameter=K>V</parameter>` with **no call id**, relying on
-        # positional correlation. None of that is this detector's business -- it asks whether a
-        # tools path exists at all -- and it does, in a macro called `render_tools` that the system
-        # branch invokes.
-        found = tool_call_shape(props(chat_template=MIMO_TOOL_MACROS))
-
-        assert found == "native"
+        assert found.tool_call_shape == "template"
+        assert template_capabilities(props(chat_template="{{ m.content }}")) == NO_TOOLS
+        assert template_capabilities({}) == NOTHING
 
     def test_the_mimo_template_also_declares_its_thinking_switch(self) -> None:
-        # The same card's quickstart is `chat_template_kwargs={"enable_thinking": true}` and its
-        # template ends with `{%- if enable_thinking is false -%}`, so the toggle is the control it
-        # wants and the effort list is not. Both answers come out of the same string, which is the
-        # whole reason this reads a template rather than a table.
         caps = template_capabilities(props(chat_template=MIMO_TOOL_MACROS + ENABLE_THINKING))
 
         assert caps.thinking_toggle is True
         assert caps.supports_reasoning_effort is False
 
-    def test_a_tools_path_named_only_in_a_prose_comment_is_not_one(self) -> None:
-        # The false positive this test exists for: a template that talks *about* tools in its
-        # documentation block has no tools path, and reporting `native` for it would put a control
-        # up that does nothing. Jinja comments are `{# #}`; a template is allowed to have them.
-        template = "{# tools are rendered by render_tools upstream #} {{ messages[0].content }}"
-        found = tool_call_shape(props(chat_template=template))
+    def test_minicpm5_agrees_with_what_the_module_already_claimed(self) -> None:
+        # `capabilities.py` has asserted these two about a real server since before this field
+        # existed. Checking them against the model's own template is a free second opinion.
+        caps = template_capabilities(props(chat_template=MINICPM5_TOOLS_TEMPLATE + ENABLE_THINKING))
 
-        assert found == "unknown"
+        assert caps.thinking_toggle is True
+        assert caps.supports_reasoning_effort is False
 
     def test_the_detector_survives_a_large_real_template(self) -> None:
-        # Size is not the question, but a 4k-character template is the real case and the regex must
-        # not care. This is the whole MiMo file.
-        assert tool_call_shape(props(chat_template=MIMO_TOOL_MACROS * 40)) == "native"
+        assert tool_call_shape(props(chat_template=MINICPM5_TOOLS_TEMPLATE * 40)) == "template"
 
 
 class TestLoading:

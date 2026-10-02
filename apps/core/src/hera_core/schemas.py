@@ -627,12 +627,15 @@ class ModelOut(BaseModel):
     each other."""
 
     tool_call_shape: str = "unknown"
-    """How this endpoint delivers a tool call - ``native``, ``textual`` or ``unknown``.
+    """Whether this endpoint's chat template can render a tool declaration - ``template``,
+    ``none`` or ``unknown``.
 
-    ``unknown`` is the ordinary answer and not a complaint: most endpoints publish nothing about
-    it. Reported rather than acted on -- nothing is reformatted on the strength of this field,
+    A fact about the template and nothing more. It is **not** a claim that a call will come back
+    as a call: that needs an engine with a parser for the model's dialect, which no endpoint
+    publishes, and which for MiniCPM5-2B differs across the four engines it runs on (#145).
+    Reported rather than acted on -- nothing is reformatted on the strength of this field,
     because silently changing how a model is asked to call a tool is the guessing ADR 18 exists
-    to stop (#145)."""
+    to stop."""
 
 
 class ProviderOut(BaseModel):

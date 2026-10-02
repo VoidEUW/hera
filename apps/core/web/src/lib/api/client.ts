@@ -229,9 +229,9 @@ export interface ModelEntry {
 	/** Which control this model wants — `values`, `budget`, `toggle` or `none`. Decided server-side
 	 * so the composer and the settings screen cannot disagree about it. */
 	thinking_shape: string;
-	/** How this endpoint delivers a tool call — `native`, `textual` or `unknown`. `unknown` is the
-	 * ordinary answer, not a complaint: most endpoints publish nothing about it. Reported rather
-	 * than acted on, because nothing is reformatted on the strength of it (#145). */
+	/** Whether this endpoint's chat template can render a tool declaration — `template`, `none` or
+	 * `unknown`. A fact about the template and nothing more: it is *not* a claim that a call will
+	 * come back as a call, which needs an engine with a parser for this model's dialect (#145). */
 	tool_call_shape: string;
 }
 
