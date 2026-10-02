@@ -62,6 +62,46 @@ QWEN_TOOLS_TEMPLATE = (
 ``tool_calls`` back out of history. Trimmed, but the two names are the whole of the question."""
 
 
+MIMO_TOOL_MACROS = (
+    # Verbatim from XiaomiMiMo/MiMo-V2.6-Distill-Qwen-9B `chat_template.jinja`, the parts that
+    # answer the question. Taken from the model rather than written here on purpose: a fixture
+    # invented to match the implementation proves only that the implementation agrees with
+    # itself, and this detector is a substring test whose failure mode is a wrong idea about what
+    # a tools path looks like.
+    "{%- macro render_tools(tools) -%}"
+    "{{- 'You are provided with the following tools:\\n\\n<tools>' -}}"
+    "{%- for tool in tools -%}"
+    "{{- '\\n' ~ (tool | tojson(ensure_ascii=False)) -}}"
+    "{%- endfor -%}"
+    "{{- '\\n</tools>' -}}"
+    "{%- endmacro -%}"
+    "{%- macro render_tool_calls(tool_calls) -%}"
+    "{%- for tool_call in tool_calls -%}"
+    "{{- '<\\u200btool_call><function=' ~ tool_call.name ~ '>' -}}"
+    "{%- for args_name, args_value in tool_call.arguments | items -%}"
+    "{{- '<parameter=' ~ args_name ~ '>' ~ render_value(args_value) ~ '</parameter>' -}}"
+    "{%- endfor -%}"
+    "{{- '</function></\\u200btool_call>' -}}"
+    "{%- endfor -%}"
+    "{%- endmacro -%}"
+    "{%- if tools is defined and tools is iterable and tools | length > 0 -%}"
+    "{{- 'system\\n' ~ render_tools(tools) ~ '' -}}"
+    "{%- endif -%}"
+)
+
+#: The generation-prompt branch of the same template, which is where the thinking switch lives:
+#: ``{%- if add_generation_prompt -%}`` ... ``{%- if enable_thinking is false -%}``. Kept apart
+#: from the tool macros so a test can ask the two questions separately.
+ENABLE_THINKING = (
+    "{%- if add_generation_prompt -%}"
+    "{{- 'assistant\\n' -}}"
+    "{%- if enable_thinking is false -%}"
+    "{{- '<think></think>' -}}"
+    "{%- endif -%}"
+    "{%- endif -%}"
+)
+
+
 def props(**extra: object) -> dict[str, object]:
     """A `/props` body. Flat, because that is what llama.cpp serves -- the template and the
     capability object are top-level keys, not entries under a `data` envelope."""
@@ -207,6 +247,40 @@ class TestToolCallShape:
 
         assert found.tool_call_shape == "native"
         assert template_capabilities(props(chat_template="")).tool_call_shape == UNKNOWN
+
+    def test_the_mimo_template_is_native(self) -> None:
+        # XiaomiMiMo/MiMo-V2.6-Distill-Qwen-9B, whose real `chat_template.jinja` renders calls as
+        # `<tool_call><function=NAME><parameter=K>V</parameter>` with **no call id**, relying on
+        # positional correlation. None of that is this detector's business -- it asks whether a
+        # tools path exists at all -- and it does, in a macro called `render_tools` that the system
+        # branch invokes.
+        found = tool_call_shape(props(chat_template=MIMO_TOOL_MACROS))
+
+        assert found == "native"
+
+    def test_the_mimo_template_also_declares_its_thinking_switch(self) -> None:
+        # The same card's quickstart is `chat_template_kwargs={"enable_thinking": true}` and its
+        # template ends with `{%- if enable_thinking is false -%}`, so the toggle is the control it
+        # wants and the effort list is not. Both answers come out of the same string, which is the
+        # whole reason this reads a template rather than a table.
+        caps = template_capabilities(props(chat_template=MIMO_TOOL_MACROS + ENABLE_THINKING))
+
+        assert caps.thinking_toggle is True
+        assert caps.supports_reasoning_effort is False
+
+    def test_a_tools_path_named_only_in_a_prose_comment_is_not_one(self) -> None:
+        # The false positive this test exists for: a template that talks *about* tools in its
+        # documentation block has no tools path, and reporting `native` for it would put a control
+        # up that does nothing. Jinja comments are `{# #}`; a template is allowed to have them.
+        template = "{# tools are rendered by render_tools upstream #} {{ messages[0].content }}"
+        found = tool_call_shape(props(chat_template=template))
+
+        assert found == "unknown"
+
+    def test_the_detector_survives_a_large_real_template(self) -> None:
+        # Size is not the question, but a 4k-character template is the real case and the regex must
+        # not care. This is the whole MiMo file.
+        assert tool_call_shape(props(chat_template=MIMO_TOOL_MACROS * 40)) == "native"
 
 
 class TestLoading:
