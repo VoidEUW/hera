@@ -22,6 +22,7 @@
 	import Modal from './Modal.svelte';
 	import SettingsIcon, { type SettingsIconName } from './SettingsIcon.svelte';
 	import Dreaming from './settings/Dreaming.svelte';
+	import Account from './settings/Account.svelte';
 	import General from './settings/General.svelte';
 	import Memory from './settings/Memory.svelte';
 	import Mind from './settings/Mind.svelte';
@@ -32,17 +33,25 @@
 	import Skills from './settings/Skills.svelte';
 
 	export type Tab =
-		'general' | 'models' | 'skills' | 'servers' | 'permissions' | 'memory' | 'mind' | 'dreaming';
+		| 'account'
+		| 'general'
+		| 'models'
+		| 'skills'
+		| 'servers'
+		| 'permissions'
+		| 'memory'
+		| 'mind'
+		| 'dreaming';
 
 	interface Props {
 		onclose?: () => void;
-		/** Which tab to land on. Defaults to models — the one nothing else works without — but
+		/** Which tab to land on. Defaults to the account — who this is for — but
 		 * a caller opening this from, say, the composer's server sheet wants to land on the
 		 * tab it was already talking about, not send a person back to the start. */
 		tab?: Tab;
 	}
 
-	let { onclose, tab: initialTab = 'models' }: Props = $props();
+	let { onclose, tab: initialTab = 'account' }: Props = $props();
 
 	interface Entry {
 		id: Tab;
@@ -56,6 +65,12 @@
 		{
 			label: t.settings.groupApp,
 			entries: [
+				{
+					id: 'account',
+					label: t.settings.account,
+					blurb: t.settings.blurbAccount,
+					icon: 'account'
+				},
 				{
 					id: 'general',
 					label: t.settings.general,
@@ -150,7 +165,9 @@
 
 		<div class="panel">
 			<Screen title={current.label} blurb={current.blurb}>
-				{#if tab === 'general'}
+				{#if tab === 'account'}
+					<Account {filter} />
+				{:else if tab === 'general'}
 					<General {filter} />
 				{:else if tab === 'models'}
 					<Models {filter} />

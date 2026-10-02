@@ -20,7 +20,7 @@
 	let busy = $state(false);
 	let error = $state<string | null>(null);
 
-	const greeting = greetingFor();
+	const greeting = $derived(greetingFor(new Date(), workspace.account?.name.split(/\s+/)[0] ?? ''));
 
 	async function start(text: string, files: Attachment[]) {
 		busy = true;

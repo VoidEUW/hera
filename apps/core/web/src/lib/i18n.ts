@@ -66,6 +66,7 @@ export const t = {
 		chats: 'Chats',
 		settings: 'Settings',
 		account: (name: string) => `${name} — Settings`,
+		accountLabel: 'Account',
 		collapse: 'Collapse the sidebar',
 		expand: 'Expand the sidebar',
 		openMenu: 'Open menu',
@@ -279,6 +280,7 @@ export const t = {
 		loadingModels: 'Loading models…',
 		loadingSkills: 'Loading skills…',
 		loadingMemory: 'Loading memories…',
+		account: 'Account',
 		general: 'General',
 		models: 'Models',
 		mind: 'Mind',
@@ -291,6 +293,7 @@ export const t = {
 		groupHera: 'Hera',
 		groupAdjust: 'Adjust',
 		// One line under each screen's heading: what it is for, not how to use it.
+		blurbAccount: 'Who you are to Hera: a name, an email and a picture.',
 		blurbGeneral: 'This browser and this machine: appearance, language, time zone, notifications.',
 		blurbMind: 'The text that shapes how she thinks and speaks, one region at a time.',
 		blurbMemory: 'What she knows about you, and how much room it takes.',
@@ -466,6 +469,29 @@ export const t = {
 		unsupported: 'This browser cannot show notifications.'
 	},
 
+	account: {
+		name: 'Name',
+		namePlaceholder: 'What should she call you?',
+		email: 'Email',
+		emailPlaceholder: 'you@example.org',
+		emailInvalid: 'That does not look like an email address.',
+		avatar: 'Picture',
+		upload: 'Upload a picture',
+		replace: 'Replace picture',
+		remove: 'Remove picture',
+		avatarNote:
+			'PNG, JPEG, WebP or GIF, up to 12 MB. It is cropped to a square and kept in your Hera folder.',
+		tooBig: 'That picture is larger than 12 MB.',
+		notAnImage: 'Choose a PNG, JPEG, WebP or GIF picture.',
+		saved: 'Saved',
+		security: 'Sign-in',
+		securityNote: 'Hera has no login yet. These are drawn so you can see what is coming.',
+		password: 'Password',
+		twoFactor: 'Two-factor authentication',
+		passkeys: 'Passkeys',
+		later: 'Coming later'
+	},
+
 	general: {
 		language: 'Language',
 		languageNote:
@@ -583,12 +609,17 @@ export const t = {
 	}
 } as const;
 
-export function greetingFor(date: Date = new Date()): string {
+export function greetingFor(date: Date = new Date(), name = ''): string {
 	const hour = date.getHours();
-	if (hour < 5) return t.greeting.night;
-	if (hour < 12) return t.greeting.morning;
-	if (hour < 18) return t.greeting.afternoon;
-	return t.greeting.evening;
+	const phrase =
+		hour < 5
+			? t.greeting.night
+			: hour < 12
+				? t.greeting.morning
+				: hour < 18
+					? t.greeting.afternoon
+					: t.greeting.evening;
+	return name ? `${phrase}, ${name}` : phrase;
 }
 
 /** "12 ms", "1.4 s" — a duration a person reads rather than a number they convert. */
