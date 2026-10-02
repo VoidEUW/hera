@@ -521,6 +521,7 @@ def act_composer(page: Page, base: str, shots: Path, report: Report) -> None:
 #: separately. Filmed by position rather than by name, because a name is a string in a
 #: translation file and a position is not.
 SETTINGS_TABS = (
+    "Account",
     "Models",
     "General",
     "Skills",
@@ -555,7 +556,7 @@ def act_settings(page: Page, base: str, shots: Path, report: Report) -> None:
         page.get_by_role("button", name="Settings").first.click(timeout=5_000)
         page.wait_for_selector("[role='dialog']", timeout=10_000)
         settled(page)
-        shoot(page, shots, "30-settings-models")
+        shoot(page, shots, "30-settings-account")
 
     nav = page.locator("[role='dialog'] nav.tabs")
     for index, tab in enumerate(SETTINGS_TABS[1:], start=1):

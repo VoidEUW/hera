@@ -45,6 +45,8 @@ def page(server: str) -> Any:
 def settings(page: Any) -> None:
     page.get_by_role("button", name="Settings").first.click()
     page.wait_for_selector("[role='dialog']", timeout=10_000)
+    # Settings opens on Account; this test is about Models.
+    page.get_by_role("button", name="Models", exact=True).click()
 
 
 def test_a_doubled_click_does_not_reopen_a_closed_dropdown(page: Any) -> None:

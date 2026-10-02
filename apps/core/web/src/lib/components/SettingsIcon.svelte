@@ -8,7 +8,15 @@
 	 * adding one.
 	 */
 	export type SettingsIconName =
-		'general' | 'mind' | 'memory' | 'models' | 'dreaming' | 'skills' | 'servers' | 'permissions';
+		| 'account'
+		| 'general'
+		| 'mind'
+		| 'memory'
+		| 'models'
+		| 'dreaming'
+		| 'skills'
+		| 'servers'
+		| 'permissions';
 
 	interface Props {
 		name: SettingsIconName;
@@ -18,6 +26,11 @@
 	let { name, size = 16 }: Props = $props();
 
 	const PATHS: Record<SettingsIconName, string[]> = {
+		// A head and shoulders.
+		account: [
+			'M8 8.2a2.8 2.8 0 1 0 0-5.6 2.8 2.8 0 0 0 0 5.6z',
+			'M2.6 14c.4-2.6 2.6-4.2 5.4-4.2s5 1.6 5.4 4.2'
+		],
 		// Three sliders.
 		general: [
 			'M2 4h5.6 M12.4 4H14',

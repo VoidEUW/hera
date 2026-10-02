@@ -143,7 +143,7 @@
 			<Rail
 				chats={workspace.chats}
 				projects={workspace.projects}
-				profile={workspace.activeProfile}
+				account={workspace.account}
 				loading={!workspace.loaded}
 				shape={workspace.shape}
 				{activeId}

@@ -269,6 +269,7 @@ def test_settings_holds_what_changes_her_behaviour(page: Any) -> None:
     nav = page.locator("[role=dialog] nav.tabs button")
     names = [text.split("\n")[0].strip() for text in nav.all_inner_texts()]
     assert names == [
+        "Account",
         "General",
         "Mind",
         "Memory",
@@ -281,7 +282,9 @@ def test_settings_holds_what_changes_her_behaviour(page: Any) -> None:
 
     # The search field is in the sidebar, beside the navigation, and the title is in the content.
     assert page.locator("[role=dialog] aside input[type=search]").count() == 1
-    assert page.locator("[role=dialog] h2").first.inner_text() == "Models"
+    assert page.locator("[role=dialog] h2").first.inner_text() == "Account"
+
+    page.get_by_role("button", name="Models", exact=True).click()
 
     # The endpoint is registered and editable, which is the whole point of this screen.
     page.wait_for_selector("text=Base URL", timeout=10_000)
@@ -320,6 +323,32 @@ def test_the_profile_card_is_the_way_into_settings(page: Any) -> None:
 
     page.keyboard.press("Escape")
     page.wait_for_selector("[role=dialog]", state="detached", timeout=10_000)
+
+
+def test_the_account_name_reaches_the_rail_card_and_the_greeting(page: Any) -> None:
+    """The Account screen is where Settings opens, and what is saved there is what the rail card
+    and the start screen call you — there is no second place that knows."""
+    page.locator("button.card").click()
+    page.wait_for_selector("[role=dialog]", timeout=10_000)
+
+    page.get_by_label("Name", exact=True).fill("Ada Lovelace")
+    page.get_by_label("Email", exact=True).fill("not an email")
+    assert page.get_by_role("button", name="Save").is_disabled()
+    page.get_by_label("Email", exact=True).fill("ada@example.org")
+    page.get_by_role("button", name="Save").click()
+    page.wait_for_selector("text=Saved", timeout=10_000)
+
+    # The three sign-in rows are drawn and cannot be used.
+    for row in ("Password", "Two-factor authentication", "Passkeys"):
+        assert page.get_by_role("button", name=row).is_disabled()
+
+    page.keyboard.press("Escape")
+    page.wait_for_selector("[role=dialog]", state="detached", timeout=10_000)
+    assert "Ada Lovelace" in page.locator("button.card").inner_text()
+    page.wait_for_selector(".greeting:has-text('Ada')", timeout=10_000)
+
+    page.reload(wait_until="networkidle")
+    assert "Ada Lovelace" in page.locator("button.card").inner_text()
 
 
 def test_a_file_can_be_attached_and_is_drawn_as_a_chip(page: Any, tmp_path: Any) -> None:

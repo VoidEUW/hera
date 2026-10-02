@@ -19,7 +19,7 @@
 	 */
 	import { untrack } from 'svelte';
 	import { resolve } from '$app/paths';
-	import { API, api, type Chat, type Profile, type Project } from '$lib/api/client';
+	import { API, api, type Account, type Chat, type Project } from '$lib/api/client';
 	import { t } from '$lib/i18n';
 	import { Placeholder } from '$lib/loading.svelte';
 	import { disclose } from '$lib/motion';
@@ -32,7 +32,8 @@
 	interface Props {
 		chats: Chat[];
 		projects: Project[];
-		profile: Profile | null;
+		/** Who the owner is, once it has answered. Null still draws the card, as "Account". */
+		account: Account | null;
 		activeId?: string | null;
 		activeProjectId?: string | null;
 		/** Whether the workspace is still being fetched. An empty list and a list that has not
@@ -55,7 +56,7 @@
 	let {
 		chats,
 		projects,
-		profile,
+		account,
 		activeId = null,
 		activeProjectId = null,
 		loading = false,
@@ -194,6 +195,8 @@
 		renaming = null;
 		creating = false;
 	}
+
+	const shown = $derived(account?.name || t.rail.accountLabel);
 
 	function initials(name: string): string {
 		return name
@@ -554,20 +557,31 @@
 			<!-- The card is the last thing in a rail that is pinned to the bottom of the window,
 			     so arriving late moves it out from under the pointer. Hold its height. -->
 			<div class="card-waiting"><Skeleton rows={1} height={42} widths={[100]} /></div>
-		{:else if profile}
+		{:else}
 			<!-- Who you are, and the way into Settings. There is no separate Settings button: the
-			     account screen is going to be Settings' first page, so this is the door to press. -->
+			     account screen is Settings' first page, so this is the door to press. It draws before
+			     the account has answered (as "Account") so a slow request cannot lock Settings away. -->
 			<button
 				class="card"
 				class:open={settingsOpen}
 				type="button"
 				aria-haspopup="dialog"
 				aria-expanded={settingsOpen}
-				aria-label={t.rail.account(profile.name)}
+				aria-label={t.rail.account(shown)}
 				onclick={() => onsettings?.()}
 			>
-				<span class="initials">{initials(profile.name)}</span>
-				<span class="label">{profile.name}</span>
+				{#if account?.avatar_version}
+					<img
+						class="initials avatar"
+						src={api.avatarUrl(account.avatar_version)}
+						alt=""
+						width="24"
+						height="24"
+					/>
+				{:else}
+					<span class="initials">{initials(account?.name ?? '') || '·'}</span>
+				{/if}
+				<span class="label">{shown}</span>
 				<span class="cog" aria-hidden="true">⚙</span>
 			</button>
 		{/if}
@@ -943,6 +957,10 @@
 		to {
 			transform: rotate(60deg);
 		}
+	}
+
+	.avatar {
+		object-fit: cover;
 	}
 
 	.initials {
