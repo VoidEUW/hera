@@ -343,8 +343,6 @@ export const t = {
 	},
 
 	models: {
-		blurb:
-			'Where she runs. Any OpenAI-compatible endpoint — LM Studio, llama.cpp, vLLM, Ollama, or a hosted API.',
 		active: 'Active',
 		activate: 'Use this one',
 		add: 'Add an endpoint',
@@ -402,7 +400,6 @@ export const t = {
 		alreadyAdded: 'Added',
 
 		options: 'Request options',
-		optionsOpen: 'Options',
 		optionsHint:
 			'Extra fields sent in the request body — for something this endpoint understands and Hera does not need to. Leave empty unless a model asks for one.',
 		optionsRawHint: 'The same data as the fields above, and anything else this server takes.',
