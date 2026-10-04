@@ -8,7 +8,7 @@
 	 * reason `modelOptions.ts` gives, and the sliders write through that same text, so a slider
 	 * and the textarea are one piece of state.
 	 *
-	 * `context_length` and `tool_calling` ride beside the options rather than inside them: they
+	 * `context_length`, `tool_calling` and `accepts_images` ride beside the options rather than inside them: they
 	 * are typed fields on `ModelEntry`, not opaque options. `tool_calling` is seeded from the
 	 * model rather than defaulted to `true`, so saving an unrelated option never silently turns
 	 * tools back on for a model somebody already flagged off (ADR 19).
@@ -24,10 +24,12 @@
 		SAMPLING_FIELDS,
 		budgetOf,
 		contextLengthToSave,
+		maxTokensOf,
 		effortsFor,
 		parsed,
 		shapeOf,
 		sourceOf,
+		tokenCountFrom,
 		thinkingOn,
 		withOption,
 		withThinking,
@@ -53,6 +55,7 @@
 	let draft = $state(written(seed.options));
 	let contextText = $state(seed.context_length != null ? String(seed.context_length) : '');
 	let toolCalling = $state(seed.tool_calling);
+	let acceptsImages = $state(seed.accepts_images);
 
 	const valid = $derived(parsed(draft) !== null);
 	const current = $derived(parsed(draft) ?? {});
@@ -76,7 +79,8 @@
 					name: model.name,
 					options,
 					context_length: contextLength,
-					tool_calling: toolCalling
+					tool_calling: toolCalling,
+					accepts_images: acceptsImages
 				})
 			);
 			onclose();
@@ -195,6 +199,19 @@
 	<p class="warn note">{t.models.sampling.overrideNote}</p>
 
 	<label>
+		<span>{t.models.maxTokens}</span>
+		<input
+			type="number"
+			min="1"
+			step="1"
+			placeholder={t.models.maxTokensPlaceholder}
+			value={maxTokensOf(current) ?? ''}
+			oninput={(e) => set('max_tokens', tokenCountFrom(e.currentTarget.value))}
+		/>
+		<small>{t.models.maxTokensHint}</small>
+	</label>
+
+	<label>
 		<span>{t.models.contextLength}</span>
 		<input
 			type="number"
@@ -218,6 +235,16 @@
 			onchange={(checked) => (toolCalling = checked)}
 		/>
 		<small>{t.models.toolCallingHint}</small>
+	</div>
+
+	<div class="field">
+		<span class="label">{t.models.acceptsImages}</span>
+		<Checkbox
+			checked={acceptsImages}
+			ariaLabel={t.models.acceptsImages}
+			onchange={(checked) => (acceptsImages = checked)}
+		/>
+		<small>{t.models.acceptsImagesHint}</small>
 	</div>
 
 	<label>

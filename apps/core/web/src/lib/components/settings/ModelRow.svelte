@@ -4,7 +4,7 @@
 	 *
 	 * The toggle is a real `<button>` that takes all the width the row has to spare, so a click
 	 * anywhere on the row's body opens or closes it, and Enter and Space do the same from the
-	 * keyboard. **Set active** and **Remove** are *siblings* of that button, not children: a
+	 * keyboard. **Remove** is a *sibling* of that button, not children: a
 	 * control inside a control is invalid, and it would make the whole row announce twice.
 	 *
 	 * Whether the editor is open is the parent's to say. A provider has one open model at a
@@ -17,33 +17,19 @@
 	interface Props {
 		provider: string;
 		model: ModelEntry;
-		/** Whether this is the model her turns run on. */
+		/** Whether this is the model her turns run on. Switching it is the composer's job, where she is
+		 * picked per message; there is no second switch here. */
 		current: boolean;
-		/** Whether the provider is the active one — only then is *Set active* offered, since a
-		 * model on an endpoint that is not in use cannot be switched to. */
-		canActivate: boolean;
 		open: boolean;
 		presets: ModelPreset[];
 		ontoggle: () => void;
-		onactivate: () => void;
 		onremove: () => void;
 		onsaved: (body: { providers: Provider[]; active: string }) => void;
 		onerror: (message: string) => void;
 	}
 
-	let {
-		provider,
-		model,
-		current,
-		canActivate,
-		open,
-		presets,
-		ontoggle,
-		onactivate,
-		onremove,
-		onsaved,
-		onerror
-	}: Props = $props();
+	let { provider, model, current, open, presets, ontoggle, onremove, onsaved, onerror }: Props =
+		$props();
 
 	const count = $derived(Object.keys(model.options).length);
 </script>
@@ -51,17 +37,16 @@
 <li class:on={current}>
 	<div class="row">
 		<button class="toggle" type="button" aria-expanded={open} onclick={ontoggle}>
-			<span class="chevron" class:open aria-hidden="true">▸</span>
-			<span class="what">
+			<span class="start">
+				<span class="chevron" class:open aria-hidden="true">▸</span>
 				<span class="name">{model.name}</span>
-				{#if model.name !== model.id}<code class="hint">{model.id}</code>{/if}
 				{#if count}<span class="badge quiet">{t.models.optionsSet(count)}</span>{/if}
 			</span>
-			{#if current}<span class="badge">{t.models.active}</span>{/if}
+			<span class="id">{model.name !== model.id ? model.id : ''}</span>
+			<span class="end"
+				>{#if current}<span class="badge">{t.models.active}</span>{/if}</span
+			>
 		</button>
-		{#if !current && canActivate}
-			<button class="small" type="button" onclick={onactivate}>{t.models.setActiveModel}</button>
-		{/if}
 		<button class="small danger" type="button" onclick={onremove}>{t.models.removeModel}</button>
 	</div>
 
@@ -93,9 +78,10 @@
 	.toggle {
 		flex: 1;
 		min-width: 0;
-		display: flex;
+		display: grid;
+		grid-template-columns: 16rem minmax(0, 1fr) auto;
 		align-items: center;
-		gap: 8px;
+		gap: 12px;
 		margin: -6px 0 -6px -8px;
 		padding: 6px 0 6px 8px;
 		border: 0;
@@ -123,30 +109,42 @@
 		transform: rotate(90deg);
 	}
 
-	.what {
-		flex: 1;
-		min-width: 0;
+	.start,
+	.end {
 		display: flex;
 		align-items: baseline;
 		gap: 8px;
+		min-width: 0;
+	}
+
+	.end {
+		justify-content: flex-end;
 	}
 
 	.name {
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
 		font-size: 13px;
 		color: var(--text);
 		transition: color var(--fade) var(--ease);
 	}
 
-	.hint {
+	/* The id starts at the same place on every row — the name column is a fixed width — in the
+	   body face and italic: a model id is a name, not code, and monospace made it read like a field
+	   somebody had forgotten to fill in. */
+	.id {
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
-		font-family: var(--font-mono);
-		font-size: 11.5px;
+		font-size: 12.5px;
+		font-style: italic;
 		color: var(--text-faint);
 	}
 
 	.badge {
+		flex: none;
 		font-size: 11px;
 		letter-spacing: 0.06em;
 		text-transform: uppercase;

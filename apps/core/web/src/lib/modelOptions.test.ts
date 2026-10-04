@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest';
 import {
 	budgetOf,
 	contextLengthToSave,
+	maxTokensOf,
 	parsed,
 	thinkingOn,
+	tokenCountFrom,
 	withOption,
 	withThinking,
 	written
@@ -74,5 +76,30 @@ describe('budgetOf', () => {
 		expect(budgetOf({ thinking_budget: 0 })).toBeUndefined();
 		expect(budgetOf({ thinking_budget: '2048' })).toBeUndefined();
 		expect(budgetOf(null)).toBeUndefined();
+	});
+});
+
+describe('max output tokens', () => {
+	it('reads only a whole number above zero out of the options', () => {
+		expect(maxTokensOf({ max_tokens: 4096 })).toBe(4096);
+		expect(maxTokensOf({ max_tokens: 0 })).toBeUndefined();
+		expect(maxTokensOf({ max_tokens: 12.5 })).toBeUndefined();
+		expect(maxTokensOf({ max_tokens: '4096' })).toBeUndefined();
+		expect(maxTokensOf({})).toBeUndefined();
+	});
+
+	it('turns typed text into a limit, and anything else into "no override"', () => {
+		expect(tokenCountFrom('8192')).toBe(8192);
+		expect(tokenCountFrom(' 8192 ')).toBe(8192);
+		expect(tokenCountFrom('')).toBeUndefined();
+		expect(tokenCountFrom('0')).toBeUndefined();
+		expect(tokenCountFrom('-5')).toBeUndefined();
+		expect(tokenCountFrom('1e3')).toBeUndefined();
+	});
+
+	it('writes and clears max_tokens through the same text as every other option', () => {
+		const set = withOption('', 'max_tokens', tokenCountFrom('8192'));
+		expect(parsed(set)).toEqual({ max_tokens: 8192 });
+		expect(withOption(set, 'max_tokens', tokenCountFrom(''))).toBe('');
 	});
 });

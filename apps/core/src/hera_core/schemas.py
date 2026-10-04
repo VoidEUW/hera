@@ -598,6 +598,7 @@ class ModelOut(BaseModel):
     options: dict[str, Any] = Field(default_factory=dict)
     context_length: int | None = None
     tool_calling: bool = True
+    accepts_images: bool = True
     reasoning_efforts: list[str] = Field(default_factory=list)
     """The ``reasoning_effort`` values this model accepts, asked of the endpoint rather than
     guessed from the id — and **empty means unknown, not "any"**.
@@ -762,6 +763,10 @@ class ModelIn(BaseModel):
     tool_calling: bool = True
     """Whether this model is offered tools at all (ADR 19). Sent whole, like ``options`` above —
     editing a model without repeating a previously-set ``False`` here puts it back to ``True``."""
+
+    accepts_images: bool = True
+    """Whether this model can be shown a picture — see ``ModelEntry.accepts_images``. Sent whole,
+    for the same reason as ``tool_calling``."""
 
     @field_validator("options")
     @classmethod

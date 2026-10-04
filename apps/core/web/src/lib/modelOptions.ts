@@ -50,6 +50,23 @@ export function budgetOf(current: Options | null | undefined): number | undefine
 	return typeof raw === 'number' && raw > 0 ? raw : undefined;
 }
 
+/** What this model's options say about how many tokens an answer may run to, or `undefined` for
+ * "send nothing" — the server's own limit then applies. A whole number above zero, and nothing
+ * else: `0` and a fraction are not limits, they are typos. */
+export function maxTokensOf(current: Options | null | undefined): number | undefined {
+	const raw = current?.max_tokens;
+	return typeof raw === 'number' && Number.isInteger(raw) && raw > 0 ? raw : undefined;
+}
+
+/** The field's text as a limit to write, or `undefined` for anything that is not one — which
+ * clears the key, so an emptied field means "no override" rather than "keep the old number". */
+export function tokenCountFrom(text: string): number | undefined {
+	const trimmed = text.trim();
+	if (!/^\d+$/.test(trimmed)) return undefined;
+	const value = Number(trimmed);
+	return value > 0 ? value : undefined;
+}
+
 /** Whether the model is thinking, which is the *absence* of `enable_thinking: false`.
  *
  * A boolean knob has no third state, so the model's own default — which for MiniCPM5 is to

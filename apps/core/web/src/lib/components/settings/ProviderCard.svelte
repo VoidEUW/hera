@@ -96,7 +96,6 @@
 
 	const activate = () => run(() => api.activateProvider(entry.name));
 	const remove = () => run(() => api.deleteProvider(entry.name));
-	const setActiveModel = (modelId: string) => run(() => api.activateProvider(entry.name, modelId));
 	const removeModel = (modelId: string) => run(() => api.removeModel(entry.name, modelId));
 
 	async function runProbe() {
@@ -322,11 +321,9 @@
 								provider={entry.name}
 								{model}
 								current={model.id === entry.active_model}
-								canActivate={isActive}
 								open={openModel === model.id}
 								{presets}
 								ontoggle={() => (openModel = openModel === model.id ? null : model.id)}
-								onactivate={() => setActiveModel(model.id)}
 								onremove={() => removeModel(model.id)}
 								onsaved={onchange}
 								{onerror}

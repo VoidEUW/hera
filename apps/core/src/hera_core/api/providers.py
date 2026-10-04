@@ -229,6 +229,7 @@ async def register_model(name: str, payload: ModelIn, container: Container) -> P
             options=payload.options,
             context_length=payload.context_length,
             tool_calling=payload.tool_calling,
+            accepts_images=payload.accepts_images,
         )
     )
     return await _commit(container, config.with_provider(updated))

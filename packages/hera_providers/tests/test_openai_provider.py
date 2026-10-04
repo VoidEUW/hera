@@ -168,6 +168,15 @@ def test_set_fields_are_sent() -> None:
     assert payload["stop"] == ["\n\n"]
 
 
+def test_a_models_max_tokens_option_overrides_the_requests_own() -> None:
+    """The Models screen writes `max_tokens` into a model's options, which travel as `extra` and
+    are merged last — so it wins over a deployment-wide limit, and it is what reaches a server
+    like mlx_lm that would otherwise stop at its own small default."""
+    payload = chat_payload(request(max_tokens=64, extra={"max_tokens": 8192}), stream=False)
+
+    assert payload["max_tokens"] == 8192
+
+
 def test_tools_are_sent_in_the_function_envelope_with_a_choice() -> None:
     spec = ToolSpec(
         name="hera__search",

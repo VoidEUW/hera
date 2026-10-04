@@ -306,6 +306,22 @@ class TestModels:
         model = next(m for m in body["providers"][0]["models"] if m["id"] == "prose-only")
         assert model["tool_calling"] is True
 
+    async def test_accepts_images_defaults_to_true(self, client: AsyncClient) -> None:
+        """Images are attachable to any model today, so an install is not changed by this."""
+        body = (await client.post(f"{API}/providers/local/models", json={"id": "usual"})).json()
+        entry = next(p for p in body["providers"] if p["name"] == "local")
+        model = next(m for m in entry["models"] if m["id"] == "usual")
+        assert model["accepts_images"] is True
+
+    async def test_accepts_images_is_stored_and_comes_back(self, client: AsyncClient) -> None:
+        await client.post(
+            f"{API}/providers/local/models", json={"id": "text-only", "accepts_images": False}
+        )
+
+        body = (await client.get(f"{API}/providers")).json()
+        model = next(m for m in body["providers"][0]["models"] if m["id"] == "text-only")
+        assert model["accepts_images"] is False
+
 
 class TestLogo:
     async def test_uploading_a_custom_logo_is_served_back_with_its_content_type(
