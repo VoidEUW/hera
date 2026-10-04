@@ -49,7 +49,6 @@ from hera_profiles import (
     SLOT_MEMORIES,
 SLOT_PROBLEMS,
     SLOT_PROJECT,
-    SLOT_SKILLS,
     SLOT_TOOLS,
     Profile,
     PromptBuilder,
@@ -400,12 +399,14 @@ class Turn:
 
         prompt = self._builder.build(context.profile)
         bindings = {
-            SLOT_SKILLS: skills_text,
             SLOT_MEMORIES: context.memories,
             SLOT_PROJECT: context.project.instructions if context.project is not None else "",
             SLOT_TOOLS: catalogue_text,
 SLOT_PROBLEMS: context.problems,
-            # Deliberately not `SLOT_NOW`. It is bound after the history instead -- see below.
+            # Deliberately not `SLOT_NOW` and not `SLOT_SKILLS`. Both are bound after the history
+            # instead -- see below. They are the only two slots whose text changes from one turn
+            # to the next, and a KV cache is a prefix cache: a change at position N re-reads
+            # everything from N onward, which here means the whole conversation.
         }
         frame = prompt.render(
             bindings={key: value for key, value in bindings.items() if value},
@@ -415,20 +416,26 @@ SLOT_PROBLEMS: context.problems,
 
         head, tail = _split_frame(frame.messages)
         messages = [*head, *context.history]
-        # The clock, **after** the history rather than inside the frame.
+        # What changes from turn to turn goes here, **after** the history, not in the frame.
         #
-        # A KV cache is a prefix cache: change one token at position N and everything from N
-        # onward is re-read. `context.now` was priority 68 -- second from last in the frame, and
-        # the frame is followed by the entire conversation -- so a minute-granularity timestamp
-        # invalidated the whole history once a minute. The static half of the frame still hit the
-        # cache; the half that grows, which is the expensive half, did not.
+        # A KV cache is a prefix cache: change one token at position N and everything from N onward
+        # is re-read. The frame is followed by the entire conversation, so anything volatile inside
+        # it invalidates all of that -- while the static half of the frame (safety, identity,
+        # approach, the tool catalogue) still hits the cache. The cache was being spent on the
+        # cheap half and thrown away on the half that grows.
         #
-        # A user-role message for the same reason `_wrap_up` uses one below: it is true of *this
-        # moment* and not of this deployment, and a system prompt that changed shape every minute
-        # would be a second prompt to reason about. Placed here it changes after everything worth
-        # caching rather than before it.
+        # Two slots move. The clock, at minute granularity. And the router's skill choice, which
+        # changes whenever routing lands differently -- the one that survives any date-only fix.
+        # Both are true of *this moment* and not of this deployment, which is the same reason
+        # `_wrap_up` below is a user-role message rather than system prompt. Here they change only
+        # what comes after everything worth caching.
+        #
+        # Order is clock, then skills, then the question. A skill's instructions belong next to
+        # the thing being asked, and a note after the question reads as part of it.
         if context.now:
             messages.append(ChatMessage(role=Role.USER, content=f"It is now {context.now}."))
+        if skills_text:
+            messages.append(ChatMessage(role=Role.USER, content=skills_text))
         # The router strips the /command; the attachments are added after that, so a file is
         # never scored as part of the turn's own words.
         spoken = content_of(self.cleaned_text, context.attachments)

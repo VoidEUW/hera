@@ -43,7 +43,7 @@ async def run(make_orchestrator: Any, **context: Any) -> list[Any]:
     from hera_providers import FakeProvider, text_turn
 
     provider = FakeProvider([text_turn("ok")])
-    turn = make_orchestrator(provider).begin(TurnContext(text="hi", **context))
+    turn = make_orchestrator(provider).begin(TurnContext(**{"text": "hi", **context}))
     await drain(turn.stream())
     return sent(provider)
 
@@ -125,6 +125,50 @@ async def test_an_unset_clock_leaves_no_trace(make_orchestrator: Any) -> None:
     asked = await run(make_orchestrator, now="")
 
     assert not any("It is now" in c for c in texts(asked[0])), texts(asked[0])
+
+
+async def test_the_skills_slot_is_not_in_the_frame(
+    make_orchestrator: Any, write_skill: Any
+) -> None:
+    """The second volatile slot, and the one that survives any date-only fix.
+
+    The router's choice changes whenever routing lands differently, and it used to sit at priority
+    60 in the frame -- in front of the whole conversation. So a turn that picked a different skill
+    re-read the history exactly as the clock did, once a minute.
+    """
+    write_skill("tdd", body="Red, green, refactor.")
+
+    asked = await run(make_orchestrator, text="/tdd how do I test this?")
+
+    frame, _ = split_frame(asked[0])
+
+    assert not any("Red, green, refactor." in c for c in frame), frame
+
+
+async def test_the_skill_body_still_reaches_her(make_orchestrator: Any, write_skill: Any) -> None:
+    """Moved, not dropped."""
+    write_skill("tdd", body="Red, green, refactor.")
+
+    asked = await run(make_orchestrator, text="/tdd how do I test this?")
+
+    _, rest = split_frame(asked[0])
+
+    assert any("Red, green, refactor." in c for c in rest), rest
+
+
+async def test_the_frame_is_identical_whatever_the_skills_and_the_clock_say(
+    make_orchestrator: Any, write_skill: Any
+) -> None:
+    """The whole claim in one assertion: turn to turn, the cacheable prefix does not move."""
+    write_skill("tdd", body="Red, green, refactor.")
+
+    plain, _ = split_frame((await run(make_orchestrator, text="hello"))[0])
+    skilled, _ = split_frame((await run(make_orchestrator, text="/tdd go"))[0])
+    later, _ = split_frame((await run(make_orchestrator, now="Friday 03 October 2026, 23:59"))[0])
+
+    assert plain, "the frame should not be empty"
+    assert plain == skilled, "selecting a skill changed the frame"
+    assert plain == later, "the clock changed the frame"
 
 
 async def test_the_turn_still_completes_with_the_clock_moved(make_orchestrator: Any) -> None:

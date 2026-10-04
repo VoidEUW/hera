@@ -165,13 +165,20 @@ class TestSkills:
     async def test_the_skill_body_reaches_the_prompt_uncorrupted(
         self, make_orchestrator: Make, write_skill: WriteSkill
     ) -> None:
-        """The reason Section.escape exists: a skill body is somebody else's code."""
+        """The reason Section.escape exists: a skill body is somebody else's code.
+
+        Asserted against the whole request rather than the first message, because the skills slot
+        is bound *after* the history -- it changes from turn to turn, and a volatile slot inside
+        the frame invalidates the conversation behind it. What this test is about is the body
+        arriving intact, not where it sits.
+        """
         write_skill("tdd", body="assert count < limit && ready")
         provider = FakeProvider([text_turn("ok")])
 
         await drain(make_orchestrator(provider).begin(TurnContext(text="/tdd go")).stream())
 
-        assert "count < limit && ready" in provider.requests[0].messages[0].content
+        asked = "\n".join(str(m.content or "") for m in provider.requests[0].messages)
+        assert "count < limit && ready" in asked
 
     async def test_pins_come_from_the_profile_and_the_project_together(
         self, make_orchestrator: Make, write_skill: WriteSkill, profile: Profile
