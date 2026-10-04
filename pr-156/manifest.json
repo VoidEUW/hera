@@ -1,0 +1,292 @@
+{
+  "ok": true,
+  "scenes": 34,
+  "ran": 34,
+  "did_not_run": 0,
+  "console_messages": 0,
+  "page_errors": 0,
+  "failed_requests": 0,
+  "screenshots": [
+    "01-start.png",
+    "02-waiting-feather.png",
+    "03-waiting-eye.png",
+    "04-first-answer.png",
+    "05-long-trace-collapsed.png",
+    "06-long-trace-open.png",
+    "07-turn-refused.png",
+    "08-turn-cut-off.png",
+    "09-answer-after-both.png",
+    "13-the-question-card.png",
+    "14-the-reply-resumed.png",
+    "15-rail.png",
+    "16-rail-menu.png",
+    "17-new-chat-is-the-start-screen.png",
+    "20-model-dropdown.png",
+    "21-servers-sheet.png",
+    "22-skills-sheet.png",
+    "23-composer-grown.png",
+    "30-settings-account.png",
+    "31-settings-models.png",
+    "32-settings-general.png",
+    "33-settings-skills.png",
+    "34-settings-servers.png",
+    "35-settings-permissions.png",
+    "36-settings-memory.png",
+    "37-settings-mind.png",
+    "38-settings-dreaming.png",
+    "39-settings-search.png",
+    "40-profile-menu.png",
+    "41-light-start.png",
+    "42-back-to-dark.png",
+    "50-reduced-motion-settings.png",
+    "51-reduced-motion-dropdown.png",
+    "70-phone-start.png",
+    "71-phone-rail.png",
+    "72-phone-answer.png",
+    "73-phone-settings.png"
+  ],
+  "videos": [
+    "desktop.webm",
+    "phone.webm"
+  ],
+  "detail": [
+    {
+      "name": "01-start",
+      "group": "conversation",
+      "ok": true,
+      "seconds": 1.12,
+      "problem": ""
+    },
+    {
+      "name": "02-waiting-mark",
+      "group": "conversation",
+      "ok": true,
+      "seconds": 4.78,
+      "problem": ""
+    },
+    {
+      "name": "03-first-answer",
+      "group": "conversation",
+      "ok": true,
+      "seconds": 1.05,
+      "problem": ""
+    },
+    {
+      "name": "04-long-trace",
+      "group": "conversation",
+      "ok": true,
+      "seconds": 14.32,
+      "problem": ""
+    },
+    {
+      "name": "05-a-turn-that-cannot-start",
+      "group": "conversation",
+      "ok": true,
+      "seconds": 0.36,
+      "problem": ""
+    },
+    {
+      "name": "06-a-turn-cut-off-mid-answer",
+      "group": "conversation",
+      "ok": true,
+      "seconds": 5.46,
+      "problem": ""
+    },
+    {
+      "name": "07-the-answer-after-both",
+      "group": "conversation",
+      "ok": true,
+      "seconds": 4.53,
+      "problem": ""
+    },
+    {
+      "name": "10-the-question-card",
+      "group": "cards",
+      "ok": true,
+      "seconds": 5.9,
+      "problem": ""
+    },
+    {
+      "name": "11-the-reply-resumes-the-turn",
+      "group": "cards",
+      "ok": true,
+      "seconds": 4.55,
+      "problem": ""
+    },
+    {
+      "name": "rail-row-menu",
+      "group": "rail",
+      "ok": true,
+      "seconds": 1.54,
+      "problem": ""
+    },
+    {
+      "name": "rail-new-chat-and-projects",
+      "group": "rail",
+      "ok": true,
+      "seconds": 0.65,
+      "problem": ""
+    },
+    {
+      "name": "composer-model-dropdown",
+      "group": "composer",
+      "ok": true,
+      "seconds": 1.22,
+      "problem": ""
+    },
+    {
+      "name": "composer-servers-sheet",
+      "group": "composer",
+      "ok": true,
+      "seconds": 1.14,
+      "problem": ""
+    },
+    {
+      "name": "composer-skills-sheet",
+      "group": "composer",
+      "ok": true,
+      "seconds": 1.12,
+      "problem": ""
+    },
+    {
+      "name": "composer-typed-and-growing",
+      "group": "composer",
+      "ok": true,
+      "seconds": 0.58,
+      "problem": ""
+    },
+    {
+      "name": "settings-open",
+      "group": "settings",
+      "ok": true,
+      "seconds": 1.28,
+      "problem": ""
+    },
+    {
+      "name": "settings-models",
+      "group": "settings",
+      "ok": true,
+      "seconds": 1.82,
+      "problem": ""
+    },
+    {
+      "name": "settings-general",
+      "group": "settings",
+      "ok": true,
+      "seconds": 0.96,
+      "problem": ""
+    },
+    {
+      "name": "settings-skills",
+      "group": "settings",
+      "ok": true,
+      "seconds": 1.73,
+      "problem": ""
+    },
+    {
+      "name": "settings-servers",
+      "group": "settings",
+      "ok": true,
+      "seconds": 1.73,
+      "problem": ""
+    },
+    {
+      "name": "settings-permissions",
+      "group": "settings",
+      "ok": true,
+      "seconds": 1.74,
+      "problem": ""
+    },
+    {
+      "name": "settings-memory",
+      "group": "settings",
+      "ok": true,
+      "seconds": 1.76,
+      "problem": ""
+    },
+    {
+      "name": "settings-mind",
+      "group": "settings",
+      "ok": true,
+      "seconds": 1.87,
+      "problem": ""
+    },
+    {
+      "name": "settings-dreaming",
+      "group": "settings",
+      "ok": true,
+      "seconds": 0.93,
+      "problem": ""
+    },
+    {
+      "name": "settings-search",
+      "group": "settings",
+      "ok": true,
+      "seconds": 1.18,
+      "problem": ""
+    },
+    {
+      "name": "profile-menu",
+      "group": "theme",
+      "ok": true,
+      "seconds": 2.4,
+      "problem": ""
+    },
+    {
+      "name": "light-theme",
+      "group": "theme",
+      "ok": true,
+      "seconds": 1.46,
+      "problem": ""
+    },
+    {
+      "name": "back-to-dark",
+      "group": "theme",
+      "ok": true,
+      "seconds": 2.17,
+      "problem": ""
+    },
+    {
+      "name": "reduced-motion",
+      "group": "accessibility",
+      "ok": true,
+      "seconds": 1.44,
+      "problem": ""
+    },
+    {
+      "name": "reduced-motion-drawer",
+      "group": "accessibility",
+      "ok": true,
+      "seconds": 0.47,
+      "problem": ""
+    },
+    {
+      "name": "phone-start",
+      "group": "phone",
+      "ok": true,
+      "seconds": 1.26,
+      "problem": ""
+    },
+    {
+      "name": "phone-rail",
+      "group": "phone",
+      "ok": true,
+      "seconds": 0.65,
+      "problem": ""
+    },
+    {
+      "name": "phone-answer",
+      "group": "phone",
+      "ok": true,
+      "seconds": 1.75,
+      "problem": ""
+    },
+    {
+      "name": "phone-settings",
+      "group": "phone",
+      "ok": true,
+      "seconds": 1.23,
+      "problem": ""
+    }
+  ]
+}
