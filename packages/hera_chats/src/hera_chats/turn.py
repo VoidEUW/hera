@@ -47,8 +47,7 @@ from hera_permissions import Decision
 from hera_profiles import (
     BEHAVIOUR_TRAITS,
     SLOT_MEMORIES,
-    SLOT_NOW,
-    SLOT_PROBLEMS,
+SLOT_PROBLEMS,
     SLOT_PROJECT,
     SLOT_SKILLS,
     SLOT_TOOLS,
@@ -405,8 +404,8 @@ class Turn:
             SLOT_MEMORIES: context.memories,
             SLOT_PROJECT: context.project.instructions if context.project is not None else "",
             SLOT_TOOLS: catalogue_text,
-            SLOT_NOW: context.now,
-            SLOT_PROBLEMS: context.problems,
+SLOT_PROBLEMS: context.problems,
+            # Deliberately not `SLOT_NOW`. It is bound after the history instead -- see below.
         }
         frame = prompt.render(
             bindings={key: value for key, value in bindings.items() if value},
@@ -416,6 +415,20 @@ class Turn:
 
         head, tail = _split_frame(frame.messages)
         messages = [*head, *context.history]
+        # The clock, **after** the history rather than inside the frame.
+        #
+        # A KV cache is a prefix cache: change one token at position N and everything from N
+        # onward is re-read. `context.now` was priority 68 -- second from last in the frame, and
+        # the frame is followed by the entire conversation -- so a minute-granularity timestamp
+        # invalidated the whole history once a minute. The static half of the frame still hit the
+        # cache; the half that grows, which is the expensive half, did not.
+        #
+        # A user-role message for the same reason `_wrap_up` uses one below: it is true of *this
+        # moment* and not of this deployment, and a system prompt that changed shape every minute
+        # would be a second prompt to reason about. Placed here it changes after everything worth
+        # caching rather than before it.
+        if context.now:
+            messages.append(ChatMessage(role=Role.USER, content=f"It is now {context.now}."))
         # The router strips the /command; the attachments are added after that, so a file is
         # never scored as part of the turn's own words.
         spoken = content_of(self.cleaned_text, context.attachments)

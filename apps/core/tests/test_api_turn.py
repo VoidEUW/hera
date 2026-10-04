@@ -152,7 +152,10 @@ class TestASimpleTurn:
             await talk(client, chat_id, "second")
 
         roles = [m.role.value for m in services.provider.requests[1].messages]
-        assert roles == ["system", "user", "assistant", "user"]
+        # The clock sits between the history and the question, as a user-role note, so that a
+        # minute-granularity timestamp does not invalidate the cache in front of the conversation.
+        # Two consecutive user messages here are that note and the question, not a mistake.
+        assert roles == ["system", "user", "assistant", "user", "user"]
 
 
 class TestSkillsAndTools:
