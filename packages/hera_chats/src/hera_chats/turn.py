@@ -47,7 +47,7 @@ from hera_permissions import Decision
 from hera_profiles import (
     BEHAVIOUR_TRAITS,
     SLOT_MEMORIES,
-SLOT_PROBLEMS,
+    SLOT_PROBLEMS,
     SLOT_PROJECT,
     SLOT_TOOLS,
     Profile,
@@ -402,7 +402,7 @@ class Turn:
             SLOT_MEMORIES: context.memories,
             SLOT_PROJECT: context.project.instructions if context.project is not None else "",
             SLOT_TOOLS: catalogue_text,
-SLOT_PROBLEMS: context.problems,
+            SLOT_PROBLEMS: context.problems,
             # Deliberately not `SLOT_NOW` and not `SLOT_SKILLS`. Both are bound after the history
             # instead -- see below. They are the only two slots whose text changes from one turn
             # to the next, and a KV cache is a prefix cache: a change at position N re-reads
