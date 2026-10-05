@@ -260,7 +260,45 @@ class TestToolCallShape:
         assert tool_call_shape(props(chat_template=None)) == UNKNOWN
 
     def test_a_server_that_declares_no_is_none(self) -> None:
-        assert tool_call_shape(props(chat_template_caps={"supports_tool_calls": False})) == "none"
+        assert tool_call_shape(props(chat_template_caps={"supports_tools": False})) == "none"
+
+    def test_a_template_rendering_call_history_alone_is_not_a_declaration_path(self) -> None:
+        # llama.cpp probes these separately: `supports_tools` from whether the template *uses* the
+        # tools it was handed, `supports_tool_calls` from whether it uses `messages[1].tool_calls`
+        # (common/jinja/caps.cpp). A template can render results without ever rendering a
+        # declaration, so `tool_calls` cannot stand in for one -- and this field means "can be
+        # offered a tool", not "can render tool history".
+        history_only = (
+            "{{ messages[0].content }}{% for m in messages %}{{ m.tool_calls }}{% endfor %}"
+        )
+
+        assert tool_call_shape(props(chat_template=history_only)) == "none"
+
+    def test_a_failed_string_argument_render_does_not_hide_a_declaration_path(self) -> None:
+        # Upstream, a template taking string arguments fails its probe and clears *both* flags
+        # (`if (!success) { supports_tool_calls = false; supports_tools = false; }`) without saying
+        # anything about a declaration path. Believing the flags before the template would report
+        # `none` here and hide a working tools path behind a probe artefact.
+        found = tool_call_shape(
+            props(
+                chat_template=MINICPM5_TOOLS_TEMPLATE,
+                chat_template_caps={"supports_tools": False, "supports_tool_calls": False},
+            )
+        )
+
+        assert found == "template"
+
+    def test_call_history_flag_false_alone_does_not_claim_a_declaration_is_absent(self) -> None:
+        # The other half of the same mistake: `supports_tool_calls: false` is about history, so it
+        # must not suppress a declaration path on its own.
+        found = tool_call_shape(
+            props(
+                chat_template=MINICPM5_TOOLS_TEMPLATE,
+                chat_template_caps={"supports_tool_calls": False},
+            )
+        )
+
+        assert found == "template"
 
     def test_an_omitted_flag_falls_through_to_the_template(self) -> None:
         # `True` says nothing useful -- not whether the engine has a parser -- so it is no reason to

@@ -73,11 +73,17 @@ ToolCallShape = Literal["template", "none", "unknown"]
 #: The honest answer for an endpoint that published nothing.
 UNKNOWN: ToolCallShape = "unknown"
 
-#: The dialect markers a chat template or a server's answer has to mention for a call to be
-#: possible at all. Matched as whole words inside the Jinja source, the same way
-#: :data:`THINKING_KWARG` is, and for the same reason: the question is *would this do anything*,
-#: which is not a Jinja parse.
-_TOOL_MARKERS = ("tools", "tool_calls", "render_tools")
+#: The markers a chat template must mention for a **tool declaration** to be rendered: the ``tools``
+#: loop, or an explicit ``render_tools`` call. Matched as whole words inside the Jinja source, the
+#: same way :data:`THINKING_KWARG` is, and for the same reason: the question is *would this do
+#: anything*, which is not a Jinja parse.
+#:
+#: ``tool_calls`` is deliberately **not** in here. llama.cpp probes it separately
+#: (``common/jinja/caps.cpp`` sets ``supports_tool_calls = false`` when a template renders call
+#: *history* without using ``messages[1].tool_calls``), and it answers a different question --
+#: whether results come back in -- rather than whether tools are offered at all. A template can
+#: render a declaration perfectly well and never mention it.
+_TOOL_MARKERS = ("tools", "render_tools")
 
 #: A Jinja comment, ``{# ... #}``, matched with DOTALL because they wrap. Replaced with a space
 #: rather than removed so that two words either side of a comment do not become one word.
@@ -173,20 +179,31 @@ def tool_call_shape(props: object) -> ToolCallShape:
     MiniCPM5's XML is SGLang-native, unparsed by vLLM and Ollama, and unsupported by llama.cpp --
     four engines, one template, three different outcomes. So:
 
-    * ``template`` -- the template can render tools. **Not** a claim that calls will come back.
-    * ``none`` -- the server declared it cannot, or the template has no tools path.
+    * ``template`` -- the template can render a tool declaration. **Not** a claim that calls will
+      come back, and not a claim that results render -- ``tool_calls`` history is a separate probe.
+    * ``none`` -- the server declared ``supports_tools: false``, or the template has no tools path.
     * ``unknown`` -- nobody said.
 
-    A server that explicitly declares ``supports_tool_calls: false`` is believed, because that is
-    the server talking about its own behaviour. Everything else waits for the engine half, which
-    has to come from somewhere other than ``/props`` (#145).
+    A server that explicitly declares ``supports_tools: false`` is believed, because that is the
+    server talking about its own behaviour, and it is the declaration probe rather than its
+    ``supports_tool_calls`` sibling, which is about call *history*. Everything else waits for the
+    engine half, which has to come from somewhere other than ``/props`` (#145).
     """
     if not isinstance(props, dict):
         return UNKNOWN
-    if _cap_flag(props, "supports_tool_calls") is False:
-        return "none"
+    # Markers first, and this ordering is load-bearing. A published template is direct evidence
+    # about what it does, while the flags are two *independent* probes upstream -- and on a template
+    # taking string arguments a failed render clears **both** of them at once
+    # (``common/jinja/caps.cpp``: `if (!success) { supports_tool_calls = false; supports_tools =
+    # false; }``) without saying anything about whether a declaration path exists. Believing the
+    # flags first would report `none` for a working tools path.
     if _mentions_any(props, _TOOL_MARKERS):
         return "template"
+    # `supports_tools` is the declaration probe and is the one that matches this field. Its sibling
+    # `supports_tool_calls` is about rendering call history, which is a different question, so an
+    # explicit `false` there says nothing about whether tools are offered.
+    if _cap_flag(props, "supports_tools") is False:
+        return "none"
     # No template published *and* nothing said is not evidence that tools cannot be rendered, so it
     # stays unknown rather than becoming `none`. Only a published template with no tools path is.
     return "none" if _published(props) else UNKNOWN
