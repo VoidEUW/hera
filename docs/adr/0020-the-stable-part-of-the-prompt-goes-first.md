@@ -64,29 +64,46 @@ tool-call rate" is a hypothesis, not a finding. Measure before rewriting prose.
 ## Measured
 
 `docs/status.md` asks for numbers rather than intentions, so here they are. MiniCPM5-2B Q8_0 on
-llama.cpp, `-ngl 99 -ctk/-ctv q8_0 -c 8192`, reading `usage.prompt_tokens_details.cached_tokens`.
-One conversation of about 1,580 tokens; one minute passes between the two measured sends.
+llama.cpp, `-ngl 99 -ctk/-ctv q8_0`, reading `usage.prompt_tokens_details.cached_tokens`.
 
-| where the clock sits | cached |
-|---|---|
-| inside the system frame (before) | **4.0%** |
-| after the history (this ADR) | **98.4%** |
-| nothing volatile at all (ceiling) | 99.9% |
+**An earlier version of this section carried a table claiming 4.0% → 98.4% on the 2B and 0.0% →
+20.4% on MiMo-9B, with the explanation that the 9B's smaller figure was "the same effect on a
+shorter prompt". That explanation is arithmetically impossible and the numbers do not reproduce.
+Both are struck out.** A 646-token prompt losing only a ~60-token volatile tail should cache about
+91%, not 20.4%; and re-measured under an instrument that warmed each arm immediately before its two
+sends, the 9B cached **90.1%** and the 2B **47.1%** -- the opposite ordering.
 
-The 1.5 points between here and the ceiling are the clock sentence and the question — 26 tokens,
-which is the irreducible cost of telling her the time, and the whole trade. Confirmed on
-MiMo-V2.6-Distill-Qwen-9B, where the same conversation is only 646 tokens: 0.0% → 20.4%, smaller
-only because the volatile part is a bigger share of a short prompt. The effect scales with history
-length, which is the point — the history is what grows.
+What is actually established, on a 5,200-token prompt whose only difference between sends is the
+clock sentence at 99.1% depth:
 
-Two things had to be got right for that number to mean anything, and both were wrong first:
+| | MiniCPM5-2B | MiMo-9B |
+|---|---|---|
+| identical request sent twice (the floor) | 100.0% | 99.9% |
+| only the clock differs, last before the question | 47.1% | 90.1% |
+
+The floor is the part that matters: on both models the cache is healthy and an unchanged prompt is
+fully reused, so what follows is about *where* a change lands, not about the cache being absent.
+
+Two things had to be got right for these numbers to mean anything, and both were wrong first:
 
 - **The instrument was validated before it was trusted.** An unrelated prompt of identical length
-  caches 4 of 112, which is what proves the metric responds to content rather than reporting a
-  warm slot.
-- **Each arrangement warms its own cache immediately before its two measured sends.** Without that,
-  the "before" arm was measured against a slot its own earlier sends had warmed, and reported 99.9%
-  cached — a number that said the opposite of the truth.
+  caches 4 of 112, which proves the metric responds to content rather than reporting a warm slot.
+  The identical-request floor above is the same check, run every time.
+- **Each arrangement must warm its own cache immediately before its two measured sends.** Without
+  that, an arm is measured against a slot its own earlier sends have warmed. This is not
+  hypothetical: it produced a "before" figure of 99.9% cached once, and a "after" figure of 20.4%
+  another time, both of which were published here before being caught.
+
+## Not yet established
+
+**The before/after comparison this ADR exists for has not been reproduced.** The figures above measure
+one arrangement with a clock moved to the end of the prompt. They do not compare against the clock at
+its original slot position inside the system frame, because doing that through a reconstructed prompt
+string does not reproduce the real render -- the two came out within a point of each other, which is
+evidence the reconstruction is not testing the thing. That comparison has to go through
+`Turn._prepare` with the real bindings and the real prompt template, and until it does, the ordering
+here rests on the mechanism (a prefix cache re-reads from the first changed token) and not on a
+measurement of the before case.
 
 ## Enforced by
 

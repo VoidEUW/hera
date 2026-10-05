@@ -404,14 +404,14 @@ def build_builtin_server(
         name="artifact_create",
         title="Publish an artifact",
         description=(
-            "Publish a file the person can open beside your answer: a page, a document, a "
-            "diagram. Use this whenever you were asked to make, draw or show something -- put "
-            "the work here rather than into a long answer, and never write a placeholder for it. "
-            "`name` is a filename and the extension decides how it is drawn: `.html` a page, "
-            "`.svg` a drawing, `.md` typeset. A diagram is the one thing this is not for -- "
-            "`diagram_create` takes mermaid and draws it for you. `inline=true` puts a figure in "
-            "the middle of what you are saying. Publishing the same name again replaces it, so "
-            "use `artifact_edit` to change one. For working notes only you read, use "
+            "Publish a file the person can open beside your answer: a page, a "
+            "document, a chart, a diagram. Use this whenever you were asked to make, draw or show "
+            "something -- put the work here rather than into a long answer, and never write a "
+            "placeholder for it. `name` is a filename and the extension decides how it is drawn: "
+            "`.html` a page, `.svg` a drawing, `.md` typeset. For a diagram you can describe in "
+            "words, `diagram_create` takes mermaid and is less work. `inline=true` puts a figure "
+            "in the middle of what you are saying. Publishing the same name again replaces it, "
+            "so use `artifact_edit` to change one. For working notes only you read, use "
             "`scratch_write`."
         ),
     )
