@@ -47,7 +47,6 @@ from hera_permissions import Decision
 from hera_profiles import (
     BEHAVIOUR_TRAITS,
     SLOT_MEMORIES,
-    SLOT_PROBLEMS,
     SLOT_PROJECT,
     SLOT_TOOLS,
     Profile,
@@ -402,11 +401,10 @@ class Turn:
             SLOT_MEMORIES: context.memories,
             SLOT_PROJECT: context.project.instructions if context.project is not None else "",
             SLOT_TOOLS: catalogue_text,
-            SLOT_PROBLEMS: context.problems,
-            # Deliberately not `SLOT_NOW` and not `SLOT_SKILLS`. Both are bound after the history
-            # instead -- see below. They are the only two slots whose text changes from one turn
-            # to the next, and a KV cache is a prefix cache: a change at position N re-reads
-            # everything from N onward, which here means the whole conversation.
+            # Deliberately not `SLOT_NOW`, not `SLOT_SKILLS`, and not `SLOT_PROBLEMS`. All three are
+            # bound after the history instead -- see below. They are the only slots whose text
+            # changes from one turn to the next, and a KV cache is a prefix cache: a change at
+            # position N re-reads everything from N onward, which here means the whole conversation.
         }
         frame = prompt.render(
             bindings={key: value for key, value in bindings.items() if value},
@@ -424,16 +422,27 @@ class Turn:
         # approach, the tool catalogue) still hits the cache. The cache was being spent on the
         # cheap half and thrown away on the half that grows.
         #
-        # Two slots move. The clock, at minute granularity. And the router's skill choice, which
-        # changes whenever routing lands differently -- the one that survives any date-only fix.
-        # Both are true of *this moment* and not of this deployment, which is the same reason
+        # Three slots move. The clock, at minute granularity. The router's skill
+        # choice, which changes whenever routing lands differently -- the one that survives any
+        # date-only fix. And what the browser could not draw this turn, which is empty on every turn
+        # that drew cleanly and so differs between two otherwise identical turns.
+        #
+        # All three are true of *this moment* and not of this deployment, which is the same reason
         # `_wrap_up` below is a user-role message rather than system prompt. Here they change only
         # what comes after everything worth caching.
         #
-        # Order is clock, then skills, then the question. A skill's instructions belong next to
-        # the thing being asked, and a note after the question reads as part of it.
+        # Order is clock, then problems, then skills, then the question. Problems are an account of
+        # this turn and belong with it; a skill's instructions belong next to the thing being
+        # asked; a note after the question reads as part of it.
         if context.now:
             messages.append(ChatMessage(role=Role.USER, content=f"It is now {context.now}."))
+        if context.problems:
+            messages.append(
+                ChatMessage(
+                    role=Role.USER,
+                    content=f"Your browser could not draw: {context.problems}",
+                )
+            )
         if skills_text:
             messages.append(ChatMessage(role=Role.USER, content=skills_text))
         # The router strips the /command; the attachments are added after that, so a file is

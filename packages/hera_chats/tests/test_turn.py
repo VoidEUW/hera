@@ -102,12 +102,23 @@ class TestASimpleTurn:
         self, make_orchestrator: Make
     ) -> None:
         """The whole point of the ``problems`` slot: a bad diagram she cannot see is one she
-        writes again, so the report has to arrive in the system prompt or nowhere."""
+        writes again, so the report has to reach the request or nowhere.
+
+        It does *not* have to be in the first message. ADR 20 moved it after the history,
+        because what the browser could not draw is true of one turn rather than of the
+        deployment, and a prefix cache re-reads everything from the first changed token. So
+        this checks that it arrives at all, and ``test_prompt_cache`` checks where.
+        """
         provider = FakeProvider([text_turn("ok")])
         context = TurnContext(text="hi", problems="- `gdp.mmd`: Lexical error on line 2")
         await drain(make_orchestrator(provider).begin(context).stream())
 
-        assert "Lexical error on line 2" in provider.requests[0].messages[0].content
+        # Content may be a list of parts when a file is attached, so text-only is what is joined.
+        everything = " ".join(
+            m.content for m in provider.requests[0].messages if isinstance(m.content, str)
+        )
+
+        assert "Lexical error on line 2" in everything
 
     async def test_history_sits_between_the_frame_and_the_question(
         self, make_orchestrator: Make

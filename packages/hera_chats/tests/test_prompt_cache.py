@@ -156,6 +156,64 @@ async def test_the_skill_body_still_reaches_her(make_orchestrator: Any, write_sk
     assert any("Red, green, refactor." in c for c in rest), rest
 
 
+async def test_the_problems_slot_is_not_in_the_frame(make_orchestrator: Any) -> None:
+    """The third volatile slot, and the one that arrived by accident.
+
+    `problems` is what the browser could not draw this turn: empty on a turn that rendered cleanly,
+    populated on one that did not. It is per-turn by definition, so in the frame it sat ahead of the
+    entire conversation and any turn carrying a broken diagram re-read all of it -- the clock's bug,
+    one commit later, in a slot nothing was currently populating.
+    """
+    asked = await run(
+        make_orchestrator,
+        text="draw a chart",
+        problems="- `gdp.mmd`: Lexical error on line 2",
+    )
+
+    frame, _ = split_frame(asked[0])
+
+    assert not any("Lexical error" in c for c in frame), frame
+
+
+async def test_the_problems_still_reach_her(make_orchestrator: Any) -> None:
+    """Moved, not dropped -- the browser's report is the only way she learns it."""
+    asked = await run(
+        make_orchestrator,
+        text="draw a chart",
+        problems="- `gdp.mmd`: Lexical error on line 2",
+    )
+
+    _, rest = split_frame(asked[0])
+
+    assert any("Lexical error" in c for c in rest), rest
+
+
+async def test_an_unset_problems_slot_leaves_no_trace(make_orchestrator: Any) -> None:
+    """A clean turn must not carry an empty section that the next turn's will invalidate."""
+    asked = await run(make_orchestrator, text="hello")
+
+    _, rest = split_frame(asked[0])
+
+    assert not any("could not draw" in c for c in rest), rest
+
+
+async def test_the_frame_is_identical_whatever_the_problems_say(make_orchestrator: Any) -> None:
+    """A turn that could not draw and a turn that did are otherwise identical requests."""
+    clean, _ = split_frame((await run(make_orchestrator, text="draw a chart"))[0])
+    broken, _ = split_frame(
+        (
+            await run(
+                make_orchestrator,
+                text="draw a chart",
+                problems="- `gdp.mmd`: Lexical error on line 2",
+            )
+        )[0]
+    )
+
+    assert clean, "the frame should not be empty"
+    assert clean == broken, "a drawing failure changed the frame"
+
+
 async def test_the_frame_is_identical_whatever_the_skills_and_the_clock_say(
     make_orchestrator: Any, write_skill: Any
 ) -> None:
