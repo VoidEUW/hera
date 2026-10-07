@@ -17,7 +17,8 @@
 	 * for.
 	 */
 	import { api, type BrokenSkill, type Skill } from '$lib/api/client';
-	import Input from '$lib/components/Input.svelte';
+	import Checkbox from '$lib/components/Checkbox.svelte';
+	import SkillEditor from './SkillEditor.svelte';
 	import { t } from '$lib/i18n';
 	import { Placeholder } from '$lib/loading.svelte';
 	import Rows from './Rows.svelte';
@@ -31,9 +32,9 @@
 	let skills = $state<Skill[]>([]);
 	let broken = $state<BrokenSkill[]>([]);
 	let trustProblem = $state('');
+	/** `undefined` is closed, `null` is a new skill, a skill is that skill. */
+	let editing = $state<Skill | null | undefined>(undefined);
 	let error = $state<string | null>(null);
-	let adding = $state(false);
-	let fresh = $state({ id: '', description: '' });
 
 	const shown = $derived(
 		skills.filter(
@@ -90,15 +91,19 @@
 		);
 	}
 
-	async function add() {
-		const id = fresh.id.trim().toLowerCase();
-		if (!id) return;
+	/** Optimistic, and put back if the write fails. Off keeps the folder: the skill is not
+	 * routed, not offered to `/slash` and not pinnable, and switching it on again is the same
+	 * click. */
+	async function toggle(skill: Skill) {
+		const previous = skills;
+		skills = skills.map((entry) =>
+			entry.id === skill.id ? { ...entry, enabled: !entry.enabled } : entry
+		);
 		try {
-			await api.createSkill({ id, description: fresh.description });
-			fresh = { id: '', description: '' };
-			adding = false;
-			await load();
+			await api.setSkillEnabled(skill.id, !skill.enabled);
+			error = null;
 		} catch (cause) {
+			skills = previous;
 			error = cause instanceof Error ? cause.message : String(cause);
 		}
 	}
@@ -116,7 +121,7 @@
 	{/if}
 
 	{#each shown as skill (skill.id)}
-		<section class="row">
+		<section class="row" class:off={!skill.enabled}>
 			<span class="icon" class:emoji={!!skill.icon} aria-hidden="true">{mark(skill)}</span>
 
 			<div class="detail">
@@ -132,9 +137,19 @@
 						{#if skill.version}
 							<span class="version mono">{t.settings.version(skill.version)}</span>
 						{/if}
-						<span class="caption used">
-							{skill.hits ? t.settings.usedTimes(skill.hits) : t.settings.never}
-						</span>
+						<button
+							class="edit"
+							type="button"
+							aria-label={t.settings.editSkill(skill.id)}
+							onclick={() => (editing = skill)}
+						>
+							{t.message.edit}
+						</button>
+						<Checkbox
+							checked={skill.enabled}
+							ariaLabel={t.settings.useSkill(skill.id)}
+							onchange={() => toggle(skill)}
+						/>
 					</span>
 				</div>
 
@@ -169,42 +184,36 @@
 		</section>
 	{/each}
 
-	{#if adding}
-		<section class="row new">
-			<span class="icon" aria-hidden="true">＋</span>
-			<div class="detail">
-				<Input
-					mono
-					value={fresh.id}
-					placeholder={t.settings.skillId}
-					ariaLabel={t.settings.skillId}
-					onchange={(value) => (fresh.id = value)}
-				/>
-				<Input
-					value={fresh.description}
-					placeholder={t.settings.skillDescription}
-					ariaLabel={t.settings.skillDescription}
-					onchange={(value) => (fresh.description = value)}
-				/>
-				<p class="caption rule">{t.settings.skillIdRule}</p>
-				<div class="buttons">
-					<button class="ghost" type="button" onclick={() => (adding = false)}>
-						{t.settings.cancel}
-					</button>
-					<button class="primary" type="button" onclick={add}>{t.settings.create}</button>
-				</div>
-			</div>
-		</section>
-	{:else}
-		<button class="add" type="button" onclick={() => (adding = true)}>
-			<span aria-hidden="true">＋</span>
-			{t.settings.addSkill}
-		</button>
-	{/if}
-
 	{#if skills.length || broken.length}
 		<p class="note caption">{t.settings.trustNote}</p>
 	{/if}
+
+	<button class="add" type="button" onclick={() => (editing = null)}>
+		<span aria-hidden="true">＋</span>
+		{t.settings.addSkill}
+	</button>
+
+	<p class="note caption">
+		{t.settings.skillsFolder}
+		<a href="https://github.com/VoidEUW/hera-skills" target="_blank" rel="noreferrer"
+			>{t.settings.skillsRepo}</a
+		>.
+	</p>
+{/if}
+
+{#if editing !== undefined}
+	<SkillEditor
+		skill={editing}
+		onclose={() => (editing = undefined)}
+		onsaved={(saved) => {
+			if (skills.some((entry) => entry.id === saved.id)) {
+				skills = skills.map((entry) => (entry.id === saved.id ? saved : entry));
+			} else {
+				void load();
+			}
+		}}
+		onremoved={(id) => (skills = skills.filter((entry) => entry.id !== id))}
+	/>
 {/if}
 
 <style>
@@ -214,6 +223,11 @@
 		gap: 12px;
 		padding: 14px 0;
 		border-bottom: 1px solid var(--line);
+	}
+
+	.row.off .detail,
+	.row.off .icon {
+		opacity: 0.55;
 	}
 
 	.detail {
@@ -260,18 +274,53 @@
 
 	.right {
 		display: flex;
-		align-items: baseline;
+		align-items: center;
 		gap: 10px;
 		margin-left: auto;
 		flex: none;
 	}
 
-	.used {
-		color: var(--text-faint);
-	}
-
 	/* On the right, in one column, so a row of skills can be compared with whatever a
 	   repository says is current. */
+	.edit {
+		padding: 6px 14px;
+		line-height: 1;
+		border: 1px solid var(--line);
+		border-radius: var(--radius);
+		font-size: 12px;
+		color: var(--text-muted);
+		transition:
+			border-color var(--fade) var(--ease),
+			color var(--fade) var(--ease);
+	}
+
+	.edit:hover,
+	.edit:focus-visible {
+		border-color: var(--brass);
+		color: var(--brass);
+	}
+
+	.add {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		width: 100%;
+		margin-top: 14px;
+		padding: 8px 12px;
+		border: 1px dashed var(--line);
+		border-radius: var(--radius);
+		font-size: 13px;
+		color: var(--text-muted);
+		transition:
+			border-color var(--fade) var(--ease),
+			color var(--fade) var(--ease);
+	}
+
+	.add:hover {
+		border-color: var(--brass);
+		color: var(--brass);
+	}
+
 	.version {
 		font-size: 12px;
 		color: var(--text-muted);
@@ -311,61 +360,13 @@
 		color: var(--text-faint);
 	}
 
-	.add {
-		display: flex;
-		align-items: center;
-		gap: 8px;
-		margin-top: 14px;
-		padding: 8px 12px;
-		border: 1px dashed var(--line);
-		border-radius: var(--radius);
-		font-size: 13px;
-		color: var(--text-muted);
-		width: 100%;
-		transition:
-			border-color var(--fade) var(--ease),
-			color var(--fade) var(--ease);
-	}
-
-	.add:hover {
-		border-color: var(--brass);
-		color: var(--brass);
-	}
-
-	.new .detail {
-		display: flex;
-		flex-direction: column;
-		gap: 6px;
-	}
-
-	.rule {
-		color: var(--text-faint);
-	}
-
-	.buttons {
-		display: flex;
-		justify-content: flex-end;
-		gap: 8px;
-	}
-
-	.buttons button {
-		padding: 5px 12px;
-		border-radius: var(--radius);
-		font-size: 12.5px;
-	}
-
-	.ghost {
-		border: 1px solid var(--line);
-		color: var(--text-muted);
-	}
-
-	.primary {
-		background: var(--pomegranate);
-		color: var(--ground);
-	}
-
 	.problem {
 		color: var(--danger);
+	}
+
+	.note a {
+		color: var(--text-muted);
+		text-decoration: underline;
 	}
 
 	.note {

@@ -29,6 +29,7 @@ from typing import Any
 from hera_chats import ChatsSettings, TurnOrchestrator
 from hera_core.chat_files import FileArtifacts, FileScratchpad
 from hera_core.config import load as load_config
+from hera_core.enabled_skills import EnabledSkillPort, EnabledSkills
 from hera_core.search import DuckDuckGo
 from hera_core.settings import CoreSettings
 from hera_home import memories_dir, mind_dir, skills_dir
@@ -37,7 +38,7 @@ from hera_memories import MemoriesSettings, MemoryPort, MemoryStore
 from hera_permissions import Decision, PermissionSet, Policy, Rule
 from hera_profiles import MindRepository, PromptBuilder
 from hera_providers import OpenAICompatibleProvider, Provider, ProviderSettings
-from hera_skillsets import SkillLibrary, SkillLibraryPort, SkillRouter
+from hera_skillsets import SkillLibrary, SkillRouter
 from hera_storage import Database, StorageSettings
 from hera_tools import ToolRegistry, ToolsSettings
 
@@ -193,7 +194,8 @@ def build_services(
     library = SkillLibrary(skills_dir())
     # No embedder yet -- see the module docstring. Keyword overlap is ADR 5's supported
     # fallback, so retrieval works; it just ranks worse than it eventually will.
-    router = SkillRouter(library)
+    # The router sees only what is switched on; `library` stays whole for the settings screen.
+    router = SkillRouter(EnabledSkills(library))
 
     # Memories are files rather than rows, so there is nothing to open and nothing to close --
     # the store is a directory and a ceiling (ADR 16). Held on the container because two
@@ -212,7 +214,7 @@ def build_services(
             # available in this deployment", because a model that cannot see a tool concludes
             # it cannot do the thing and says so to the person.
             builtin=build_builtin_server(
-                skills=SkillLibraryPort(library),
+                skills=EnabledSkillPort(library),
                 searcher=DuckDuckGo(),
                 # Two tools and no way to list or delete, which is the design rather than an
                 # omission: every enabled memory is already in her prompt, and `forget`
