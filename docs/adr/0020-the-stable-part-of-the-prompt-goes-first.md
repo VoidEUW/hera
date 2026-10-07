@@ -96,47 +96,65 @@ tool-call rate" is a hypothesis, not a finding. Measure before rewriting prose.
 
 ## Measured
 
-`docs/status.md` asks for numbers rather than intentions, so here they are. MiniCPM5-2B Q8_0 on
-llama.cpp, `-ngl 99 -ctk/-ctv q8_0`, reading `usage.prompt_tokens_details.cached_tokens`.
+`docs/status.md` asks for numbers rather than intentions, so here they are.
+
+Two things had to be got right for any of them to mean anything, and both were wrong first:
+
+- **The instrument was validated before it was trusted.** An identical request must come back ~99.9%
+  cached before any figure about a *changing* prompt is read, which proves the metric responds to
+  content rather than reporting a warm slot. The floor is reported with every table here.
+- **Each arrangement warms its own cache immediately before its two measured sends.** Without that, an
+  arm is measured against a slot its own earlier sends have warmed. This is not hypothetical: it
+  produced a "before" figure of 99.9% cached once, and an "after" figure of 20.4% another time, both
+  published here before being caught.
+
+## Measured, properly
+
+The comparison this ADR exists for was finally made by running the **real turn on both
+arrangements** — the "before" being the commit where `now`, `problems` and `skills` are all bound
+into the system frame, checked out and run rather than imitated. A `Turn` is built by the real
+orchestrator, `FakeProvider` captures what it actually sent, and that request is replayed at the
+endpoint. MiniCPM5-2B Q8_0, `-ngl 99`, `-ctk/-ctv q8_0 -c 16384`. Two sends identical, then two a
+minute apart; the clock is the only difference.
+
+| exchanges in history | before | after |
+|---|---|---|
+| 1 | 90.7% | 90.1% |
+| 3 | 86.5% | 90.5% |
+| 6 | 81.4% | 91.1% |
+| 12 | **72.1%** | **92.1%** |
+| identical request (the floor, both) | 99.9% | 99.9% |
+
+**Before, the cache degrades as the conversation grows. After, it does not.** That is the whole claim,
+and the *shape* of the two columns is the evidence rather than any single figure. Twenty points at
+twelve exchanges, and none of it at one.
+
+**There is no benefit in a short conversation, and that is worth saying rather than hiding in the
+table.** At one exchange the before arrangement is marginally *ahead* (90.7% against 90.1%), which is
+what a first measurement showed and nearly sent me hunting for a regression: 88.6% against 90.3%,
+which looked like noise and was. The reason is visible in the render — with almost no history the
+clock sat at 94.8% of the prompt, so "ahead of the conversation" and "near the end of the frame" were
+nearly the same place. The fix is worth what the thing it protects is worth, and a short chat has
+almost nothing to protect.
 
 **An earlier version of this section carried a table claiming 4.0% → 98.4% on the 2B and 0.0% →
-20.4% on MiMo-9B, with the explanation that the 9B's smaller figure was "the same effect on a
-shorter prompt". That explanation is arithmetically impossible and the numbers do not reproduce.
-Both are struck out.** A 646-token prompt losing only a ~60-token volatile tail should cache about
-91%, not 20.4%; and re-measured under an instrument that warmed each arm immediately before its two
-sends, the 9B cached **90.1%** and the 2B **47.1%** -- the opposite ordering.
+20.4% on the 9B, and a later one replaced it with 47.1% against 90.1%. Both are struck out.** The
+20.4% came with an explanation — "the same effect on a shorter prompt" — that was arithmetically
+impossible: a 646-token prompt losing a ~60-token tail should cache about 91%. Neither set was
+measured with the variable that decides the question.
 
-What is actually established, on a 5,200-token prompt whose only difference between sends is the
-clock sentence at 99.1% depth:
+Both mistakes are the same one, and it is not an obvious one: **measuring the mechanism on the case
+where it has nothing to do.** The 47%/90% pair and the 88.6%/90.3% pair are both *true* measurements
+of a prompt with almost no conversation in it, and both say nothing about this decision, because how
+much text sits behind the volatile slot is the entire variable and neither varied it.
 
-| | MiniCPM5-2B | MiMo-9B |
-|---|---|---|
-| identical request sent twice (the floor) | 100.0% | 99.9% |
-| only the clock differs, last before the question | 47.1% | 90.1% |
+### What this does not show
 
-The floor is the part that matters: on both models the cache is healthy and an unchanged prompt is
-fully reused, so what follows is about *where* a change lands, not about the cache being absent.
-
-Two things had to be got right for these numbers to mean anything, and both were wrong first:
-
-- **The instrument was validated before it was trusted.** An unrelated prompt of identical length
-  caches 4 of 112, which proves the metric responds to content rather than reporting a warm slot.
-  The identical-request floor above is the same check, run every time.
-- **Each arrangement must warm its own cache immediately before its two measured sends.** Without
-  that, an arm is measured against a slot its own earlier sends have warmed. This is not
-  hypothetical: it produced a "before" figure of 99.9% cached once, and a "after" figure of 20.4%
-  another time, both of which were published here before being caught.
-
-## Not yet established
-
-**The before/after comparison this ADR exists for has not been reproduced.** The figures above measure
-one arrangement with a clock moved to the end of the prompt. They do not compare against the clock at
-its original slot position inside the system frame, because doing that through a reconstructed prompt
-string does not reproduce the real render -- the two came out within a point of each other, which is
-evidence the reconstruction is not testing the thing. That comparison has to go through
-`Turn._prepare` with the real bindings and the real prompt template, and until it does, the ordering
-here rests on the mechanism (a prefix cache re-reads from the first changed token) and not on a
-measurement of the before case.
+One model, one context size, one kind of conversation. MiMo-9B was not re-measured on both
+arrangements, so no cross-model claim is made here. And the gain is in cache *reuse*, not latency or
+cost as such — a 2B on this card re-reads 200 tokens quickly enough that the saving is invisible
+unless you count it. The honest description is that this grows with the conversation, not that it is
+large.
 
 ## Enforced by
 
