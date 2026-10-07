@@ -139,8 +139,10 @@ class TestASimpleTurn:
 
         for index, question in enumerate(["first", "second", "third"]):
             sent = services.provider.requests[index].messages
-            assert [m.content for m in sent].count(question) == 1
-            assert sent[-1].content == question
+            # Sent once, and the last thing in its message. The clock note shares that message now
+            # rather than preceding it, so the last message is no longer only the question.
+            assert sum(1 for m in sent if question in str(m.content)) == 1
+            assert str(sent[-1].content).rstrip().endswith(question)
 
     async def test_the_conversation_alternates(self, make_services: Any) -> None:
         """The property behind the one above, and the one the affected models actually care
@@ -152,6 +154,13 @@ class TestASimpleTurn:
             await talk(client, chat_id, "second")
 
         roles = [m.role.value for m in services.provider.requests[1].messages]
+
+        # The clock sits between the history and the question, so a minute-granularity timestamp
+        # does not invalidate the cache in front of the conversation -- and it merges into the
+        # question's own message rather than going out as a second user message, because a strict
+        # template answers an *empty message* when roles do not alternate. An earlier version of
+        # this assertion read `[..., "user", "user"]` and its comment called that "not a mistake".
+        # It was a mistake, and the models it broke are the ones this test was written for.
         assert roles == ["system", "user", "assistant", "user"]
 
 
@@ -939,12 +948,16 @@ class TestAttachments:
 
         content = provider.requests[0].messages[-1].content
         assert isinstance(content, list), "a message with a picture is a list of parts"
-        words, picture = content
-        assert isinstance(words, TextPart)
-        assert isinstance(picture, ImagePart)
-        assert picture.url == url
+        # The clock note merges in as a leading text part, since the message must stay
+        # user-role and a second one breaks alternation. So the parts are [note, question, picture],
+        # and the picture is found by type rather than by position -- which is what a list is for.
+        pictures = [part for part in content if isinstance(part, ImagePart)]
+        words = [part for part in content if isinstance(part, TextPart)]
+        assert len(pictures) == 1, content
+        assert pictures[0].url == url
+        assert any("what is this?" in word.text for word in words), content
         # Named in the text too, so "the second screenshot" has something to refer to.
-        assert "Attached image: shot.png" in words.text
+        assert "Attached image: shot.png" in " ".join(w.text for w in words)
 
         chip = detail["messages"][0]["attachments"][0]
         assert chip == {"name": "shot.png", "bytes": 9, "media_type": "image/png"}

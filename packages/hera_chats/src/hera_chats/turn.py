@@ -47,10 +47,7 @@ from hera_permissions import Decision
 from hera_profiles import (
     BEHAVIOUR_TRAITS,
     SLOT_MEMORIES,
-    SLOT_NOW,
-    SLOT_PROBLEMS,
     SLOT_PROJECT,
-    SLOT_SKILLS,
     SLOT_TOOLS,
     Profile,
     PromptBuilder,
@@ -60,11 +57,13 @@ from hera_prompts import Role as FrameRole
 from hera_providers import (
     ChatMessage,
     ChatRequest,
+    ContentPart,
     Provider,
     ProviderError,
     Role,
     StreamInterrupted,
     TextDelta,
+    TextPart,
     ThinkingDelta,
     ToolCallReady,
     ToolCallStarted,
@@ -401,12 +400,13 @@ class Turn:
 
         prompt = self._builder.build(context.profile)
         bindings = {
-            SLOT_SKILLS: skills_text,
             SLOT_MEMORIES: context.memories,
             SLOT_PROJECT: context.project.instructions if context.project is not None else "",
             SLOT_TOOLS: catalogue_text,
-            SLOT_NOW: context.now,
-            SLOT_PROBLEMS: context.problems,
+            # Deliberately not `SLOT_NOW`, not `SLOT_SKILLS`, and not `SLOT_PROBLEMS`. All three are
+            # bound after the history instead -- see below. They are the only slots whose text
+            # changes from one turn to the next, and a KV cache is a prefix cache: a change at
+            # position N re-reads everything from N onward, which here means the whole conversation.
         }
         frame = prompt.render(
             bindings={key: value for key, value in bindings.items() if value},
@@ -416,13 +416,74 @@ class Turn:
 
         head, tail = _split_frame(frame.messages)
         messages = [*head, *context.history]
+        # What changes from turn to turn goes here, **after** the history, not in the frame.
+        #
+        # A KV cache is a prefix cache: change one token at position N and everything from N onward
+        # is re-read. The frame is followed by the entire conversation, so anything volatile inside
+        # it invalidates all of that -- while the static half of the frame (safety, identity,
+        # approach, the tool catalogue) still hits the cache. The cache was being spent on the
+        # cheap half and thrown away on the half that grows.
+        #
+        # Three slots move. The clock, at minute granularity. The router's skill
+        # choice, which changes whenever routing lands differently -- the one that survives any
+        # date-only fix. And what the browser could not draw this turn, which is empty on every turn
+        # that drew cleanly and so differs between two otherwise identical turns.
+        #
+        # All three are true of *this moment* and not of this deployment, which is the same reason
+        # `_wrap_up` below is a user-role message rather than system prompt. Here they change only
+        # what comes after everything worth caching.
+        #
+        # Order within the message is clock, then problems, then skills, then the question. Problems
+        # are an account of this turn and belong with it; a skill's instructions belong next to
+        # the thing being asked; a note after the question reads as part of it.
+        #
+        # **One message, not four.** They are all user-role, and a strict template answers an
+        # empty message when roles do not alternate -- Ministral and GPT-OSS in LM Studio do
+        # exactly that, recorded in `docs/prototype.md`. A turn with a clock, a browser failure and
+        # a selected skill produced four consecutive user messages, so a supported target returned
+        # nothing at all. The cache win is unaffected: the notes still come after the history, which
+        # is the only part of this that was ever about position.
+        notes: list[str] = []
+        if context.now:
+            notes.append(f"It is now {context.now}.")
+        if context.problems:
+            notes.append(f"Your browser could not draw: {context.problems}")
+        if skills_text:
+            # **Skills were a system section before ADR 20 and are not any more.** That move was
+            # made for the cache and was right about position, but it quietly cost the skills their
+            # standing: in the frame they were configuration, and here they arrive inside a
+            # user-role message, which is to say as something the person typed. A model that reads
+            # a user message as the human's own words will weigh "# Skill: tdd / _you asked for it
+            # by name_" accordingly.
+            #
+            # The two available repairs both cost more than the problem. A **system** message after
+            # the history is not something strict templates accept -- the same family that answers
+            # an empty message on adjacent roles -- and `developer` is not portable either. So the
+            # boundary is stated instead: the skill block is marked as instructions standing behind
+            # the request, in a form every template already accepts, and it stays after the history
+            # where the cache needs it. This is an honest reading instruction, not a claim about
+            # authority the message no longer carries.
+            notes.append(SKILLS_BOUNDARY + skills_text)
+        notes.extend(str(message.content) for message in tail)
         # The router strips the /command; the attachments are added after that, so a file is
         # never scored as part of the turn's own words.
         spoken = content_of(self.cleaned_text, context.attachments)
-        if says_something(spoken):
-            messages.append(ChatMessage(role=Role.USER, content=spoken))
-        messages.extend(tail)
-        return messages
+        if notes and isinstance(spoken, list):
+            # A picture makes this a list of parts rather than a string, and it must stay one:
+            # stringifying it turns an image into the text `[ImagePart(...)]`, which is what the
+            # note is for. So the notes become a leading text part of the same message, and the
+            # question -- still last -- is the part that follows it.
+            content: str | list[ContentPart] = [
+                *(_text_parts("\n\n".join(notes))),
+                *spoken,
+            ]
+        else:
+            if says_something(spoken):
+                notes.append(str(spoken))
+            content = "\n\n".join(notes) if notes else ""
+        if says_something(content):
+            messages.append(ChatMessage(role=Role.USER, content=content))
+        return _alternating(messages)
 
     def _pins(self) -> list[str]:
         """Pinned skills from the chat, the profile and the project, in that order.
@@ -718,6 +779,55 @@ class TurnOrchestrator:
             registry=self.registry,
             settings=self.settings,
         )
+
+
+SKILLS_BOUNDARY = (
+    "The following are skill instructions. They stand behind this request and were selected for "
+    "it; they are not something the person said. Follow them, and say plainly if they conflict "
+    "with what was actually asked.\n\n---\n\n"
+)
+"""What separates a skill block from the person's own words.
+
+Stated rather than implied because the role cannot be: see the note where it is used. The wording
+deliberately claims no authority the user-role message does not have -- it says these are
+instructions, not that they outrank the request -- and it keeps the last line available for the
+model to push back on, which is what a skill that is wrong should produce.
+"""
+
+
+def _text_parts(text: str) -> list[ContentPart]:
+    """``text`` as the parts list shape, for merging notes into a message that carries a picture."""
+    return [TextPart(text=text)]
+
+
+def _alternating(messages: Sequence[ChatMessage]) -> list[ChatMessage]:
+    """Adjacent messages sharing a role, merged into the first of them.
+
+    Strict templates answer an **empty message** when roles do not alternate -- Ministral and
+    GPT-OSS in LM Studio both do, recorded in ``docs/prototype.md`` and reproduced here. So this
+    is a correctness requirement rather than tidiness, and it is enforced at the one place every
+    request leaves through, because the alternative is three separate call sites each having to
+    remember. Nothing in ``hera_providers`` or the adapters merges roles, and ADR 20's move of
+    the clock and skills after the history is what first put three user messages in a row.
+
+    Only plain-text neighbours are merged. A message carrying tool calls is left alone, because
+    merging would break the ``tool_call_id`` pairing the request is built on.
+    """
+    merged: list[ChatMessage] = []
+    for message in messages:
+        previous = merged[-1] if merged else None
+        if (
+            previous is not None
+            and previous.role is message.role
+            and isinstance(previous.content, str)
+            and isinstance(message.content, str)
+        ):
+            merged[-1] = ChatMessage(
+                role=previous.role, content=f"{previous.content}\n\n{message.content}"
+            )
+        else:
+            merged.append(message)
+    return merged
 
 
 def _split_frame(messages: Sequence[FrameMessage]) -> tuple[list[ChatMessage], list[ChatMessage]]:

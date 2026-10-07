@@ -16,6 +16,7 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query, status
 from fastapi.responses import Response
+from hera_providers.capabilities import EndpointCapabilities
 from hera_providers.thinking import NOTHING, Registry, Thinking
 
 from hera_core.config import ConfigError, HeraConfig, ModelEntry, ProviderEntry
@@ -77,6 +78,11 @@ async def _out(config: HeraConfig, active: str) -> ProvidersOut:
             model["thinking_budget"] = found.budget
             model["thinking_source"] = found.source
             model["thinking_shape"] = found.shape
+            # Read from the same `/props` the thinking probe already fetched and cached, so this
+            # costs nothing: `EndpointCapabilities` is keyed by `base_url` and `Registry.resolve`
+            # has just populated it. Reported, never acted on (#145).
+            caps = await EndpointCapabilities.load(entry.base_url)
+            model["tool_call_shape"] = caps.tool_call_shape
         providers.append(data)
 
     return ProvidersOut(providers=providers, active=active)

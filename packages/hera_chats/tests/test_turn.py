@@ -102,12 +102,23 @@ class TestASimpleTurn:
         self, make_orchestrator: Make
     ) -> None:
         """The whole point of the ``problems`` slot: a bad diagram she cannot see is one she
-        writes again, so the report has to arrive in the system prompt or nowhere."""
+        writes again, so the report has to reach the request or nowhere.
+
+        It does *not* have to be in the first message. ADR 20 moved it after the history,
+        because what the browser could not draw is true of one turn rather than of the
+        deployment, and a prefix cache re-reads everything from the first changed token. So
+        this checks that it arrives at all, and ``test_prompt_cache`` checks where.
+        """
         provider = FakeProvider([text_turn("ok")])
         context = TurnContext(text="hi", problems="- `gdp.mmd`: Lexical error on line 2")
         await drain(make_orchestrator(provider).begin(context).stream())
 
-        assert "Lexical error on line 2" in provider.requests[0].messages[0].content
+        # Content may be a list of parts when a file is attached, so text-only is what is joined.
+        everything = " ".join(
+            m.content for m in provider.requests[0].messages if isinstance(m.content, str)
+        )
+
+        assert "Lexical error on line 2" in everything
 
     async def test_history_sits_between_the_frame_and_the_question(
         self, make_orchestrator: Make
@@ -160,18 +171,30 @@ class TestSkills:
         assert isinstance(events[0], SkillSelected)
         assert events[0].skill == "tdd"
         assert events[0].reason == "pinned" or events[0].reason == "slash"
-        assert provider.requests[0].messages[-1].content == "how do I test this?"
+        # The skill body and the question share one user message now: strict templates answer an
+        # empty message when roles do not alternate, and the body is user-role too. So "stripped"
+        # is the last line being the bare question, not the last message being only it.
+        last = provider.requests[0].messages[-1].content
+        assert isinstance(last, str)
+        assert last.rstrip().endswith("how do I test this?"), last
 
     async def test_the_skill_body_reaches_the_prompt_uncorrupted(
         self, make_orchestrator: Make, write_skill: WriteSkill
     ) -> None:
-        """The reason Section.escape exists: a skill body is somebody else's code."""
+        """The reason Section.escape exists: a skill body is somebody else's code.
+
+        Asserted against the whole request rather than the first message, because the skills slot
+        is bound *after* the history -- it changes from turn to turn, and a volatile slot inside
+        the frame invalidates the conversation behind it. What this test is about is the body
+        arriving intact, not where it sits.
+        """
         write_skill("tdd", body="assert count < limit && ready")
         provider = FakeProvider([text_turn("ok")])
 
         await drain(make_orchestrator(provider).begin(TurnContext(text="/tdd go")).stream())
 
-        assert "count < limit && ready" in provider.requests[0].messages[0].content
+        asked = "\n".join(str(m.content or "") for m in provider.requests[0].messages)
+        assert "count < limit && ready" in asked
 
     async def test_pins_come_from_the_profile_and_the_project_together(
         self, make_orchestrator: Make, write_skill: WriteSkill, profile: Profile

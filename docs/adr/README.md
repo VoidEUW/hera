@@ -26,3 +26,4 @@ later.
 | [17](0017-a-stance-is-a-sentence-and-a-question-stands-alone.md) | A stance is a sentence, and a question stands on its own | accepted · supersedes [3](0003-emotions-as-tool-calls.md) |
 | [18](0018-a-model-may-carry-request-options.md) | A model may carry request options, and Hera does not know what they mean | accepted |
 | [19](0019-preferred-models-widen-past-qwen.md) | Preferred models widen past Qwen, and a model may decline tool calling | accepted |
+| [20](0020-the-stable-part-of-the-prompt-goes-first.md) | The stable part of the prompt goes first, and what changes goes last | accepted |

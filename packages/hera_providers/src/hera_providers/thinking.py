@@ -294,7 +294,7 @@ async def _probe(
     # `/props` is llama.cpp's, and is asked of everything: it 404s in a millisecond anywhere else,
     # and gating it on `kind == "llamacpp"` would miss a llama.cpp registered as `openai`, which
     # is the ordinary way somebody registers one.
-    caps = await EndpointCapabilities.load(base_url, client=client)
+    caps = await EndpointCapabilities.load(base_url, model_id=model_id, client=client)
     if caps.thinking_toggle:
         return Thinking(toggle=True, source="llamacpp")
 

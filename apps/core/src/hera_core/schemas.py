@@ -652,10 +652,21 @@ class ModelOut(BaseModel):
     entered on this screen, or ``"none"``. Shown beside the control, because a person looking at it
     is entitled to know whether the endpoint said so or they did."""
     thinking_shape: str = "none"
-    """Which control this model wants — ``values``, ``budget``, ``toggle`` or ``none``. Decided
+    """Which control this model wants - ``values``, ``budget``, ``toggle`` or ``none``. Decided
     server-side so that the browser and the settings screen cannot disagree about it, and so that
     a model wanting both a list and a switch gets one control rather than two that contradict
     each other."""
+
+    tool_call_shape: str = "unknown"
+    """Whether this endpoint's chat template can render a tool declaration - ``template``,
+    ``none`` or ``unknown``.
+
+    A fact about the template and nothing more. It is **not** a claim that a call will come back
+    as a call: that needs an engine with a parser for the model's dialect, which no endpoint
+    publishes, and which for MiniCPM5-2B differs across the four engines it runs on (#145).
+    Reported rather than acted on -- nothing is reformatted on the strength of this field,
+    because silently changing how a model is asked to call a tool is the guessing ADR 18 exists
+    to stop."""
 
 
 class ProviderOut(BaseModel):

@@ -172,19 +172,21 @@ LAYOUT: tuple[Node, ...] = (
             Node(key="memory.recalled", title="Recalled", priority=55, slot=SLOT_MEMORIES),
         ),
     ),
-    Node(key="skills", title="Skills", priority=60, slot=SLOT_SKILLS),
+    # `skills` (priority 60), `context.now` (68) and `context.problems` (90) used to be nodes
+    # here, bound from `hera_chats`. None of them is any more: ADR 20 moved all three out of the
+    # frame and after the history, because a slot whose text can differ between two turns
+    # invalidates the entire cache behind it. `hera_chats.turn` now sends them inside the question's
+    # own message.
+    #
+    # The keys are deliberately absent rather than left bound-and-unused. An unbound slot renders to
+    # nothing, so keeping them would have cost nothing -- but a node that looks live is an
+    # invitation to bind it again, and that is precisely the change ADR 20 exists to prevent.
+    # The `SLOT_*` names stay exported, because they are the vocabulary the frame is described in.
     Node(
         key="context",
         title="Context",
         priority=70,
         children=(
-            # First in the group and low-priority on purpose: it is one line, and a model that
-            # does not know the date answers "what is current" from its training data — a whole
-            # class of confidently stale answers for thirty tokens.
-            Node(key="context.now", title="Right now", priority=68, slot=SLOT_NOW),
-            # Kept when the window is short: it is a correction to something she just made, and
-            # the one thing here she cannot look up again.
-            Node(key="context.problems", title="Did not draw", priority=90, slot=SLOT_PROBLEMS),
             Node(key="context.project", title="This project", priority=70, slot=SLOT_PROJECT),
             Node(key="context.user", title="About this person", priority=71, region="user_prefs"),
         ),

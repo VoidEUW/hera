@@ -404,19 +404,15 @@ def build_builtin_server(
         name="artifact_create",
         title="Publish an artifact",
         description=(
-            "Publish a file the person can open: a page, a document, a diagram, a small program. "
-            "This is the thing you were asked for, and it appears beside your answer with its "
-            "name on it, ready to read and download -- so put the work here rather than into a "
-            "very long answer, and then say what you made in a sentence or two. `name` is a "
-            "plain filename and its extension decides how it is drawn: `.html` renders as a "
-            "page, `.svg` draws, `.md` is typeset, anything else is shown as code. A diagram is "
-            "the one thing this tool is not for -- `diagram_create` takes mermaid and draws it "
-            "for you, and it is far easier to get right than SVG path data. Publishing "
-            "the same name again replaces what was there, so use `artifact_edit` for a change. "
-            "Set `inline=true` for a figure that belongs in the middle of what you are saying -- "
-            "a diagram or a chart explaining the paragraph above it -- and leave it false for a "
-            "page or a document, which the person opens beside the conversation. For working "
-            "notes only you read, use `scratch_write` instead."
+            "Publish a file the person can open beside your answer: a page, a "
+            "document, a chart, a diagram. Use this whenever you were asked to make, draw or show "
+            "something -- put the work here rather than into a long answer, and never write a "
+            "placeholder for it. `name` is a filename and the extension decides how it is drawn: "
+            "`.html` a page, `.svg` a drawing, `.md` typeset. For a diagram you can describe in "
+            "words, `diagram_create` takes mermaid and is less work. `inline=true` puts a figure "
+            "in the middle of what you are saying. Publishing the same name again replaces it, "
+            "so use `artifact_edit` to change one. For working notes only you read, use "
+            "`scratch_write`."
         ),
     )
     async def artifact_create(
