@@ -53,7 +53,7 @@ dev = [
     # Drives the built interface in the end-to-end suite. CI installs the browser with
     # `uv run playwright install --with-deps chromium`; without this the command has no
     # package to come from.
-    "playwright>=1.49",
+    "playwright>=1.63.0",
 ]
 
 # ---------------------------------------------------------------------------
