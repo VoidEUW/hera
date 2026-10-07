@@ -54,91 +54,91 @@
       "name": "01-start",
       "group": "conversation",
       "ok": true,
-      "seconds": 1.12,
+      "seconds": 1.15,
       "problem": ""
     },
     {
       "name": "02-waiting-mark",
       "group": "conversation",
       "ok": true,
-      "seconds": 4.78,
+      "seconds": 4.6,
       "problem": ""
     },
     {
       "name": "03-first-answer",
       "group": "conversation",
       "ok": true,
-      "seconds": 1.05,
+      "seconds": 1.02,
       "problem": ""
     },
     {
       "name": "04-long-trace",
       "group": "conversation",
       "ok": true,
-      "seconds": 14.32,
+      "seconds": 14.52,
       "problem": ""
     },
     {
       "name": "05-a-turn-that-cannot-start",
       "group": "conversation",
       "ok": true,
-      "seconds": 0.36,
+      "seconds": 0.4,
       "problem": ""
     },
     {
       "name": "06-a-turn-cut-off-mid-answer",
       "group": "conversation",
       "ok": true,
-      "seconds": 5.46,
+      "seconds": 5.48,
       "problem": ""
     },
     {
       "name": "07-the-answer-after-both",
       "group": "conversation",
       "ok": true,
-      "seconds": 4.53,
+      "seconds": 4.64,
       "problem": ""
     },
     {
       "name": "10-the-question-card",
       "group": "cards",
       "ok": true,
-      "seconds": 5.9,
+      "seconds": 5.92,
       "problem": ""
     },
     {
       "name": "11-the-reply-resumes-the-turn",
       "group": "cards",
       "ok": true,
-      "seconds": 4.55,
+      "seconds": 4.58,
       "problem": ""
     },
     {
       "name": "rail-row-menu",
       "group": "rail",
       "ok": true,
-      "seconds": 1.54,
+      "seconds": 1.47,
       "problem": ""
     },
     {
       "name": "rail-new-chat-and-projects",
       "group": "rail",
       "ok": true,
-      "seconds": 0.65,
+      "seconds": 0.62,
       "problem": ""
     },
     {
       "name": "composer-model-dropdown",
       "group": "composer",
       "ok": true,
-      "seconds": 1.22,
+      "seconds": 1.23,
       "problem": ""
     },
     {
       "name": "composer-servers-sheet",
       "group": "composer",
       "ok": true,
-      "seconds": 1.14,
+      "seconds": 1.13,
       "problem": ""
     },
     {
@@ -152,105 +152,105 @@
       "name": "composer-typed-and-growing",
       "group": "composer",
       "ok": true,
-      "seconds": 0.58,
+      "seconds": 0.56,
       "problem": ""
     },
     {
       "name": "settings-open",
       "group": "settings",
       "ok": true,
-      "seconds": 1.28,
+      "seconds": 1.11,
       "problem": ""
     },
     {
       "name": "settings-models",
       "group": "settings",
       "ok": true,
-      "seconds": 1.82,
+      "seconds": 1.8,
       "problem": ""
     },
     {
       "name": "settings-general",
       "group": "settings",
       "ok": true,
-      "seconds": 0.96,
+      "seconds": 0.93,
       "problem": ""
     },
     {
       "name": "settings-skills",
       "group": "settings",
       "ok": true,
-      "seconds": 1.73,
+      "seconds": 1.72,
       "problem": ""
     },
     {
       "name": "settings-servers",
       "group": "settings",
       "ok": true,
-      "seconds": 1.73,
+      "seconds": 1.8,
       "problem": ""
     },
     {
       "name": "settings-permissions",
       "group": "settings",
       "ok": true,
-      "seconds": 1.74,
+      "seconds": 1.72,
       "problem": ""
     },
     {
       "name": "settings-memory",
       "group": "settings",
       "ok": true,
-      "seconds": 1.76,
+      "seconds": 1.74,
       "problem": ""
     },
     {
       "name": "settings-mind",
       "group": "settings",
       "ok": true,
-      "seconds": 1.87,
+      "seconds": 1.78,
       "problem": ""
     },
     {
       "name": "settings-dreaming",
       "group": "settings",
       "ok": true,
-      "seconds": 0.93,
+      "seconds": 0.95,
       "problem": ""
     },
     {
       "name": "settings-search",
       "group": "settings",
       "ok": true,
-      "seconds": 1.18,
+      "seconds": 1.17,
       "problem": ""
     },
     {
       "name": "profile-menu",
       "group": "theme",
       "ok": true,
-      "seconds": 2.4,
+      "seconds": 2.44,
       "problem": ""
     },
     {
       "name": "light-theme",
       "group": "theme",
       "ok": true,
-      "seconds": 1.46,
+      "seconds": 1.43,
       "problem": ""
     },
     {
       "name": "back-to-dark",
       "group": "theme",
       "ok": true,
-      "seconds": 2.17,
+      "seconds": 2.15,
       "problem": ""
     },
     {
       "name": "reduced-motion",
       "group": "accessibility",
       "ok": true,
-      "seconds": 1.44,
+      "seconds": 1.37,
       "problem": ""
     },
     {
@@ -264,28 +264,28 @@
       "name": "phone-start",
       "group": "phone",
       "ok": true,
-      "seconds": 1.26,
+      "seconds": 1.28,
       "problem": ""
     },
     {
       "name": "phone-rail",
       "group": "phone",
       "ok": true,
-      "seconds": 0.65,
+      "seconds": 0.66,
       "problem": ""
     },
     {
       "name": "phone-answer",
       "group": "phone",
       "ok": true,
-      "seconds": 1.75,
+      "seconds": 1.76,
       "problem": ""
     },
     {
       "name": "phone-settings",
       "group": "phone",
       "ok": true,
-      "seconds": 1.23,
+      "seconds": 1.18,
       "problem": ""
     }
   ]
