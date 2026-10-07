@@ -17,6 +17,8 @@ from hera_profiles import (
     EMOJI,
     FORMALITY,
     LANGUAGE,
+    SLOT_NOW,
+    SLOT_PROBLEMS,
     SLOT_PROJECT,
     SLOT_SKILLS,
     SLOT_TOOLS,
@@ -111,10 +113,24 @@ class TestSlots:
 
     def test_every_declared_slot_is_bindable(self, builder: PromptBuilder) -> None:
         result = builder.build().render(
-            bindings={SLOT_TOOLS: "t", SLOT_SKILLS: "s", SLOT_PROJECT: "p", "memories": "m"},
+            bindings={SLOT_TOOLS: "t", SLOT_PROJECT: "p", "memories": "m"},
             registry=BEHAVIOUR_TRAITS,
         )
         assert result.unused_bindings == []
+
+    def test_the_three_moved_slots_are_reported_as_unused(self, builder: PromptBuilder) -> None:
+        """ADR 20 took these out of the layout, and they are still bindable names.
+
+        So a caller passing one gets `unused_bindings` rather than silence -- which is what makes
+        the removal visible to whoever eventually passes one again, instead of the binding landing
+        nowhere and the slot looking like it still works.
+        """
+        result = builder.build().render(
+            bindings={SLOT_SKILLS: "s", SLOT_NOW: "n", SLOT_PROBLEMS: "p"},
+            registry=BEHAVIOUR_TRAITS,
+        )
+
+        assert sorted(result.unused_bindings) == sorted([SLOT_SKILLS, SLOT_NOW, SLOT_PROBLEMS])
 
     def test_a_slot_nobody_bound_is_reported_rather_than_hidden(
         self, builder: PromptBuilder
@@ -227,8 +243,12 @@ class TestTraits:
 class TestForeignContent:
     def test_a_slot_is_not_escaped(self, builder: PromptBuilder) -> None:
         """A skill body or a project's instructions routinely contain code. Escaping would
-        hand the model `if count &lt; limit` and expect it to learn from the sample."""
-        text = rendered(builder, **{SLOT_SKILLS: "if count < limit && ready"})
+        hand the model `if count &lt; limit` and expect it to learn from the sample.
+
+        Driven through `project` now: `skills` left the layout in ADR 20, but the invariant is
+        about every slot, and one that has no slot left to test it through stops being tested.
+        """
+        text = rendered(builder, **{SLOT_PROJECT: "if count < limit && ready"})
         assert "if count < limit && ready" in text
 
     def test_a_region_is_escaped(self, builder: PromptBuilder, mind: MindRepository) -> None:

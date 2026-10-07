@@ -13,6 +13,7 @@ work* and a control that does nothing is worse than an absent one.
 from __future__ import annotations
 
 from collections.abc import Callable
+from typing import Any
 
 import httpx
 import pytest
@@ -548,3 +549,112 @@ class TestCommentStripping:
         ``true`` says nothing about the engine parser, which is the half nothing publishes.
         """
         assert tool_call_shape(props) == expected
+
+
+class TestOneAddressManyModels:
+    """``/props`` describes the model a server has *loaded*, so one address can serve several.
+
+    A router -- llama-swap, or anything that swaps on a port -- is registered as one endpoint with
+    several models against it, and its template changes underneath. Keyed by address alone the first
+    model asked answers for all of them for an hour, which is a capability claim made about models
+    nobody asked.
+    """
+
+    @staticmethod
+    def _swapper(template: str, asked: list[str]) -> Any:
+        def handler(request: httpx.Request) -> httpx.Response:
+            asked.append(request.url.path)
+            return httpx.Response(200, json={"chat_template": template})
+
+        return _client(handler)
+
+    async def test_two_models_on_one_address_are_not_answered_alike(self) -> None:
+        """The bug: with an address-only key the second model silently inherits the first.
+
+        Both templates are asked for exactly once -- a router cannot answer for two models at the
+        same moment -- so the cache cannot skip the second fetch, only mis-file the first.
+        """
+        asked: list[str] = []
+        with_tools = "{% for t in tools %}x{% endfor %}"
+        without = "{{ m.content }}"
+
+        first = await EndpointCapabilities.load(
+            "http://swap:8080/v1",
+            model_id="qwen3",
+            client=self._swapper(with_tools, asked),
+        )
+        second = await EndpointCapabilities.load(
+            "http://swap:8080/v1",
+            model_id="llama-3.2-1b",
+            client=self._swapper(without, asked),
+        )
+
+        assert first.tool_call_shape == "template"
+        assert second.tool_call_shape == "none", second.tool_call_shape
+        assert len(asked) == 2, asked
+
+    async def test_the_same_model_on_one_address_is_asked_once(self) -> None:
+        """The cache still does its job -- one answer per (address, model), not per call."""
+        asked: list[str] = []
+        client = self._swapper("{% for t in tools %}x{% endfor %}", asked)
+
+        for _ in range(3):
+            await EndpointCapabilities.load("http://swap:9090/v1", model_id="qwen3", client=client)
+
+        assert len(asked) == 1, asked
+
+    async def test_an_unknown_model_id_keeps_the_single_entry_cache(self) -> None:
+        """A caller without a model must not get a fresh fetch every time."""
+        asked: list[str] = []
+        client = self._swapper("{{ m.content }}", asked)
+
+        for _ in range(3):
+            await EndpointCapabilities.load("http://swap:9091/v1", client=client)
+
+        assert len(asked) == 1, asked
+
+    def test_peek_is_keyed_the_same_way(self) -> None:
+        """Otherwise a lookup with a model id would miss the entry ``load`` just wrote."""
+        assert EndpointCapabilities.peek("http://h:9/v1", "qwen3") == NOTHING
+
+
+class TestWhereTheHeuristicIsWrong:
+    """The two known limits of a substring test over Jinja, pinned so they stay visible.
+
+    This is not a Jinja parser and does not pretend to be one -- the question it answers is *would
+    this do anything*, and a word answers that. Both cases below are therefore wrong by
+    construction rather than by accident, and both err the same way: towards reporting a capability
+    the template does not have, because a word inside a literal is still a word present. Fixing
+    either means parsing, which would be a different and larger claim.
+    """
+
+    def test_the_word_in_a_string_literal_is_still_read_as_a_path(self) -> None:
+        """A known false positive. This template has no tools path at all -- it emits one fixed
+        sentence -- and it reads ``template`` because ``tools`` appears in it.
+
+        The direction is what makes it tolerable: a false positive draws a control that does
+        nothing, where a false negative hides one that works. So it is recorded rather than fixed.
+        """
+        template = "{{ " + repr("You have no tools.") + " }}"
+
+        assert tool_call_shape({"chat_template": template}) == "template"
+
+    def test_a_functions_only_template_is_none(self) -> None:
+        """Correct, and worth saying why. ``functions`` is the legacy field name and
+        ``tool_choice`` is a setting; neither is a declaration path. Hera offers tools over
+        ``tools[]``, so a template built on them cannot render what it is offered.
+        """
+        legacy = "{% for f in message.functions %}x{% endfor %}"
+        setting = "{% if tool_choice %}y{% endif %}"
+
+        assert tool_call_shape({"chat_template": legacy}) == "none"
+        assert tool_call_shape({"chat_template": setting}) == "none"
+
+    def test_a_declaration_path_still_wins_over_the_setting(self) -> None:
+        """``tool_choice`` beside a real path is ``template``, not ``none``. A template can honour
+        the setting and still be offered nothing to choose between, and the path is the part that
+        answers the question asked here.
+        """
+        both = "{% for t in tools %}{{ tool_choice }}{% endfor %}"
+
+        assert tool_call_shape({"chat_template": both}) == "template"

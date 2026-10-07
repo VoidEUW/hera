@@ -248,6 +248,18 @@ def tool_call_shape(props: object, *, code: str | None = None) -> ToolCallShape:
     Everything else waits for the engine half, which has to come from somewhere other than
     ``/props`` (#145).
 
+    **Where this is wrong, and which way.** It is a whole-word test over Jinja source rather than a
+    parse, so it errs towards reporting a path that is not there: ``{{ 'You have no tools.' }}``
+    contains the word and reads ``template``, though it has no loop and can be offered nothing.
+    Excluding that means parsing Jinja, which is a larger and more confident claim than this field
+    is willing to make. The direction is the tolerable one -- a false positive draws a control that
+    does nothing, where a false negative hides one that works -- and the case is pinned in
+    ``test_capabilities.py`` so it stays visible rather than surprising somebody.
+
+    ``functions`` and ``tool_choice`` alone read ``none``, which is right rather than merely
+    tolerable: ``functions`` is the legacy field name and ``tool_choice`` is a setting, and Hera
+    offers tools over ``tools[]``, so a template built on either cannot render what it is handed.
+
     ``code`` is the template with its comments already stripped, when the caller already has it --
     :func:`template_capabilities` reads three capabilities out of one template and does not strip
     it once per lookup. Optional, so this stays callable on its own in a test.
@@ -328,12 +340,16 @@ def _mentions(code: str, name: str) -> bool:
 
 
 class EndpointCapabilities:
-    """What each endpoint has said, remembered per ``base_url``.
+    """What each endpoint has said, remembered per ``base_url`` **and model**.
 
     Process-wide and cached, for the same reason the OpenRouter catalogue is: there is one answer
     per endpoint, every request wants the same one, and two requests arriving together would
     otherwise both ask. A failure is cached too, so an endpoint that is down is not asked again on
     every keystroke.
+
+    "One answer per endpoint" is not quite true and the key admits it. ``/props`` describes the
+    model the server has *loaded*, so on something that swaps models behind one address every
+    registration against it has its own answer -- see :meth:`load`.
     """
 
     _cache: ClassVar[dict[str, tuple[float, Capabilities]]] = {}
@@ -352,32 +368,51 @@ class EndpointCapabilities:
         cls._cache.clear()
 
     @classmethod
-    def peek(cls, base_url: str) -> Capabilities:
+    def peek(cls, base_url: str, model_id: str = "") -> Capabilities:
         """What is already known about an endpoint, without asking it anything."""
-        entry = cls._cache.get(base_url)
+        entry = cls._cache.get(_key(base_url, model_id))
         return entry[1] if entry is not None else NOTHING
 
     @classmethod
-    async def load(cls, base_url: str, *, client: httpx.AsyncClient | None = None) -> Capabilities:
+    async def load(
+        cls, base_url: str, *, model_id: str = "", client: httpx.AsyncClient | None = None
+    ) -> Capabilities:
         """What an endpoint says, asking it at most once per :data:`TTL_SECONDS`.
 
         Never raises. A 404, a refused connection and a body that is not JSON all mean the same
         thing -- this endpoint has not told us anything -- and all of them are cached so the
         question is not asked again.
+
+        ``model_id`` is part of the cache key, and that is not tidiness. ``/props`` describes
+        whichever model the server has *loaded*, so on a router -- llama-swap, or anything that
+        swaps on the same port -- one address serves several templates. Keyed by address alone, the
+        first model asked would answer for every model registered against it, for an hour: a Qwen3
+        template's tools path would be reported for a model that has none, which is a capability
+        claim about a model nobody has asked.
         """
         now = time.monotonic()
-        entry = cls._cache.get(base_url)
+        key = _key(base_url, model_id)
+        entry = cls._cache.get(key)
         if entry is not None and now - entry[0] < TTL_SECONDS:
             return entry[1]
 
         async with cls._guard():
             now = time.monotonic()
-            entry = cls._cache.get(base_url)
+            entry = cls._cache.get(key)
             if entry is not None and now - entry[0] < TTL_SECONDS:
                 return entry[1]
             found = await _ask(base_url, client)
-            cls._cache[base_url] = (time.monotonic(), found)
+            cls._cache[key] = (time.monotonic(), found)
             return found
+
+
+def _key(base_url: str, model_id: str) -> str:
+    """The cache key for one endpoint answering for one model.
+
+    A model id that is unknown does not join the key, so a caller without one still gets the
+    cheaper single-entry cache rather than a distinct entry per call.
+    """
+    return f"{base_url}\n{model_id}" if model_id else base_url
 
 
 async def _ask(base_url: str, client: httpx.AsyncClient | None) -> Capabilities:
