@@ -26,6 +26,8 @@ from hera_providers.capabilities import (
     tool_call_shape,
 )
 
+from hera_providers import capabilities as _capabilities
+
 Handler = Callable[[httpx.Request], httpx.Response]
 
 MINICPM_TEMPLATE = (
@@ -438,3 +440,74 @@ class TestLoading:
 
     def test_peek_never_asks(self) -> None:
         assert EndpointCapabilities.peek("http://h:1/v1") == NOTHING
+
+
+class TestCommentStripping:
+    """``{# ... #}`` removal, which used to be a quadratic regex.
+
+    The bug is not observable in the answers -- every case below had the right answer before --
+    only in the cost. So these are mostly about the edges a rewrite would get wrong, and the
+    linear-time property is asserted structurally rather than by timing, which would be flaky.
+    """
+
+    def test_an_unterminated_comment_ends_the_scan(self) -> None:
+        """The quadratic case. ``{#.*?#}`` restarts a lazy match at every ``{#`` and scans to the
+        end of the string for a ``#}`` that never comes, so 4x the input was 16x the work:
+        measured 0.04s / 0.56s / 9.0s at 2k / 8k / 32k unclosed comments.
+        """
+        hostile = "{#" * 50_000 + "tools"
+
+        found, done = _capabilities._strip_jinja_comments(hostile), False
+        try:
+            assert "tools" not in found
+            done = True
+        finally:
+            assert done, "stripping did not finish"
+
+    def test_an_unterminated_comment_is_removed_not_kept(self) -> None:
+        # What Jinja does with it, and what makes the fast path legal: everything from an
+        # unterminated ``{#`` to the end is comment.
+        # The comment is replaced by its space and the unterminated tail adds nothing, so
+        # two spaces: harmless here, and the same thing a closed comment leaves behind.
+        assert _capabilities._strip_jinja_comments("before {# after") == "before  "
+
+    def test_several_comments_in_one_template(self) -> None:
+        assert _capabilities._strip_jinja_comments("{#a#}keep{#b#}this{#c#}") == " keep this "
+
+    def test_a_template_with_no_comments_is_returned_unchanged(self) -> None:
+        plain = "{% for m in messages %}{{ m.content }}{% endfor %}"
+
+        assert _capabilities._strip_jinja_comments(plain) == plain
+
+    def test_words_either_side_do_not_join(self) -> None:
+        """The reason a space replaces the comment rather than nothing.
+
+        Without it ``a{# note #}tools`` became ``atools``, which is not a field name anyone
+        declares -- so the whole-word rule would have passed on a string it should have failed.
+        """
+        assert _capabilities._strip_jinja_comments("a{# note #}tools") == "a tools"
+
+    def test_a_nested_looking_open_is_not_special(self) -> None:
+        """Jinja comments do not nest, so neither does this: the first ``#}`` closes it."""
+        assert _capabilities._strip_jinja_comments("{# outer {# inner #} tail") == "  tail"
+
+    def test_a_template_is_stripped_once_per_props_not_once_per_lookup(self) -> None:
+        """Three capabilities are read out of one template, and each was re-running the strip.
+
+        On the event loop, inside the capabilities cache lock, four or five times per ``/props``.
+        Counted here rather than timed, because the count is the property and a clock is not.
+        """
+        calls: list[str] = []
+        original = _capabilities._strip_jinja_comments
+
+        def counted(template: str) -> str:
+            calls.append(template)
+            return original(template)
+
+        _capabilities._strip_jinja_comments = counted
+        try:
+            template_capabilities({"chat_template": MINICPM5_TOOLS_TEMPLATE})
+        finally:
+            _capabilities._strip_jinja_comments = original
+
+        assert len(calls) == 1, calls

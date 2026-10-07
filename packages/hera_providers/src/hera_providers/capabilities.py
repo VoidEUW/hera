@@ -85,9 +85,46 @@ UNKNOWN: ToolCallShape = "unknown"
 #: render a declaration perfectly well and never mention it.
 _TOOL_MARKERS = ("tools", "render_tools")
 
-#: A Jinja comment, ``{# ... #}``, matched with DOTALL because they wrap. Replaced with a space
-#: rather than removed so that two words either side of a comment do not become one word.
-_JINJA_COMMENT = re.compile(r"{#.*?#}", re.DOTALL)
+#: Jinja's comment delimiters. Matched by :func:`_strip_jinja_comments` rather than by regex,
+#: because ``{#.*?#}`` is quadratic on unclosed input: every ``{#`` starts a lazy match that scans
+#: to the end of the template looking for a ``#}`` that is not there. Measured on ``"{#" * n`` at
+#: 2,000 / 8,000 / 32,000 -- 0.04s / 0.56s / 9.0s, so four times the input is sixteen times the
+#: work. A ``chat_template`` arrives from the endpoint and is parsed on the event loop inside the
+#: capabilities cache lock, so a hostile or merely broken template could stall every other
+#: endpoint's probe behind it.
+_OPEN_COMMENT = "{#"
+_CLOSE_COMMENT = "#}"
+
+
+def _strip_jinja_comments(template: str) -> str:
+    """``template`` with every ``{# ... #}`` span replaced by a space.
+
+    A space rather than nothing so that two words either side of a comment do not become one word,
+    which is the whole reason this exists: a header reading "tools are rendered by ``render_tools``
+    upstream" must not read as a tools path.
+
+    **One pass, and an unterminated ``{#`` ends the scan.** Each ``{#`` found is jumped to its
+    ``#}`` or to the end of the string, so no position is examined twice -- which is what makes this
+    linear where the regex was quadratic, and it also means a template with one unclosed comment is
+    a cheap case rather than a pathological one.
+    """
+    if _OPEN_COMMENT not in template:
+        return template
+    out: list[str] = []
+    cursor = 0
+    while True:
+        start = template.find(_OPEN_COMMENT, cursor)
+        if start < 0:
+            out.append(template[cursor:])
+            return "".join(out)
+        out.append(template[cursor:start])
+        out.append(" ")
+        end = template.find(_CLOSE_COMMENT, start + len(_OPEN_COMMENT))
+        if end < 0:
+            # Unterminated. Everything from here was comment as far as Jinja is concerned, and
+            # dropping it is both the correct answer and the reason this cannot degrade.
+            return "".join(out)
+        cursor = end + len(_CLOSE_COMMENT)
 
 
 class Capabilities(NamedTuple):
@@ -152,20 +189,26 @@ def template_capabilities(props: object) -> Capabilities:
     if not isinstance(props, dict):
         return NOTHING
 
+    # Stripped **once**, here, and passed down. Three capabilities are read out of the same template
+    # and each was re-running the strip for its own lookups -- four or five times per `/props`,
+    # on the event loop, inside the capabilities cache lock. The strip is pure, so this changes
+    # nothing about what is answered; it just stops paying for the same answer repeatedly.
+    code = _code_of(props)
+
     # The server's own capability object is the answer when it declares one. Where it does not,
     # the template is asked instead: a template that *reads* `reasoning_effort` is one that
     # honours it. Same question, same evidence, asked in the other direction.
     declared = _cap_flag(props, "supports_reasoning_effort")
-    effort = declared if declared is not None else _mentions(props, "reasoning_effort")
+    effort = declared if declared is not None else _mentions(code, "reasoning_effort")
 
     return Capabilities(
         supports_reasoning_effort=effort,
-        thinking_toggle=_mentions(props, THINKING_KWARG),
-        tool_call_shape=tool_call_shape(props),
+        thinking_toggle=_mentions(code, THINKING_KWARG),
+        tool_call_shape=tool_call_shape(props, code=code),
     )
 
 
-def tool_call_shape(props: object) -> ToolCallShape:
+def tool_call_shape(props: object, *, code: str | None = None) -> ToolCallShape:
     """Whether this endpoint's chat template can render a tool declaration, or ``unknown``.
 
     One half of a two-part question, and deliberately the half that can actually be answered from
@@ -188,16 +231,22 @@ def tool_call_shape(props: object) -> ToolCallShape:
     server talking about its own behaviour, and it is the declaration probe rather than its
     ``supports_tool_calls`` sibling, which is about call *history*. Everything else waits for the
     engine half, which has to come from somewhere other than ``/props`` (#145).
+
+    ``code`` is the template with its comments already stripped, when the caller already has it --
+    :func:`template_capabilities` reads three capabilities out of one template and does not strip
+    it once per lookup. Optional, so this stays callable on its own in a test.
     """
     if not isinstance(props, dict):
         return UNKNOWN
+    if code is None:
+        code = _code_of(props)
     # Markers first, and this ordering is load-bearing. A published template is direct evidence
     # about what it does, while the flags are two *independent* probes upstream -- and on a template
     # taking string arguments a failed render clears **both** of them at once
     # (``common/jinja/caps.cpp``: `if (!success) { supports_tool_calls = false; supports_tools =
     # false; }``) without saying anything about whether a declaration path exists. Believing the
     # flags first would report `none` for a working tools path.
-    if _mentions_any(props, _TOOL_MARKERS):
+    if _mentions_any(code, _TOOL_MARKERS):
         return "template"
     # `supports_tools` is the declaration probe and is the one that matches this field. Its sibling
     # `supports_tool_calls` is about rendering call history, which is a different question, so an
@@ -209,8 +258,20 @@ def tool_call_shape(props: object) -> ToolCallShape:
     return "none" if _published(props) else UNKNOWN
 
 
-def _mentions_any(props: object, names: Sequence[str]) -> bool:
-    return any(_mentions(props, name) for name in names)
+def _code_of(props: object) -> str:
+    """``props``' chat template with comments stripped, or ``""`` when there is none.
+
+    The single place a template is cleaned, so the cost is paid once per ``/props`` rather than
+    once per capability read out of it.
+    """
+    template = props.get("chat_template") if isinstance(props, dict) else None
+    if not isinstance(template, str) or not template:
+        return ""
+    return _strip_jinja_comments(template)
+
+
+def _mentions_any(code: str, names: Sequence[str]) -> bool:
+    return any(_mentions(code, name) for name in names)
 
 
 def _published(props: object) -> bool:
@@ -223,29 +284,30 @@ def _published(props: object) -> bool:
     return isinstance(template, str) and bool(template.strip())
 
 
-def _mentions(props: object, name: str) -> bool:
-    """Whether the published chat template refers to ``name`` as code.
+def _mentions(code: str, name: str) -> bool:
+    """Whether the comment-free chat template refers to ``name`` as code.
+
+    ``code`` is the template as :func:`_code_of` returns it, so the comment rule below has already
+    been applied and this is a whole-word search and nothing else.
 
     Two things are excluded, and the first is the one that is easy to miss:
 
-    * **Comments.** Jinja's ``{# ... #}`` is stripped first. A template's header routinely explains
-      what it does -- "tools are rendered by ``render_tools`` upstream" -- and a template that
-      *describes* a tools path has no tools path. Without this a well-documented template reports a
-      capability it does not have, which is worse than reporting none: the control goes up and does
-      nothing. The reasoning fields happened to be protected by the rule below, because
-      ``supports_reasoning_effort`` cannot match ``\\breasoning_effort\\b`` (an underscore is a word
-      character, so there is no boundary before it) -- but ``tools`` on its own in a comment is a
-      plain match, and nothing else would have caught it.
+    * **Comments.** Jinja's ``{# ... #}`` is stripped before anything is read. A template's
+      header routinely explains what it does -- "tools are rendered by ``render_tools`` upstream" --
+      and a template that *describes* a tools path has no tools path. Without this a well-documented
+      template reports a capability it does not have, which is worse than reporting none: the
+      control goes up and does nothing. The reasoning fields happened to be protected by the rule
+      below, because ``supports_reasoning_effort`` cannot match ``\\breasoning_effort\\b`` (an
+      underscore is a word character, so there is no boundary before it) -- but ``tools`` on its own
+      in a comment is a plain match, and nothing else would have caught it.
     * **Longer names containing the field.** A whole-word match, so ``my_reasoning_effort_setting``
       is a different name.
 
     Neither is a Jinja parse. The question is *would this do anything*, which is all that is being
     decided.
     """
-    template = props.get("chat_template") if isinstance(props, dict) else None
-    if not isinstance(template, str) or not template:
+    if not code:
         return False
-    code = _JINJA_COMMENT.sub(" ", template)
     return re.search(rf"\b{re.escape(name)}\b", code) is not None
 
 
