@@ -224,13 +224,29 @@ def tool_call_shape(props: object, *, code: str | None = None) -> ToolCallShape:
 
     * ``template`` -- the template can render a tool declaration. **Not** a claim that calls will
       come back, and not a claim that results render -- ``tool_calls`` history is a separate probe.
-    * ``none`` -- the server declared ``supports_tools: false``, or the template has no tools path.
+    * ``none`` -- the template has no tools path. (The server's own ``supports_tools: false`` is
+      read too, but cannot produce this answer on its own -- see below.)
     * ``unknown`` -- nobody said.
 
-    A server that explicitly declares ``supports_tools: false`` is believed, because that is the
-    server talking about its own behaviour, and it is the declaration probe rather than its
-    ``supports_tool_calls`` sibling, which is about call *history*. Everything else waits for the
-    engine half, which has to come from somewhere other than ``/props`` (#145).
+    **What decides ``none``, precisely, because the flag is not consulted first.** A
+    template's own markers win outright: if it declares a path the answer is ``template`` *even when
+    the server said ``supports_tools: false``*. Only once no marker is found does the flag apply,
+    and it moves exactly one answer -- an endpoint that published **no** template but declared
+    ``supports_tools: false`` is ``none``, where silence alone would be ``unknown``. Everywhere else
+    it agrees with what the template already implied: a published template with no path is ``none``
+    either way.
+
+    It is read because it is the server talking about its own behaviour, and because it is the
+    declaration probe rather than its ``supports_tool_calls`` sibling, which is about call
+    *history* and says nothing about whether tools are offered.
+
+    An earlier version of this docstring read "``none`` -- the server declared ``supports_tools:
+    false``", which described the order before the markers were moved ahead of the flags and stopped
+    being true when they were. The flag's apparent power is exactly what misleads here, so it is
+    spelled out rather than left to the reader.
+
+    Everything else waits for the engine half, which has to come from somewhere other than
+    ``/props`` (#145).
 
     ``code`` is the template with its comments already stripped, when the caller already has it --
     :func:`template_capabilities` reads three capabilities out of one template and does not strip

@@ -511,3 +511,40 @@ class TestCommentStripping:
             _capabilities._strip_jinja_comments = original
 
         assert len(calls) == 1, calls
+
+    @pytest.mark.parametrize(
+        ("props", "expected"),
+        [
+            # The flag cannot override a declared path, whatever it says.
+            (
+                {
+                    "chat_template": "{% for t in tools %}x{% endfor %}",
+                    "chat_template_caps": {"supports_tools": False},
+                },
+                "template",
+            ),
+            # No path, flag agrees with the template: none either way.
+            (
+                {
+                    "chat_template": "{{ m.content }}",
+                    "chat_template_caps": {"supports_tools": False},
+                },
+                "none",
+            ),
+            ({"chat_template": "{{ m.content }}"}, "none"),
+            # Silence is unknown -- except when the server says otherwise, which is the one
+            # answer the flag actually moves.
+            ({"chat_template_caps": {"supports_tools": False}}, "none"),
+            ({}, "unknown"),
+            ({"chat_template_caps": {"supports_tools": True}}, "unknown"),
+        ],
+    )
+    def test_what_decides_none(self, props: object, expected: str) -> None:
+        """The whole of the decision table, so the docstring describing it cannot drift.
+
+        Written as a table because the interesting part is not any single row -- it is which rows
+        the flag can move, and the answer is exactly one: no template *and* an explicit false.
+        Everything else it agrees with. ``supports_tools: true`` moves nothing at all, because
+        ``true`` says nothing about the engine parser, which is the half nothing publishes.
+        """
+        assert tool_call_shape(props) == expected
