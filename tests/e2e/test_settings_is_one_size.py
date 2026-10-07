@@ -47,9 +47,8 @@ def settings(page: Any) -> None:
 
 def test_every_settings_screen_draws_its_shape_first(page: Any) -> None:
     settings(page)
-    # Models is where it lands, so its placeholder is up before anything has been clicked.
-    page.wait_for_selector(WAITING, timeout=5_000)
-
+    # It lands on Account, which has nothing to wait for; the first screen below is the
+    # first one with a placeholder.
     for screen in SCREENS:
         # Gone first, so what is found below is this screen's placeholder and not the last one's.
         page.wait_for_selector(WAITING, state="detached", timeout=10_000)
@@ -61,7 +60,7 @@ def test_the_sheet_is_one_size_whatever_is_in_it(page: Any) -> None:
     settings(page)
 
     sizes = {}
-    for screen in ("General", *SCREENS, "Dreaming"):
+    for screen in ("Account", "General", *SCREENS, "Dreaming"):
         # `Dreaming` carries a "v0.3" badge inside the button, so its accessible name is not
         # just the word; everything else is matched exactly.
         button = (

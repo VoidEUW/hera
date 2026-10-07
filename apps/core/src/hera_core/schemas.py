@@ -21,6 +21,7 @@ from __future__ import annotations
 import base64
 import binascii
 import json
+import re
 from datetime import date, datetime
 from typing import Any
 from uuid import UUID
@@ -29,6 +30,7 @@ from hera_skillsets.models import ID_PATTERN
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from hera_chats import Chat, Message, Project
+from hera_core.account import Account
 from hera_core.config import ProviderKind, validate_provider_name
 from hera_core.model_presets import PRESETS, ModelPreset
 from hera_memories import MAX_DESCRIPTION, MAX_TEXT
@@ -881,3 +883,57 @@ class HealthOut(BaseModel):
     model: str
     skills: int
     servers: list[ServerOut]
+
+
+class AccountOut(BaseModel):
+    """Who the owner is.
+
+    ``avatar_version`` is zero when there is no picture, and otherwise the row's last-change
+    time. The interface puts it in the picture's query string, so a replaced picture is a
+    different address and a browser holding the old one has no reason to keep showing it.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    name: str
+    email: str
+    avatar_version: int
+
+    @classmethod
+    def of(cls, account: Account) -> AccountOut:
+        return cls(
+            name=account.name,
+            email=account.email,
+            avatar_version=int(account.updated_at.timestamp()) if account.avatar_type else 0,
+        )
+
+
+_EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
+class AccountPatch(BaseModel):
+    """``None`` means *leave it*; an empty string clears the field."""
+
+    name: str | None = Field(default=None, max_length=120)
+    email: str | None = Field(default=None, max_length=254)
+
+    @field_validator("name")
+    @classmethod
+    def _tidy_name(cls, name: str | None) -> str | None:
+        return None if name is None else name.strip()
+
+    @field_validator("email")
+    @classmethod
+    def _plausible_email(cls, email: str | None) -> str | None:
+        if email is None:
+            return None
+        email = email.strip()
+        if email and not _EMAIL.match(email):
+            raise ValueError("that does not look like an email address")
+        return email
+
+
+class AvatarIn(BaseModel):
+    """A picture as a data URL, the way an attachment arrives."""
+
+    data_url: str = Field(min_length=1)
