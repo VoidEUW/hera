@@ -1,7 +1,7 @@
 {
   "ok": true,
-  "scenes": 32,
-  "ran": 32,
+  "scenes": 34,
+  "ran": 34,
   "did_not_run": 0,
   "console_messages": 0,
   "page_errors": 0,
@@ -25,13 +25,15 @@
     "21-servers-sheet.png",
     "22-skills-sheet.png",
     "23-composer-grown.png",
-    "30-settings-models.png",
-    "31-settings-skills.png",
-    "32-settings-servers.png",
-    "33-settings-permissions.png",
-    "34-settings-memory.png",
-    "35-settings-mind.png",
-    "36-settings-dreaming.png",
+    "30-settings-account.png",
+    "31-settings-models.png",
+    "32-settings-general.png",
+    "33-settings-skills.png",
+    "34-settings-servers.png",
+    "35-settings-permissions.png",
+    "36-settings-memory.png",
+    "37-settings-mind.png",
+    "38-settings-dreaming.png",
     "39-settings-search.png",
     "40-profile-menu.png",
     "41-light-start.png",
@@ -52,224 +54,238 @@
       "name": "01-start",
       "group": "conversation",
       "ok": true,
-      "seconds": 1.38,
+      "seconds": 1.04,
       "problem": ""
     },
     {
       "name": "02-waiting-mark",
       "group": "conversation",
       "ok": true,
-      "seconds": 4.75,
+      "seconds": 4.48,
       "problem": ""
     },
     {
       "name": "03-first-answer",
       "group": "conversation",
       "ok": true,
-      "seconds": 0.54,
+      "seconds": 1.03,
       "problem": ""
     },
     {
       "name": "04-long-trace",
       "group": "conversation",
       "ok": true,
-      "seconds": 11.51,
+      "seconds": 10.65,
       "problem": ""
     },
     {
       "name": "05-a-turn-that-cannot-start",
       "group": "conversation",
       "ok": true,
-      "seconds": 0.59,
+      "seconds": 0.25,
       "problem": ""
     },
     {
       "name": "06-a-turn-cut-off-mid-answer",
       "group": "conversation",
       "ok": true,
-      "seconds": 5.53,
+      "seconds": 5.42,
       "problem": ""
     },
     {
       "name": "07-the-answer-after-both",
       "group": "conversation",
       "ok": true,
-      "seconds": 4.62,
+      "seconds": 4.55,
       "problem": ""
     },
     {
       "name": "10-the-question-card",
       "group": "cards",
       "ok": true,
-      "seconds": 5.94,
+      "seconds": 5.74,
       "problem": ""
     },
     {
       "name": "11-the-reply-resumes-the-turn",
       "group": "cards",
       "ok": true,
-      "seconds": 4.62,
+      "seconds": 4.5,
       "problem": ""
     },
     {
       "name": "rail-row-menu",
       "group": "rail",
       "ok": true,
-      "seconds": 1.77,
+      "seconds": 1.36,
       "problem": ""
     },
     {
       "name": "rail-new-chat-and-projects",
       "group": "rail",
       "ok": true,
-      "seconds": 0.72,
+      "seconds": 0.61,
       "problem": ""
     },
     {
       "name": "composer-model-dropdown",
       "group": "composer",
       "ok": true,
-      "seconds": 1.53,
+      "seconds": 1.16,
       "problem": ""
     },
     {
       "name": "composer-servers-sheet",
       "group": "composer",
       "ok": true,
-      "seconds": 1.24,
+      "seconds": 1.08,
       "problem": ""
     },
     {
       "name": "composer-skills-sheet",
       "group": "composer",
       "ok": true,
-      "seconds": 1.25,
+      "seconds": 1.08,
       "problem": ""
     },
     {
       "name": "composer-typed-and-growing",
       "group": "composer",
       "ok": true,
-      "seconds": 0.64,
+      "seconds": 0.55,
       "problem": ""
     },
     {
       "name": "settings-open",
       "group": "settings",
       "ok": true,
-      "seconds": 2.44,
+      "seconds": 1.01,
+      "problem": ""
+    },
+    {
+      "name": "settings-models",
+      "group": "settings",
+      "ok": true,
+      "seconds": 1.88,
+      "problem": ""
+    },
+    {
+      "name": "settings-general",
+      "group": "settings",
+      "ok": true,
+      "seconds": 0.91,
       "problem": ""
     },
     {
       "name": "settings-skills",
       "group": "settings",
       "ok": true,
-      "seconds": 1.82,
+      "seconds": 1.69,
       "problem": ""
     },
     {
       "name": "settings-servers",
       "group": "settings",
       "ok": true,
-      "seconds": 1.78,
+      "seconds": 1.68,
       "problem": ""
     },
     {
       "name": "settings-permissions",
       "group": "settings",
       "ok": true,
-      "seconds": 1.83,
+      "seconds": 1.7,
       "problem": ""
     },
     {
       "name": "settings-memory",
       "group": "settings",
       "ok": true,
-      "seconds": 1.82,
+      "seconds": 1.76,
       "problem": ""
     },
     {
       "name": "settings-mind",
       "group": "settings",
       "ok": true,
-      "seconds": 1.87,
+      "seconds": 1.74,
       "problem": ""
     },
     {
       "name": "settings-dreaming",
       "group": "settings",
       "ok": true,
-      "seconds": 1.04,
+      "seconds": 0.9,
       "problem": ""
     },
     {
       "name": "settings-search",
       "group": "settings",
       "ok": true,
-      "seconds": 2.55,
+      "seconds": 1.15,
       "problem": ""
     },
     {
       "name": "profile-menu",
       "group": "theme",
       "ok": true,
-      "seconds": 1.8,
+      "seconds": 2.36,
       "problem": ""
     },
     {
       "name": "light-theme",
       "group": "theme",
       "ok": true,
-      "seconds": 1.51,
+      "seconds": 1.38,
       "problem": ""
     },
     {
       "name": "back-to-dark",
       "group": "theme",
       "ok": true,
-      "seconds": 2.27,
+      "seconds": 2.11,
       "problem": ""
     },
     {
       "name": "reduced-motion",
       "group": "accessibility",
       "ok": true,
-      "seconds": 2.74,
+      "seconds": 1.27,
       "problem": ""
     },
     {
       "name": "reduced-motion-drawer",
       "group": "accessibility",
       "ok": true,
-      "seconds": 0.53,
+      "seconds": 0.46,
       "problem": ""
     },
     {
       "name": "phone-start",
       "group": "phone",
       "ok": true,
-      "seconds": 1.31,
+      "seconds": 1.21,
       "problem": ""
     },
     {
       "name": "phone-rail",
       "group": "phone",
       "ok": true,
-      "seconds": 0.68,
+      "seconds": 0.63,
       "problem": ""
     },
     {
       "name": "phone-answer",
       "group": "phone",
       "ok": true,
-      "seconds": 1.82,
+      "seconds": 1.72,
       "problem": ""
     },
     {
       "name": "phone-settings",
       "group": "phone",
       "ok": true,
-      "seconds": 2.44,
+      "seconds": 1.2,
       "problem": ""
     }
   ]
