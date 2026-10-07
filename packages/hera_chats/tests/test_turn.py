@@ -171,7 +171,12 @@ class TestSkills:
         assert isinstance(events[0], SkillSelected)
         assert events[0].skill == "tdd"
         assert events[0].reason == "pinned" or events[0].reason == "slash"
-        assert provider.requests[0].messages[-1].content == "how do I test this?"
+        # The skill body and the question share one user message now: strict templates answer an
+        # empty message when roles do not alternate, and the body is user-role too. So "stripped"
+        # is the last line being the bare question, not the last message being only it.
+        last = provider.requests[0].messages[-1].content
+        assert isinstance(last, str)
+        assert last.rstrip().endswith("how do I test this?"), last
 
     async def test_the_skill_body_reaches_the_prompt_uncorrupted(
         self, make_orchestrator: Make, write_skill: WriteSkill

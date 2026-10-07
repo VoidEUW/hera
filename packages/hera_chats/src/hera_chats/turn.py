@@ -57,11 +57,13 @@ from hera_prompts import Role as FrameRole
 from hera_providers import (
     ChatMessage,
     ChatRequest,
+    ContentPart,
     Provider,
     ProviderError,
     Role,
     StreamInterrupted,
     TextDelta,
+    TextPart,
     ThinkingDelta,
     ToolCallReady,
     ToolCallStarted,
@@ -431,27 +433,43 @@ class Turn:
         # `_wrap_up` below is a user-role message rather than system prompt. Here they change only
         # what comes after everything worth caching.
         #
-        # Order is clock, then problems, then skills, then the question. Problems are an account of
-        # this turn and belong with it; a skill's instructions belong next to the thing being
-        # asked; a note after the question reads as part of it.
+        # Order within the message is clock, then problems, then skills, then the question. Problems
+        # are an account of this turn and belong with it; a skill's instructions belong next to
+        # the thing being asked; a note after the question reads as part of it.
+        #
+        # **One message, not four.** They are all user-role, and a strict template answers an
+        # empty message when roles do not alternate -- Ministral and GPT-OSS in LM Studio do
+        # exactly that, recorded in `docs/prototype.md`. A turn with a clock, a browser failure and
+        # a selected skill produced four consecutive user messages, so a supported target returned
+        # nothing at all. The cache win is unaffected: the notes still come after the history, which
+        # is the only part of this that was ever about position.
+        notes: list[str] = []
         if context.now:
-            messages.append(ChatMessage(role=Role.USER, content=f"It is now {context.now}."))
+            notes.append(f"It is now {context.now}.")
         if context.problems:
-            messages.append(
-                ChatMessage(
-                    role=Role.USER,
-                    content=f"Your browser could not draw: {context.problems}",
-                )
-            )
+            notes.append(f"Your browser could not draw: {context.problems}")
         if skills_text:
-            messages.append(ChatMessage(role=Role.USER, content=skills_text))
+            notes.append(skills_text)
+        notes.extend(str(message.content) for message in tail)
         # The router strips the /command; the attachments are added after that, so a file is
         # never scored as part of the turn's own words.
         spoken = content_of(self.cleaned_text, context.attachments)
-        if says_something(spoken):
-            messages.append(ChatMessage(role=Role.USER, content=spoken))
-        messages.extend(tail)
-        return messages
+        if notes and isinstance(spoken, list):
+            # A picture makes this a list of parts rather than a string, and it must stay one:
+            # stringifying it turns an image into the text `[ImagePart(...)]`, which is what the
+            # note is for. So the notes become a leading text part of the same message, and the
+            # question -- still last -- is the part that follows it.
+            content: str | list[ContentPart] = [
+                *(_text_parts("\n\n".join(notes))),
+                *spoken,
+            ]
+        else:
+            if says_something(spoken):
+                notes.append(str(spoken))
+            content = "\n\n".join(notes) if notes else ""
+        if says_something(content):
+            messages.append(ChatMessage(role=Role.USER, content=content))
+        return _alternating(messages)
 
     def _pins(self) -> list[str]:
         """Pinned skills from the chat, the profile and the project, in that order.
@@ -747,6 +765,41 @@ class TurnOrchestrator:
             registry=self.registry,
             settings=self.settings,
         )
+
+
+def _text_parts(text: str) -> list[ContentPart]:
+    """``text`` as the parts list shape, for merging notes into a message that carries a picture."""
+    return [TextPart(text=text)]
+
+
+def _alternating(messages: Sequence[ChatMessage]) -> list[ChatMessage]:
+    """Adjacent messages sharing a role, merged into the first of them.
+
+    Strict templates answer an **empty message** when roles do not alternate -- Ministral and
+    GPT-OSS in LM Studio both do, recorded in ``docs/prototype.md`` and reproduced here. So this
+    is a correctness requirement rather than tidiness, and it is enforced at the one place every
+    request leaves through, because the alternative is three separate call sites each having to
+    remember. Nothing in ``hera_providers`` or the adapters merges roles, and ADR 20's move of
+    the clock and skills after the history is what first put three user messages in a row.
+
+    Only plain-text neighbours are merged. A message carrying tool calls is left alone, because
+    merging would break the ``tool_call_id`` pairing the request is built on.
+    """
+    merged: list[ChatMessage] = []
+    for message in messages:
+        previous = merged[-1] if merged else None
+        if (
+            previous is not None
+            and previous.role is message.role
+            and isinstance(previous.content, str)
+            and isinstance(message.content, str)
+        ):
+            merged[-1] = ChatMessage(
+                role=previous.role, content=f"{previous.content}\n\n{message.content}"
+            )
+        else:
+            merged.append(message)
+    return merged
 
 
 def _split_frame(messages: Sequence[FrameMessage]) -> tuple[list[ChatMessage], list[ChatMessage]]:

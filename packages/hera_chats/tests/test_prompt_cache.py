@@ -20,6 +20,7 @@ whole claim is about the shape of the request on the wire.
 
 from __future__ import annotations
 
+from itertools import pairwise
 from typing import Any
 
 import pytest
@@ -96,10 +97,12 @@ async def test_the_clock_reaches_the_model(make_orchestrator: Any) -> None:
 async def test_the_clock_sits_after_the_history_and_before_the_question(
     make_orchestrator: Any,
 ) -> None:
-    """The exact position: conversation, then clock, then what she was asked.
+    """The exact position: conversation, then the notes, then the question within them.
 
-    Between the history and the question rather than after both, because a note that follows the
-    question reads as part of it.
+    The clock sits between the history and the question rather than after both, because a note
+    that follows the question reads as part of it. The clock and the question now share one
+    message -- role alternation requires it -- so the ordering is *within* that message and is
+    checked as text.
     """
     asked = await run(
         make_orchestrator,
@@ -113,10 +116,12 @@ async def test_the_clock_sits_after_the_history_and_before_the_question(
     contents = texts(asked[0])
     clock_at = next(i for i, c in enumerate(contents) if "It is now" in c)
     answer_at = next(i for i, c in enumerate(contents) if "earlier answer" in c)
-    question_at = len(contents) - 1
+    last = contents[-1]
 
-    assert answer_at < clock_at < question_at, contents
-    assert contents[question_at] == "hi", contents
+    assert answer_at < clock_at, contents
+    assert clock_at == len(contents) - 1, contents
+    assert last.rstrip().endswith("hi"), last
+    assert last.index("It is now") < last.index("hi"), last
 
 
 async def test_an_unset_clock_leaves_no_trace(make_orchestrator: Any) -> None:
@@ -242,3 +247,49 @@ async def test_the_turn_still_completes_with_the_clock_moved(make_orchestrator: 
 
     assert isinstance(events[-1], TurnClosed)
     assert events[-1].reason == "completed"
+
+
+async def test_roles_alternate_with_all_three_notes_present(
+    make_orchestrator: Any, write_skill: Any
+) -> None:
+    """Strict templates answer an *empty message* when roles do not alternate.
+
+    Ministral and GPT-OSS in LM Studio both do, recorded in ``docs/prototype.md``. Moving the
+    clock, the browser report and the skills after the history put three user messages in a row,
+    so a supported target returned nothing at all. This is a correctness requirement, and it is
+    the one thing in this file that was never asserted -- every other test here checks *where*
+    something sits, not whether the shape a strict template rejects is the shape we produce.
+    """
+    write_skill("tdd", body="Red, green, refactor.")
+
+    asked = await run(
+        make_orchestrator,
+        text="hi",
+        now="Friday 03 October 2026, 14:05",
+        problems="- `gdp.mmd`: Lexical error on line 2",
+    )
+
+    roles = [message.role for message in asked[0].messages]
+
+    assert all(a is not b for a, b in pairwise(roles)), roles
+
+
+async def test_the_notes_share_one_message_with_the_question_last(
+    make_orchestrator: Any, write_skill: Any
+) -> None:
+    """Merged, not dropped, and the question is still the final thing she reads."""
+    write_skill("tdd", body="Red, green, refactor.")
+
+    asked = await run(
+        make_orchestrator,
+        text="/tdd how do I test this?",
+        now="Friday 03 October 2026, 14:05",
+        problems="- `gdp.mmd`: Lexical error on line 2",
+    )
+
+    last = texts(asked[0])[-1]
+
+    assert "It is now" in last, last
+    assert "Lexical error" in last, last
+    assert "Red, green, refactor." in last, last
+    assert last.rstrip().endswith("how do I test this?"), last
