@@ -455,9 +455,17 @@ class SkillOut(BaseModel):
     trust: str = "unknown"
     """``verified``, ``modified`` or ``unknown`` — see :mod:`hera_core.trust`."""
 
+    enabled: bool = True
+    """Off means not routed, not offered to `/slash`, not pinnable. The folder stays."""
+
     @classmethod
     def of(
-        cls, skill: Skill, usage: SkillUsage | None = None, *, trust: str = "unknown"
+        cls,
+        skill: Skill,
+        usage: SkillUsage | None = None,
+        *,
+        trust: str = "unknown",
+        enabled: bool = True,
     ) -> SkillOut:
         meta = skill.metadata
         return cls(
@@ -476,7 +484,18 @@ class SkillOut(BaseModel):
             homepage=meta.get("homepage", ""),
             digest=skill.digest,
             trust=trust,
+            enabled=enabled,
         )
+
+
+class SkillPatch(BaseModel):
+    enabled: bool
+
+
+class SkillSource(BaseModel):
+    """A skill's ``SKILL.md`` as written — frontmatter and body, the file a person would open."""
+
+    content: str = Field(max_length=200_000)
 
 
 class SkillIn(BaseModel):
@@ -490,6 +509,9 @@ class SkillIn(BaseModel):
     id: str = Field(min_length=1, max_length=64)
     description: str = Field(default="", max_length=1024)
     body: str = ""
+    content: str = Field(default="", max_length=200_000)
+    """A whole ``SKILL.md``, written verbatim when given — what the editor sends. Without it the
+    file is assembled from ``description`` and ``body``."""
 
     @field_validator("id")
     @classmethod

@@ -317,6 +317,18 @@ class ProviderEntry(BaseModel):
         return self.model_copy(update={"active_model": model_id})
 
 
+class SkillsConfig(BaseModel):
+    """``[skills]`` — which skills are switched off.
+
+    A list of ids rather than a flag on each skill, because a skill is a folder and the folder
+    is not ours to write into. The folder stays; the router just does not see it.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    disabled: list[str] = Field(default_factory=list)
+
+
 class HeraConfig(BaseModel):
     """Everything in ``config.toml``."""
 
@@ -324,6 +336,7 @@ class HeraConfig(BaseModel):
 
     providers: list[ProviderEntry] = Field(default_factory=list)
     active_provider: str = ""
+    skills: SkillsConfig = Field(default_factory=SkillsConfig)
 
     timezone: str = ""
     """Where the person is, as an IANA name — ``Europe/Berlin``, not an offset.
@@ -357,24 +370,26 @@ class HeraConfig(BaseModel):
         if all(existing.name != entry.name for existing in self.providers):
             replaced = [*self.providers, entry]
         active = self.active_provider or entry.name
-        return HeraConfig(providers=replaced, active_provider=active, timezone=self.timezone)
+        return self.model_copy(update={"providers": replaced, "active_provider": active})
 
     def without(self, name: str) -> HeraConfig:
         remaining = [entry for entry in self.providers if entry.name != name]
         active = self.active_provider
         if active == name:
             active = remaining[0].name if remaining else ""
-        return HeraConfig(providers=remaining, active_provider=active, timezone=self.timezone)
+        return self.model_copy(update={"providers": remaining, "active_provider": active})
 
     def with_timezone(self, timezone: str) -> HeraConfig:
-        return HeraConfig(
-            providers=list(self.providers), active_provider=self.active_provider, timezone=timezone
-        )
+        return self.model_copy(update={"timezone": timezone})
 
     def activated(self, name: str) -> HeraConfig:
-        return HeraConfig(
-            providers=list(self.providers), active_provider=name, timezone=self.timezone
-        )
+        return self.model_copy(update={"active_provider": name})
+
+    def with_skill_enabled(self, skill_id: str, enabled: bool) -> HeraConfig:
+        """Switch one skill on or off. Off is a name in a list, never a deleted folder."""
+        rest = [name for name in self.skills.disabled if name != skill_id]
+        disabled = rest if enabled else [*rest, skill_id]
+        return self.model_copy(update={"skills": SkillsConfig(disabled=disabled)})
 
 
 def load(path: Path | None = None) -> HeraConfig:
@@ -401,10 +416,8 @@ def load(path: Path | None = None) -> HeraConfig:
     if not config.providers:
         # Seeded, but the rest of the file is kept: a person who deleted every endpoint by hand
         # should not also lose the timezone they set on the screen above it.
-        return HeraConfig(
-            providers=[_seeded_from_environment()],
-            active_provider="local",
-            timezone=config.timezone,
+        return config.model_copy(
+            update={"providers": [_seeded_from_environment()], "active_provider": "local"}
         )
     return config
 

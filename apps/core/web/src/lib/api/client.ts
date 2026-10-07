@@ -158,6 +158,7 @@ export interface Skill {
 	resources: string[];
 	problems: string[];
 	hits: number;
+	enabled: boolean;
 	last_used_at: string | null;
 	author: string;
 	license: string;
@@ -454,8 +455,27 @@ export const api = {
 
 	skills: () =>
 		request<{ skills: Skill[]; broken: BrokenSkill[]; trust_problem: string }>('/skills'),
-	createSkill: (body: { id: string; description?: string; body?: string }) =>
+	/** Creates a skill folder. `content` is a whole SKILL.md and is written as it is. */
+	createSkill: (body: { id: string; content: string }) =>
 		request<Skill>('/skills', { method: 'POST', body: JSON.stringify(body) }),
+	/** Deletes the skill's folder. Not undoable. */
+	deleteSkill: (id: string) =>
+		request<void>(`/skills/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+	/** The skill's SKILL.md verbatim, for the editor. */
+	skillSource: (id: string) =>
+		request<{ content: string }>(`/skills/${encodeURIComponent(id)}/source`),
+	/** Replaces the file. What comes back is what the loader made of it, `problems` included. */
+	saveSkillSource: (id: string, content: string) =>
+		request<Skill>(`/skills/${encodeURIComponent(id)}/source`, {
+			method: 'PUT',
+			body: JSON.stringify({ content })
+		}),
+	/** Off means not routed, not offered to `/slash`, not pinnable. The folder stays. */
+	setSkillEnabled: (id: string, enabled: boolean) =>
+		request<Skill>(`/skills/${encodeURIComponent(id)}`, {
+			method: 'PATCH',
+			body: JSON.stringify({ enabled })
+		}),
 
 	/** Everything she has written down (ADR 16). Switched-off ones included — the switch is
 	 * about what a turn costs, and a list that hid them would leave you unable to switch one
