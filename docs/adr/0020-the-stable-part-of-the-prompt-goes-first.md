@@ -36,6 +36,39 @@ rather than of this deployment belongs in a user-role message, because a system 
 shape would be a second prompt to reason about. That reasoning generalises, and the two volatile
 slots now use it.
 
+### What this cost the skills, and what was done about it
+
+The skills were **not** merely relocated. In the frame they were a section of configuration, read
+with the rest of the prompt; after the history they are text inside a user-role message, which is
+to say text the model may reasonably take for something the person typed. `_you asked for it by
+name_` is a weak signal against a hundred tokens of somebody's instructions.
+
+The two ways to restore the standing were both rejected on evidence rather than taste:
+
+- **A `system` message after the history.** Not something strict templates accept, and the ones that
+  refuse are the same family that answers an *empty message* on adjacent roles — so this would trade
+  one blank answer for another.
+- **A `developer` message.** The role exists (`hera_prompts` can emit it) but is not portable: whether
+  a server honours it or folds it into the system prompt is, per its own docstring, "the server's
+  business", and the compiler's default is to fold it *before* the request rather than risk it.
+
+So the boundary is **stated in the text** instead: the skill block is introduced as instructions
+standing behind the request and explicitly not something the person said, and it is told to say
+plainly if it conflicts with what was actually asked. That last clause matters — a skill that is
+wrong should produce a disagreement rather than a silent substitution, and only a note that claims
+no authority over the request can ask for one honestly.
+
+This is a partial repair and is recorded as one. It does not make a skill as strong as a system
+section, and nothing here claims it does; the tests pin both halves — that the boundary text is
+present, and that no `system` or `developer` message carries the body, so re-adding the skills slot
+to the frame cannot pass unnoticed as a pure cache win.
+
+**All three notes are merged into one user message, not three.** They are all user-role, and a
+strict template answers an empty message when roles do not alternate, so a turn with a clock, a
+browser failure and a selected skill produced four consecutive user messages and a supported target
+returned nothing. One message, notes first and the question last, keeps the cache win — the notes
+still follow the history — and keeps the roles alternating.
+
 The order is deliberate. A skill's instructions belong next to the thing being asked, and a note
 *after* the question reads as part of it.
 

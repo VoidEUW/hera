@@ -293,3 +293,44 @@ async def test_the_notes_share_one_message_with_the_question_last(
     assert "Lexical error" in last, last
     assert "Red, green, refactor." in last, last
     assert last.rstrip().endswith("how do I test this?"), last
+
+
+async def test_the_skill_block_is_marked_as_instructions_not_as_speech(
+    make_orchestrator: Any, write_skill: Any
+) -> None:
+    """A skill used to be a system section. ADR 20 moved it after the history for the cache, and
+    that cost it its standing: inside a user-role message it reads as something the person typed.
+
+    A system message after the history is not an option -- the strict templates that answer an
+    empty message on adjacent roles are the same ones that will not take one -- and ``developer``
+    is not portable. So the boundary is stated in the text instead, and this pins it, because
+    "they are instructions" is exactly the sort of thing a later edit drops for being redundant.
+    """
+    write_skill("tdd", body="Red, green, refactor.")
+
+    asked = await run(make_orchestrator, text="/tdd how do I test this?")
+
+    last = texts(asked[0])[-1]
+
+    assert "skill instructions" in last, last
+    assert "not something the person said" in last, last
+    assert "Red, green, refactor." in last, last
+
+
+async def test_no_skill_text_appears_in_a_system_or_developer_message(
+    make_orchestrator: Any, write_skill: Any
+) -> None:
+    """The cost of the move, stated as a test so nobody re-adds the skills slot to the frame
+
+    expecting only a cache win. If this ever passes, the frame is carrying the body again and the
+    boundary text is duplicating instructions rather than replacing them.
+    """
+    write_skill("tdd", body="Red, green, refactor.")
+
+    asked = await run(make_orchestrator, text="/tdd how do I test this?")
+
+    authoritative = [
+        str(m.content) for m in asked[0].messages if m.role.value in ("system", "developer")
+    ]
+
+    assert not any("Red, green, refactor." in c for c in authoritative), authoritative

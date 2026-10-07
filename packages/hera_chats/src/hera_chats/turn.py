@@ -449,7 +449,21 @@ class Turn:
         if context.problems:
             notes.append(f"Your browser could not draw: {context.problems}")
         if skills_text:
-            notes.append(skills_text)
+            # **Skills were a system section before ADR 20 and are not any more.** That move was
+            # made for the cache and was right about position, but it quietly cost the skills their
+            # standing: in the frame they were configuration, and here they arrive inside a
+            # user-role message, which is to say as something the person typed. A model that reads
+            # a user message as the human's own words will weigh "# Skill: tdd / _you asked for it
+            # by name_" accordingly.
+            #
+            # The two available repairs both cost more than the problem. A **system** message after
+            # the history is not something strict templates accept -- the same family that answers
+            # an empty message on adjacent roles -- and `developer` is not portable either. So the
+            # boundary is stated instead: the skill block is marked as instructions standing behind
+            # the request, in a form every template already accepts, and it stays after the history
+            # where the cache needs it. This is an honest reading instruction, not a claim about
+            # authority the message no longer carries.
+            notes.append(SKILLS_BOUNDARY + skills_text)
         notes.extend(str(message.content) for message in tail)
         # The router strips the /command; the attachments are added after that, so a file is
         # never scored as part of the turn's own words.
@@ -765,6 +779,20 @@ class TurnOrchestrator:
             registry=self.registry,
             settings=self.settings,
         )
+
+
+SKILLS_BOUNDARY = (
+    "The following are skill instructions. They stand behind this request and were selected for "
+    "it; they are not something the person said. Follow them, and say plainly if they conflict "
+    "with what was actually asked.\n\n---\n\n"
+)
+"""What separates a skill block from the person's own words.
+
+Stated rather than implied because the role cannot be: see the note where it is used. The wording
+deliberately claims no authority the user-role message does not have -- it says these are
+instructions, not that they outrank the request -- and it keeps the last line available for the
+model to push back on, which is what a skill that is wrong should produce.
+"""
 
 
 def _text_parts(text: str) -> list[ContentPart]:
