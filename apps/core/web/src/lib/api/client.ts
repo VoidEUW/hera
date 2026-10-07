@@ -205,6 +205,9 @@ export interface ModelEntry {
 	 * what looks like a tool call instead of making one for real — it answers in prose alone
 	 * rather than attempting a call it cannot make. */
 	tool_calling: boolean;
+	/** Whether this model can be shown a picture. Recorded for a later change to read; nothing
+	 * refuses an attachment on it yet. */
+	accepts_images: boolean;
 	/** The `reasoning_effort` values this model accepts, asked of the endpoint. **Empty means
 	 * unknown, not "any"** — so a reasoning control is drawn only when this is non-empty. The
 	 * values are not a shared vocabulary (OpenRouter carries `minimal`, `none` and `xhigh`, and a
@@ -437,6 +440,7 @@ export const api = {
 			options?: Record<string, unknown>;
 			context_length?: number | null;
 			tool_calling?: boolean;
+			accepts_images?: boolean;
 		}
 	) =>
 		request<Providers>(`/providers/${name}/models`, { method: 'POST', body: JSON.stringify(body) }),

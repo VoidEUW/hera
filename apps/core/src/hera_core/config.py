@@ -111,6 +111,16 @@ class ModelEntry(BaseModel):
     configured at all.
     """
 
+    accepts_images: bool = True
+    """Whether this model can be shown a picture.
+
+    Recorded now and read by nothing yet: it is the fact a later change needs in order to refuse
+    an image attachment for a model that would only choke on it, or to say so before somebody
+    sends one. ``True`` by default because that is how every model behaves today — images are
+    attachable without asking — so an install does not change under anybody. Set by a person,
+    never guessed from the model's id (the same stance as :attr:`tool_calling`).
+    """
+
     thinking: dict[str, Any] = Field(default_factory=dict)
     """What this model can be told about its reasoning, **as declared by a person**.
 

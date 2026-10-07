@@ -343,8 +343,6 @@ export const t = {
 	},
 
 	models: {
-		blurb:
-			'Where she runs. Any OpenAI-compatible endpoint — LM Studio, llama.cpp, vLLM, Ollama, or a hosted API.',
 		active: 'Active',
 		activate: 'Use this one',
 		add: 'Add an endpoint',
@@ -396,13 +394,11 @@ export const t = {
 		modelName: 'Display name',
 		addModel: 'Add model',
 		removeModel: 'Remove',
-		setActiveModel: 'Use this model',
 		noModels: 'No models registered on this endpoint yet.',
 		search: 'Search models…',
 		alreadyAdded: 'Added',
 
 		options: 'Request options',
-		optionsOpen: 'Options',
 		optionsHint:
 			'Extra fields sent in the request body — for something this endpoint understands and Hera does not need to. Leave empty unless a model asks for one.',
 		optionsRawHint: 'The same data as the fields above, and anything else this server takes.',
@@ -450,11 +446,20 @@ export const t = {
 			unset: 'Unset'
 		},
 
+		maxTokens: 'Max output tokens',
+		maxTokensPlaceholder: 'Server default',
+		maxTokensHint:
+			'The most tokens one answer may run to, sent as max_tokens. Empty sends nothing, so the server’s own limit applies — some, like mlx_lm, stop at a few hundred by default and cut answers off mid-sentence. Overrides what the endpoint would otherwise use.',
+
 		contextLength: 'Context window',
 		contextLengthPlaceholder: 'e.g. 32768',
 		contextLengthHint:
 			'Tokens this model can hold, for the composer’s usage bar. Not probed — fill it in yourself; empty means no bar.',
 		contextLengthInvalid: 'This should be a whole number greater than zero, or empty.',
+
+		acceptsImages: 'Accepts images',
+		acceptsImagesHint:
+			'Whether this model can be shown a picture. Kept for later — nothing checks it yet, so images can still be attached to any model.',
 
 		toolCalling: 'Uses tools',
 		toolCallingHint:

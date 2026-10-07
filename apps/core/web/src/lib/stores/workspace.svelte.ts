@@ -367,7 +367,13 @@ export class Workspace {
 
 	async #writeOptions(
 		entry: { name: string },
-		model: { id: string; name: string; context_length: number | null; tool_calling: boolean },
+		model: {
+			id: string;
+			name: string;
+			context_length: number | null;
+			tool_calling: boolean;
+			accepts_images: boolean;
+		},
 		options: Record<string, unknown>
 	) {
 		try {
@@ -381,7 +387,9 @@ export class Workspace {
 				// somebody deliberately turned them off -- and the only thing that has changed
 				// for them is a reasoning effort or a thinking budget. The schema says this in
 				// so many words; this is that sentence being honoured.
-				tool_calling: model.tool_calling
+				tool_calling: model.tool_calling,
+				// Same reason, same sentence: a typed field `addModel` replaces whole.
+				accepts_images: model.accepts_images
 			});
 			this.providers = found.providers;
 			this.activeProvider = found.active;
