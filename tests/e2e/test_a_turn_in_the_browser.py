@@ -260,15 +260,28 @@ def test_a_skill_is_switched_on_for_one_chat(page: Any) -> None:
 
 
 def test_settings_holds_what_changes_her_behaviour(page: Any) -> None:
-    """Models first, because nothing works until she is pointed at one; then the two lists a
-    person comes back to. Dreaming is listed and disabled rather than hidden — a v0.2 feature
-    you can see coming is a promise, and one you cannot is a surprise."""
+    """Grouped by kind — App, Hera, Adjust — with Models the first thing she needs among hers.
+    Dreaming is listed and disabled rather than hidden — a v0.2 feature you can see coming
+    is a promise, and one you cannot is a surprise."""
     page.get_by_role("button", name="Settings").click()
     page.wait_for_selector("[role=dialog]", timeout=10_000)
 
     nav = page.locator("[role=dialog] nav.tabs button")
-    assert nav.all_inner_texts()[:4] == ["Models", "Skills", "Servers", "Permissions"]
-    assert "Dreaming" in nav.last.inner_text()
+    names = [text.split("\n")[0].strip() for text in nav.all_inner_texts()]
+    assert names == [
+        "General",
+        "Mind",
+        "Memory",
+        "Models",
+        "Dreaming",
+        "Skills",
+        "Servers",
+        "Permissions",
+    ]
+
+    # The search field is in the sidebar, beside the navigation, and the title is in the content.
+    assert page.locator("[role=dialog] aside input[type=search]").count() == 1
+    assert page.locator("[role=dialog] h2").first.inner_text() == "Models"
 
     # The endpoint is registered and editable, which is the whole point of this screen.
     page.wait_for_selector("text=Base URL", timeout=10_000)
@@ -293,15 +306,17 @@ def test_manage_servers_lands_on_the_servers_tab(page: Any) -> None:
     page.wait_for_selector("[role=dialog]", state="detached", timeout=10_000)
 
 
-def test_the_profile_card_holds_everything_that_is_not_about_her(page: Any) -> None:
-    """Appearance and where your data lives are not model behaviour, and mixing the two is how
-    a person ends up scrolling past six model fields to find a light-mode toggle."""
+def test_the_profile_card_is_the_way_into_settings(page: Any) -> None:
+    """There is one door, not two: the card at the foot of the rail opens Settings, and
+    appearance and where your data lives are on its General screen."""
+    assert page.locator("nav.rail button.action:has-text('Settings')").count() == 0
     page.locator("button.card").click()
     page.wait_for_selector("[role=dialog]", timeout=10_000)
 
-    menu = page.locator("[role=dialog]")
-    assert "APPEARANCE" in menu.inner_text().upper()
-    assert "ABOUT" in menu.inner_text().upper()
+    page.get_by_role("button", name="General", exact=True).click()
+    dialog = page.locator("[role=dialog]")
+    assert "APPEARANCE" in dialog.inner_text().upper()
+    assert "ABOUT" in dialog.inner_text().upper()
 
     page.keyboard.press("Escape")
     page.wait_for_selector("[role=dialog]", state="detached", timeout=10_000)

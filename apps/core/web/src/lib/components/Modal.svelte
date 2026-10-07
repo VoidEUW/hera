@@ -2,7 +2,7 @@
 	/**
 	 * One modal shell for every sheet in the application (#99).
 	 *
-	 * The four sheets this replaces — Settings, ServerSheet, SkillPicker, ProfileMenu — each
+	 * The four sheets this replaces — Settings, ServerSheet, SkillPicker, the profile menu — each
 	 * carried their own copy of the scrim / sheet / Escape pattern, and the comments in each said
 	 * so. This is that copy, once.
 	 *

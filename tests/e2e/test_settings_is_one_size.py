@@ -61,7 +61,7 @@ def test_the_sheet_is_one_size_whatever_is_in_it(page: Any) -> None:
     settings(page)
 
     sizes = {}
-    for screen in (*SCREENS, "Dreaming"):
+    for screen in ("General", *SCREENS, "Dreaming"):
         # `Dreaming` carries a "v0.3" badge inside the button, so its accessible name is not
         # just the word; everything else is matched exactly.
         button = (
