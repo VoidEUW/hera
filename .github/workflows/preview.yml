@@ -119,7 +119,7 @@ jobs:
       # pictures are what a reviewer looks at, and these two are what they ask for when a picture
       # is not enough.
       - name: Upload the media
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: preview-media
           path: preview-media/
