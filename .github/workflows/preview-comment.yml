@@ -47,7 +47,7 @@ jobs:
           echo "number=$number" >> "$GITHUB_OUTPUT"
 
       - name: Check out this repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Fetch the filmed media
         if: env.CONCLUSION == 'success'

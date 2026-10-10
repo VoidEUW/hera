@@ -46,12 +46,12 @@ jobs:
       # pull request's head explicitly. Plain pull_request runs keep the default checkout.
       # The ref is taken from an untrusted input, so the checkout must not persist the token
       # into .git/config (CodeQL: cache poisoning via execution of untrusted code).
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         if: inputs.pr_number
         with:
           ref: refs/pull/${{ inputs.pr_number }}/head
           persist-credentials: false
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         if: ${{ !inputs.pr_number }}
         with:
           persist-credentials: false
