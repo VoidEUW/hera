@@ -51,7 +51,7 @@ jobs:
 
       - name: Fetch the filmed media
         if: env.CONCLUSION == 'success'
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: preview-media
           run-id: ${{ env.RUN_ID }}
