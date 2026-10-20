@@ -1,0 +1,24 @@
+name: Bug
+description: Something that doesn't work as it should.
+labels: [bug]
+title: "[BUG] "
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Description of the bug
+      placeholder: Usually...
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. ...
+        2. ...
+    validations:
+      required: true
+  - type: textarea
+    id: screenshot
+    attributes:
+      label: Screenshot or video
+      description: Drag a file into this box. A screenshot or recording that shows the wrong behavior.

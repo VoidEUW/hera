@@ -1,0 +1,29 @@
+name: Feature
+description: Describe a new feature that hera should be able to do.
+title: "[FEATURE] "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: Idea
+      description: What is the core idea behind your thought?
+      placeholder: I want to ...
+    validations:
+      required: false
+  - type: textarea
+    id: todos
+    attributes:
+      label: Todos
+      description: The things that need to be done before closing this issue.
+      placeholder: |
+        - [ ] ...
+        - [ ] ...
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes
+      description: Some additional notes that might be good to know
+      placeholder: Don't forget to...
