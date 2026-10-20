@@ -78,11 +78,12 @@ def test_the_placeholder_is_the_height_the_list_turns_out_to_be(server: str, pag
 
     page.goto(server, wait_until="networkidle")
     page.wait_for_selector("text=Clock skew", timeout=15_000)
-    settled = page.locator("ul.scroll").bounding_box()["height"]
+    chats = page.get_by_role("region", name="Chats")
+    settled = chats.bounding_box()["height"]
 
     page.reload()
     page.wait_for_selector("[role='status'][aria-label='Loading chats…']", timeout=10_000)
-    holding = page.locator("ul.scroll").bounding_box()["height"]
+    holding = chats.bounding_box()["height"]
 
     # Within one row of the real thing, rather than within a guess of it.
     assert abs(holding - settled) < 32, f"placeholder {holding}px, list {settled}px"

@@ -64,7 +64,7 @@ describe('a component', () => {
 	});
 
 	it('spells no icon as a text glyph', () => {
-		const glyphs = /[✕×▸▾▴☰⋯＋↑✓✔⚠]/;
+		const glyphs = /[✕×▸▾▴☰⋯＋↑✓✔⚠⚙]/;
 		const offenders = components(src).flatMap((path) =>
 			markup(path)
 				.split('\n')

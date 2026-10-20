@@ -7,6 +7,7 @@ message. Everything real except the model.
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 import pytest
@@ -16,6 +17,12 @@ from hera_providers import TextDelta, ThinkingDelta, TurnEnd, text_turn, tool_ca
 playwright = pytest.importorskip(
     "playwright.sync_api", reason="playwright is not installed; run `uv run playwright install`"
 )
+
+
+def account_button(page: Any) -> Any:
+    """The account entry at the foot of the sidebar: the door into Settings, named after you."""
+    return page.get_by_role("button", name=re.compile(r"— Settings$"))
+
 
 pytestmark = pytest.mark.e2e
 
@@ -145,9 +152,9 @@ def test_a_chat_is_renamed_and_deleted_from_the_rail(page: Any) -> None:
     composer.fill("Explain Kerberos")
     composer.press("Enter")
     page.wait_for_url("**/chat/**", timeout=15_000)
-    page.wait_for_selector("nav.rail li.item", timeout=15_000)
+    page.wait_for_selector('nav[aria-label="Hera"] a[href^="/chat/"]', timeout=15_000)
 
-    page.locator("nav.rail button.more").first.click()
+    page.get_by_role("button", name="Chat options").first.click()
     page.get_by_role("menuitem", name="Rename").click()
 
     field = page.locator("input.rename")
@@ -159,14 +166,14 @@ def test_a_chat_is_renamed_and_deleted_from_the_rail(page: Any) -> None:
     # A title typed by hand sticks: she only ever names a chat that has no name.
     page.wait_for_selector("text=Tickets, not passwords", timeout=15_000)
 
-    page.locator("nav.rail button.more").first.click()
+    page.get_by_role("button", name="Chat options").first.click()
     page.get_by_role("menuitem", name="Delete").click()
     assert page.locator("text=Delete this chat?").count() == 1
     page.get_by_role("menuitem", name="Delete").click()
 
     # The conversation on screen went with it, so the route goes back to the start.
     page.wait_for_url(lambda url: "/chat/" not in url, timeout=10_000)
-    assert page.locator("nav.rail li.item").count() == 0
+    assert page.locator('nav[aria-label="Hera"] a[href^="/chat/"]').count() == 0
 
 
 def test_a_chat_can_be_exported_from_the_rail(page: Any) -> None:
@@ -179,9 +186,9 @@ def test_a_chat_can_be_exported_from_the_rail(page: Any) -> None:
     composer.press("Enter")
     page.wait_for_url("**/chat/**", timeout=15_000)
     page.wait_for_selector("text=ticket-granting ticket", timeout=30_000)
-    page.wait_for_selector("nav.rail li.item", timeout=15_000)
+    page.wait_for_selector('nav[aria-label="Hera"] a[href^="/chat/"]', timeout=15_000)
 
-    page.locator("nav.rail button.more").first.click()
+    page.get_by_role("button", name="Chat options").first.click()
     export = page.get_by_role("menuitem", name="Export")
 
     assert export.count() == 1
@@ -266,8 +273,13 @@ def test_settings_holds_what_changes_her_behaviour(page: Any) -> None:
     page.get_by_role("button", name="Settings").click()
     page.wait_for_selector("[role=dialog]", timeout=10_000)
 
-    nav = page.locator("[role=dialog] nav.tabs button")
-    names = [text.split("\n")[0].strip() for text in nav.all_inner_texts()]
+    nav = page.get_by_role("navigation", name="Settings").get_by_role("button")
+    # The first non-empty line of each entry: the icon is a line of its own with no text, and a
+    # section that is coming carries its version after the name.
+    names = [
+        next(line for line in text.split("\n") if line.strip()).strip()
+        for text in nav.all_inner_texts()
+    ]
     assert names == [
         "Account",
         "General",
@@ -281,7 +293,9 @@ def test_settings_holds_what_changes_her_behaviour(page: Any) -> None:
     ]
 
     # The search field is in the sidebar, beside the navigation, and the title is in the content.
-    assert page.locator("[role=dialog] aside input[type=search]").count() == 1
+    assert (
+        page.get_by_role("navigation", name="Settings").locator("input[type=search]").count() == 1
+    )
     assert page.locator("[role=dialog] h2").first.inner_text() == "Account"
 
     page.get_by_role("button", name="Models", exact=True).click()
@@ -301,9 +315,9 @@ def test_manage_servers_lands_on_the_servers_tab(page: Any) -> None:
     page.wait_for_selector("[role=dialog]", timeout=10_000)
 
     page.get_by_role("button", name="Manage servers").click()
-    page.wait_for_selector(
-        "[role=dialog] nav.tabs button.active:has-text('Servers')", timeout=10_000
-    )
+    page.get_by_role("navigation", name="Settings").locator(
+        "button[aria-current='true']", has_text="Servers"
+    ).wait_for(timeout=10_000)
 
     page.keyboard.press("Escape")
     page.wait_for_selector("[role=dialog]", state="detached", timeout=10_000)
@@ -312,8 +326,13 @@ def test_manage_servers_lands_on_the_servers_tab(page: Any) -> None:
 def test_the_profile_card_is_the_way_into_settings(page: Any) -> None:
     """There is one door, not two: the card at the foot of the rail opens Settings, and
     appearance and where your data lives are on its General screen."""
-    assert page.locator("nav.rail button.action:has-text('Settings')").count() == 0
-    page.locator("button.card").click()
+    assert (
+        page.get_by_role("navigation", name="Hera")
+        .get_by_role("button", name="Settings", exact=True)
+        .count()
+        == 0
+    )
+    account_button(page).click()
     page.wait_for_selector("[role=dialog]", timeout=10_000)
 
     page.get_by_role("button", name="General", exact=True).click()
@@ -328,7 +347,7 @@ def test_the_profile_card_is_the_way_into_settings(page: Any) -> None:
 def test_the_account_name_reaches_the_rail_card_and_the_greeting(page: Any) -> None:
     """The Account screen is where Settings opens, and what is saved there is what the rail card
     and the start screen call you — there is no second place that knows."""
-    page.locator("button.card").click()
+    account_button(page).click()
     page.wait_for_selector("[role=dialog]", timeout=10_000)
 
     page.get_by_label("Name", exact=True).fill("Ada Lovelace")
@@ -344,11 +363,11 @@ def test_the_account_name_reaches_the_rail_card_and_the_greeting(page: Any) -> N
 
     page.keyboard.press("Escape")
     page.wait_for_selector("[role=dialog]", state="detached", timeout=10_000)
-    assert "Ada Lovelace" in page.locator("button.card").inner_text()
+    assert "Ada Lovelace" in account_button(page).inner_text()
     page.wait_for_selector(".greeting:has-text('Ada')", timeout=10_000)
 
     page.reload(wait_until="networkidle")
-    assert "Ada Lovelace" in page.locator("button.card").inner_text()
+    assert "Ada Lovelace" in account_button(page).inner_text()
 
 
 def test_a_file_can_be_attached_and_is_drawn_as_a_chip(page: Any, tmp_path: Any) -> None:
@@ -671,7 +690,7 @@ class TestWhatShePublishes:
         the confirmation opens rather than carried on every row in the rail."""
         self._publish(page)
 
-        page.locator(".item .more").first.click()
+        page.get_by_role("button", name="Chat options").first.click()
         page.get_by_role("menuitem", name="Delete").click()
 
         page.wait_for_selector("text=The artifact in it goes too.", timeout=15_000)

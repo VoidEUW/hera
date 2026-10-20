@@ -34,6 +34,7 @@ import argparse
 import asyncio
 import json
 import os
+import re
 import socket
 import tempfile
 import threading
@@ -464,9 +465,9 @@ def act_rail(page: Page, base: str, shots: Path, report: Report) -> None:
     """The rail's own states, which the conversation scenes never show."""
     with report.scene("rail-row-menu", "rail", page, shots):
         page.goto(base, wait_until="networkidle")
-        page.wait_for_selector("nav.rail li.item", timeout=15_000)
+        page.wait_for_selector('nav[aria-label="Hera"] a[href^="/chat/"]', timeout=15_000)
         shoot(page, shots, "15-rail")
-        page.locator("nav.rail button.more").first.click(timeout=5_000)
+        page.get_by_role("button", name="Chat options").first.click(timeout=5_000)
         page.wait_for_timeout(300)
         shoot(page, shots, "16-rail-menu")
         page.keyboard.press("Escape")
@@ -477,6 +478,17 @@ def act_rail(page: Page, base: str, shots: Path, report: Report) -> None:
         page.get_by_role("button", name="New chat", exact=True).first.click(timeout=5_000)
         page.wait_for_timeout(400)
         shoot(page, shots, "17-new-chat-is-the-start-screen")
+
+    with report.scene("rail-folded", "rail", page, shots):
+        # Folded to one icon column, with the label of the row under the pointer as a tooltip --
+        # and unfolded again, so every later scene sees the rail it expects.
+        page.get_by_role("button", name="Collapse the sidebar").click(timeout=5_000)
+        page.wait_for_timeout(500)
+        page.locator('nav[aria-label="Hera"] a[href^="/chat/"]').first.hover()
+        page.wait_for_timeout(1500)
+        shoot(page, shots, "18-rail-folded")
+        page.get_by_role("button", name="Expand the sidebar").click(timeout=5_000)
+        page.wait_for_timeout(400)
 
 
 def act_composer(page: Page, base: str, shots: Path, report: Report) -> None:
@@ -558,7 +570,7 @@ def act_settings(page: Page, base: str, shots: Path, report: Report) -> None:
         settled(page)
         shoot(page, shots, "30-settings-account")
 
-    nav = page.locator("[role='dialog'] nav.tabs")
+    nav = page.get_by_role("navigation", name="Settings")
     for index, tab in enumerate(SETTINGS_TABS[1:], start=1):
         with report.scene(f"settings-{tab.lower()}", "settings", page, shots):
             # Not `exact`: **Dreaming** is labelled with a `v0.3` badge beside it, so its accessible
@@ -590,7 +602,7 @@ def act_profile(page: Page, base: str, shots: Path, report: Report) -> None:
     """
     with report.scene("profile-menu", "theme", page, shots):
         page.goto(base, wait_until="networkidle")
-        page.locator("nav.rail button.card").first.click(timeout=5_000)
+        page.get_by_role("button", name=re.compile(r"— Settings$")).first.click(timeout=5_000)
         page.wait_for_selector("[role='dialog']", timeout=10_000)
         page.get_by_role("button", name="General", exact=True).click(timeout=5_000)
         page.wait_for_timeout(500)
@@ -609,7 +621,7 @@ def act_profile(page: Page, base: str, shots: Path, report: Report) -> None:
         shoot(page, shots, "41-light-start")
 
     with report.scene("back-to-dark", "theme", page, shots):
-        page.locator("nav.rail button.card").first.click(timeout=5_000)
+        page.get_by_role("button", name=re.compile(r"— Settings$")).first.click(timeout=5_000)
         page.wait_for_selector("[role='dialog']", timeout=10_000)
         page.get_by_role("button", name="General", exact=True).click(timeout=5_000)
         page.get_by_role("radio", name="Dark", exact=True).first.click(timeout=5_000)

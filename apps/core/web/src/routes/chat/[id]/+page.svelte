@@ -17,6 +17,7 @@
 	import Message from '$lib/components/Message.svelte';
 	import Select from '$lib/components/ui/Select.svelte';
 	import Skeleton from '$lib/components/ui/Skeleton.svelte';
+	import Topbar from '$lib/components/ui/Topbar.svelte';
 	import { t } from '$lib/i18n';
 	import { Placeholder } from '$lib/loading.svelte';
 	import { artifacts } from '$lib/stores/artifacts.svelte';
@@ -229,28 +230,25 @@
 	<div class="held-hers"><Skeleton rows={4} height={16} gap={9} widths={[100, 96, 100, 58]} /></div>
 {/snippet}
 
-<header class="top">
-	<h1 class="title">{session.chat?.title || t.empty.title}</h1>
-	<div class="right">
-		{#if published && session.chat}
-			{#if artifacts.open && artifacts.name}
-				<ArtifactTools chatId={session.chat.id} name={artifacts.name} />
-			{/if}
-			<!-- The count is what it says while the drawer is shut; open, it names the file being
-			     shown, and the list is the way to another one. -->
-			<div class="published">
-				<Select
-					choices={listing.map((file) => ({ value: file.name, label: headingOf(file.name) }))}
-					value={artifacts.open ? (artifacts.name ?? '') : ''}
-					label={t.artifact.panel}
-					placeholder={t.artifact.count(published)}
-					align="end"
-					onchange={(name) => session.chat && artifacts.show(session.chat.id, name)}
-				/>
-			</div>
+<Topbar title={session.chat?.title || t.empty.title}>
+	{#if published && session.chat}
+		{#if artifacts.open && artifacts.name}
+			<ArtifactTools chatId={session.chat.id} name={artifacts.name} />
 		{/if}
-	</div>
-</header>
+		<!-- The count is what it says while the drawer is shut; open, it names the file being
+			     shown, and the list is the way to another one. -->
+		<div class="published">
+			<Select
+				choices={listing.map((file) => ({ value: file.name, label: headingOf(file.name) }))}
+				value={artifacts.open ? (artifacts.name ?? '') : ''}
+				label={t.artifact.panel}
+				placeholder={t.artifact.count(published)}
+				align="end"
+				onchange={(name) => session.chat && artifacts.show(session.chat.id, name)}
+			/>
+		</div>
+	{/if}
+</Topbar>
 
 <!-- The conversation and the drawer are side by side rather than stacked, which is the whole
      point of a drawer: you keep working with it open — reading the page, asking for a change,
@@ -348,38 +346,6 @@
 </div>
 
 <style>
-	.top {
-		display: flex;
-		align-items: center;
-		gap: 12px;
-		flex: none;
-		padding: 14px 24px;
-		border-bottom: 1px solid var(--line);
-	}
-
-	/* Room for the fixed menu button `+layout.svelte` draws over the top-left corner below the
-	   phone breakpoint — without it the title runs under the button instead of stopping short
-	   of it. The bar grows to match rather than the button being squeezed into whatever height
-	   the title alone needed: that button is 40px square at `top: 12px`, so 64px is what centres
-	   it — `align-items: center` above then puts the title on the same line, instead of the two
-	   merely overlapping. */
-	@media (max-width: 780px) {
-		.top {
-			min-height: 64px;
-			padding-left: 64px;
-		}
-	}
-
-	/* Everything that is not the title, pinned to the far edge as one group -- the artifact
-	   tools and the selector read as one group rather than as separate things that happen to
-	   have ended up on the same side. */
-	.right {
-		display: flex;
-		align-items: center;
-		gap: 10px;
-		margin-left: auto;
-	}
-
 	/* The way back to something published nine turns ago. Without it, the only door to an
 	   artifact is the card in the turn that made it, and an edit later on leaves you scrolling
 	   for the thing you just changed. */
@@ -403,17 +369,6 @@
 		flex-direction: column;
 		flex: 1;
 		min-width: 0;
-	}
-
-	.title {
-		margin: 0;
-		font-family: var(--font-body);
-		font-size: 15px;
-		font-weight: 400;
-		color: var(--text-muted);
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
 	}
 
 	.scroll {

@@ -1,9 +1,11 @@
 <script lang="ts">
 	/**
 	 * A person, as a picture or an initial (the theme's `hera/chips`, the avatar part). The
-	 * initial is the first letter of the name, so a nameless account is a neutral disc rather than
-	 * a question mark.
+	 * initial is the first letter of the name; a nameless account is the `user` icon rather than
+	 * an empty disc, which reads as something that failed to load.
 	 */
+	import Icon from './Icon.svelte';
+
 	interface Props {
 		name?: string;
 		/** A data or same-origin URL. */
@@ -19,8 +21,10 @@
 <span class="avatar" style:--diameter="{size}px" aria-hidden="true">
 	{#if src}
 		<img {src} alt="" />
-	{:else}
+	{:else if initial}
 		{initial}
+	{:else}
+		<Icon name="user" size="calc(var(--diameter) * 0.6)" />
 	{/if}
 </span>
 

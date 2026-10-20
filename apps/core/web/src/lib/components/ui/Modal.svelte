@@ -20,6 +20,7 @@
 	 */
 	import { expoIn } from 'svelte/easing';
 	import { fade } from 'svelte/transition';
+	import { dialog, topmost } from '$lib/dialog';
 	import CloseButton from './CloseButton.svelte';
 	import { LEAVING, reveal, slot, still } from '$lib/motion';
 
@@ -107,72 +108,10 @@
 		easing: expoIn
 	});
 
-	/** Where focus was when the sheet opened — the trigger that opened it, usually. Returned
-	 * on close, because a control that takes focus away and keeps it is a control that has
-	 * stranded a keyboard user. Captured on mount rather than trusted to the caller: the caller
-	 * knows *whether* to open a sheet, not where focus happens to be when it does. */
-	let opener = $state<HTMLElement | null>(null);
 	let sheet = $state<HTMLDivElement | null>(null);
 
-	$effect(() => {
-		opener = document.activeElement as HTMLElement | null;
-		// The sheet exists to be interacted with, so it takes focus on open — a dialog that
-		// does not is a dialog a keyboard user has to tab into.
-		const first =
-			sheet?.querySelector<HTMLElement>(
-				'input, button:not(.close), select, textarea, [href], [tabindex]:not([tabindex="-1"])'
-			) ?? sheet;
-		first?.focus();
-		return () => opener?.focus?.();
-	});
-
-	/** Whether this sheet is the one on top. A sheet opened from inside another (the skill
-	 * editor over Settings) is later in the document, and it alone answers Escape, Tab and a
-	 * click outside — otherwise one keypress would close both. */
-	function topmost(): boolean {
-		const open = document.querySelectorAll('[role="dialog"]');
-		return open[open.length - 1] === sheet;
-	}
-
-	function onkeydown(event: KeyboardEvent) {
-		if (!topmost()) return;
-		if (event.key === 'Escape') {
-			// One Escape does one thing (#112's rule, arriving early). If a Select dropdown is open
-			// inside the sheet, closing it is what this Escape is for — the modal is the layer
-			// underneath it, and closing both at once is the double-close the dropdown's own
-			// handler used to race. Select owns its Escape through `svelte:window` too, so the
-			// check is on the DOM: an open dropdown is a `role="listbox"` that Select rendered.
-			const dropdown = sheet?.querySelector('[role="listbox"]');
-			if (dropdown) return;
-			close();
-			return;
-		}
-		if (event.key === 'Tab') {
-			// `aria-modal` is a promise that nothing outside the sheet is reachable, and Tab is
-			// where that promise is kept: forward from the last focusable wraps to the first,
-			// reverse from the first wraps to the last. Without this the browser happily tabs
-			// into the conversation behind the scrim, which is exactly what `aria-modal` said
-			// could not happen. (#121 is the same bug in the rail's sheet.)
-			const focusable = [
-				...(sheet?.querySelectorAll<HTMLElement>(
-					'input:not([disabled]), button:not([disabled]), select:not([disabled]), textarea:not([disabled]), [href], [tabindex]:not([tabindex="-1"])'
-				) ?? [])
-			].filter((el) => el.offsetParent !== null);
-			if (!focusable.length) return;
-			const first = focusable[0];
-			const last = focusable[focusable.length - 1];
-			const here = document.activeElement;
-			if (event.shiftKey) {
-				if (here === first || here === sheet) {
-					event.preventDefault();
-					last.focus();
-				}
-			} else if (here === last) {
-				event.preventDefault();
-				first.focus();
-			}
-		}
-	}
+	/* Focus in, focus held, the topmost-only Escape and focus back are `$lib/dialog` — the same
+	   action the rail's phone sheet uses, so the rule exists once (#121). */
 
 	/** Every exit from the shell is this one function, so a caller overriding one behaviour
 	 * (the profile menu closing on an outside click, say) can watch a single seam. */
@@ -202,7 +141,7 @@
 		let armed = false;
 		const arm = requestAnimationFrame(() => (armed = true));
 		const away = (event: MouseEvent) => {
-			if (!armed || !topmost()) return;
+			if (!armed || !sheet || !topmost(sheet)) return;
 			// The propagation path rather than a captured `sheet` reference: the sheet that is
 			// live at event time is the only one that can answer `contains`, and a listener that
 			// outlived its own instance (a tab switch can unmount and remount Settings within one
@@ -225,8 +164,6 @@
 	});
 </script>
 
-<svelte:window {onkeydown} />
-
 <div
 	class="scrim"
 	class:clear={!dim}
@@ -245,6 +182,7 @@
 	tabindex="-1"
 	in:reveal={gesture}
 	out:reveal={gesture}
+	use:dialog={{ onclose: close }}
 >
 	{#if title || caption}
 		<header>

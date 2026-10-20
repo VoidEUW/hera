@@ -68,6 +68,7 @@ export const t = {
 		account: (name: string) => `${name} — Settings`,
 		accountLabel: 'Account',
 		collapse: 'Collapse the sidebar',
+		resize: 'Resize the sidebar',
 		expand: 'Expand the sidebar',
 		openMenu: 'Open menu',
 		closeMenu: 'Close menu',
