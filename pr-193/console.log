@@ -1,5 +1,10 @@
 # browser console
 
+[desktop] warning: A preload for 'http://127.0.0.1:49511/_app/immutable/entry/start.CZRLbhNp.js' is found, but is not used because it is a cross-world service worker resource mismatch.  (http://127.0.0.1:49511/:26)
+[desktop] warning: A preload for 'http://127.0.0.1:49511/_app/immutable/entry/start.CZRLbhNp.js' is found, but is not used because it is a cross-world service worker resource mismatch.  (http://127.0.0.1:49511/:26)
+[desktop] warning: A preload for 'http://127.0.0.1:49511/_app/immutable/entry/payload.DSmR2FwN.js' is found, but is not used because it is a cross-world service worker resource mismatch.  (http://127.0.0.1:49511/:27)
+[desktop] warning: A preload for 'http://127.0.0.1:49511/_app/immutable/chunks/BfnrvmXY.js' is found, but is not used because it is a cross-world service worker resource mismatch.  (http://127.0.0.1:49511/:29)
+[desktop] warning: A preload for 'http://127.0.0.1:49511/_app/immutable/entry/payload.DSmR2FwN.js' is found, but is not used because it is a cross-world service worker resource mismatch.  (http://127.0.0.1:49511/:27)
 
 # uncaught page errors
 
