@@ -1,0 +1,13 @@
+# browser console
+
+[desktop] warning: A preload for 'http://127.0.0.1:36787/_app/immutable/entry/start.CRxStaKj.js' is found, but is not used because it is a cross-world service worker resource mismatch.  (http://127.0.0.1:36787/:26)
+[desktop] warning: A preload for 'http://127.0.0.1:36787/_app/immutable/entry/start.CRxStaKj.js' is found, but is not used because it is a cross-world service worker resource mismatch.  (http://127.0.0.1:36787/:26)
+[desktop] warning: A preload for 'http://127.0.0.1:36787/_app/immutable/entry/start.CRxStaKj.js' is found, but is not used because it is a cross-world service worker resource mismatch.  (http://127.0.0.1:36787/:26)
+[desktop] warning: A preload for 'http://127.0.0.1:36787/_app/immutable/entry/payload.DSmR2FwN.js' is found, but is not used because it is a cross-world service worker resource mismatch.  (http://127.0.0.1:36787/:27)
+
+# uncaught page errors
+
+
+# failed requests (network failure or a 4xx/5xx)
+
+(none)
