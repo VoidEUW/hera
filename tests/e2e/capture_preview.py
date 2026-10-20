@@ -378,16 +378,16 @@ def act_conversation(page: Page, base: str, shots: Path, report: Report) -> str:
         composer.press("Enter")
         page.wait_for_url("**/chat/**", timeout=15_000)
         chat_url = page.url
-        # Two samples a little under half the four-second cycle apart, so one frame catches the
-        # feather and one catches the eye; the video covers the whole loop. A mark that trips on a
-        # slow runner is not worth losing the scene for, so a miss here waits for the answer
-        # instead and the scene is recorded as the miss it is.
+        # Two samples half the thinking pulse apart, so one frame catches the eye small and one
+        # catches it whole; the video covers the whole loop. A mark that trips on a slow runner is
+        # not worth losing the scene for, so a miss here waits for the answer instead and the scene
+        # is recorded as the miss it is.
         try:
-            page.wait_for_selector(".waiting", timeout=15_000)
-            page.wait_for_timeout(1400)
-            shoot(page, shots, "02-waiting-feather")
-            page.wait_for_timeout(1900)
-            shoot(page, shots, "03-waiting-eye")
+            page.wait_for_selector(".thinking[role='status']", timeout=15_000)
+            page.wait_for_timeout(800)
+            shoot(page, shots, "02-thinking-small")
+            page.wait_for_timeout(1760)
+            shoot(page, shots, "03-thinking-whole")
         except (PlaywrightTimeout, PlaywrightError) as missed:
             page.wait_for_selector("text=ticket-granting ticket", timeout=60_000)
             raise AssertionError(f"the waiting mark was never caught: {missed}") from missed
@@ -479,17 +479,6 @@ def act_rail(page: Page, base: str, shots: Path, report: Report) -> None:
         page.wait_for_timeout(400)
         shoot(page, shots, "17-new-chat-is-the-start-screen")
 
-    with report.scene("rail-folded", "rail", page, shots):
-        # Folded to one icon column, with the label of the row under the pointer as a tooltip --
-        # and unfolded again, so every later scene sees the rail it expects.
-        page.get_by_role("button", name="Collapse the sidebar").click(timeout=5_000)
-        page.wait_for_timeout(500)
-        page.locator('nav[aria-label="Hera"] a[href^="/chat/"]').first.hover()
-        page.wait_for_timeout(1500)
-        shoot(page, shots, "18-rail-folded")
-        page.get_by_role("button", name="Expand the sidebar").click(timeout=5_000)
-        page.wait_for_timeout(400)
-
     with report.scene("not-found", "rail", page, shots):
         # An address that leads nowhere: the router's error page, inside the shell.
         page.goto(f"{base}/no-such-screen", wait_until="networkidle")
@@ -507,15 +496,15 @@ def act_composer(page: Page, base: str, shots: Path, report: Report) -> None:
     """
     with report.scene("composer-model-dropdown", "composer", page, shots):
         page.goto(base, wait_until="networkidle")
-        page.locator(".bar .model button.pill").first.click(timeout=5_000)
-        page.wait_for_selector("[role='listbox']", timeout=5_000)
+        page.get_by_role("button", name="Model").first.click(timeout=5_000)
+        page.wait_for_selector("[role='menu']", timeout=5_000)
         page.wait_for_timeout(300)
         shoot(page, shots, "20-model-dropdown")
         page.keyboard.press("Escape")
 
     with report.scene("composer-servers-sheet", "composer", page, shots):
         page.get_by_role("button", name=re.compile(r"^\d+ servers?$")).first.click(timeout=5_000)
-        page.wait_for_selector("[role='dialog']", timeout=5_000)
+        page.wait_for_selector("[role='menu']", timeout=5_000)
         page.wait_for_timeout(500)
         shoot(page, shots, "21-servers-sheet")
         page.keyboard.press("Escape")
@@ -524,7 +513,7 @@ def act_composer(page: Page, base: str, shots: Path, report: Report) -> None:
     with report.scene("composer-skills-sheet", "composer", page, shots):
         skills = page.get_by_role("button", name=re.compile(r"^(Choose skills|\d+ skills?)$"))
         skills.first.click(timeout=5_000)
-        page.wait_for_selector("[role='dialog']", timeout=5_000)
+        page.wait_for_selector("[role='menu']", timeout=5_000)
         page.wait_for_timeout(500)
         shoot(page, shots, "22-skills-sheet")
         page.keyboard.press("Escape")
@@ -693,8 +682,8 @@ def act_reduced_motion(page: Page, base: str, shots: Path, report: Report) -> No
     with report.scene("reduced-motion-drawer", "accessibility", page, shots):
         # The second of the two, and the one a person meets most: a dropdown that arrives
         # instantly rather than sliding.
-        page.locator(".bar .model button.pill").first.click(timeout=5_000)
-        page.wait_for_selector("[role='listbox']", timeout=5_000)
+        page.get_by_role("button", name="Model").first.click(timeout=5_000)
+        page.wait_for_selector("[role='menu']", timeout=5_000)
         page.wait_for_timeout(300)
         shoot(page, shots, "51-reduced-motion-dropdown")
         page.keyboard.press("Escape")
@@ -708,7 +697,7 @@ def act_mobile(page: Page, base: str, shots: Path, report: Report, chat_url: str
         shoot(page, shots, "70-phone-start")
 
     with report.scene("phone-rail", "phone", page, shots):
-        page.locator("button.menu").first.click(timeout=5_000)
+        page.get_by_role("button", name="Open menu").first.click(timeout=5_000)
         page.wait_for_timeout(500)
         shoot(page, shots, "71-phone-rail")
 
@@ -720,7 +709,7 @@ def act_mobile(page: Page, base: str, shots: Path, report: Report, chat_url: str
         shoot(page, shots, "72-phone-answer")
 
     with report.scene("phone-settings", "phone", page, shots):
-        page.locator("button.menu").first.click(timeout=5_000)
+        page.get_by_role("button", name="Open menu").first.click(timeout=5_000)
         page.wait_for_timeout(400)
         page.get_by_role("button", name="Settings").first.click(timeout=5_000)
         page.wait_for_selector("[role='dialog']", timeout=10_000)

@@ -33,11 +33,10 @@
 		type ToolResultEvent
 	} from '$lib/api/events';
 	import { duration, t } from '$lib/i18n';
-	import { disclose } from '$lib/motion';
 	import { markOf, subject, toolName } from '$lib/tools';
 	import type { Activity } from '$lib/turn';
 	import Prose from './Prose.svelte';
-	import Icon from './ui/Icon.svelte';
+	import TraceRow from './ui/TraceRow.svelte';
 
 	interface Props {
 		row: Activity;
@@ -130,346 +129,106 @@
 	}
 </script>
 
-{#snippet settled()}
-	<span class="trail">
-		{trail}
-		{#if standing === 'done'}<span class="check" class:drawn={streaming}><Icon name="check" /></span
-			>{/if}
-	</span>
+{#snippet detail()}
+	{#if thought}
+		<!-- Reasoning is written in the same notation her answers are, so it is set the same way
+		     (ADR 11) — quieter, a step smaller, and never mixed into the prose above. -->
+		<div class="thinking"><Prose text={thought} /></div>
+	{:else}
+		{#if args.length || result?.text}
+			<!-- The call's input and what came back, in the tool-call's own bordered box (`.tr-io`).
+			     A skill body is a document and this is a gutter row, so it scrolls inside a fixed
+			     frame rather than pushing her answer down the page. -->
+			<div class="io">
+				{#each args as line (line)}<div class="arg">{line}</div>{/each}
+				{#if result?.text}
+					{#if args.length}<div class="arrow">→</div>{/if}
+					<pre>{result.text}</pre>
+				{/if}
+			</div>
+			{#if lines > 12}<p class="size">{t.activity.lines(lines)}</p>{/if}
+		{/if}
+		{#if others.length}
+			<!-- A result can be an image or a resource link (ADR 4). Those are named, because the
+			     text above is not all of what came back. -->
+			<p class="size">{others.join(', ')}</p>
+		{/if}
+	{/if}
 {/snippet}
 
-<div class="row" class:loud>
-	<span class="gutter"><span class="dot {standing}" aria-hidden="true"></span></span>
+{#snippet foreign()}
+	{#if named.server && !mine}<strong>{named.server}</strong>{/if}
+	{named.action}
+{/snippet}
 
-	<button
-		class="head"
-		type="button"
-		disabled={!expandable}
-		aria-expanded={expandable ? open : undefined}
-		onclick={() => (open = !open)}
-	>
-		{#if skill}
-			<!-- The same shape `hera__skill` gets below. Being handed a skill by the router and
-			     reaching for one mid-task are the same event to a reader, and the trail is where
-			     the difference belongs. -->
-			<span class="verb">{t.activity.skill}</span>
-			<span class="target">{skill.skill}</span>
-			<span class="trail">{why}</span>
-		{:else if row.kind === 'thinking'}
-			<span class="verb">{t.activity.thoughtFor}</span>
-			<span class="target">{words} {words === 1 ? 'word' : 'words'}</span>
-			<span class="trail">{open ? t.activity.hide : t.activity.show}</span>
-		{:else if row.kind === 'unknown'}
-			<span class="verb">{row.event.type}</span>
-			<span class="trail">{t.activity.unknown}</span>
-		{:else if mine && (did || begun)}
-			<!-- Her own tool reads with its own name as the verb. `begun` keeps it that way while
-			     the arguments are still arriving, so the row does not say *called scratch write*
-			     for a minute and then change its mind to *scratch write design-plan.md*: the
-			     wording settles once and only the target fills in. -->
-			<span class="verb">{named.action}</span>
-			<span class="target" class:struck={standing === 'failed'} title={named.qualified}>{did}</span>
-			{@render settled()}
-		{:else}
-			<span class="verb">{t.activity.called}</span>
-			<span class="target" class:struck={standing === 'failed'} title={named.qualified}>
-				{#if named.server && !mine}<strong>{named.server}</strong>{/if}
-				{named.action}
-			</span>
-			{@render settled()}
-		{/if}
-	</button>
-</div>
-{#if open}
-	<!-- A disclosure, because a row's detail is something you open rather than something that
-	     arrives: the column of rows and the sentence below it rearrange themselves as the panel
-	     grows, and the height change is the whole of what says so. This can be a whole skill
-	     document — `LONG_TRACE` and `.result`'s scrolling frame both exist because it can be — so
-	     it is the largest thing in the interface that appears with no warning at all, and a fade
-	     alone would leave the column snapping under a panel that had already finished arriving.
-
-	     Closes quicker than it opens, for the reason `reveal` gives. -->
-	<div
-		class="body"
-		in:disclose={{ slot: 'trace-disclose' }}
-		out:disclose={{ slot: 'trace-disclose' }}
-	>
-		<span class="gutter hairline"></span>
-		<div class="detail">
-			{#if thought}
-				<!-- Reasoning is written in the same notation her answers are, so it is set the
-				     same way (ADR 11) — quieter, a step smaller, and never mixed into the prose
-				     above. A wall of unbroken text was the one place her thinking was harder to
-				     read than her answer. -->
-				<div class="thinking"><Prose text={thought} /></div>
-			{:else}
-				{#if args.length}
-					<ul class="args mono">
-						{#each args as line (line)}<li>{line}</li>{/each}
-					</ul>
-				{/if}
-				{#if result?.text}
-					<div class="result">
-						<pre class="mono">{result.text}</pre>
-					</div>
-					{#if lines > 12}
-						<p class="caption size">{t.activity.lines(lines)}</p>
-					{/if}
-				{/if}
-				{#if others.length}
-					<!-- A result can be an image or a resource link (ADR 4). Those are named,
-					     because the text above is not all of what came back. Plain text blocks
-					     are what the panel already shows, and listing "text" under it said
-					     nothing. -->
-					<p class="caption">{others.join(', ')}</p>
-				{/if}
-			{/if}
-		</div>
-	</div>
+{#if skill}
+	<!-- The same shape `hera__skill` gets below: being handed a skill by the router and reaching for
+	     one mid-task are the same event to a reader, and the meta is where the difference goes. -->
+	<TraceRow verb={t.activity.skill} text={skill.skill} meta={why} />
+{:else if row.kind === 'thinking'}
+	<!-- `trace.tail: none` — a shut thought shows only its word count. -->
+	<TraceRow
+		verb={t.activity.thoughtFor}
+		text="{words} {words === 1 ? 'word' : 'words'}"
+		toggle
+		bind:open
+		body={thought ? detail : undefined}
+	/>
+{:else if row.kind === 'unknown'}
+	<TraceRow verb={row.event.type} meta={t.activity.unknown} />
+{:else if mine && (did || begun)}
+	<!-- Her own tool reads with its own name as the verb. `begun` keeps it that way while the
+	     arguments are still arriving, so the wording settles once and only the target fills in. -->
+	<TraceRow
+		state={standing}
+		verb={named.action}
+		text={did}
+		meta={trail}
+		fresh={streaming}
+		{loud}
+		hint={named.qualified}
+		bind:open
+		body={expandable ? detail : undefined}
+	/>
+{:else}
+	<TraceRow
+		state={standing}
+		verb={t.activity.called}
+		target={foreign}
+		meta={trail}
+		fresh={streaming}
+		{loud}
+		hint={named.qualified}
+		bind:open
+		body={expandable ? detail : undefined}
+	/>
 {/if}
 
 <style>
-	.row {
-		animation: row-in var(--motion-trace-row);
-	}
-
-	@keyframes row-in {
-		from {
-			opacity: 0;
-		}
-	}
-
-	.row,
-	.body {
-		display: grid;
-		grid-template-columns: 18px 1fr;
-		align-items: start;
-		gap: 9px;
-
-		/* One line of the row, named once. The mark's cell is exactly this tall and centres
-		   inside it, so every mark sits on the same optical line as its words whatever size
-		   the glyph is — rather than each icon being nudged with its own padding until it
-		   looks about right, which is what left the 13 px ones two pixels low. */
-		--line-box: 25px;
-	}
-
-	.gutter {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		height: var(--line-box);
-		position: relative;
-	}
-
-	/* The hairline that joins the eyes into one column. */
-	/* The gutter line: dashed (the theme's `trace.line` part), drawn down from the first row as
-	   the trace grows (`trace.line`). */
-	.gutter::before {
-		content: '';
-		position: absolute;
-		inset: 0 auto -6px 50%;
-		width: 0;
-		border-left: 1px dashed var(--line);
-		transform: translateX(-50%);
-		transform-origin: top;
-		animation: grow var(--motion-trace-line);
-	}
-
-	@keyframes grow {
-		from {
-			transform: translateX(-50%) scaleY(0);
-		}
-	}
-
-	/* The row's marker: a 7px dot in its state colour, on the ground so the dashed line breaks
-	   around it rather than running through it. */
-	.dot {
-		position: relative;
-		width: 7px;
-		height: 7px;
-		border-radius: 50%;
-		background: var(--text-faint);
-		box-shadow: 0 0 0 3px var(--ground);
-	}
-
-	.dot.live,
-	.dot.done {
-		background: var(--laurel);
-	}
-
-	/* `tool.running`: the dot pulses while the call is out. */
-	.dot.live {
-		animation: running var(--motion-tool-running) infinite alternate;
-	}
-
-	@keyframes running {
-		from {
-			transform: scale(0.55);
-			opacity: 0.35;
-		}
-	}
-
-	.dot.failed {
-		background: var(--danger);
-	}
-
-	.hairline {
-		align-self: stretch;
-		height: auto;
-	}
-
-	.head {
-		display: flex;
-		align-items: baseline;
-		gap: 9px;
-		width: 100%;
-		text-align: left;
-		font-size: 13.5px;
-		line-height: var(--line-box);
+	.io {
+		max-height: 15em;
+		margin: 2px 0;
+		padding: 8px 10px;
+		overflow: auto;
+		overscroll-behavior: contain;
+		border: var(--border-width) solid var(--line);
+		border-radius: var(--radius-sm);
+		background: var(--surface);
 		color: var(--text-muted);
-		border-radius: 4px;
-		transition: color var(--fade) var(--ease);
+		font: 12px/1.55 var(--font-mono);
 	}
 
-	.head:not(:disabled):hover {
-		color: var(--text);
-	}
-
-	.head:disabled {
-		cursor: default;
-	}
-
-	/* A real column, not a hint. This was 34px — narrower than the word "thought" — so every
-	   verb rendered at its natural width and the targets beside them started at a different x on
-	   every row. A gutter is read down its left edge; ragged starts are the one thing that stops
-	   it being a column at all. Sized in `em` so it tracks the type rather than being a number
-	   that quietly stops fitting the next time this grows.
-
-	   Clipped as well as fixed, because for her own tools the verb *is* the tool's name and the
-	   longest one is not knowable here: a tool added to `hera_mcp` with a long name would
-	   otherwise push its own row's target out of the column and be the only row that does.
-
-	   Widened from 5.2em when the scratchpad landed, which is the case the paragraph above
-	   predicted: `scratch write` and `scratch read` both clipped to `scratch w…` and `scratch
-	   r…`, so the two rows a person most needs to tell apart were the two the column made
-	   identical. In the trace's small mono capitals (ADR 21) 9em fits her longest name with
-	   room, and the target still has the reading column to itself. */
-	.verb {
-		width: 9em;
-		flex: none;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-		/* The theme's `trace.verb` part: small mono capitals. */
-		font-family: var(--font-mono);
-		font-size: 10.5px;
-		letter-spacing: 0.08em;
-		text-transform: uppercase;
-		color: var(--text-faint);
-	}
-
-	/* `min-width: 0` is the one that matters: a flex item will not shrink below its content by
-	   default, so a search query long enough — and hers are model-written, so they are — pushed
-	   the whole row wider than the column and took the duration off the end of it with it.
-	   Ellipsis needs somewhere to happen, and this is what gives it somewhere.
-
-	   `max-width` on top of that is a reading decision rather than a layout one: a row that
-	   fills every pixel up to the duration is a paragraph, not a gutter entry, and the column of
-	   times down the right stops reading as a column when one line reaches it and the rest do
-	   not. The whole query is in the expanded panel and in the tooltip. */
-	.target {
-		min-width: 0;
-		max-width: 46ch;
-		color: var(--text-muted);
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-	}
-
-	/* Where it came from, set in the sentence rather than boxed. Five chips down a gutter read
-	   as a form; the same five words in bold read as a list of things she did. */
-	.target strong {
-		font-weight: 600;
-		color: var(--text);
-	}
-
-	/* `padding-left` rather than a wider gap, so the breathing room only exists on the side that
-	   can be reached by a truncated target. An ellipsis that stops one space short of a duration
-	   reads as a collision even when it is not one. */
-	.trail {
-		display: inline-flex;
-		align-items: center;
-		gap: 6px;
-		margin-left: auto;
-		flex: none;
-		padding-left: 14px;
-		color: var(--text-faint);
-		/* The theme's `trace.meta` part: the duration in mono, small. */
-		font-family: var(--font-mono);
-		font-size: 11px;
-		font-variant-numeric: tabular-nums;
-	}
-
-	/* `tool.done`: a laurel check after the duration. One that settles while you watch draws
-	   its own stroke; one loaded from history is simply there. */
-	.check {
-		display: flex;
-		color: var(--laurel);
-	}
-
-	.check.drawn :global(path) {
-		stroke-dasharray: 24;
-		animation: draw var(--motion-tool-done) both;
-	}
-
-	@keyframes draw {
-		from {
-			stroke-dashoffset: 24;
-		}
-	}
-
-	/* The theme's `tool.error` part: the target struck through in danger, at once. */
-	.struck {
-		color: var(--danger);
-		text-decoration: line-through;
-		text-decoration-color: var(--danger);
-	}
-
-	.loud .trail {
-		color: var(--danger);
-	}
-
-	.detail {
-		padding: 2px 0 10px;
-		font-size: 13.5px;
-		color: var(--text-muted);
-	}
-
-	.args {
-		margin: 0;
-		padding: 0;
-		list-style: none;
-	}
-
-	.args li {
+	.arg {
 		overflow-wrap: anywhere;
 	}
 
-	/* A skill body is a document, and this is a gutter row. It scrolls inside a fixed frame
-	   rather than pushing her answer down the page. */
-	.result {
-		margin: 6px 0 0;
-		background: var(--surface);
-		border: 1px solid var(--line);
-		border-radius: var(--radius);
-		max-height: 15em;
-		overflow: auto;
-		overscroll-behavior: contain;
+	.arrow {
+		color: var(--text-faint);
 	}
 
-	.result pre {
+	pre {
 		margin: 0;
-		padding: 8px 10px;
+		font: inherit;
 		white-space: pre-wrap;
 		overflow-wrap: anywhere;
 	}
@@ -477,24 +236,20 @@
 	.size {
 		margin: 4px 0 0;
 		color: var(--text-faint);
+		font-size: 12px;
 	}
 
-	/* `:global`, because the prose is rendered through `{@html}` and Svelte's scoped classes
-	   never reach it. Scoped under `.thinking` so this is still only about this row. */
+	/* `:global`, because the prose is rendered through `{@html}`. */
 	.thinking :global(.prose) {
-		font-size: 15px;
-		line-height: 1.6;
 		color: var(--text-muted);
+		font-size: 14px;
+		line-height: 1.65;
 	}
 
 	.thinking :global(.prose h1),
 	.thinking :global(.prose h2),
 	.thinking :global(.prose h3) {
-		font-size: 15px;
 		margin: 1em 0 0.3em;
-	}
-
-	.thinking :global(.prose pre) {
-		background: var(--ground);
+		font-size: 14px;
 	}
 </style>

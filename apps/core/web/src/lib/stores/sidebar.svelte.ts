@@ -1,6 +1,5 @@
 /**
- * How wide the chat sidebar is, and whether it is folded to an icon rail (the theme's
- * `hera/sidebar`, chat variant). Kept per browser in localStorage, like the appearance: it is
+ * How wide the chat sidebar is (the theme's `hera/sidebar`, chat variant). Kept per browser in localStorage, like the appearance: it is
  * about this screen, not about the person.
  *
  * The width is clamped to the theme's range on every way in — a drag, a key, a stored value from
@@ -15,7 +14,6 @@ export const STEP = 16;
 export const DEFAULT = 264;
 
 const WIDTH = 'hera:sidebar-width';
-const FOLDED = 'hera:sidebar-collapsed';
 
 export function clamp(width: number): number {
 	if (!Number.isFinite(width)) return DEFAULT;
@@ -24,12 +22,10 @@ export function clamp(width: number): number {
 
 export class Sidebar {
 	width = $state(DEFAULT);
-	collapsed = $state(false);
 
 	load(storage: Pick<Storage, 'getItem'> = localStorage) {
 		const stored = storage.getItem(WIDTH);
 		this.width = stored === null ? DEFAULT : clamp(Number(stored));
-		this.collapsed = storage.getItem(FOLDED) === '1';
 	}
 
 	resize(width: number, storage: Pick<Storage, 'setItem'> = localStorage) {
@@ -57,11 +53,6 @@ export class Sidebar {
 
 	reset(storage: Pick<Storage, 'setItem'> = localStorage) {
 		this.resize(DEFAULT, storage);
-	}
-
-	toggle(storage: Pick<Storage, 'setItem'> = localStorage) {
-		this.collapsed = !this.collapsed;
-		storage.setItem(FOLDED, this.collapsed ? '1' : '0');
 	}
 }
 

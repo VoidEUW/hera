@@ -11,11 +11,12 @@
 	import { artifactOf } from '$lib/api/events';
 	import { headingOf } from '$lib/artifacts';
 	import ArtifactDrawer from '$lib/components/ArtifactDrawer.svelte';
-	import ArtifactTools from '$lib/components/ArtifactTools.svelte';
 	import Backdrop from '$lib/components/Backdrop.svelte';
 	import Composer from '$lib/components/Composer.svelte';
 	import Message from '$lib/components/Message.svelte';
-	import Select from '$lib/components/ui/Select.svelte';
+	import ContextMeter from '$lib/components/ui/ContextMeter.svelte';
+	import IconButton from '$lib/components/ui/IconButton.svelte';
+	import Selector from '$lib/components/ui/Selector.svelte';
 	import Skeleton from '$lib/components/ui/Skeleton.svelte';
 	import Topbar from '$lib/components/ui/Topbar.svelte';
 	import { t } from '$lib/i18n';
@@ -29,6 +30,15 @@
 	let scroller = $state<HTMLElement | null>(null);
 	let listing = $state<ArtifactSummary[]>([]);
 	const published = $derived(listing.length);
+
+	/** How full the context window is: the active model's declared `context_length` against the
+	 * last exchange's token usage. No meter at all when the model declares no length — a meter
+	 * pinned at a guessed ceiling says something nobody knows (ADR 16's rule for the memory
+	 * budget, again). */
+	const contextLimit = $derived.by(() => {
+		const entry = workspace.providers.find((p) => p.name === workspace.activeProvider);
+		return entry?.models.find((m) => m.id === entry.active_model)?.context_length ?? null;
+	});
 
 	/** The shape of a conversation while it is being fetched, on the same beat as the rail's.
 	 *
@@ -231,22 +241,36 @@
 {/snippet}
 
 <Topbar title={session.chat?.title || t.empty.title}>
+	{#if contextLimit && session.chat}
+		<ContextMeter used={session.usage?.total_tokens ?? 0} limit={contextLimit} />
+	{/if}
 	{#if published && session.chat}
-		{#if artifacts.open && artifacts.name}
-			<ArtifactTools chatId={session.chat.id} name={artifacts.name} />
-		{/if}
-		<!-- The count is what it says while the drawer is shut; open, it names the file being
-			     shown, and the list is the way to another one. -->
-		<div class="published">
-			<Select
-				choices={listing.map((file) => ({ value: file.name, label: headingOf(file.name) }))}
-				value={artifacts.open ? (artifacts.name ?? '') : ''}
-				label={t.artifact.panel}
-				placeholder={t.artifact.count(published)}
-				align="end"
-				onchange={(name) => session.chat && artifacts.show(session.chat.id, name)}
-			/>
-		</div>
+		<!-- The way back to something published nine turns ago: the count while the side view is
+		     shut, the open file's name while it is open, and the list is the way to another. -->
+		<Selector
+			look="chip"
+			icon="file"
+			choices={listing.map((file) => ({
+				value: file.name,
+				label: headingOf(file.name),
+				icon: 'file' as const
+			}))}
+			value={artifacts.open ? (artifacts.name ?? '') : ''}
+			label={t.artifact.panel}
+			placeholder={t.artifact.count(published)}
+			align="end"
+			onchange={(name) => session.chat && artifacts.show(session.chat.id, name)}
+		/>
+		<IconButton
+			icon="panelR"
+			label={t.artifact.toggle}
+			on={artifacts.open}
+			aria-pressed={artifacts.open}
+			onclick={() =>
+				artifacts.open
+					? artifacts.close()
+					: session.chat && artifacts.show(session.chat.id, artifacts.name)}
+		/>
 	{/if}
 </Topbar>
 
@@ -297,6 +321,7 @@
 								busy={session.busy}
 								onanswer={answer}
 								onreply={reply}
+								onretry={() => session.retry()}
 							/>
 						{/if}
 
@@ -330,7 +355,6 @@
 						void workspace.setThinkingBudget(name, modelId, tokens)}
 					onsettings={(section) => workspace.openSettings(section)}
 					onskills={(names) => session.pinSkills(names)}
-					usage={session.usage}
 				/>
 			</div>
 		</div>
@@ -346,13 +370,6 @@
 </div>
 
 <style>
-	/* The way back to something published nine turns ago. Without it, the only door to an
-	   artifact is the card in the turn that made it, and an edit later on leaves you scrolling
-	   for the thing you just changed. */
-	.published {
-		flex: none;
-	}
-
 	/* The conversation keeps its own column and its own scrolling; the drawer takes width from
 	   beside it rather than from over it. `min-width: 0` on the conversation is what stops a
 	   long line in the transcript refusing to give the drawer its room. */

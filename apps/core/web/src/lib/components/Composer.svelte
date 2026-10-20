@@ -1,89 +1,71 @@
 <script lang="ts">
 	/**
-	 * The composer. Stays put, focused on load, Enter to send.
+	 * The composer (the theme's `hera/composer`, soft look): a filled rounded box that takes a
+	 * laurel border and ring on focus (`composer.focus`). Top to bottom: the files going with the
+	 * message, the field with "Enter to send" in its corner, and the toolbar.
 	 *
-	 * The bar under the field carries, left to right: **＋** to attach a file, what is *switched
-	 * on* for this turn, the **profile** she is answering as, then **reasoning effort**, the
-	 * **model**, and send. The trailing pair answer different questions and sit at opposite ends
-	 * from the profile on purpose — a profile is who is answering, an endpoint is what she is
-	 * thinking with, and ADR 2 fixes the model *family* rather than how many endpoints you may
-	 * keep registered.
+	 * The toolbar, left to right: **+** to attach, the **skills** chip (what is pinned for this
+	 * chat, a menu of checkbox rows), the **servers** chip (what she can reach, read-only — changing
+	 * the list is Settings → Servers), the **profile** when there is more than one, then at the right
+	 * end the **reasoning** control this model has, the **model**, and **send**.
 	 *
-	 * The bar holds two context pills side by side — one for **skills** and one for
-	 * **servers** — because a pinned skill and a running MCP server change what happens to
-	 * the next thing you type, and both were previously only visible two screens away in
-	 * Settings. The skills pill opens the **skill picker** (ADR 5 says the model is never
-	 * asked which skill applies, and this is where a person answers instead when code guesses
-	 * wrong); the servers pill opens a small sheet listing what is connected, read-only,
-	 * because changing the list is Settings → Servers, not something a chat owns.
+	 * ADR 5 says the model is never asked which skill applies — selection is code — and the skills
+	 * menu is where a person answers instead when code guesses wrong. A pin here outranks the
+	 * profile's and the project's, and is applied as it is clicked: a switch that needs confirming
+	 * is a switch you have to remember you flipped.
 	 *
-	 * **Reasoning effort** reads and writes the active model's own `options.reasoning_effort` —
-	 * there is no typed field for it (ADR 18), so changing it here is the same call Settings →
-	 * Models makes to edit any other option. Global, like the model picker beside it: it applies
-	 * to every chat from the next message on, not just this one.
+	 * **Reasoning** reads and writes the active model's own options (ADR 18), in whichever shape
+	 * the server says this model has (`thinking_shape`): a level picker, an on/off chip, a token
+	 * budget, or nothing — global, like the model beside it.
 	 *
-	 * **The context bar**, above the field, is a fact about the active model — its declared
-	 * `context_length` against the last exchange's token usage — so it lives here rather than in
-	 * the chat header, which carries chat-level concerns instead. Absent entirely when the model
-	 * carries no `context_length`, the same "no bar rather than a guessed one" rule ADR 16's
-	 * memory budget follows.
-	 *
-	 * `/commands` are left in the text on purpose: the router strips them server-side, and a
-	 * browser that also stripped them would be a second implementation of the same rule.
+	 * How full the context window is lives in the top bar now: it describes the chat, not the
+	 * message being typed. `/commands` are left in the text on purpose: the router strips them
+	 * server-side, and a browser that also stripped them would be a second implementation.
 	 */
-	import Chip from './ui/Chip.svelte';
-	import SendButton from './ui/SendButton.svelte';
-	import Icon from '$lib/components/ui/Icon.svelte';
 	import type { Profile, Provider, Server } from '$lib/api/client';
 	import { isImage, read, size, type Attachment } from '$lib/attachments';
 	import { t } from '$lib/i18n';
-	import { providerFallbackIcon, providerIcon } from '$lib/providers';
-	import Select from '$lib/components/ui/Select.svelte';
-	import ServerSheet from './ServerSheet.svelte';
+	import ModelSelector from './ModelSelector.svelte';
+	import SkillMenu from './SkillMenu.svelte';
 	import type { Tab as SettingsTab } from './Settings.svelte';
-	import SkillPicker from './SkillPicker.svelte';
+	import AttachmentChip from './ui/AttachmentChip.svelte';
+	import Chip from './ui/Chip.svelte';
+	import FileButton from './ui/FileButton.svelte';
+	import Menu from './ui/Menu.svelte';
+	import MenuHeading from './ui/MenuHeading.svelte';
+	import MenuItem from './ui/MenuItem.svelte';
+	import MenuNote from './ui/MenuNote.svelte';
+	import MenuSeparator from './ui/MenuSeparator.svelte';
+	import NumberField from './ui/NumberField.svelte';
+	import Selector from './ui/Selector.svelte';
+	import SendButton from './ui/SendButton.svelte';
+	import Textarea from './ui/Textarea.svelte';
 
 	interface Props {
 		placeholder?: string;
-		/** A turn is streaming. Swaps send for **Stop**, which is the only thing this decides —
-		 * it is about something being *in flight*, not about whether you may type. */
+		/** A turn is streaming. Swaps send for **Stop**. */
 		busy?: boolean;
-		/** The composer may not take a new message: a turn is running, or a card is open waiting
-		 * on you. Kept apart from `busy` because a suspended turn is not a running one, and
-		 * offering **Stop** for something that already stopped is a lie about what is happening. */
+		/** The composer may not take a new message: a turn is running, or a card is open waiting on
+		 * you. Kept apart from `busy` because a suspended turn is not a running one, and offering
+		 * **Stop** for something that already stopped is a lie about what is happening. */
 		blocked?: boolean;
 		autofocus?: boolean;
 		profiles?: Profile[];
 		profileId?: string | null;
-		/** Endpoints she can answer from, and which one is active. Empty is a normal state on a
-		 * fresh install and says so rather than hiding the control. */
 		providers?: Provider[];
 		activeProvider?: string;
 		servers?: Server[];
-		/** Skills pinned to this conversation. On the start screen this is the workspace's set of
-		 * pending pins instead — there is no chat yet, and the answer to "use this one" is known
-		 * before the question is typed, not after. */
+		/** Skills pinned to this conversation. On the start screen, the workspace's pending pins. */
 		chatSkills?: string[] | null;
 		onsend?: (text: string, attachments: Attachment[]) => void;
 		onstop?: () => void;
 		onprofile?: (id: string) => void;
 		onmodel?: (providerName: string, modelId?: string) => void;
-		/** Changes `options.reasoning_effort` on the active model — global and immediate, the
-		 * same reach as `onmodel`, not scoped to this chat or this message. */
 		onreasoning?: (providerName: string, modelId: string, value: string) => void;
-		/** Turns reasoning on or off for the active model, by writing
-		 * `chat_template_kwargs.enable_thinking` — the knob a model whose template declares it
-		 * actually has, as against the effort enum the other kind declares. A callback because
-		 * the composer is handed what it may change and nothing else, which is the same bargain
-		 * `onreasoning` makes, and it carries the same two arguments for the same reason. Only
-		 * called for a model the endpoint has said declares it. */
 		onthinking?: (providerName: string, modelId: string, on: boolean) => void;
-		/** Sets a thinking token budget, for a model that takes one rather than a named level. */
 		onbudget?: (providerName: string, modelId: string, tokens: number) => void;
 		onsettings?: (section?: SettingsTab) => void;
 		onskills?: (names: string[]) => void;
-		/** The last exchange's token usage, for the context-window bar. `null` draws no bar. */
-		usage?: { prompt_tokens: number; completion_tokens: number; total_tokens: number } | null;
 	}
 
 	let {
@@ -105,141 +87,68 @@
 		onthinking,
 		onbudget,
 		onsettings,
-		onskills,
-		usage = null
+		onskills
 	}: Props = $props();
-
-	let picking = $state(false);
-	let showingServers = $state(false);
 
 	let text = $state('');
 	let field = $state<HTMLTextAreaElement | null>(null);
-	let picker = $state<HTMLInputElement | null>(null);
 	let attached = $state<Attachment[]>([]);
 	let refused = $state<string[]>([]);
+
+	let serversOpen = $state(false);
+	let serversChip = $state<HTMLButtonElement | null>(null);
+	let budgetOpen = $state(false);
+	let budgetChip = $state<HTMLButtonElement | null>(null);
 
 	$effect(() => {
 		if (autofocus) field?.focus();
 	});
 
-	// Grow with the content up to a ceiling, so a long message is visible without the composer
-	// taking the whole screen.
-	$effect(() => {
-		if (!field) return;
-		void text;
-		field.style.height = 'auto';
-		field.style.height = `${Math.min(field.scrollHeight, 260)}px`;
-	});
-
 	const sendable = $derived(Boolean(text.trim()) || attached.length > 0);
 
-	// What is on for the next turn. Pinned skills come from the profile answering; a project's
-	// pins land here when project instructions reach the interface. Retrieval adds more per
-	// turn and is deliberately not counted — this says what is *always* on, and a number that
-	// changed with every message would be noise rather than state.
-	// The chat's pins first, then the profile's — the same order the turn merges them in, so
-	// the count on screen is the set she will actually be given.
-	const pinned = $derived([
-		...(chatSkills ?? []),
-		...(profiles.find((entry) => entry.id === profileId)?.pinned_skills ?? []).filter(
-			(name) => !(chatSkills ?? []).includes(name)
-		)
-	]);
-	const connected = $derived(servers.filter((server) => server.connected));
-	// Each pill counts only its own kind, so "0 servers" really means none are reachable —
-	// a number that changed with every message would be noise, and a folded-together one
-	// says wrong words about whichever it was not named after.
-	const skillsLabel = $derived(
-		pinned.length ? t.composer.skillCount(pinned.length) : t.skills.pick
+	// The chat's pins first, then the profile's — the same order the turn merges them in, so the
+	// count on screen is the set she will actually be given.
+	const profilePins = $derived(
+		profiles.find((entry) => entry.id === profileId)?.pinned_skills ?? []
 	);
-	const serversLabel = $derived(t.composer.serverCount(connected.length));
-	const skillsDetail = $derived(pinned.join(', '));
+	const connected = $derived(servers.filter((server) => server.connected));
 
 	const activeEntry = $derived(providers.find((entry) => entry.name === activeProvider) ?? null);
 	const activeModel = $derived(
 		activeEntry?.models.find((entry) => entry.id === activeEntry.active_model) ?? null
 	);
-	// One choice per model, across every endpoint — not one per endpoint, now that an endpoint
-	// may carry several. `${provider}::${model}` is safe to split on the *first* `::`: a
-	// provider name is restricted to [a-z0-9_-] (`validate_provider_name`), so it can never
-	// contain `::`, while a model id legally could.
-	const modelChoices = $derived(
-		providers.flatMap((entry) =>
-			entry.models.map((model) => ({
-				value: `${entry.name}::${model.id}`,
-				label: model.name,
-				hint: `${entry.name} · ${entry.base_url}`,
-				icon: providerIcon(entry),
-				iconFallback: providerFallbackIcon(entry)
-			}))
-		)
-	);
-	const activeChoice = $derived(
-		activeEntry && activeModel ? `${activeEntry.name}::${activeModel.id}` : ''
-	);
 
 	// **One slot, whichever control this model actually has.** The server decides which, in
-	// `thinking_shape`, so the composer and the settings screen cannot disagree:
-	//
-	//   values  a published vocabulary      -> a picker of the levels it accepts
-	//   budget  it wants a thinking budget  -> a stepper of tokens
-	//   toggle  it has a thinking switch     -> a switch
-	//   none    nobody has said             -> nothing at all
-	//
-	// There is deliberately no fifth option. A model nobody could ask about gets no control, and
-	// the field stays writable on Settings -> Models — which is where a person states a
-	// vocabulary once, for the providers that publish it in prose and nowhere else.
+	// `thinking_shape`, so the composer and the settings screen cannot disagree. A model nobody
+	// could ask about gets no control; the field stays writable on Settings → Models.
 	const shape = $derived(activeModel?.thinking_shape ?? 'none');
 	const efforts = $derived(activeModel?.reasoning_efforts ?? []);
 	const reasoningChoices = $derived([
 		{ value: '', label: t.composer.effort.default },
 		...efforts.map((effort) => ({ value: effort, label: effort }))
 	]);
-	// The toggle is the value, so there are only two of them and no third state: absent from the
-	// model's options means the server's own default, which for MiniCPM5 is to think. Read from
-	// options rather than a local flag so this bar and Settings -> Models always show the same.
 	const thinkingOn = $derived(
 		(activeModel?.options.chat_template_kwargs as { enable_thinking?: unknown } | undefined)
 			?.enable_thinking !== false
 	);
-	// A budget is a number, and there is no absent: `undefined` means the model reasons and this
-	// one has not been given a budget, which is not the same as a budget of zero.
-	const budget = $derived(activeModel?.options.thinking_budget);
+	const budget = $derived(
+		typeof activeModel?.options.thinking_budget === 'number'
+			? activeModel.options.thinking_budget
+			: null
+	);
 	const reasoningValue = $derived(
 		typeof activeModel?.options.reasoning_effort === 'string'
 			? activeModel.options.reasoning_effort
 			: ''
 	);
 
-	const contextLimit = $derived(activeModel?.context_length ?? null);
-	const contextFilled = $derived(
-		contextLimit && usage ? Math.min(1, usage.total_tokens / contextLimit) : 0
-	);
-
-	function chooseModel(value: string) {
-		const sep = value.indexOf('::');
-		onmodel?.(value.slice(0, sep), value.slice(sep + 2));
-	}
-
-	function chooseReasoning(value: string) {
-		if (!activeEntry || !activeModel) return;
-		onreasoning?.(activeEntry.name, activeModel.id, value);
-	}
-
-	function setThinking(on: boolean) {
-		if (!activeEntry || !activeModel) return;
-		onthinking?.(activeEntry.name, activeModel.id, on);
-	}
-
-	/** A thinking *budget*, which is a number of tokens rather than a named level.
-	 *
-	 * Clamped to something a request can carry: 0 is "do not think" and is left to the switch,
-	 * and the ceiling is a number a person can read rather than one that has to be looked up. */
+	/** A thinking budget is a number of tokens: 0 is "do not think" and is left to the switch, and
+	 * the ceiling is a number a person can read rather than one that has to be looked up. */
 	const BUDGET_MIN = 256;
 	const BUDGET_MAX = 32768;
 
-	function setBudget(value: number) {
-		if (!activeEntry || !activeModel) return;
+	function setBudget(value: number | null) {
+		if (!activeEntry || !activeModel || value === null) return;
 		onbudget?.(activeEntry.name, activeModel.id, Math.min(BUDGET_MAX, Math.max(BUDGET_MIN, value)));
 	}
 
@@ -257,532 +166,266 @@
 		submit();
 	}
 
-	async function pick(event: Event) {
-		const input = event.currentTarget as HTMLInputElement;
-		if (!input.files?.length) return;
-		const picked = await read(input.files);
+	async function pick(files: FileList) {
+		const picked = await read(files);
 		attached = [...attached, ...picked.attachments];
 		refused = picked.rejected.map((item) => item.reason);
-		// Cleared so choosing the same file twice in a row still fires a change event.
-		input.value = '';
-	}
-
-	function drop(index: number) {
-		attached = attached.filter((_, at) => at !== index);
 	}
 </script>
 
-{#if picking && onskills}
-	<SkillPicker
-		pinned={chatSkills ?? []}
-		onclose={() => (picking = false)}
-		onpick={(names) => onskills(names)}
-	/>
-{/if}
-
-{#if showingServers}
-	<ServerSheet
-		servers={connected}
-		onclose={() => (showingServers = false)}
-		onsettings={() => {
-			showingServers = false;
-			onsettings?.('servers');
-		}}
-	/>
-{/if}
-
 <div class="composer">
 	{#if attached.length}
-		<ul class="attached">
+		<div class="attachments">
 			{#each attached as file, index (file.name + index)}
-				<li class:picture={isImage(file)}>
-					<!-- The composer is the one place that still holds the bytes, so it is the one
-					     place that can show the picture rather than its name. After the message is
-					     sent the contents are gone from the browser on purpose and the bubble draws
-					     a chip — the same chip a text file gets, which is honest about what the
-					     interface knows at that point. -->
-					{#if isImage(file)}
-						<img src={file.data_url} alt={file.name} />
-					{/if}
-					<span class="mono name">{file.name}</span>
-					<span class="size">{size(file.bytes)}</span>
-					<button type="button" onclick={() => drop(index)}>
-						<span class="sr-only">{t.attach.remove}</span>
-						<Icon name="x" />
-					</button>
-				</li>
+				<!-- The composer is the one place that still holds the bytes, so it is the one place
+				     that can show the picture rather than its name. -->
+				<AttachmentChip
+					name={file.name}
+					size={size(file.bytes)}
+					icon={isImage(file) ? 'image' : 'file'}
+					thumbnail={isImage(file) ? file.data_url : undefined}
+					onremove={() => (attached = attached.filter((_, at) => at !== index))}
+				/>
 			{/each}
-		</ul>
+		</div>
 	{/if}
 
 	{#each refused as reason (reason)}
 		<p class="refused">{reason}</p>
 	{/each}
 
-	{#if contextLimit}
-		<!-- No bar at all when the active model carries no `context_length` — a person who never
-		     filled it in sees nothing rather than a bar pinned at a guessed ceiling. -->
-		<div class="usage">
-			<div
-				class="track"
-				role="meter"
-				aria-valuenow={usage?.total_tokens ?? 0}
-				aria-valuemin={0}
-				aria-valuemax={contextLimit}
-				aria-label={t.composer.contextLabel}
-			>
-				<div
-					class="fill"
-					class:tight={contextFilled > 0.85}
-					style:width={`${contextFilled * 100}%`}
-				></div>
-			</div>
-			<span class="reading">{t.composer.contextUsed(usage?.total_tokens ?? 0, contextLimit)}</span>
-		</div>
-	{/if}
-
-	<div class="field">
-		<!-- Disabled while a turn is running or a card is open. The second case is the one that
-		     matters: sending past an open card writes a fresh assistant row, and the resume
-		     routes work from the latest one — so the suspended turn would be orphaned and its
-		     question could never be answered. `submit()` refuses too, because a disabled field
-		     is a hint and not a guarantee. -->
-		<textarea
-			bind:this={field}
-			bind:value={text}
+	<div class="top">
+		<!-- Disabled while a turn is running or a card is open. Sending past an open card writes a
+		     fresh assistant row, and the resume routes work from the latest one — so the suspended
+		     turn would be orphaned. `submit()` refuses too: a disabled field is a hint, not a
+		     guarantee. -->
+		<Textarea
+			bare
+			grow={160}
+			bind:ref={field}
+			value={text}
 			{placeholder}
-			{onkeydown}
-			rows="1"
+			ariaLabel={placeholder}
 			disabled={blocked}
-			aria-label={placeholder}></textarea>
-
-		<!-- Beside the first line rather than under the bar, and gone the moment there is
-		     something to send: it is the one thing here that a person needs exactly once. -->
-		<!-- Gone once there is something to send, and gone while the field is closed: a hint
-		     about how to send in a box you cannot type in is instructions for nothing. -->
-		<span class="hint caption" class:gone={Boolean(text) || blocked}>{t.composer.hint}</span>
+			{onkeydown}
+			onchange={(value) => (text = value)}
+		/>
+		<span class="hint">{t.composer.hint}</span>
 	</div>
 
-	<div class="bar">
-		<button class="attach" type="button" title={t.attach.add} onclick={() => picker?.click()}>
-			<span class="sr-only">{t.attach.add}</span>
-			<Icon name="plus" />
-		</button>
-		<input bind:this={picker} class="sr-only" type="file" multiple tabindex="-1" onchange={pick} />
+	<div class="row">
+		<FileButton label={t.attach.add} multiple onfiles={pick} />
 
-		<!-- Two pills, two destinations. The skills pill opens the picker; the servers pill
-		     opens the read-only sheet. They sit side by side because the two "switched on"
-		     facts they report are about the same next message, not about the same thing. -->
 		{#if onskills}
-			<Chip
-				on={pinned.length > 0}
-				title={skillsDetail || t.skills.pick}
-				onclick={() => (picking = true)}
-			>
-				{skillsLabel}
-			</Chip>
+			<SkillMenu pinned={chatSkills ?? []} locked={profilePins} onpick={onskills} />
 		{/if}
 
-		<Chip on={connected.length > 0} title={t.servers.title} onclick={() => (showingServers = true)}>
-			{serversLabel}
+		<Chip
+			bind:ref={serversChip}
+			on={connected.length > 0}
+			haspopup="menu"
+			expanded={serversOpen}
+			onclick={() => (serversOpen = !serversOpen)}
+		>
+			{t.composer.serverCount(connected.length)}
 		</Chip>
+		<Menu
+			open={serversOpen}
+			anchor={serversChip}
+			label={t.servers.title}
+			placement="above"
+			onclose={() => (serversOpen = false)}
+		>
+			<MenuHeading>{t.servers.heading}</MenuHeading>
+			{#each servers as server (server.name)}
+				<MenuItem
+					icon="plug"
+					disabled
+					description={`${server.tools} ${server.tools === 1 ? t.servers.toolSingular : t.servers.toolPlural} · ${server.connected ? t.servers.connected : t.servers.notConnected}`}
+					>{server.name}</MenuItem
+				>
+			{:else}
+				<MenuNote quiet>{t.servers.none}</MenuNote>
+			{/each}
+			<MenuSeparator />
+			<MenuItem
+				icon="sliders"
+				onclick={() => {
+					serversOpen = false;
+					onsettings?.('servers');
+				}}>{t.servers.configure}</MenuItem
+			>
+		</Menu>
 
 		{#if profiles.length > 1}
-			<div class="profile">
-				<Select
-					choices={profiles.map((profile) => ({
-						value: profile.id,
-						label: profile.name,
-						hint: profile.description
-					}))}
-					value={profileId ?? ''}
-					label={t.composer.profile}
-					placement="above"
-					onchange={(id) => onprofile?.(id)}
-				/>
-			</div>
+			<Selector
+				look="chip"
+				icon="user"
+				choices={profiles.map((profile) => ({
+					value: profile.id,
+					label: profile.name,
+					description: profile.description
+				}))}
+				value={profileId ?? ''}
+				label={t.composer.profile}
+				placement="above"
+				onchange={(id) => onprofile?.(id)}
+			/>
 		{/if}
 
-		<!-- Takes the room the left-hand controls leave, so what follows — the model, whatever
-		     reasoning control it has, and Send — sits at the right end. It was an auto margin on
-		     the reasoning control, which a model without one does not have. -->
-		<span class="spacer" aria-hidden="true"></span>
+		<span class="space" aria-hidden="true"></span>
 
-		{#if modelChoices.length}
-			<!-- **One slot, whichever of the three controls this model has.** The server decided
-			     which, in `thinking_shape`, so this and Settings -> Models cannot disagree. A
-			     model nobody could ask about gets nothing: a control whose only setting cannot be
-			     expressed is the inert control, and the field stays writable on the settings
-			     screen, which is where a person states a vocabulary once. -->
+		{#if activeEntry && activeModel}
 			{#if shape === 'values'}
-				<div class="effort">
-					<Select
-						choices={reasoningChoices}
-						value={reasoningValue}
-						label={t.composer.reasoning}
-						placement="above"
-						align="end"
-						onchange={chooseReasoning}
-					/>
-				</div>
+				<Selector
+					look="chip"
+					icon="brain"
+					choices={reasoningChoices}
+					value={reasoningValue}
+					label={t.composer.reasoning}
+					placement="above"
+					align="end"
+					onchange={(value) => onreasoning?.(activeEntry.name, activeModel.id, value)}
+				/>
 			{:else if shape === 'toggle'}
 				<Chip
 					on={thinkingOn}
 					pressed={thinkingOn}
-					title={thinkingOn ? t.composer.thinkingOn : t.composer.thinkingOff}
-					onclick={() => setThinking(!thinkingOn)}
+					hint={thinkingOn ? t.composer.thinkingOn : t.composer.thinkingOff}
+					onclick={() => onthinking?.(activeEntry.name, activeModel.id, !thinkingOn)}
 				>
 					{thinkingOn ? t.composer.thinking : t.composer.thinkingOff}
 				</Chip>
 			{:else if shape === 'budget'}
-				<!-- A number, not a level. `inputmode=numeric` so a phone opens the keypad rather
-				     than the keyboard, and the value is only sent on change rather than on every
-				     keystroke -- a budget is a setting, not a search. -->
-				<label class="context budget" title={t.composer.budgetTitle}>
-					<span class="dot" aria-hidden="true"></span>
-					<span class="sr-only">{t.composer.budgetTitle}</span>
-					<input
-						type="number"
-						inputmode="numeric"
-						min={BUDGET_MIN}
-						max={BUDGET_MAX}
-						step={256}
-						value={budget ?? BUDGET_MIN}
-						onchange={(event) => setBudget(Number(event.currentTarget.value) || BUDGET_MIN)}
-					/>
-				</label>
-			{/if}
-			<div class="model">
-				<Select
-					choices={modelChoices}
-					value={activeChoice}
-					label={t.composer.model}
+				<Chip
+					bind:ref={budgetChip}
+					icon="brain"
+					chevron
+					haspopup="menu"
+					expanded={budgetOpen}
+					label={t.composer.budgetTitle}
+					onclick={() => (budgetOpen = !budgetOpen)}
+				>
+					{budget === null ? t.composer.effort.default : t.composer.budget(budget)}
+				</Chip>
+				<Menu
+					open={budgetOpen}
+					anchor={budgetChip}
+					label={t.composer.budgetTitle}
 					placement="above"
 					align="end"
-					title={activeModel ? `${activeModel.name} · ${activeEntry?.base_url}` : ''}
-					onchange={chooseModel}
-				/>
-			</div>
-		{:else}
-			<!-- Nothing registered. Saying so where the model belongs beats an empty gap, and it
-			     is one click from the screen that fixes it. -->
-			<button class="nomodel" type="button" onclick={() => onsettings?.()}>
-				{t.composer.noModel}
-			</button>
+					onclose={() => (budgetOpen = false)}
+				>
+					<MenuHeading>{t.composer.budgetTitle}</MenuHeading>
+					{#each [1024, 4096, 16384] as preset (preset)}
+						<MenuItem
+							trail="check"
+							on={budget === preset}
+							onclick={() => {
+								setBudget(preset);
+								budgetOpen = false;
+							}}>{t.composer.budget(preset)}</MenuItem
+						>
+					{/each}
+					<MenuSeparator />
+					<div class="custom">
+						<NumberField
+							compact
+							value={budget}
+							min={BUDGET_MIN}
+							max={BUDGET_MAX}
+							step={256}
+							unit={t.composer.tokens}
+							ariaLabel={t.composer.budgetTitle}
+							onkeydown={(event) => {
+								if (event.key === 'Enter') budgetOpen = false;
+							}}
+							onchange={setBudget}
+						/>
+					</div>
+				</Menu>
+			{/if}
 		{/if}
+
+		<ModelSelector
+			{providers}
+			{activeProvider}
+			onmodel={(provider, model) => onmodel?.(provider, model)}
+			onsettings={() => onsettings?.('models')}
+		/>
 
 		<SendButton {busy} disabled={!sendable || blocked} onsend={submit} onstop={() => onstop?.()} />
 	</div>
 </div>
 
 <style>
-	/* The soft composer: a filled rounded box, and on focus a laurel border with a soft laurel
-	   ring around it (`composer.focus`) — typing to her is giving her your attention, and focus is
-	   laurel everywhere. */
 	.composer {
-		background: var(--surface);
+		position: relative;
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+		width: 100%;
+		padding: 10px 10px 10px 14px;
 		border: var(--border-width) solid var(--line);
 		border-radius: var(--radius-lg);
-		padding: calc(var(--space) * 3) calc(var(--space) * 3.5) calc(var(--space) * 2.5);
-		box-shadow: 0 0 0 0 transparent;
+		background: var(--surface);
+		container-type: inline-size;
 		transition:
-			border-color var(--motion-composer-focus),
-			box-shadow var(--motion-composer-focus);
+			box-shadow var(--motion-composer-focus),
+			border-color var(--motion-composer-focus);
 	}
 
+	/* `composer.focus`, the ring preset: a laurel border and a 3px laurel-soft ring. */
 	.composer:focus-within {
 		border-color: var(--laurel);
 		box-shadow: 0 0 0 3px var(--laurel-soft);
 	}
 
-	.attached {
+	.attachments {
 		display: flex;
 		flex-wrap: wrap;
 		gap: 6px;
-		list-style: none;
-		margin: 0 0 10px;
-		padding: 0;
-	}
-
-	.attached li {
-		display: flex;
-		align-items: center;
-		gap: 8px;
-		padding: 3px 6px 3px 10px;
-		background: var(--surface-raised);
-		border: 1px solid var(--line);
-		border-radius: var(--radius);
-		font-size: 12.5px;
-	}
-
-	/* A picture keeps the chip it would have had and gains a thumbnail on the left, so a row of
-	   four attachments still reads as one row of the same thing rather than two kinds of card. */
-	.attached li.picture {
-		padding-left: 3px;
-	}
-
-	.attached img {
-		width: 26px;
-		height: 26px;
-		object-fit: cover;
-		border-radius: 6px;
-		background: var(--ground);
-	}
-
-	.name {
-		max-width: 22ch;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-	}
-
-	.size {
-		color: var(--text-faint);
-	}
-
-	.attached button {
-		color: var(--text-faint);
-		font-size: 11px;
-	}
-
-	.attached button:hover {
-		color: var(--danger);
 	}
 
 	.refused {
-		margin: 0 0 8px;
-		font-size: 12.5px;
+		margin: 0;
 		color: var(--danger);
+		font-size: 12px;
 	}
 
-	/* Styled to match Settings → Memory's gauge (ADR 16) -- same shape, smaller, because this one
-	   is glanced at on every message rather than read once on a settings screen. Its own class,
-	   not `.context` — that name already belongs to the skills/servers pills below, and sharing
-	   it merged both rule sets onto whichever element had it (this bar picked up the pills'
-	   padding and pill-shaped border; the pills picked up this bar's margin). */
-	.usage {
+	.top {
 		display: flex;
-		align-items: center;
-		gap: 8px;
-		margin-bottom: 6px;
-	}
-
-	.usage .track {
-		flex: 1;
-		min-width: 0;
-		height: 4px;
-		border: 1px solid var(--line);
-		border-radius: 999px;
-		background: var(--surface-raised);
-		overflow: hidden;
-	}
-
-	.usage .fill {
-		height: 100%;
-		background: var(--brass);
-		transition: width var(--fade) var(--ease);
-	}
-
-	.usage .fill.tight {
-		background: var(--danger);
-	}
-
-	.usage .reading {
-		flex: none;
-		overflow: hidden;
-		max-width: 40%;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-		font-size: 11px;
-		color: var(--text-faint);
-	}
-
-	.field {
-		position: relative;
-	}
-
-	textarea {
-		display: block;
-		width: 100%;
-		border: 0;
-		background: none;
-		resize: none;
-		font-family: var(--font-body);
-		font-size: 16px;
-		line-height: 1.55;
-		max-height: 260px;
-		overflow-y: auto;
-		/* The grow effect above assigns `height` on every keystroke, so without this the whole
-		   composer jumps a line at a time while you are still reading what you are typing. This
-		   is the disclosure height `--disclose` is named for, applied to the one place it happens
-		   continuously rather than on a click — a person watching their own sentence push the
-		   button bar down is the same event as a panel opening, and it deserves the same gesture.
-
-		   `--disclose` and not `--fade`: this is a height, and a height measured in 120ms reads as
-		   a twitch next to one measured in 160. */
-		transition: height var(--disclose) var(--ease);
-	}
-
-	textarea:focus {
-		outline: none;
-	}
-
-	/* Kept legible rather than greyed out. Whatever was half-typed is still yours, and the
-	   reason you cannot send it is a card on screen a few lines up. */
-	textarea:disabled {
-		color: var(--text-muted);
-		cursor: default;
-	}
-
-	textarea::placeholder {
-		color: var(--text-faint);
-	}
-
-	.bar {
-		display: flex;
-		align-items: center;
+		align-items: flex-start;
 		gap: 10px;
-		margin-top: 8px;
 	}
 
-	.attach {
-		display: grid;
-		place-items: center;
-		width: 26px;
-		height: 26px;
-		flex: none;
-		border-radius: 50%;
-		border: 1px solid var(--line);
-		color: var(--text-muted);
-		font-size: 13px;
-		transition:
-			border-color var(--fade) var(--ease),
-			color var(--fade) var(--ease);
-	}
-
-	.attach:hover {
-		border-color: var(--brass);
-		color: var(--brass);
-	}
-
-	.context {
-		display: flex;
-		align-items: center;
-		gap: 6px;
-		padding: 3px 9px;
-		border: 1px solid var(--line);
-		border-radius: 999px;
-		font-size: 12.5px;
-		color: var(--text-muted);
-		transition:
-			border-color var(--fade) var(--ease),
-			color var(--fade) var(--ease);
-	}
-
-	.context:hover {
-		border-color: var(--text-faint);
-		color: var(--text);
-	}
-
-	/* Live state, so laurel: something is switched on for the next thing you type. Nothing on
-	   is not a failure, so the dot goes quiet rather than red. */
-	.dot {
-		width: 6px;
-		height: 6px;
-		border-radius: 50%;
-		background: var(--laurel);
-	}
-
-	/* Both dropdowns are `Select`, which owns the pill and the popup. They used to be a native
-	   `<select>` with `appearance: none` and a chevron drawn on this element — which gave back
-	   the frame and left the *list* the platform's, so opening one dropped the operating
-	   system's own panel into an interface that draws everything else itself. What is left here
-	   is only where they sit in the row. */
-	.profile,
-	.effort,
-	.model {
-		display: flex;
-		align-items: center;
-		min-width: 0;
-	}
-
-	.spacer {
-		flex: 1;
-		min-width: 0;
-	}
-
-	.effort {
-		max-width: 14ch;
-	}
-
-	.model {
-		max-width: 22ch;
-	}
-
-	/* Dashed, because nothing is registered — the one control on this bar that is a gap rather
-	   than a setting, and it should not read as a pill that happens to be empty. */
-	.nomodel {
-		padding: 3px 10px;
-		border: 1px dashed var(--line);
-		border-radius: 999px;
-		font-size: 12.5px;
-		color: var(--text-faint);
-	}
-
-	.nomodel:hover {
-		border-color: var(--brass);
-		color: var(--brass);
-	}
-
+	/* `cmp.hint: show` — "Enter to send" in the corner, at every width. */
 	.hint {
-		position: absolute;
-		top: 4px;
-		right: 0;
-		pointer-events: none;
+		padding-top: 5px;
 		color: var(--text-faint);
-		background: var(--surface);
-		padding-left: 8px;
-		transition: opacity var(--fade) var(--ease);
+		font-size: 11px;
+		white-space: nowrap;
 	}
 
-	.hint.gone {
-		opacity: 0;
-	}
-
-	@media (max-width: 640px) {
+	@container (max-width: 420px) {
 		.hint {
 			display: none;
 		}
+	}
 
-		/* The budget is a number inside the pill, so the input has to give up the pill's own
-	   typography and padding without the pill losing its shape. */
-		.context.budget {
-			flex: none;
-			gap: 7px;
-		}
+	.row {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		min-width: 0;
+	}
 
-		.context.budget input {
-			width: 5.5ch;
-			padding: 0;
-			border: 0;
-			background: none;
-			font-family: var(--font-mono);
-			font-size: 12px;
-			color: var(--text);
-		}
+	.space {
+		flex: 1;
+		min-width: 4px;
+	}
 
-		.context.budget input:focus-visible {
-			outline: 2px solid var(--laurel);
-			outline-offset: 2px;
-			border-radius: 4px;
-		}
-
-		.effort {
-			display: none;
-		}
-
-		.model {
-			max-width: 12ch;
-		}
+	.custom {
+		padding: 4px 9px 6px;
 	}
 </style>

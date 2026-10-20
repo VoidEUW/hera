@@ -14,12 +14,14 @@
 	 * tools back on for a model somebody already flagged off (ADR 19).
 	 */
 	import Button from '$lib/components/ui/Button.svelte';
-	import Icon from '$lib/components/ui/Icon.svelte';
+	import CloseButton from '$lib/components/ui/CloseButton.svelte';
+	import NumberField from '$lib/components/ui/NumberField.svelte';
+	import Textarea from '$lib/components/ui/Textarea.svelte';
 	import { untrack } from 'svelte';
 	import { api, type ModelEntry, type ModelPreset, type Provider } from '$lib/api/client';
 	import Checkbox from '$lib/components/ui/Checkbox.svelte';
 	import Input from '$lib/components/ui/Input.svelte';
-	import Select from '$lib/components/ui/Select.svelte';
+	import Selector from '$lib/components/ui/Selector.svelte';
 	import Slider from '$lib/components/ui/Slider.svelte';
 	import { t } from '$lib/i18n';
 	import {
@@ -112,27 +114,20 @@
 						ariaLabel={field.label}
 						onchange={(next) => set(field.key, next)}
 					/>
-					<input
-						class="mono"
-						type="number"
+					<NumberField
+						compact
 						step={field.step}
 						placeholder={t.models.sampling.unset}
-						value={value ?? ''}
-						oninput={(e) => {
-							const text = e.currentTarget.value;
-							set(field.key, text === '' ? undefined : Number(text));
-						}}
+						ariaLabel={field.label}
+						value={value ?? null}
+						onchange={(next) => set(field.key, next ?? undefined)}
 					/>
 					{#if value !== undefined}
-						<button
-							class="clear"
-							type="button"
-							title={t.models.sampling.unset}
+						<CloseButton
+							size="sm"
+							label={t.models.sampling.unset}
 							onclick={() => set(field.key, undefined)}
-						>
-							<span class="sr-only">{t.models.sampling.unset}</span>
-							<Icon name="x" />
-						</button>
+						/>
 					{/if}
 				</div>
 			</div>
@@ -146,37 +141,30 @@
 								     only way the ~17 prose-only providers are
 								     reachable at all. -->
 			{#if shapeOf(model) === 'values'}
-				<Select
+				<Selector
 					choices={effortsFor(model)}
 					value={typeof current.reasoning_effort === 'string' ? current.reasoning_effort : ''}
 					label={t.models.sampling.reasoningEffort}
-					field
 					onchange={(value) => set('reasoning_effort', value)}
 				/>
 			{:else if shapeOf(model) === 'toggle'}
 				<Checkbox
+					variant="switch"
 					checked={thinkingOn(current)}
 					label={t.models.sampling.thinking}
 					ariaLabel={t.models.sampling.thinkingToggle}
 					onchange={(on) => (draft = withThinking(draft, on))}
 				/>
 			{:else if shapeOf(model) === 'budget'}
-				<!-- A raw number input rather than `Input`, whose
-				     `kind` is a closed set of *text* kinds on
-				     purpose. Matches the context-length field
-				     below it. -->
-				<div class="sampling-row">
-					<input
-						type="number"
-						min="256"
-						max="32768"
-						step="256"
-						aria-label={t.models.sampling.thinkingBudget}
-						value={budgetOf(current) ?? 1024}
-						onchange={(event) => set('thinking_budget', Number(event.currentTarget.value) || 1024)}
-					/>
-					<span class="caption">tokens</span>
-				</div>
+				<NumberField
+					min={256}
+					max={32768}
+					step={256}
+					unit={t.composer.tokens}
+					ariaLabel={t.models.sampling.thinkingBudget}
+					value={budgetOf(current) ?? 1024}
+					onchange={(next) => set('thinking_budget', next ?? 1024)}
+				/>
 			{:else}
 				<Input
 					mono
@@ -200,262 +188,150 @@
 
 	<p class="warn note">{t.models.sampling.overrideNote}</p>
 
-	<label>
-		<span>{t.models.maxTokens}</span>
-		<input
-			type="number"
-			min="1"
-			step="1"
-			placeholder={t.models.maxTokensPlaceholder}
-			value={maxTokensOf(current) ?? ''}
-			oninput={(e) => set('max_tokens', tokenCountFrom(e.currentTarget.value))}
-		/>
-		<small>{t.models.maxTokensHint}</small>
-	</label>
+	<NumberField
+		min={1}
+		step={1}
+		unit={t.composer.tokens}
+		label={t.models.maxTokens}
+		help={t.models.maxTokensHint}
+		placeholder={t.models.maxTokensPlaceholder}
+		value={maxTokensOf(current) ?? null}
+		onchange={(next) => set('max_tokens', next === null ? undefined : tokenCountFrom(String(next)))}
+	/>
 
-	<label>
-		<span>{t.models.contextLength}</span>
-		<input
-			type="number"
-			min="1"
-			step="1"
-			placeholder={t.models.contextLengthPlaceholder}
-			value={contextText}
-			oninput={(e) => (contextText = e.currentTarget.value)}
-		/>
-		<small>{t.models.contextLengthHint}</small>
-	</label>
-	{#if !contextValid}
-		<p class="warn">{t.models.contextLengthInvalid}</p>
-	{/if}
+	<NumberField
+		min={1}
+		step={1}
+		unit={t.composer.tokens}
+		label={t.models.contextLength}
+		help={t.models.contextLengthHint}
+		error={contextValid ? undefined : t.models.contextLengthInvalid}
+		placeholder={t.models.contextLengthPlaceholder}
+		value={contextText === '' ? null : Number(contextText)}
+		onchange={(next) => (contextText = next === null ? '' : String(next))}
+	/>
 
-	<div class="field">
-		<span class="label">{t.models.toolCalling}</span>
-		<Checkbox
-			checked={toolCalling}
-			ariaLabel={t.models.toolCalling}
-			onchange={(checked) => (toolCalling = checked)}
-		/>
-		<small>{t.models.toolCallingHint}</small>
-	</div>
+	<Checkbox
+		checked={toolCalling}
+		label={t.models.toolCalling}
+		description={t.models.toolCallingHint}
+		onchange={(checked) => (toolCalling = checked)}
+	/>
 
-	<div class="field">
-		<span class="label">{t.models.acceptsImages}</span>
-		<Checkbox
-			checked={acceptsImages}
-			ariaLabel={t.models.acceptsImages}
-			onchange={(checked) => (acceptsImages = checked)}
-		/>
-		<small>{t.models.acceptsImagesHint}</small>
-	</div>
+	<Checkbox
+		checked={acceptsImages}
+		label={t.models.acceptsImages}
+		description={t.models.acceptsImagesHint}
+		onchange={(checked) => (acceptsImages = checked)}
+	/>
 
-	<label>
-		<span>{t.models.optionsPreset}</span>
-		<Select
-			choices={[
-				{ value: '', label: t.models.optionsPresetNone },
-				...presets.map((preset) => ({
-					value: preset.id,
-					label: preset.label,
-					hint: preset.hint
-				}))
-			]}
-			value=""
-			label={t.models.optionsPreset}
-			field
-			onchange={(chosenId) => {
-				const chosen = presets.find((p) => p.id === chosenId);
-				if (chosen) draft = written(chosen.options);
-			}}
-		/>
-	</label>
-	<label>
-		<span>{t.models.options}</span>
-		<textarea
-			class="mono"
-			rows="5"
-			spellcheck="false"
-			value={draft}
-			oninput={(e) => (draft = e.currentTarget.value)}></textarea>
-		<small>{t.models.optionsRawHint}</small>
-	</label>
-	{#if !valid}
-		<p class="warn">{t.models.optionsInvalid}</p>
-	{/if}
+	<Selector
+		caption={t.models.optionsPreset}
+		choices={[
+			{ value: '', label: t.models.optionsPresetNone },
+			...presets.map((preset) => ({
+				value: preset.id,
+				label: preset.label,
+				description: preset.hint
+			}))
+		]}
+		value=""
+		label={t.models.optionsPreset}
+		onchange={(chosenId) => {
+			const chosen = presets.find((p) => p.id === chosenId);
+			if (chosen) draft = written(chosen.options);
+		}}
+	/>
+	<Textarea
+		mono
+		rows={5}
+		label={t.models.options}
+		help={t.models.optionsRawHint}
+		error={valid ? undefined : t.models.optionsInvalid}
+		value={draft}
+		onchange={(value) => (draft = value)}
+	/>
 	<div class="options-actions">
-		<Button variant="ghost" size="sm" disabled={!valid || !contextValid} onclick={() => save()}>
-			{t.models.optionsSave}
-		</Button>
 		<Button variant="ghost" size="sm" onclick={() => (draft = '')}>
 			{t.models.optionsClear}
+		</Button>
+		<Button
+			variant="highlighted"
+			size="sm"
+			disabled={!valid || !contextValid}
+			onclick={() => save()}
+		>
+			{t.models.optionsSave}
 		</Button>
 	</div>
 </div>
 
 <style>
-	label {
-		display: block;
-		margin-bottom: 10px;
-	}
-
-	/* The same shape as a `label` block, for the one control that brings its own label — a
-	   `Checkbox` rooted in a `<label>` of its own, and nested labels are invalid HTML that
-	   announce twice. The wrapper carries the layout; the text rides on the control. */
-	.field {
-		display: block;
-		margin-bottom: 10px;
-	}
-
-	label > span,
-	.field > .label {
-		display: block;
-		font-size: 12.5px;
-		color: var(--text-muted);
-		margin-bottom: 3px;
-	}
-
-	input {
-		width: 100%;
-		padding: 7px 10px;
-		background: var(--surface);
-		border: 1px solid var(--line);
-		border-radius: var(--radius);
-		font-family: var(--font-mono);
-		font-size: 13px;
-	}
-
-	small {
-		display: block;
-		margin-top: 3px;
-		font-size: 12px;
-		color: var(--text-faint);
-	}
-
-	button {
-		padding: 5px 12px;
-		border: 1px solid var(--line);
-		border-radius: var(--radius);
-		font-size: 13px;
-		color: var(--text-muted);
-		transition:
-			border-color var(--fade) var(--ease),
-			color var(--fade) var(--ease);
-	}
-
-	button:not(:disabled):hover {
-		border-color: var(--text-faint);
-		color: var(--text);
-	}
-
-	button:disabled {
-		opacity: 0.4;
-		cursor: default;
-	}
-
 	/* The options editor, open only when somebody asked for it — a model that needs nothing
 	   should read exactly as it did before this existed. */
 	.options {
-		margin-top: 8px;
-		padding-top: 8px;
-		border-top: 1px solid var(--line);
+		display: flex;
+		flex-direction: column;
+		gap: 14px;
+		padding-top: 4px;
+		color: var(--text);
 	}
 
-	.options .explains {
-		margin: 0 0 8px;
+	.explains {
+		margin: 0;
 		max-width: 60ch;
-		font-family: var(--font-body);
-		font-size: 12.5px;
-		line-height: 1.5;
 		color: var(--text-muted);
-	}
-
-	.options textarea {
-		width: 100%;
-		padding: 7px 10px;
-		background: var(--ground);
-		border: 1px solid var(--line);
-		border-radius: var(--radius);
-		font-family: var(--font-mono);
 		font-size: 12.5px;
 		line-height: 1.5;
-		resize: vertical;
 	}
 
 	.sampling {
 		display: flex;
 		flex-direction: column;
 		gap: 10px;
-		margin-bottom: 10px;
-		padding: 10px;
+		padding: 10px 12px;
+		border: var(--border-width) solid var(--line);
+		border-radius: var(--radius-sm);
 		background: var(--ground);
-		border: 1px solid var(--line);
-		border-radius: var(--radius);
 	}
 
-	.sampling-field span {
+	.sampling-field > span {
 		display: block;
-		font-size: 12px;
-		color: var(--text-muted);
 		margin-bottom: 3px;
+		color: var(--text);
+		font-size: 12px;
+		font-weight: 500;
 	}
 
 	.sampling-row {
 		display: flex;
 		align-items: center;
-		gap: 6px;
+		gap: 8px;
 	}
 
-	/* `:global` reaches past `Slider.svelte`'s own scope — its root is the `<input>` itself, with
-	   no wrapper `div` this rule could otherwise land on. */
+	/* `:global` reaches past `Slider.svelte`'s own scope. */
 	.sampling-row :global(.slider) {
 		flex: 1;
 	}
 
-	/* Wide enough for the `unset` placeholder to read in full rather than clip, and the native
-	   spinner is dropped — it was eating into that same width, which is what made 8ch too
-	   narrow for a five-letter word to begin with. */
-	.sampling-row input[type='number'] {
-		width: 10ch;
-		flex: none;
-		padding: 3px 6px;
-		font-size: 12.5px;
-		text-align: center;
-		appearance: textfield;
-	}
-
-	.sampling-row input[type='number']::-webkit-inner-spin-button,
-	.sampling-row input[type='number']::-webkit-outer-spin-button {
-		appearance: none;
-		margin: 0;
-	}
-
-	.sampling-row .clear {
-		flex: none;
-		padding: 1px 6px;
-		font-size: 11px;
+	small {
+		display: block;
+		margin-top: 4px;
 		color: var(--text-faint);
-	}
-
-	.sampling-row .clear:hover {
-		color: var(--danger);
+		font-size: 11.5px;
 	}
 
 	.options-actions {
 		display: flex;
-		gap: 6px;
-	}
-
-	.warn {
-		margin: 0 0 8px;
-		font-family: var(--font-body);
-		font-size: 12.5px;
-		color: var(--text-muted);
+		justify-content: flex-end;
+		gap: 8px;
 	}
 
 	/* The one line calling out that a sampling field set here can silently outrank the
-	   deployment's own default (`packages/hera_providers`'s `extra` merges last) — worth saying
-	   plainly now that this form is the encouraged way to set it, not a JSON edge case. */
-	.warn.note {
+	   deployment's own default (`packages/hera_providers`'s `extra` merges last). */
+	.warn {
+		margin: 0;
 		color: var(--text-faint);
+		font-size: 12px;
 	}
 </style>

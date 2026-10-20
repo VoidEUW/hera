@@ -8,7 +8,7 @@
 	 */
 	import { api, type Health, type Preferences } from '$lib/api/client';
 	import Checkbox from '$lib/components/ui/Checkbox.svelte';
-	import Select from '$lib/components/ui/Select.svelte';
+	import Selector from '$lib/components/ui/Selector.svelte';
 	import Segmented from '$lib/components/ui/Segmented.svelte';
 	import { t } from '$lib/i18n';
 	import { notifications } from '$lib/notifications.svelte';
@@ -81,7 +81,7 @@
 	<section>
 		<h3>{t.general.language}</h3>
 		<div class="control">
-			<Select choices={LANGUAGES} value="en" label={t.general.language} />
+			<Selector choices={LANGUAGES} value="en" label={t.general.language} />
 		</div>
 		<p class="caption">{t.general.languageNote}</p>
 	</section>
@@ -91,7 +91,7 @@
 	<section>
 		<h3>{t.profileMenu.timezone}</h3>
 		<div class="control">
-			<Select
+			<Selector
 				choices={zoneChoices}
 				value={preferences?.timezone ?? ''}
 				label={t.profileMenu.timezone}
@@ -107,6 +107,7 @@
 	<section>
 		<h3>{t.notifications.heading}</h3>
 		<Checkbox
+			variant="switch"
 			checked={notifications.enabled}
 			label={t.notifications.toggle}
 			disabled={notifications.permission === 'denied' || notifications.permission === 'unsupported'}

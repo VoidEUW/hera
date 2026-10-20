@@ -1,20 +1,20 @@
 <script lang="ts">
 	/**
-	 * What replaces a screen when loading it failed (the theme's `hera/error-page`): offline, a
-	 * server error, not found, a model that does not answer. It says what happened, what that
-	 * means, and the one thing to do next — in that order, in a centred card with a large mark.
+	 * What replaces a screen when loading it failed (the theme's `hera/error-page`, soft look): a
+	 * centred filled card with a large mark, rising into place (`error.enter`). It says what
+	 * happened, what that means, and the one thing to do next.
 	 *
-	 * The kind decides the mark and nothing else; the words are the caller's, because only the
-	 * caller knows what failed. A command to run is copyable with one click, because the person
-	 * reading this screen is about to go and type it. Technical detail is there for whoever needs
-	 * it and quiet for whoever does not.
+	 * The mark is the ocellus bent by the kind: shut for offline, a red iris for a server fault, a
+	 * dimmed eye for an address that leads nowhere, a broken ring for a model that does not answer.
+	 * The words are the caller's, because only the caller knows what failed. A command to run sits
+	 * in a box with a copy button, because the person reading this is about to go and type it.
 	 */
 	import type { Snippet } from 'svelte';
 	import { t } from '$lib/i18n';
-	import type { IconName } from '$lib/icons';
 	import { toasts } from '$lib/toasts.svelte';
 	import Button from './Button.svelte';
-	import Icon from './Icon.svelte';
+	import IconButton from './IconButton.svelte';
+	import Ocellus from './Ocellus.svelte';
 
 	type Kind = 'offline' | 'server' | 'not-found' | 'model';
 
@@ -34,18 +34,11 @@
 		secondary?: Action;
 		/** What the browser or the server actually said. */
 		detail?: { label: string; text: string };
-		/** Anything else the screen needs under its actions. */
+		/** Anything else the screen needs under its actions — a retry countdown. */
 		children?: Snippet;
 	}
 
 	let { kind, title, body, command, primary, secondary, detail, children }: Props = $props();
-
-	const MARK: Record<Kind, IconName> = {
-		offline: 'plug',
-		server: 'alert',
-		'not-found': 'search',
-		model: 'cube'
-	};
 
 	async function copy(text: string) {
 		try {
@@ -59,27 +52,38 @@
 
 <div class="page">
 	<section class="card {kind}" role={kind === 'not-found' ? undefined : 'alert'}>
-		<span class="mark"><Icon name={MARK[kind]} size="28px" /></span>
-		<h1 class="title">{title}</h1>
+		<Ocellus
+			size={44}
+			closed={kind === 'offline'}
+			tone={kind === 'server'
+				? 'server'
+				: kind === 'not-found'
+					? 'missing'
+					: kind === 'model'
+						? 'model'
+						: undefined}
+		/>
+		<div class="code">{t.errorPage[kind]}</div>
+		<h1>{title}</h1>
 		<p class="body">{body}</p>
 
 		{#if command}
-			<button class="command" type="button" onclick={() => copy(command.text)}>
-				<span class="mono">{command.text}</span>
-				<Icon name="copy" />
-			</button>
+			<div class="command">
+				<code>$ {command.text}</code>
+				<IconButton icon="copy" label={t.ui.copy} onclick={() => copy(command.text)} />
+			</div>
 			{#if command.hint}<p class="hint">{command.hint}</p>{/if}
 		{/if}
 
 		{#if primary || secondary}
 			<div class="actions">
-				{#if secondary}
-					<Button variant="ghost" onclick={secondary.onclick}>{secondary.label}</Button>
-				{/if}
 				{#if primary}
-					<Button variant="highlighted" disabled={primary.busy} onclick={primary.onclick}>
+					<Button variant="highlighted" busy={primary.busy} onclick={primary.onclick}>
 						{primary.label}
 					</Button>
+				{/if}
+				{#if secondary}
+					<Button variant="ghost" onclick={secondary.onclick}>{secondary.label}</Button>
 				{/if}
 			</div>
 		{/if}
@@ -89,7 +93,7 @@
 		{#if detail}
 			<details class="detail">
 				<summary>{detail.label}</summary>
-				<p class="mono">{detail.text}</p>
+				<pre>{detail.text}</pre>
 			</details>
 		{/if}
 	</section>
@@ -100,20 +104,21 @@
 		display: grid;
 		place-items: center;
 		min-height: 100%;
-		padding: calc(var(--space) * 6);
+		padding: 40px 24px;
+		background: var(--ground);
 	}
 
-	/* The soft look: a filled card, centred, rising into place (`error.enter`). */
 	.card {
 		display: flex;
 		flex-direction: column;
 		align-items: center;
-		gap: calc(var(--space) * 3);
-		width: min(480px, 100%);
-		padding: calc(var(--space) * 10) calc(var(--space) * 8);
+		gap: 14px;
+		width: 100%;
+		max-width: 480px;
+		padding: 32px;
+		border: var(--border-width) solid var(--line);
 		border-radius: var(--radius-lg);
 		background: var(--surface);
-		box-shadow: var(--shadow-sm);
 		text-align: center;
 		animation: rise var(--motion-error-enter);
 	}
@@ -125,85 +130,96 @@
 		}
 	}
 
-	.mark {
-		display: grid;
-		place-items: center;
-		width: 64px;
-		height: 64px;
-		border-radius: 50%;
-		background: var(--danger-soft);
+	.code {
 		color: var(--danger);
+		font: 500 11px var(--font-mono);
+		letter-spacing: 0.12em;
+		text-transform: uppercase;
 	}
 
-	/* Not found is not a failure of anything: the address simply leads nowhere. */
-	.not-found .mark {
-		background: var(--hover);
-		color: var(--text-muted);
+	.not-found .code {
+		color: var(--text-faint);
 	}
 
-	.title {
-		margin: calc(var(--space) * 1) 0 0;
+	h1 {
+		margin: 0;
 		font-family: var(--font-display);
-		font-size: 30px;
+		font-size: 28px;
 		font-weight: var(--display-weight);
 		line-height: 1.15;
+		text-wrap: balance;
 	}
 
 	.body {
-		max-width: 40ch;
+		max-width: 46ch;
 		margin: 0;
 		color: var(--text-muted);
+		font-size: 14px;
 		line-height: 1.55;
 	}
 
 	.command {
 		display: flex;
 		align-items: center;
-		gap: calc(var(--space) * 3);
-		margin-top: calc(var(--space) * 2);
-		padding: calc(var(--space) * 2) calc(var(--space) * 3.5);
+		gap: 6px;
+		width: 100%;
+		max-width: 360px;
+		padding: 4px 4px 4px 12px;
 		border: var(--border-width) solid var(--line);
 		border-radius: var(--radius-sm);
 		background: var(--ground);
-		color: var(--text);
-		transition: border-color var(--fade) var(--ease);
+		font: 12.5px var(--font-mono);
+		text-align: left;
 	}
 
-	.command:hover {
-		border-color: var(--text-faint);
-	}
-
-	.command :global(.icon) {
-		color: var(--text-faint);
+	code {
+		flex: 1;
+		overflow: hidden;
+		font: inherit;
+		text-overflow: ellipsis;
+		white-space: nowrap;
 	}
 
 	.hint {
 		margin: 0;
 		color: var(--text-faint);
-		font-size: calc(var(--ui-size) - 1.5px);
+		font-size: 12px;
 	}
 
 	.actions {
 		display: flex;
-		gap: calc(var(--space) * 2);
-		margin-top: calc(var(--space) * 3);
+		flex-wrap: wrap;
+		justify-content: center;
+		gap: 8px;
 	}
 
 	.detail {
 		width: 100%;
-		margin-top: calc(var(--space) * 2);
-		color: var(--text-faint);
-		font-size: calc(var(--ui-size) - 1.5px);
 		text-align: left;
 	}
 
-	.detail summary {
+	summary {
+		padding: 4px 0;
+		color: var(--text-faint);
+		font-size: 12px;
 		cursor: pointer;
-		text-align: center;
 	}
 
-	.detail p {
-		margin: calc(var(--space) * 2) 0 0;
+	summary:hover {
+		color: var(--text);
+	}
+
+	pre {
+		max-height: 200px;
+		margin: 8px 0 0;
+		padding: 12px;
+		overflow: auto;
+		border: var(--border-width) solid var(--line);
+		border-radius: var(--radius-sm);
+		background: var(--ground);
+		color: var(--text-muted);
+		font: 12px/1.6 var(--font-mono);
+		white-space: pre-wrap;
 		overflow-wrap: anywhere;
 	}
 </style>

@@ -158,8 +158,8 @@ a bug:
 
 | Token | Means | Used for |
 |---|---|---|
-| `brass` | **her authority** | The leading colour: the mark's ring, skills, permission cards, the active chat, emphasis, a switch that is on |
-| `laurel` | **her attention** | Thinking, a tool running, the ocellus iris, live state, the focus ring |
+| `brass` | **her authority** | The leading colour: the mark's ring, highlighted buttons, toggles and chips that are on, the check on a chosen row, question and permission cards |
+| `laurel` | **her attention** | Thinking, a tool running, the ocellus iris, live state, progress, the active chat's bar, the focus ring |
 | `pomegranate` | **her** | The send action and her name — the two places that are *her*, and nothing else |
 
 `danger` is for failures and destructive actions, and is never used for a question or a stance —
@@ -210,61 +210,71 @@ the sentence rather than as an image dropped into it.
 a breath when she meant a gap between two parts. It is never a heading — Markdown's setext form
 would promote the sentence *above* it, which is the opposite of what she meant by it.
 
-Syntax highlighting is not in yet. It is a palette decision of its own and belongs in the same
-pass as everything else under **Open**.
+Source is coloured the way an editor colours it — VS Code Dark+ on a dark ground, Light+ on a
+light one (`--vs-*` in `app.css`, the theme's file-editor spec) — because code is read by people
+whose eyes are trained on those hues, and they are not the theme's to choose.
 
 ## Motion
 
 She is *ox-eyed*: wide, calm, unhurried. Nothing flickers and nothing slides in from off-screen.
 There is exactly one piece of choreography, and everything else is a fade or a height change.
 
-**The thinking indicator** is that one piece, and it has two states. While she is still without
-words the ocellus **displays**, at 22 px rather than the usual 16: over a 2.4-second beat the eye
-swells, eight feathers throw outward in every direction, hold, and fold back behind it — the one
-bounce in the interface, and it is there because a waiting mark that does not move is the thing
-[issue #44](https://github.com/VoidEUW/hera/issues/44) was opened about. The fan turns as it
-goes, over 45° — eight blades 45° apart are the same eight blades turned 45°, so the rotation
-loops with no seam. Its 3.1 s interval is deliberately not the beat and does not divide into it:
-on the beat, every throw sampled the same arc and the tail came back out at the angle the last
-one started from, which read as the turn resetting each time. Off it, each display picks up
-about 35° further round than the last, which is what a turn that never stopped looks like. Once
-she is speaking it settles onto the slower four-second cycle: the iris rotates once, with the
-ring breathing between 60 % and 100 % opacity. Both are slow enough to read as attention rather
-than as a spinner.
-
-**The display is shorter than the settled state on purpose.** It is one gesture with a beginning
-and an end, so whatever is left after it finishes is a still circle, and the way to have less of
-that is to come round again sooner rather than to find something to fill it with. A version that
-filled it — the mark dimming and coming back up between throws — was tried and removed: a blink
-next to a gesture this smooth reads as a different animation borrowed from somewhere else. What
-covers the quiet part instead is the eye easing back up from the bounce, which runs to the end of
-the beat.
-
-Because it loops, every segment of it starts and ends at a standstill, which is why the burst
-runs on `ease-in-out` rather than the ease-out everything else uses. The throw overrides that
-with a curve that leaves from rest and overshoots, rather than the back-out it first used: a
-back-out opens at roughly four times its average speed, and the previous beat had just finished
-decelerating into the loop point, so position matched across the join and velocity did not. That
-is the whole of what a jerky restart is.
-
-**The tail comes back in rather than being cut off.** When her first words land the throw and
-the swell freeze where they stand and the fan is drawn into the eye over 460 ms, still turning
-as it comes — `Ocellus` exports `FOLD_MS` and `Message` keeps the mark mounted exactly that long
-past the end of `waiting`. Freezing rather than cancelling is the whole trick: a cancelled
-animation snaps back to its resting value, so the tail would vanish before it could be pulled in.
-It only shrinks as far as half, too, because a feather at full stretch has its tip 20.5 units out
-and the eye covers 11.5 of them — everything past that is animating something already hidden.
-
-Only the waiting mark displays, and it is drawn in a box twice its layout size — a fanned feather
-reaches past where the eye sits, so it bleeds over its neighbours rather than pushing the line
-apart. Once the tail is in, the mark gives way to the activity gutter, whose first row is the
-thought she just had. The animation becomes the record.
+**The thinking indicator** is that one piece (`hera/thinking`): while she is still without words,
+a still ocellus pulses in scale where her answer will begin — small and faint to whole and back,
+on the theme's `thinking.loop` — and the word *Thinking* breathes beside it on `thinking.label`.
+The plume burst the previous rebuild drew here is gone: the theme names a pulse, and a pulse is
+what a reader takes for attention rather than for a spinner. When nothing has arrived for thirty
+seconds it becomes the stall box instead — the spinner turned red and breathing, with Wait and
+Retry — because a model that is loading or has died looks exactly like one that is thinking, and
+only time tells them apart.
 
 Everything else has exactly one **motion slot** — `--motion-<slot>`, a duration and a curve
 supplied by the theme ([Heaven's table](themes/hera-theme-heaven.md#motion)) — and a component
-reads its slot rather than naming a duration. `prefers-reduced-motion` replaces the rotation with
-a static ocellus at full opacity, leaves the tail folded, and removes every transition; the
-interface must be completely usable and completely legible with all motion off.
+reads its slot rather than naming a duration (`--motion-<slot>-d` is the duration alone, for the
+few places that multiply one). `prefers-reduced-motion` shows the ocellus still at full opacity
+and removes every transition; the interface must be completely usable and completely legible with
+all motion off.
+
+## Components
+
+**Every control is a primitive in `lib/components/ui/`, drawn the way the Theme Builder draws it**
+and resolved through the export's looks and parts. A feature component composes them and owns no
+control markup of its own — `primitives.test.ts` fails on a `<button>`, `<input>`, `<textarea>` or
+`<select>` outside `ui/`, and on `--brass` read anywhere the theme does not name. `/design` shows
+every one in every state.
+
+| Theme component | Primitive |
+|---|---|
+| `hera/sidebar`, `-group`, `-entry` | `sidebar/Sidebar`, `SidebarGroup`, `SidebarEntry` |
+| `hera/topbar` | `Topbar` |
+| `hera/search` | `SearchBar` |
+| `hera/selector` (and every menu) | `Selector`, `Menu`, `MenuItem`, `MenuHeading`, `MenuSeparator`, `MenuNote` |
+| `hera/segmented` | `Segmented` |
+| `hera/tooltip` | the `tooltip` action, built into `IconButton`, `Chip`, `CloseButton` |
+| `hera/button` | `Button` (words), `IconButton` (an icon alone), `FileButton` (opens the file chooser) |
+| `hera/close-button` | `CloseButton` |
+| `hera/auth` | `Auth` (on `/design` until there are accounts) |
+| `hera/text-field`, `hera/textarea` | `Input`, `Textarea`, `NumberField`, framed by `Field` |
+| `hera/toggles` | `Checkbox` (box or switch), drawn by `Toggle` |
+| `hera/collapsible` | `Collapsible` |
+| `hera/chips` | `Chip`, `Pill`, `Avatar`, `Kbd` |
+| `hera/spinner`, `-stalled` | `Spinner`, `StallBox` |
+| `hera/progress-bar` | `ProgressBar` |
+| `hera/skeleton` | `Skeleton` |
+| `hera/toast` | `Toaster` |
+| `hera/modal` | `Modal`, `Scrim` |
+| `hera/error-page` | `ErrorPage` |
+| `hera/ocellus`, `hera/thinking` | `Ocellus`, `Thinking` |
+| `hera/thought-trace`, `hera/tool-call` | `TraceRow` |
+| `hera/send-button` | `SendButton` |
+| `hera/voice`, `hera/image-gen` | `VoiceCall`, `ImageGen` (on `/design` until there is a backend) |
+| `hera/file-editor` | `FileEditor`, `CodeView` |
+| Hera amendments | `ContextMeter`, `AttachmentChip`, `NumberField`, `StallBox`, `CodeView`, `Swatches` |
+
+The composer, message, artifact card, side view and the two cards are feature components
+(`Composer`, `Message`, `ArtifactCard`, `ArtifactDrawer`, `QuestionCard`, `PermissionCard`) built
+only from these. The amendments are written into the theme export itself, under
+[Hera amendments](themes/hera-theme-heaven.md#hera-amendments).
 
 ## Waiting
 
@@ -364,7 +374,7 @@ a model picker. There is one model (ADR 2); there are many of her.
 └───────────────────────┴──────────────────────────────────────────────┘
 ```
 
-The rail collapses to icons. Projects disclose their chats inline, as in the reference — it is
+The rail is resized by its edge and does not fold. Projects disclose their chats inline, as in the reference — it is
 genuinely easier to find a chat under the thing it belongs to than in one flat list sorted by
 time. Settings sits directly above the profile card at the bottom, where the brief put it.
 

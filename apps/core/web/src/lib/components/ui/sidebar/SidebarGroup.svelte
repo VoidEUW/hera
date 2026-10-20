@@ -7,12 +7,10 @@
 	 * body stays in the document while shut (`inert`), so a rename in progress inside it is not
 	 * thrown away by closing the group. `fixed` groups — the settings sidebar's — do not close at
 	 * all, because a settings section you can hide is one you can lose.
-	 *
-	 * Folded to an icon rail, the label line is gone and the group is only its entries.
 	 */
 	import type { Snippet } from 'svelte';
 	import Icon from '../Icon.svelte';
-	import { sidebarContext } from './Sidebar.svelte';
+	import IconButton from '../IconButton.svelte';
 
 	interface Props {
 		label: string;
@@ -35,12 +33,11 @@
 		children
 	}: Props = $props();
 
-	const context = sidebarContext();
-	const id = `group-${Math.random().toString(36).slice(2, 9)}`;
-	const shut = $derived(!fixed && !open && !context.collapsed);
+	const id = $props.id();
+	const shut = $derived(!fixed && !open);
 </script>
 
-<section class="group" class:shut class:collapsed={context.collapsed} aria-label={label}>
+<section class="group" class:shut aria-label={label}>
 	<div class="label-row">
 		{#if fixed}
 			<h3 class="label">{label}</h3>
@@ -58,9 +55,7 @@
 		{/if}
 		{#if count !== undefined}<span class="count">{count}</span>{/if}
 		{#if onadd}
-			<button class="add" type="button" aria-label={addLabel} title={addLabel} onclick={onadd}>
-				<Icon name="plus" />
-			</button>
+			<IconButton icon="plus" size="sm" label={addLabel ?? label} onclick={onadd} />
 		{/if}
 	</div>
 	<div class="entries" {id} inert={shut}>
@@ -81,13 +76,6 @@
 		gap: calc(var(--space) * 1.5);
 		height: calc(var(--space) * 7);
 		padding: 0 var(--sb-ir) 0 var(--sb-ix);
-		transition: opacity var(--motion-sidebar-collapse);
-	}
-
-	.collapsed .label-row {
-		opacity: 0;
-		height: calc(var(--space) * 2);
-		overflow: hidden;
 	}
 
 	.label {
@@ -127,23 +115,6 @@
 		font-size: 11px;
 		font-variant-numeric: tabular-nums;
 		line-height: 1.6;
-	}
-
-	.add {
-		display: grid;
-		place-items: center;
-		width: calc(var(--space) * 5.5);
-		height: calc(var(--space) * 5.5);
-		border-radius: var(--radius-sm);
-		color: var(--text-faint);
-		transition:
-			background var(--motion-entry-hover),
-			color var(--motion-entry-hover);
-	}
-
-	.add:hover {
-		background: var(--hover);
-		color: var(--text);
 	}
 
 	.entries {

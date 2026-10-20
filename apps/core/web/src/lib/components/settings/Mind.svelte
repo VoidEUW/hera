@@ -8,6 +8,8 @@
 	 * called twice while mounted.
 	 */
 	import Button from '$lib/components/ui/Button.svelte';
+	import Pill from '$lib/components/ui/Pill.svelte';
+	import Textarea from '$lib/components/ui/Textarea.svelte';
 	import { api, type Region } from '$lib/api/client';
 	import { t } from '$lib/i18n';
 	import { Placeholder } from '$lib/loading.svelte';
@@ -82,23 +84,30 @@
 		<section class="region">
 			<div class="region-head">
 				<h3>{region.title}</h3>
-				<span class="caption">
+				<Pill tone={region.tier === 'owner_fixed' ? 'neutral' : 'authority'} dot={false}>
 					{region.tier === 'owner_fixed' ? t.settings.ownerFixed : t.settings.evolvable}
-					· {t.settings.generation(region.generation)}
-				</span>
+				</Pill>
+				<span class="caption generation">{t.settings.generation(region.generation)}</span>
 			</div>
 			<p class="caption purpose">{region.purpose}</p>
-			<textarea bind:value={drafts[region.id]} rows="4"></textarea>
+			<Textarea
+				prose
+				rows={4}
+				ariaLabel={region.title}
+				value={drafts[region.id] ?? ''}
+				onchange={(value) => (drafts[region.id] = value)}
+			/>
 			<div class="region-foot">
 				<Button
 					variant="highlighted"
+					size="sm"
 					disabled={drafts[region.id] === region.text}
 					onclick={() => saveRegion(region)}
 				>
 					{t.settings.save}
 				</Button>
 				{#if savedRegion === region.id}
-					<span class="caption saved">{t.settings.saved}</span>
+					<Pill tone="live">{t.settings.saved}</Pill>
 				{/if}
 			</div>
 		</section>
@@ -121,25 +130,16 @@
 
 	.region-head {
 		display: flex;
-		align-items: baseline;
-		justify-content: space-between;
-		gap: 12px;
+		align-items: center;
+		gap: 8px;
+	}
+
+	.generation {
+		margin-left: auto;
 	}
 
 	.purpose {
 		margin: 4px 0 8px;
-	}
-
-	textarea {
-		width: 100%;
-		padding: 10px 12px;
-		background: var(--surface);
-		border: 1px solid var(--line);
-		border-radius: var(--radius);
-		font-family: var(--font-body);
-		font-size: 15px;
-		line-height: 1.55;
-		resize: vertical;
 	}
 
 	.region-foot {
@@ -147,10 +147,6 @@
 		align-items: center;
 		gap: 10px;
 		margin-top: 8px;
-	}
-
-	.saved {
-		color: var(--laurel);
 	}
 
 	.empty {

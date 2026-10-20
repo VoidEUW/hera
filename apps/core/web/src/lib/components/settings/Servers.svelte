@@ -7,6 +7,7 @@
 	 * cannot tell two loads apart.
 	 */
 	import { api, type Server } from '$lib/api/client';
+	import Pill from '$lib/components/ui/Pill.svelte';
 	import { t } from '$lib/i18n';
 	import { Placeholder } from '$lib/loading.svelte';
 	import Rows from './Rows.svelte';
@@ -59,9 +60,9 @@
 		<section class="row">
 			<div class="row-head">
 				<h3>{server.name}</h3>
-				<span class="caption" class:problem={!server.connected}>
+				<Pill tone={server.connected ? 'live' : 'danger'}>
 					{server.connected ? t.settings.connected : t.settings.disconnected}
-				</span>
+				</Pill>
 			</div>
 			<p class="caption">{t.settings.toolCount(server.tools)}</p>
 			{#if server.failure}
@@ -87,7 +88,7 @@
 
 	.row-head {
 		display: flex;
-		align-items: baseline;
+		align-items: center;
 		justify-content: space-between;
 		gap: 12px;
 	}

@@ -19,6 +19,8 @@
 	 * being asked feel like being stopped.
 	 */
 	import Button from './ui/Button.svelte';
+	import Pill from './ui/Pill.svelte';
+	import Textarea from './ui/Textarea.svelte';
 	import Icon from './ui/Icon.svelte';
 	import type { AnswerRequired } from '$lib/api/events';
 	import { isAskKind } from '$lib/api/events';
@@ -65,20 +67,16 @@
 		event.preventDefault();
 		send();
 	}
-
-	/** The turn stopped for this, so the cursor belongs in it. */
-	function takeover(node: HTMLTextAreaElement) {
-		node.focus();
-	}
 </script>
 
+<!-- The theme's question card (`hera/question-card`, soft look with `qc.frame: none`): a brass
+     capital header with its mark, her question in the body face, and the free answer under it.
+     No frame — it sits in the flow of her answer, where she asked. -->
 <aside class="card" class:settled>
 	<p class="head">
-		<span class="mark"><Icon name="help" /></span>
-		{#if label}
-			<span class="kind" data-kind={card.kind}>{label}</span>
-		{/if}
-		<span class="caption">{t.question.asked}</span>
+		<Icon name="help" />
+		<span>{settled ? t.question.answered : t.question.asked}</span>
+		{#if label}<Pill tone={card.kind === 'blocked' ? 'authority' : 'neutral'}>{label}</Pill>{/if}
 	</p>
 
 	<p class="question">{card.question || t.question.nothing}</p>
@@ -87,16 +85,18 @@
 		<p class="reply">{reply || t.question.noReply}</p>
 	{:else}
 		<div class="answer">
-			<textarea
-				bind:value={draft}
-				use:takeover
-				{onkeydown}
-				rows="2"
+			<Textarea
+				autofocus
+				rows={2}
+				value={draft}
 				disabled={busy}
 				placeholder={t.question.placeholder}
-				aria-label={card.question || t.question.asked}></textarea>
+				ariaLabel={card.question || t.question.asked}
+				{onkeydown}
+				onchange={(value) => (draft = value)}
+			/>
 			<div class="actions">
-				<span class="caption hint">{t.composer.hint}</span>
+				<span class="hint">{t.composer.hint}</span>
 				<Button variant="highlighted" size="sm" disabled={busy} onclick={send}>
 					{t.question.send}
 				</Button>
@@ -106,19 +106,13 @@
 </aside>
 
 <style>
-	/* No frame (the theme's `qc.frame: none`): the question sits in the flow of her answer,
-	   marked by its brass icon — a question card is her authority asking, like a permission. */
 	.card {
-		margin: calc(var(--space) * 4) 0;
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
 		max-width: var(--measure);
+		margin: calc(var(--space) * 4) 0;
 		animation: card-in var(--motion-card-enter);
-		/* Answering is the card settling: the field leaves and the card takes on the quieter
-		   surface it keeps for the rest of the conversation's life. Both halves of that used to
-		   happen in one frame, so the reply read as the card being replaced rather than as the
-		   card being answered. */
-		transition:
-			background-color var(--fade) var(--ease),
-			opacity var(--fade) var(--ease);
 	}
 
 	@keyframes card-in {
@@ -127,72 +121,34 @@
 		}
 	}
 
-	.settled {
-		opacity: 0.85;
-	}
-
 	.head {
 		display: flex;
-		align-items: baseline;
+		align-items: center;
 		gap: 8px;
-		margin: 0 0 6px;
-	}
-
-	.mark {
-		display: flex;
-		align-self: center;
-		color: var(--brass);
-	}
-
-	/* What sort of question it is. Nothing here may be the danger colour: no question she can
-	   ask is an error, and being asked one is not a thing going wrong.
-
-	   Only `blocked` is set apart, and only as far as brass. It is the one of the three where
-	   the turn is genuinely stopped on the reply — *unsure* and *choice* are her asking, which
-	   is the card's own laurel and needs no second colour to say it twice. */
-	.kind {
-		font-size: 12.5px;
-		letter-spacing: 0.03em;
-		color: var(--text-muted);
-	}
-
-	.kind[data-kind='blocked'] {
-		color: var(--brass);
-	}
-
-	.caption {
 		margin: 0;
+		color: var(--brass);
+		font-size: 11px;
+		font-weight: 600;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+	}
+
+	.settled .head {
 		color: var(--text-faint);
 	}
 
-	/* Her prose face at reading size. This is something she said, not a label on a control. */
 	.question {
 		margin: 0;
-		font-family: var(--font-body);
-		font-size: 17px;
-		line-height: 1.5;
 		color: var(--text);
+		font-family: var(--font-body);
+		font-size: 16px;
+		line-height: 1.5;
 	}
 
 	.answer {
-		margin-top: 12px;
-	}
-
-	textarea {
-		width: 100%;
-		padding: 8px 10px;
-		background: var(--ground);
-		border: 1px solid var(--line);
-		border-radius: var(--radius);
-		color: var(--text);
-		font: inherit;
-		font-size: 15px;
-		resize: vertical;
-	}
-
-	textarea:focus {
-		outline: none;
-		border-color: var(--laurel);
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
 	}
 
 	.actions {
@@ -200,30 +156,21 @@
 		align-items: center;
 		justify-content: flex-end;
 		gap: 10px;
-		margin-top: 8px;
 	}
 
 	.hint {
-		margin: 0;
-		font-size: 11.5px;
+		color: var(--text-faint);
+		font-size: 11px;
 	}
 
-	/* What they answered, once they have. Indented under the question the way a reply is, and
-	   faded in because it replaces the field — the card is seen to have been answered rather than
-	   to have been swapped. */
+	/* What they answered, once they have, indented under the question the way a reply is. */
 	.reply {
-		margin: 10px 0 0;
+		margin: 0;
 		padding-left: 12px;
 		border-left: 2px solid var(--line);
+		color: var(--text-muted);
 		font-family: var(--font-body);
 		font-size: 15px;
-		color: var(--text-muted);
-		animation: fade var(--fade) var(--ease);
-	}
-
-	@keyframes fade {
-		from {
-			opacity: 0;
-		}
+		animation: card-in var(--motion-card-enter);
 	}
 </style>

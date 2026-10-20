@@ -13,6 +13,9 @@
 	 * attachment has (type, size, and bytes that match the type).
 	 */
 	import Button from '$lib/components/ui/Button.svelte';
+	import Avatar from '$lib/components/ui/Avatar.svelte';
+	import FileButton from '$lib/components/ui/FileButton.svelte';
+	import Pill from '$lib/components/ui/Pill.svelte';
 	import { api } from '$lib/api/client';
 	import { MAX_IMAGE_BYTES } from '$lib/attachments';
 	import Input from '$lib/components/ui/Input.svelte';
@@ -46,8 +49,6 @@
 
 	let error = $state<string | null>(null);
 	let saved = $state(false);
-	let input = $state<HTMLInputElement | null>(null);
-
 	const emailBad = $derived(email.trim() !== '' && !EMAIL.test(email.trim()));
 	const dirty = $derived(
 		!!account && (name.trim() !== account.name || email.trim() !== account.email)
@@ -72,10 +73,8 @@
 		}
 	}
 
-	async function choose(event: Event) {
-		const target = event.currentTarget as HTMLInputElement;
-		const file = target.files?.[0];
-		target.value = '';
+	async function choose(files: FileList) {
+		const file = files[0];
 		if (!file) return;
 		error = null;
 		if (!TYPES.includes(file.type)) {
@@ -124,15 +123,6 @@
 		bitmap.close();
 		return canvas.toDataURL('image/png');
 	}
-
-	function initials(value: string): string {
-		return value
-			.split(/\s+/)
-			.filter(Boolean)
-			.slice(0, 2)
-			.map((part) => part[0]?.toUpperCase() ?? '')
-			.join('');
-	}
 </script>
 
 {#if error}
@@ -143,65 +133,45 @@
 	<section>
 		<h3>{t.account.avatar}</h3>
 		<div class="avatar-row">
-			{#if account?.avatar_version}
-				<img
-					class="face"
-					src={api.avatarUrl(account.avatar_version)}
-					alt=""
-					width="64"
-					height="64"
-				/>
-			{:else}
-				<span class="face initials" aria-hidden="true">{initials(account?.name ?? '') || '·'}</span>
-			{/if}
+			<Avatar
+				name={account?.name ?? ''}
+				src={account?.avatar_version ? api.avatarUrl(account.avatar_version) : undefined}
+				size={64}
+			/>
 			<div class="actions">
-				<Button variant="neutral" onclick={() => input?.click()}>
+				<FileButton icon="image" label={t.account.upload} accept={TYPES.join(',')} onfiles={choose}>
 					{account?.avatar_version ? t.account.replace : t.account.upload}
-				</Button>
+				</FileButton>
 				{#if account?.avatar_version}
 					<Button variant="ghost" onclick={clear}>{t.account.remove}</Button>
 				{/if}
 			</div>
-			<input
-				bind:this={input}
-				class="file"
-				type="file"
-				accept={TYPES.join(',')}
-				tabindex="-1"
-				aria-label={t.account.upload}
-				onchange={choose}
-			/>
 		</div>
 		<p class="caption">{t.account.avatarNote}</p>
 	</section>
 
 	<section>
-		<label class="field">
-			<span class="heading">{t.account.name}</span>
+		<div class="fields">
 			<Input
+				label={t.account.name}
 				value={name}
 				placeholder={t.account.namePlaceholder}
-				ariaLabel={t.account.name}
 				onchange={(value) => (name = value)}
 			/>
-		</label>
-		<label class="field">
-			<span class="heading">{t.account.email}</span>
 			<Input
+				kind="email"
+				label={t.account.email}
+				error={emailBad ? t.account.emailInvalid : undefined}
 				value={email}
 				placeholder={t.account.emailPlaceholder}
-				ariaLabel={t.account.email}
 				onchange={(value) => (email = value)}
 			/>
-		</label>
-		{#if emailBad}
-			<p class="caption problem">{t.account.emailInvalid}</p>
-		{/if}
+		</div>
 		<div class="foot">
-			<Button variant="neutral" disabled={!dirty || emailBad} onclick={save}>
+			<Button variant="highlighted" disabled={!dirty || emailBad} onclick={save}>
 				{t.settings.save}
 			</Button>
-			{#if saved}<span class="caption saved">{t.account.saved}</span>{/if}
+			{#if saved}<Pill tone="live">{t.account.saved}</Pill>{/if}
 		</div>
 	</section>
 {/if}
@@ -213,10 +183,8 @@
 		<ul class="later">
 			{#each [t.account.password, t.account.twoFactor, t.account.passkeys] as label (label)}
 				<li>
-					<button type="button" disabled>
-						<span>{label}</span>
-						<span class="caption">{t.account.later}</span>
-					</button>
+					<span>{label}</span>
+					<Pill>{t.account.later}</Pill>
 				</li>
 			{/each}
 		</ul>
@@ -249,44 +217,17 @@
 		gap: 16px;
 	}
 
-	.face {
-		display: grid;
-		place-items: center;
-		width: 64px;
-		height: 64px;
-		flex: none;
-		border-radius: 50%;
-		object-fit: cover;
-		background: var(--surface-raised);
-		border: 1px solid var(--line);
-	}
-
-	.initials {
-		font-size: 20px;
-		letter-spacing: 0.04em;
-		color: var(--text-muted);
-	}
-
 	.actions {
 		display: flex;
 		gap: 8px;
 	}
 
-	.file {
-		display: none;
-	}
-
-	.field {
-		display: block;
+	.fields {
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
 		max-width: 360px;
 		margin-bottom: 12px;
-	}
-
-	.heading {
-		display: block;
-		margin-bottom: 4px;
-		font-size: 12.5px;
-		color: var(--text-muted);
 	}
 
 	.foot {
@@ -295,36 +236,23 @@
 		gap: 10px;
 	}
 
-	.saved {
-		margin: 0;
-		color: var(--laurel);
-	}
-
 	.later {
 		margin: 10px 0 0;
 		padding: 0;
 		list-style: none;
 	}
 
-	.later button {
+	.later li {
 		display: flex;
-		width: 100%;
-		align-items: baseline;
+		align-items: center;
 		justify-content: space-between;
 		max-width: 420px;
 		padding: 8px 0;
-		border-top: 1px solid var(--line);
-		font-size: 13.5px;
+		border-top: var(--border-width) solid var(--line);
 		color: var(--text-faint);
-		cursor: not-allowed;
-		text-align: left;
+		font-size: 13.5px;
 	}
 
-	.later li {
-		max-width: 420px;
-	}
-
-	.problem,
 	.error {
 		color: var(--danger);
 	}

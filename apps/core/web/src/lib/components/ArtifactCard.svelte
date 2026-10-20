@@ -23,6 +23,8 @@
 	 * with the next.
 	 */
 	import Button from './ui/Button.svelte';
+	import IconButton from './ui/IconButton.svelte';
+	import Segmented from './ui/Segmented.svelte';
 	import type { Artifact } from '$lib/api/events';
 	import { downloadUrl, extensionOf, hasSource, kindOf, size, headingOf } from '$lib/artifacts';
 	import { t } from '$lib/i18n';
@@ -69,51 +71,37 @@
 		{#if artifact.inline && chatId && hasSource(artifact.name)}
 			<!-- Only where the thing itself is drawn here: a card that is just a strip has no
 			     picture to swap for its code. -->
-			<Button
-				variant="ghost"
+			<Segmented
 				size="sm"
-				aria-pressed={source}
-				aria-label={source
-					? t.artifact.showDrawnOf(artifact.name)
-					: t.artifact.showSourceOf(artifact.name)}
-				onclick={() => (source = !source)}
-			>
-				{source ? t.artifact.showDrawn : t.artifact.showSource}
-			</Button>
+				label={t.artifact.view}
+				value={source ? 'source' : 'preview'}
+				options={[
+					{ value: 'preview', label: t.ui.preview },
+					{ value: 'source', label: t.ui.source }
+				]}
+				onchange={(next) => (source = next === 'source')}
+			/>
 		{/if}
 		{#if chatId && drawn}
-			<!-- A button rather than the link beside it, because what it saves is not what a link
-			     here would point at: a diagram is converted to the page that draws it on the way
-			     out, and the file at the download URL is its mermaid source. `$lib/mermaid` does
-			     the converting, and falls back to that URL when the source will not parse. -->
-			<Button
-				variant="ghost"
-				size="sm"
+			<!-- A diagram is converted to the page that draws it on the way out (`$lib/mermaid`), so
+			     this is a button, not the link the other files get. -->
+			<IconButton
 				icon="download"
 				label={t.artifact.downloadDrawnOne(artifact.name)}
 				onclick={() => saveDiagram(chatId, artifact.name)}
 			/>
 		{:else if chatId}
-			<!-- Saving it is the other thing anybody does with a published file, and until now it
-			     meant opening the drawer to find the link. A plain `<a download>` at the download
-			     URL, the same one the drawer uses: the browser knows how to save a file, and the
-			     response says `attachment` with a neutral media type, so a page she wrote is never
-			     a document rendered at Hera's own origin.
-
-			     A glyph and no word, because the row already carries three pieces of text and the
-			     name is the one that has to stay legible when it is long. The name is in the label
-			     rather than just *Download*, so a screen reader on the fourth card of a turn is
-			     told which file it would be saving. -->
-			<a
-				class="save"
+			<!-- A plain link at the download URL: the browser knows how to save a file, and the
+			     response says `attachment` with a neutral media type, so a page she wrote is never a
+			     document rendered at Hera's own origin. The name is in the label, so a screen reader
+			     on the fourth card of a turn is told which file it would be saving. -->
+			<IconButton
+				icon="download"
+				label={t.artifact.downloadOne(artifact.name)}
 				href={downloadUrl(chatId, artifact.name)}
 				download={artifact.name}
-				rel="external"
-				title={t.artifact.download}
-				aria-label={t.artifact.downloadOne(artifact.name)}
-			>
-				<Icon name="download" />
-			</a>
+				external
+			/>
 		{/if}
 		<Button
 			size="sm"
@@ -144,10 +132,10 @@
 	   An inline artifact does not get the border, because the thing above the caption is already
 	   the object and boxing it twice reads as a frame around a frame. */
 	.artifact:not(.inline) .bar {
-		padding: calc(var(--space) * 2.5) calc(var(--space) * 3);
-		background: var(--surface);
+		padding: 9px 10px 9px 14px;
 		border: var(--border-width) solid var(--line);
 		border-radius: var(--radius);
+		background: var(--surface);
 	}
 
 	.bar {
@@ -183,7 +171,7 @@
 
 	.title {
 		font-family: var(--font-body);
-		font-size: calc(var(--prose-size) - 1px);
+		font-size: 15px;
 		color: var(--text);
 		overflow: hidden;
 		text-overflow: ellipsis;
@@ -197,42 +185,15 @@
 
 	.about {
 		display: flex;
-		gap: 5px;
 		flex: none;
-		font-size: calc(var(--ui-size) - 2px);
+		gap: 5px;
 		color: var(--text-faint);
+		font-size: 11.5px;
+		letter-spacing: 0.02em;
 	}
 
 	.kind {
 		letter-spacing: 0.04em;
 		text-transform: uppercase;
-	}
-
-	/* Square, so the glyph sits in the middle of a target the same height as the button beside
-	   it. Faint until it is wanted: saving is the second thing you do with an artifact and it
-	   should not compete with the first. */
-	.save {
-		display: flex;
-		flex: none;
-		align-items: center;
-		justify-content: center;
-		width: 27px;
-		height: 27px;
-		border: 1px solid transparent;
-		border-radius: var(--radius);
-		color: var(--text-faint);
-		transition:
-			color var(--fade) var(--ease),
-			border-color var(--fade) var(--ease);
-	}
-
-	.save:hover {
-		color: var(--text);
-		border-color: var(--brass);
-	}
-
-	.artifact.inline .save {
-		width: 22px;
-		height: 22px;
 	}
 </style>

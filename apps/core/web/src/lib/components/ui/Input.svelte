@@ -1,44 +1,35 @@
 <script lang="ts">
 	/**
-	 * One text field, typed by what it holds (#99).
+	 * One text field, typed by what it holds (the theme's `hera/text-field`, open look):
+	 * transparent, outlined, and on focus a 2px laurel underline drawn inside the bottom edge
+	 * (`field.focus`) — focus is her attention, so it is laurel, and drawn inside so it moves
+	 * nothing. With a `label`, `help` or `error` it is drawn inside a `Field`.
 	 *
-	 * Every text-like `<input>` in a settings screen used to spread its own copy of `noAutofill`
-	 * and guess its own native `type` by hand — a base URL sat in a plain `type="text"` beside an
-	 * API key, which is exactly the pair a password manager reads as a login form. `kind` is a
-	 * closed set rather than a string here, so a URL field cannot become a password field through
-	 * a typo, and the flags that keep a password manager from treating any of them as a login live
-	 * in one place (`$lib/noAutofill`) instead of at every call site.
+	 * `kind` is a closed set, so a URL field cannot become a password field through a typo, and the
+	 * flags that keep a password manager from treating a settings screen as a login live in one
+	 * place (`$lib/noAutofill`). A filter is a `SearchBar`, a number a `NumberField`.
 	 *
-	 * `variant` is the look, not the meaning: the settings-screen `'field'` (surface, a hairline
-	 * border, a brass ring on focus) is the default. `'inline'` is the rail's in-place rename —
-	 * dark ground, a brass border that does not wait for focus, because the field replacing a
-	 * title *is* the edit rather than a control that starts one. `'editor'` is the memory editor's
-	 * paragraph field, which sits beside a `<textarea>` this component does not own and has to
-	 * match it exactly: ground, brass only once focused. Three existing looks, kept apart rather
-	 * than flattened into one, because the difference was intentional in each place it was drawn.
+	 * `inline` is the sidebar's in-place rename: shorter, on the ground, its border already laurel,
+	 * because the field replacing a title *is* the edit rather than a control that starts one.
 	 */
 	import { noAutofill } from '$lib/noAutofill';
+	import Field from './Field.svelte';
 
 	interface Props {
-		/** What the field holds. Decides the native `type` and, through it, the keyboard a phone
-		 * offers and the validation the browser does on its own — `'url'` for an endpoint,
-		 * `'password'` for a secret, `'search'` for a filter, `'text'` for everything else. */
-		kind?: 'text' | 'url' | 'password' | 'search';
+		kind?: 'text' | 'url' | 'password' | 'email';
 		value: string;
 		placeholder?: string;
-		variant?: 'field' | 'inline' | 'editor';
+		variant?: 'field' | 'inline';
 		/** The monospace face — an id or a URL, not a sentence. */
 		mono?: boolean;
-		/** Appended to the component's own class list, so a caller can put a name on the field.
-		 *  A name rather than a style: the look is this component's job, and the note on `.control`
-		 *  below is about exactly the collisions an open class list invites. What this is for is a
-		 *  handle — the rail's three in-place fields were `input.rename` before they came here, and
-		 *  an end-to-end test needs one selector that says which field it means. */
+		label?: string;
+		help?: string;
+		error?: string;
+		/** A name for the field — a handle for a test, never a style. */
 		class?: string;
 		ariaLabel?: string;
 		disabled?: boolean;
-		/** Takes focus and selects its contents the instant it mounts — the rail's rename field
-		 * replacing a title in place, where leaving focus behind would leave it nowhere to be. */
+		/** Takes focus and selects its contents the instant it mounts. */
 		autofocus?: boolean;
 		onchange?: (value: string) => void;
 		onblur?: () => void;
@@ -51,6 +42,9 @@
 		placeholder = '',
 		variant = 'field',
 		mono = false,
+		label,
+		help,
+		error,
 		class: extra = '',
 		ariaLabel = '',
 		disabled = false,
@@ -60,9 +54,8 @@
 		onkeydown
 	}: Props = $props();
 
-	function handle(event: Event) {
-		onchange?.((event.currentTarget as HTMLInputElement).value);
-	}
+	const id = $props.id();
+	const framed = $derived(Boolean(label || help || error));
 
 	function takeover(node: HTMLInputElement) {
 		if (!autofocus) return;
@@ -71,57 +64,63 @@
 	}
 </script>
 
-<input
-	class="control {variant} {extra}"
-	class:mono
-	type={kind}
-	{value}
-	{placeholder}
-	{disabled}
-	aria-label={ariaLabel || undefined}
-	{...noAutofill}
-	use:takeover
-	oninput={handle}
-	{onblur}
-	{onkeydown}
-/>
+{#snippet control()}
+	<input
+		{id}
+		class="control {variant} {extra}"
+		class:mono
+		type={kind}
+		{value}
+		{placeholder}
+		{disabled}
+		aria-label={ariaLabel || undefined}
+		aria-invalid={error ? true : undefined}
+		aria-describedby={help || error ? `${id}-help` : undefined}
+		{...noAutofill}
+		use:takeover
+		oninput={(event) => onchange?.(event.currentTarget.value)}
+		{onblur}
+		{onkeydown}
+	/>
+{/snippet}
+
+{#if framed}
+	<Field {id} {label} {help} {error}>{@render control()}</Field>
+{:else}
+	{@render control()}
+{/if}
 
 <style>
-	/* Named `.control` rather than `.field` — a settings screen that reaches in with `:global()`
-	   (`Models.svelte`'s `.add-model`, `.search`) already has its own unrelated `.field` class on
-	   the `<label>` wrapper around a `Checkbox`, and the two must never collide.
-
-	   The theme's open look: transparent, outlined, and on focus a laurel underline drawn inside
-	   the bottom edge (`field.focus`) — focus is her attention, so it is laurel, and drawn inside
-	   so it moves nothing. Nine density units tall. */
 	.control {
 		width: 100%;
 		height: calc(var(--space) * 9);
-		padding: 0 calc(var(--space) * 3);
-		background: transparent;
+		padding: 0 11px;
 		border: var(--border-width) solid var(--line);
 		border-radius: var(--radius-sm);
-		font-family: var(--font-ui);
-		font-size: var(--ui-size);
+		background: transparent;
 		color: var(--text);
+		font-family: var(--font-ui);
+		font-size: 13px;
+		outline: 0;
 		box-shadow: inset 0 0 0 transparent;
 		transition:
 			box-shadow var(--motion-field-focus),
-			border-color var(--fade) var(--ease);
+			border-color var(--motion-field-focus);
 	}
 
 	.control::placeholder {
 		color: var(--text-faint);
 	}
 
-	.control.mono {
+	.mono {
 		font-family: var(--font-mono);
-		font-size: calc(var(--ui-size) - 0.5px);
+		font-size: 12.5px;
 	}
 
 	.control:disabled {
-		cursor: default;
+		background: var(--ground);
 		color: var(--text-faint);
+		cursor: not-allowed;
 	}
 
 	.control:focus-visible {
@@ -129,22 +128,18 @@
 		box-shadow: inset 0 -2px 0 var(--laurel);
 	}
 
-	/* The rail's in-place rename: the brass border is the edit state itself, not a focus ring on
-	   top of one, so there is nothing extra to draw on focus. */
-	.control.inline {
+	.control[aria-invalid='true']:focus-visible {
+		box-shadow: inset 0 -2px 0 var(--danger);
+	}
+
+	.inline {
 		height: calc(var(--space) * 7.5);
-		padding: 0 calc(var(--space) * 2);
+		padding: 0 8px;
+		border-color: var(--laurel);
 		background: var(--ground);
-		border-color: var(--brass);
 	}
 
-	.control.inline:focus-visible {
+	.inline:focus-visible {
 		box-shadow: none;
-	}
-
-	/* The memory editor's paragraph field — matches the editor textarea beside it: ground, the
-	   underline only once focused. */
-	.control.editor {
-		background: var(--ground);
 	}
 </style>

@@ -663,6 +663,64 @@ One component for looking at and changing files: uploaded images (zoom), PDFs (p
 - Tokens: `--surface`, `--ground`, `--line`, `--laurel`
 - Parts and states: kinds: image, pdf, source, markdown, skill; zoom and page navigation; copy, download, edit switch; modal or inline; read only / unsaved / saved / modified
 
+## Hera amendments
+
+Not from the Theme Builder. These are the pieces Hera needed that the export does not draw, written in the export's own shape so they read as part of the same family, and one deliberate change to it. `npm run theme:import` reads only the `css` and `json` blocks, so nothing here changes a generated file. A future export of this theme should carry them over.
+
+### Changed
+
+- **Sidebar entry · `entry.active`** — the 2px bar on the active row is `--laurel`, not `--brass`. The chat you are in is where her attention is; a brass bar beside every active title read as a highlight. Brass stays on everything else the rules name.
+
+- **Sidebar · `sidebar.collapse`** — Hera does not fold the sidebar to an icon rail, so there is no fold button and the slot is unused. The sidebar is resizable by its edge and always shows its labels.
+- **Settings sidebar** — the settings dialog's sidebar is the chat sidebar's float panel (brand, search, fixed groups), on the dialog's `--ground`; there is no separate flat variant look.
+
+### Added
+
+#### Context meter · `hera/context-meter`
+
+How full the conversation's context window is, in the top bar's toolbar. A 16px ring filled to the share used — one arc over a `--line` track, the same circle drawn twice and never two circles, so it is not taken for the ocellus — and the two numbers beside it in mono (`12.4k / 32k`). The exact count is the tooltip.
+
+- Tokens: `--laurel`, `--danger`, `--line`, `--text-muted`
+- Parts and states: share 0–85% (laurel); past 85% (danger); absent when the model declares no context length
+- Motion: `bar.indeterminate` (the arc's fill moves on the loading bar's curve)
+
+#### Attachment chip · `hera/attachment`
+
+A file going with a message, and the same file in the sent bubble. The builder's `.att`, as its own component: icon or thumbnail, name, size or "uploading" with a 2px laurel bar on the bottom edge, and a small close button while it can still be taken off.
+
+- Tokens: `--surface-raised`, `--line`, `--laurel`, `--text-faint`
+- Parts and states: file; image with thumbnail; uploading with progress; removable / sent
+
+#### Number field · `hera/number-field`
+
+A text field that holds a number: the open text-field frame, mono with tabular figures, an optional unit after the value, no native spinner. Empty means "not set", never zero. `compact` for a number inside a row or a menu.
+
+- Tokens: as `hera/text-field`
+- Parts and states: label; unit; help; error; compact
+- Motion: `field.focus`
+
+#### Stall box · `hera/stall-box`
+
+The builder's loading line and stall box as one component: a spinner, what is being waited on and for how long, and — once nothing has arrived for a while — the stalled spinner with **Wait** and **Retry**. Hera shows it in place of the thinking indicator after 30 seconds of silence.
+
+- Tokens: `--surface`, `--line`, `--danger-soft`, `--text-faint`
+- Parts and states: waiting; stalled with actions
+- Motion: `spinner.loop`, `spinner.stall`
+
+#### Code view · `hera/code-view`
+
+The builder's `.cv`, which the side view, the file editor and error details already share: a bar with the language in mono and copy (and the Edit switch where the source can change), a sticky gutter of line numbers, and the code in the editor's own colours — VS Code Dark+ on a dark ground, Light+ on a light one. The colours are `--vs-*` tokens in `src/app.css` until an export carries them.
+
+- Tokens: `--ground`, `--line`, `--laurel`, `--vs-*`
+- Parts and states: bar or bare; read only / editing (laurel hairline); notice line
+
+#### Swatches · `hera/swatches`
+
+A choice of colour: round swatches in a row, the chosen one ringed in `--text` — not brass, because picking a colour grants her nothing.
+
+- Tokens: `--text`, `--ground`
+- Motion: `button.hover`
+
 ## Source of truth
 
 ```json

@@ -40,15 +40,49 @@
 	   assumes. */
 	--canvas: #fff;
 
-	/* Syntax hues for source views, each mixed with the theme's text colour so it keeps its
-	   contrast in either mode instead of needing a second palette. A theme export does not carry
-	   these yet; when one does, these move into it. */
-	--syntax-keyword: color-mix(in srgb, #c678dd 70%, var(--text));
-	--syntax-string: color-mix(in srgb, #7cb35b 70%, var(--text));
-	--syntax-number: color-mix(in srgb, #d19a66 70%, var(--text));
-	--syntax-title: color-mix(in srgb, #61afef 70%, var(--text));
-	--syntax-attribute: color-mix(in srgb, #e5c07b 65%, var(--text));
-	--syntax-deletion: color-mix(in srgb, #e06c75 70%, var(--text));
+	/* Source is coloured the way an editor colours it (the theme's `hera/file-editor`: "VS Code
+	   colours") — Dark+ on a dark ground, Light+ on a light one. Code is read by people whose
+	   eyes are trained on those hues, so they are not the theme's to choose. A theme export does
+	   not carry them; when one does, these move into it. */
+	--vs-fg: #d4d4d4;
+	--vs-keyword: #569cd6;
+	--vs-control: #c586c0;
+	--vs-string: #ce9178;
+	--vs-number: #b5cea8;
+	--vs-comment: #6a9955;
+	--vs-function: #dcdcaa;
+	--vs-type: #4ec9b0;
+	--vs-variable: #9cdcfe;
+	--vs-tag: #569cd6;
+	--vs-attribute: #9cdcfe;
+	--vs-punctuation: #808080;
+	--vs-regexp: #d16969;
+	--vs-selector: #d7ba7d;
+	--vs-heading: #569cd6;
+	--vs-bullet: #6796e6;
+	--vs-gutter: #858585;
+	--vs-selection: rgba(38, 79, 120, 0.85);
+}
+
+[data-theme='light'] {
+	--vs-fg: #000000;
+	--vs-keyword: #0000ff;
+	--vs-control: #af00db;
+	--vs-string: #a31515;
+	--vs-number: #098658;
+	--vs-comment: #008000;
+	--vs-function: #795e26;
+	--vs-type: #267f99;
+	--vs-variable: #001080;
+	--vs-tag: #800000;
+	--vs-attribute: #e50000;
+	--vs-punctuation: #800000;
+	--vs-regexp: #811f3f;
+	--vs-selector: #800000;
+	--vs-heading: #800000;
+	--vs-bullet: #0451a5;
+	--vs-gutter: #237893;
+	--vs-selection: rgba(173, 214, 255, 0.9);
 }
 
 *,
@@ -252,8 +286,7 @@ a {
 }
 
 .prose a:hover {
-	color: var(--brass);
-	text-decoration-color: var(--brass);
+	text-decoration-color: currentColor;
 }
 
 .prose strong {
@@ -265,48 +298,132 @@ a {
 	border-radius: var(--radius);
 }
 
-/* A fenced block is a figure: a caption bar carrying the language and the copy button, then
-   the code. The bar is part of the frame rather than floating over the code, so it cannot end
-   up on top of the first line of a program. */
+/* A fenced block is a figure in the code view's frame (the theme's `.cv`): a bar carrying the
+   language in mono and the copy button, then the code on the ground. The bar is part of the frame
+   rather than floating over the code, so it cannot end up on top of the first line of a program.
+   `markdown.ts` writes this markup into `{@html}`, where no component can be used — so the look
+   is stated here, once, to match `CodeView`. */
 .prose figure.code {
 	margin: 0 0 1em;
-	background: var(--surface);
-	border: 1px solid var(--line);
-	border-radius: var(--radius);
 	overflow: hidden;
+	border: var(--border-width) solid var(--line);
+	border-radius: var(--radius-sm);
+	background: var(--ground);
 }
 
 .prose figure.code figcaption {
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
-	gap: 10px;
-	padding: 4px 8px 4px 12px;
-	border-bottom: 1px solid var(--line);
+	gap: 8px;
+	min-height: 36px;
+	padding: 5px 6px 5px 12px;
+	border-bottom: var(--border-width) solid var(--line);
+	color: var(--text-faint);
 	font-family: var(--font-ui);
 	font-size: 11.5px;
-	color: var(--text-faint);
 }
 
 .prose figure.code .lang {
+	color: var(--text-muted);
+	font: 500 11px var(--font-mono);
 	letter-spacing: 0.03em;
 }
 
 .prose figure.code .copy {
-	padding: 3px 8px;
-	border-radius: 6px;
+	height: calc(var(--space) * 6);
+	padding: 0 8px;
+	border-radius: var(--radius-sm);
+	color: var(--text-muted);
 	font-family: var(--font-ui);
-	font-size: 11.5px;
-	color: var(--text-faint);
+	font-size: 12px;
 	cursor: pointer;
 	transition:
-		background var(--fade) var(--ease),
-		color var(--fade) var(--ease);
+		box-shadow var(--motion-button-hover),
+		color var(--motion-button-hover);
 }
 
 .prose figure.code .copy:hover {
-	background: var(--surface-raised);
 	color: var(--text);
+	box-shadow: inset 0 0 0 100px var(--hover);
+}
+
+.prose figure.code pre {
+	color: var(--vs-fg);
+}
+
+/* Token colours for every source view — `CodeView` and the code in her prose — the editor's own
+   (`--vs-*`), keyed by the classes highlight.js writes. */
+:where(.cv, .prose) .hljs-comment,
+:where(.cv, .prose) .hljs-quote {
+	color: var(--vs-comment);
+}
+
+:where(.cv, .prose) :is(.hljs-keyword, .hljs-literal, .hljs-doctag) {
+	color: var(--vs-keyword);
+}
+
+:where(.cv, .prose) :is(.hljs-meta) {
+	color: var(--vs-control);
+}
+
+:where(.cv, .prose) :is(.hljs-string, .hljs-code, .hljs-link, .hljs-addition) {
+	color: var(--vs-string);
+}
+
+:where(.cv, .prose) :is(.hljs-number, .hljs-symbol) {
+	color: var(--vs-number);
+}
+
+:where(.cv, .prose) :is(.hljs-regexp, .hljs-deletion) {
+	color: var(--vs-regexp);
+}
+
+:where(.cv, .prose) :is(.hljs-title, .hljs-function) {
+	color: var(--vs-function);
+}
+
+:where(.cv, .prose) :is(.hljs-title.class_, .hljs-type, .hljs-built_in) {
+	color: var(--vs-type);
+}
+
+:where(.cv, .prose)
+	:is(.hljs-params, .hljs-variable, .hljs-property, .hljs-template-variable, .hljs-attribute) {
+	color: var(--vs-variable);
+}
+
+:where(.cv, .prose) .hljs-attr {
+	color: var(--vs-attribute);
+}
+
+:where(.cv, .prose) .hljs-tag {
+	color: var(--vs-punctuation);
+}
+
+:where(.cv, .prose) .hljs-name {
+	color: var(--vs-tag);
+}
+
+:where(.cv, .prose)
+	:is(.hljs-selector-tag, .hljs-selector-class, .hljs-selector-id, .hljs-selector-pseudo) {
+	color: var(--vs-selector);
+}
+
+:where(.cv, .prose) .hljs-section {
+	color: var(--vs-heading);
+	font-weight: 700;
+}
+
+:where(.cv, .prose) .hljs-bullet {
+	color: var(--vs-bullet);
+}
+
+:where(.cv, .prose) .hljs-strong {
+	font-weight: 700;
+}
+
+:where(.cv, .prose) .hljs-emphasis {
+	font-style: italic;
 }
 
 .prose pre {

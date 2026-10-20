@@ -18,8 +18,9 @@
 	 * conversation visible behind it.
 	 */
 	import { t } from '$lib/i18n';
-	import Input from '$lib/components/ui/Input.svelte';
+	import SearchBar from '$lib/components/ui/SearchBar.svelte';
 	import Modal from '$lib/components/ui/Modal.svelte';
+	import Ocellus from '$lib/components/ui/Ocellus.svelte';
 	import type { IconName } from '$lib/icons';
 	import Sidebar from '$lib/components/ui/sidebar/Sidebar.svelte';
 	import SidebarEntry from '$lib/components/ui/sidebar/SidebarEntry.svelte';
@@ -136,15 +137,17 @@
 	<div class="body">
 		<Sidebar variant="settings" label={t.settings.title}>
 			{#snippet head()}
-				<label class="search">
-					<span class="sr-only">{t.settings.search}</span>
-					<Input
-						kind="search"
+				<div class="brand">
+					<Ocellus size={22} />
+					<span class="display title">{t.settings.title}</span>
+				</div>
+				<div class="search">
+					<SearchBar
 						value={query}
 						placeholder={t.settings.search}
 						onchange={(value) => (query = value)}
 					/>
-				</label>
+				</div>
 			{/snippet}
 			{#each GROUPS as group (group.label)}
 				<SidebarGroup label={group.label} fixed>
@@ -198,7 +201,6 @@
 	   that resized itself around each one made switching between them the loudest thing on the
 	   screen. The panel scrolls inside it instead. */
 	.pane {
-		display: contents;
 		animation: pane-in var(--motion-settings-switch);
 	}
 
@@ -212,15 +214,31 @@
 		height: min(92vh, 860px);
 	}
 
+	/* The ground the sidebar floats on, as in the chat screen. */
 	.body {
 		display: flex;
 		min-height: 0;
 		flex: 1;
+		border-radius: inherit;
+		background: var(--ground);
 	}
 
-	/* Level with the close button on the far side of the sheet. */
+	.brand {
+		display: flex;
+		align-items: center;
+		gap: calc(var(--sb-gap) - 2px);
+		height: calc(var(--space) * 10);
+		padding: 0 var(--sb-ir) 0 calc(var(--sb-ix) - 3px);
+		margin-bottom: calc(var(--space) * 1);
+	}
+
+	.title {
+		font-size: 21px;
+		line-height: 1;
+	}
+
 	.search {
-		display: block;
+		margin: calc(var(--space) * 1.5) 0 calc(var(--space) * 1);
 	}
 
 	/* Right padding clears the floating close button, which sits over the panel's top corner. */
@@ -229,18 +247,6 @@
 		min-width: 0;
 		padding: 18px 44px 28px 28px;
 		overflow-y: auto;
-	}
-
-	.sr-only {
-		position: absolute;
-		width: 1px;
-		height: 1px;
-		padding: 0;
-		margin: -1px;
-		overflow: hidden;
-		clip-path: inset(50%);
-		white-space: nowrap;
-		border: 0;
 	}
 
 	@media (max-width: 600px) {

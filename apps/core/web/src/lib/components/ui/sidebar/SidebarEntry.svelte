@@ -5,18 +5,17 @@
 	 * project, a settings section, the account.
 	 *
 	 * A link when it goes somewhere (`href`, already resolved by the caller), a button when it
-	 * does something. Active is a 2 px brass bar on the left edge with a faint fill
-	 * (`entry.active`) — brass, because the chat you are in is her authority's one mark here.
+	 * does something. Active is a 2 px laurel bar on the left edge with a faint fill
+	 * (`entry.active`). The export draws it brass; Hera's amendment makes it laurel, because the
+	 * chat you are in is where her attention is, and brass beside every title read as a highlight.
 	 *
 	 * The trailing action shows on hover, on keyboard focus anywhere in the row, and while it is
 	 * `pinned` (its menu is open) — a control that only appears under a pointer is one a keyboard
-	 * cannot reach. Folded to an icon rail, the row is its icon with the label as a tooltip.
+	 * cannot reach.
 	 */
 	import type { Snippet } from 'svelte';
 	import type { IconName } from '$lib/icons';
-	import { tooltip } from '$lib/tooltip';
 	import Icon from '../Icon.svelte';
-	import { sidebarContext } from './Sidebar.svelte';
 
 	interface Props {
 		label: string;
@@ -56,9 +55,6 @@
 		action,
 		ariaLabel
 	}: Props = $props();
-
-	const context = sidebarContext();
-	const hint = $derived(context.collapsed ? label : undefined);
 </script>
 
 {#snippet inside()}
@@ -78,8 +74,7 @@
 			{href}
 			aria-current={active ? 'page' : undefined}
 			aria-label={ariaLabel}
-			{onclick}
-			use:tooltip={hint}>{@render inside()}</a
+			{onclick}>{@render inside()}</a
 		>
 		<!-- eslint-enable svelte/no-navigation-without-resolve -->
 	{:else}
@@ -91,12 +86,11 @@
 			aria-current={active ? 'true' : undefined}
 			aria-label={ariaLabel}
 			{onclick}
-			use:tooltip={hint}
 		>
 			{@render inside()}
 		</button>
 	{/if}
-	{#if action && !context.collapsed}<span class="action">{@render action()}</span>{/if}
+	{#if action}<span class="action">{@render action()}</span>{/if}
 </div>
 
 <style>
@@ -152,13 +146,20 @@
 	.active .entry::before {
 		content: '';
 		position: absolute;
-		top: 22%;
-		bottom: 22%;
+		top: 7px;
+		bottom: 7px;
 		left: 0;
 		width: 2px;
-		border-radius: 1px;
-		background: var(--brass);
+		border-radius: 2px;
+		background: var(--laurel);
+		animation: bar-in var(--motion-entry-active);
 		transition: opacity var(--motion-entry-active);
+	}
+
+	@keyframes bar-in {
+		from {
+			opacity: 0;
+		}
 	}
 
 	.lead {
@@ -180,7 +181,6 @@
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
-		transition: opacity var(--motion-sidebar-collapse);
 	}
 
 	.meta {
@@ -188,12 +188,6 @@
 		color: var(--text-faint);
 		font-family: var(--font-mono);
 		font-size: 11px;
-	}
-
-	/* Folded: the label goes in the first part of the fold, and the row is only its icon. */
-	:global(.sidebar.collapsed) .label,
-	:global(.sidebar.collapsed) .meta {
-		opacity: 0;
 	}
 
 	.action {

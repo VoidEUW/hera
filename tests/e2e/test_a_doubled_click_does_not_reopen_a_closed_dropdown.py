@@ -61,7 +61,7 @@ def test_a_doubled_click_does_not_reopen_a_closed_dropdown(page: Any) -> None:
     trigger.wait_for(state="visible")
 
     trigger.click()
-    page.wait_for_selector("[role='listbox']")
+    page.wait_for_selector("[role='menu']")
 
     box = trigger.bounding_box()
     cx, cy = box["x"] + box["width"] / 2, box["y"] + box["height"] / 2
@@ -90,9 +90,9 @@ def test_a_doubled_click_does_not_reopen_a_closed_dropdown(page: Any) -> None:
         [cx, cy],
     )
 
-    # `aria-expanded` reflects `open` the instant it changes; the listbox itself lingers a little
+    # `aria-expanded` reflects `open` the instant it changes; the menu itself lingers a little
     # longer, fading out through its own closing transition rather than vanishing on the same
     # frame. A doubled click that *did* reopen it would leave both of these true forever, not
     # briefly -- so waiting out the transition here still tells buggy and fixed code apart.
     assert trigger.get_attribute("aria-expanded") == "false"
-    page.wait_for_selector("[role='listbox']", state="detached", timeout=1_000)
+    page.wait_for_selector("[role='menu']", state="detached", timeout=1_000)

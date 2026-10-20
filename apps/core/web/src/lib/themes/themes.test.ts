@@ -6,7 +6,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { parseExport, type Declaration } from '../../../scripts/import-theme.ts';
+import { parseExport, withDurations, type Declaration } from '../../../scripts/import-theme.ts';
 import registry from './registry.json';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -70,7 +70,7 @@ describe('an imported theme', () => {
 			expect(
 				find((s) => s.endsWith(palette)),
 				`${entry.id} shared`
-			).toEqual(asMap(exported.shared));
+			).toEqual(asMap(withDurations(exported.shared)));
 			expect(
 				find((s) => s.includes(`${palette}[data-theme='dark']`)),
 				`${entry.id} dark`
@@ -178,7 +178,7 @@ describe('a component', () => {
 	it('names no duration of its own', () => {
 		// The ocellus is the one piece of choreography (docs/frontend.md § Motion): its beats are
 		// tuned against each other and exported (`FOLD_MS`), so they are the mark's, not a slot's.
-		const choreography = new Set(['lib/components/Ocellus.svelte']);
+		const choreography = new Set(['lib/components/ui/Ocellus.svelte']);
 		const literal = /(transition|animation)[^;]*?\b\d*\.?\d+m?s\b/;
 		const offenders = components
 			.filter((path) => !choreography.has(relative(src, path)))

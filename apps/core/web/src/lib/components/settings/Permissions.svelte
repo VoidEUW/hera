@@ -5,6 +5,7 @@
 	 * Counted load, as in `Servers.svelte`.
 	 */
 	import { api, type Rule } from '$lib/api/client';
+	import Pill from '$lib/components/ui/Pill.svelte';
 	import { t } from '$lib/i18n';
 	import { Placeholder } from '$lib/loading.svelte';
 	import Rows from './Rows.svelte';
@@ -62,7 +63,13 @@
 		<section class="row">
 			<div class="row-head">
 				<h3 class="mono">{rule.pattern}</h3>
-				<span class="caption decision" data-decision={rule.decision}>{rule.decision}</span>
+				<Pill
+					tone={rule.decision === 'allow'
+						? 'live'
+						: rule.decision === 'deny'
+							? 'danger'
+							: 'authority'}>{rule.decision}</Pill
+				>
 			</div>
 			{#if rule.reason}
 				<p class="caption">{rule.reason}</p>
@@ -87,19 +94,9 @@
 
 	.row-head {
 		display: flex;
-		align-items: baseline;
+		align-items: center;
 		justify-content: space-between;
 		gap: 12px;
-	}
-
-	.decision[data-decision='allow'] {
-		color: var(--laurel);
-	}
-	.decision[data-decision='deny'] {
-		color: var(--danger);
-	}
-	.decision[data-decision='ask'] {
-		color: var(--brass);
 	}
 
 	.empty {

@@ -79,7 +79,7 @@ def test_a_message_streams_back_and_survives_a_reload(page: Any) -> None:
     # Where it does live: a row in the gutter that opens onto it. The preview is gone by now —
     # it belongs to the block still being written, and this turn has finished.
     assert page.locator("article.hers .tail").count() == 0
-    page.locator("article.hers .row .head", has_text="thought").first.click()
+    page.locator("article.hers .row button.line", has_text="thought").first.click()
     page.wait_for_selector(f"article.hers .body:has-text('{reasoning}')", timeout=5_000)
 
     url = page.url
@@ -198,20 +198,17 @@ def test_a_chat_can_be_exported_from_the_rail(page: Any) -> None:
 
 def test_the_composer_says_what_she_runs_on(page: Any) -> None:
     """The model is a control beside send rather than a setting two screens away, and the
-    Enter hint gets out of the way as soon as there is something to send.
+    Enter hint sits in the composer's corner (the theme's `cmp.hint: show`).
 
-    The control is `Select`, not a native `<select>`: it draws its own popup so that a list
+    The control is `Selector`, not a native `<select>`: it draws its own menu so that a list
     looks the same wherever it was opened from. So what is asserted is what a person sees — the
-    pill naming the active endpoint — rather than a form value nothing renders.
+    chip naming the active model — rather than a form value nothing renders.
     """
-    model = page.get_by_label("Model", exact=True)
+    model = page.get_by_role("button", name="Model", exact=True)
     assert model.inner_text().strip() != ""
 
-    hint = page.locator("span.hint").first
-    assert "gone" not in (hint.get_attribute("class") or "")
-
-    page.locator("textarea").first.fill("Explain Kerberos")
-    assert "gone" in (page.locator("span.hint").first.get_attribute("class") or "")
+    hint = page.get_by_text("Enter to send, Shift+Enter for a new line").first
+    assert hint.is_visible()
 
 
 def test_a_dropdown_opens_the_interfaces_own_list(page: Any) -> None:
@@ -222,17 +219,17 @@ def test_a_dropdown_opens_the_interfaces_own_list(page: Any) -> None:
     produces our markup at all: a native `<select>` renders its list outside the DOM, where
     nothing here could see it and this assertion would be impossible to write.
     """
-    page.get_by_label("Model", exact=True).click()
-    page.wait_for_selector('[role="listbox"]', timeout=5_000)
+    page.get_by_role("button", name="Model", exact=True).click()
+    page.wait_for_selector('[role="menu"]', timeout=5_000)
 
-    listbox = page.locator('[role="listbox"]')
-    assert listbox.locator('[role="option"]').count() >= 1
-    # The current value is marked in the list, not only shown on the pill.
-    assert listbox.locator('[role="option"][aria-selected="true"]').count() == 1
+    menu = page.locator('[role="menu"]')
+    assert menu.locator('[role="menuitemradio"]').count() >= 1
+    # The current value is marked in the list, not only shown on the chip.
+    assert menu.locator('[role="menuitemradio"][aria-checked="true"]').count() == 1
 
     # Escape closes it and hands focus back, so the keyboard is not left inside a closed popup.
     page.keyboard.press("Escape")
-    page.wait_for_selector('[role="listbox"]', state="detached", timeout=5_000)
+    page.wait_for_selector('[role="menu"]', state="detached", timeout=5_000)
 
 
 def test_a_skill_is_switched_on_for_one_chat(page: Any) -> None:
@@ -245,7 +242,7 @@ def test_a_skill_is_switched_on_for_one_chat(page: Any) -> None:
     page.wait_for_selector("text=ticket-granting ticket", timeout=30_000)
 
     page.get_by_role("button", name=re.compile(r"^(Choose skills|\d+ skills?)$")).click()
-    page.wait_for_selector("[role=dialog]", timeout=10_000)
+    page.wait_for_selector("[role=menu]", timeout=10_000)
 
     # Wait for the write itself, not for the pill. `ChatStore.pinSkills` is deliberately
     # optimistic — a tick that waits for a round trip reads as a click that did not land — so the
@@ -255,7 +252,7 @@ def test_a_skill_is_switched_on_for_one_chat(page: Any) -> None:
     with page.expect_response(
         lambda response: response.request.method == "PATCH" and "/chats/" in response.url
     ) as patched:
-        page.locator(".entry", has_text="tdd").click()
+        page.get_by_role("menuitemcheckbox", name=re.compile(r"^tdd")).click()
     assert patched.value.ok
 
     page.keyboard.press("Escape")
@@ -308,13 +305,13 @@ def test_settings_holds_what_changes_her_behaviour(page: Any) -> None:
 
 
 def test_manage_servers_lands_on_the_servers_tab(page: Any) -> None:
-    """Issue #45: the composer's servers pill opens a read-only sheet, and its "Manage
+    """Issue #45: the composer's servers chip opens a read-only menu, and its "Manage
     servers" button used to always reopen Settings on Models — the tab it defaults to,
     not the one the person was just looking at."""
     page.get_by_role("button", name=re.compile(r"^\d+ servers?$")).click()
-    page.wait_for_selector("[role=dialog]", timeout=10_000)
+    page.wait_for_selector("[role=menu]", timeout=10_000)
 
-    page.get_by_role("button", name="Manage servers").click()
+    page.get_by_role("menuitem", name="Manage servers").click()
     page.get_by_role("navigation", name="Settings").locator(
         "button[aria-current='true']", has_text="Servers"
     ).wait_for(timeout=10_000)
@@ -357,9 +354,10 @@ def test_the_account_name_reaches_the_rail_card_and_the_greeting(page: Any) -> N
     page.get_by_role("button", name="Save").click()
     page.wait_for_selector("text=Saved", timeout=10_000)
 
-    # The three sign-in rows are drawn and cannot be used.
+    # The three sign-in rows are drawn, marked as coming later, and are not controls at all.
     for row in ("Password", "Two-factor authentication", "Passkeys"):
-        assert page.get_by_role("button", name=row).is_disabled()
+        assert page.locator(".later li", has_text=row).count() == 1
+        assert page.get_by_role("button", name=row).count() == 0
 
     page.keyboard.press("Escape")
     page.wait_for_selector("[role=dialog]", state="detached", timeout=10_000)
@@ -387,7 +385,7 @@ def test_a_file_can_be_attached_and_is_drawn_as_a_chip(page: Any, tmp_path: Any)
     page.wait_for_selector("text=ticket-granting ticket", timeout=30_000)
 
     # The chip survives, and the file's contents are not pasted into the bubble.
-    assert page.locator("li:has-text('notes.md')").count() >= 1
+    assert page.locator(".attachment:has-text('notes.md')").count() >= 1
     assert page.locator("text=Slide 14 contradicts slide 9.").count() == 0
 
 
@@ -851,7 +849,7 @@ class TestWhatSheRemembers:
         panel = self._open_memory(page)
 
         before = int(panel.locator("[role='meter']").get_attribute("aria-valuenow") or "0")
-        panel.get_by_role("checkbox", name="Use runs-models-locally").click()
+        panel.get_by_role("switch", name="Use runs-models-locally").click()
 
         panel.get_by_text("Kept, not used").wait_for(timeout=15_000)
         # Waited for rather than read: the row moves optimistically and the bar is re-read from
@@ -929,15 +927,16 @@ class TestALongTraceCollapses:
 
         # Four rows happened, and one of them is on the screen: the most recent one, under the
         # count line. A summary of the trace, not a placeholder where it was.
-        assert page.locator("article.hers .row").count() == 4
-        summary = page.get_by_role("button", name="4 things she did")
+        rows = "article.hers .rows .row"
+        assert page.locator(rows).count() == 4
+        summary = page.locator("article.hers .summary button", has_text="4 things she did")
         summary.wait_for(timeout=5_000)
-        assert page.locator("article.hers .row:visible").count() == 1
-        assert page.locator("article.hers .row:visible", has_text="the coat pockets").count() == 1
+        assert page.locator(f"{rows}:visible").count() == 1
+        assert page.locator(f"{rows}:visible", has_text="the coat pockets").count() == 1
 
         # And it is a door, not a lid: the count line opens onto the whole trace and puts it
         # away again.
         summary.click()
-        assert page.locator("article.hers .row:visible").count() == 4
+        assert page.locator(f"{rows}:visible").count() == 4
         summary.click()
-        assert page.locator("article.hers .row:visible").count() == 1
+        assert page.locator(f"{rows}:visible").count() == 1

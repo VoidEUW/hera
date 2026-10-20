@@ -15,16 +15,20 @@
 	 * edit itself: you can see the answer you are about to replace while you retype the
 	 * question.
 	 */
+	import AttachmentChip from './ui/AttachmentChip.svelte';
 	import Button from './ui/Button.svelte';
+	import IconButton from './ui/IconButton.svelte';
+	import StallBox from './ui/StallBox.svelte';
+	import Textarea from './ui/Textarea.svelte';
+	import Thinking from './ui/Thinking.svelte';
+	import TraceRow from './ui/TraceRow.svelte';
 	import { toasts } from '$lib/toasts.svelte';
-	import { untrack } from 'svelte';
 	import type { AnswerRequired, AnyEvent, Artifact, PermissionRequired } from '$lib/api/events';
 	import { size } from '$lib/attachments';
 	import { t } from '$lib/i18n';
 	import { isAnswered, reduce, replyTo } from '$lib/turn';
 	import ActivityRow from './ActivityRow.svelte';
 	import ArtifactCard from './ArtifactCard.svelte';
-	import Ocellus, { FOLD_MS } from './Ocellus.svelte';
 	import PermissionCard from './PermissionCard.svelte';
 	import QuestionCard from './QuestionCard.svelte';
 	import Prose from './Prose.svelte';
@@ -50,6 +54,8 @@
 		onreply?: (callId: string, text: string) => void;
 		/** Ask again from this message. Text rewords the question; nothing repeats it. */
 		onredo?: (text?: string) => void;
+		/** Give up on a turn that stopped arriving and ask again — the stalled spinner's Retry. */
+		onretry?: () => void;
 	}
 
 	let {
@@ -62,7 +68,8 @@
 		busy = false,
 		onanswer,
 		onreply,
-		onredo
+		onredo,
+		onretry
 	}: Props = $props();
 
 	let editing = $state(false);
@@ -82,34 +89,29 @@
 
 	const turn = $derived(reduce(events));
 	const closed = $derived(turn.closed);
-	// The one piece of choreography: the ocellus appears where her answer will begin, and when
-	// the first text arrives it shrinks into the gutter as the first eye of the turn.
+	// The one piece of choreography (`hera/thinking`): while she is still without words, the eye
+	// pulses where her answer will begin.
 	const waiting = $derived(streaming && turn.inline.length === 0 && turn.activity.length === 0);
 
-	/** The mark outlives `waiting` by exactly one fold, so the tail is drawn back into the eye
-	 * instead of being cut off mid-air the moment her first words land. `waiting` says whether
-	 * she is still without words; these two say what is on screen. */
-	let marked = $state(false);
-	let folding = $state(false);
+	/** How long is too long (`hera/spinner-stalled`). Nothing arriving for this many seconds while
+	 * a turn is open turns the wait into a red, breathing spinner with Wait and Retry: a model that
+	 * is loading or has died looks exactly like one that is thinking, and only time tells them
+	 * apart. */
+	const STALL_AFTER = 30;
+	let quiet = $state(0);
+	let held = $state(false);
 
 	$effect(() => {
-		if (waiting) {
-			marked = true;
-			folding = false;
-			return;
-		}
-		// Untracked: this effect writes `marked`, and reading it as a dependency would mean the
-		// write schedules the effect that did it.
-		if (!untrack(() => marked)) return;
-		folding = true;
-		const fold = setTimeout(() => {
-			marked = false;
-			folding = false;
-		}, FOLD_MS);
-		// Also the cancel path: a turn that starts again before the fold finishes drops the
-		// timer, and the branch above puts the tail straight back up.
-		return () => clearTimeout(fold);
+		// Restarted by every event that arrives — reading the length is the subscription.
+		void events.length;
+		quiet = 0;
+		held = false;
+		if (!streaming) return;
+		const tick = setInterval(() => (quiet += 1), 1000);
+		return () => clearInterval(tick);
 	});
+
+	const stalled = $derived(streaming && !held && quiet >= STALL_AFTER);
 
 	const note = $derived.by(() => {
 		if (!closed) {
@@ -190,13 +192,6 @@
 		if (text && text !== content) onredo?.(text);
 	}
 
-	/** The cursor lands in the field with the question selected, the way renaming works. */
-	function takeover(node: HTMLTextAreaElement) {
-		node.focus();
-		node.select();
-		node.style.height = `${Math.min(node.scrollHeight, 300)}px`;
-	}
-
 	function decision(callId: string) {
 		if (!isAnswered(events, callId)) return null;
 		const event = events.find(
@@ -213,17 +208,21 @@
 		<p class="speaker">{t.message.you}</p>
 		{#if editing}
 			<div class="editor">
-				<textarea
-					bind:value={draft}
-					use:takeover
-					aria-label={t.message.edit}
+				<Textarea
+					prose
+					autofocus
+					resizable={false}
+					value={draft}
+					ariaLabel={t.message.edit}
+					onchange={(value) => (draft = value)}
 					onkeydown={(event) => {
 						if (event.key === 'Escape') editing = false;
 						if (event.key === 'Enter' && !event.shiftKey) {
 							event.preventDefault();
 							saveEdit();
 						}
-					}}></textarea>
+					}}
+				/>
 				<div class="editing">
 					<span class="caption">{t.message.editNote}</span>
 					<Button variant="ghost" size="sm" onclick={() => (editing = false)}>
@@ -234,42 +233,34 @@
 				</div>
 			</div>
 		{:else}
-			<div class="bubble">
-				{#if content.trim()}<p class="said">{content}</p>{/if}
-				{#if attachments.length}
-					<ul class="files">
-						{#each attachments as file (file.name)}
-							<li>
-								<span class="mono">{file.name}</span>
-								{#if file.media_type?.startsWith('image/')}
-									<span class="bytes">{t.attach.image}</span>
-								{/if}
-								<span class="bytes">{size(file.bytes)}</span>
-							</li>
-						{/each}
-					</ul>
-				{/if}
-			</div>
+			{#if attachments.length}
+				<div class="files">
+					{#each attachments as file (file.name)}
+						<AttachmentChip
+							name={file.name}
+							size={size(file.bytes)}
+							icon={file.media_type?.startsWith('image/') ? 'image' : 'file'}
+						/>
+					{/each}
+				</div>
+			{/if}
+			{#if content.trim()}
+				<div class="bubble"><p class="said">{content}</p></div>
+			{/if}
 
 			{#if canCopy || canRedo}
 				<div class="actions right">
 					{#if canCopy}
-						<Button
-							variant="ghost"
+						<IconButton
 							size="sm"
 							icon={copied ? 'check' : 'copy'}
+							on={copied}
 							label={t.message.copy}
 							onclick={copy}
 						/>
 					{/if}
 					{#if canRedo}
-						<Button
-							variant="ghost"
-							size="sm"
-							icon="edit"
-							label={t.message.edit}
-							onclick={startEdit}
-						/>
+						<IconButton size="sm" icon="edit" label={t.message.edit} onclick={startEdit} />
 					{/if}
 				</div>
 			{/if}
@@ -290,17 +281,15 @@
 						<!-- CSS alone decides where a collapse exists to switch: a *long* block at any
 						     width, anything past one row on the phone. Untouched blocks keep this hidden —
 						     `.summary` is what CSS hides there, not a second branch of markup. -->
-						<button
-							class="summary"
-							type="button"
-							aria-expanded={expandedGutter[item.key] ?? false}
-							onclick={() => (expandedGutter[item.key] = !(expandedGutter[item.key] ?? false))}
-						>
-							<span>{t.activity.didThings(item.rows.length)}</span>
-							<span class="trail">
-								{expandedGutter[item.key] ? t.activity.hide : t.activity.show}
-							</span>
-						</button>
+						<div class="summary">
+							<TraceRow
+								verb={t.activity.did}
+								text={t.activity.didThings(item.rows.length)}
+								toggle
+								open={expandedGutter[item.key] ?? false}
+								ontoggle={(next) => (expandedGutter[item.key] = next)}
+							/>
+						</div>
 					{/if}
 					<div
 						class="rows"
@@ -346,11 +335,16 @@
 			{/if}
 		{/each}
 
-		{#if marked}
-			<p class="waiting" role="status">
-				<Ocellus size={22} alive burst {folding} />
-				<span class="thinking">{t.message.thinking}</span>
-			</p>
+		{#if stalled}
+			<StallBox
+				title={t.message.thinking}
+				seconds={quiet}
+				stalled
+				onwait={() => (held = true)}
+				{onretry}
+			/>
+		{:else if waiting}
+			<Thinking />
 		{/if}
 
 		{#if note}
@@ -363,22 +357,16 @@
 					<span class="tokens">{t.turn.tokens(generated)}</span>
 				{/if}
 				{#if canCopy}
-					<Button
-						variant="ghost"
+					<IconButton
 						size="sm"
 						icon={copied ? 'check' : 'copy'}
+						on={copied}
 						label={t.message.copy}
 						onclick={copy}
 					/>
 				{/if}
 				{#if canRedo}
-					<Button
-						variant="ghost"
-						size="sm"
-						icon="refresh"
-						label={t.message.retry}
-						onclick={() => onredo?.()}
-					/>
+					<IconButton size="sm" icon="refresh" label={t.message.retry} onclick={() => onredo?.()} />
 				{/if}
 			</div>
 		{/if}
@@ -459,23 +447,7 @@
 	}
 
 	.editor {
-		width: min(46ch, 100%);
-	}
-
-	.editor textarea {
-		width: 100%;
-		padding: 10px 14px;
-		background: var(--surface);
-		border: 1px solid var(--brass);
-		border-radius: var(--radius-lg);
-		font-family: var(--font-body);
-		font-size: 16px;
-		line-height: 1.55;
-		resize: none;
-	}
-
-	.editor textarea:focus {
-		outline: none;
+		width: min(460px, 100%);
 	}
 
 	.editing {
@@ -498,41 +470,21 @@
 	.files {
 		display: flex;
 		flex-wrap: wrap;
+		justify-content: flex-end;
 		gap: 6px;
-		list-style: none;
-		margin: 8px 0 0;
-		padding: 0;
-	}
-
-	.files:first-child {
-		margin-top: 0;
-	}
-
-	.files li {
-		display: flex;
-		align-items: baseline;
-		gap: 8px;
-		padding: 3px 10px;
-		background: var(--ground);
-		border: 1px solid var(--line);
-		border-radius: var(--radius);
-		font-size: 12.5px;
-	}
-
-	.bytes {
-		color: var(--text-faint);
+		margin-bottom: 8px;
 	}
 
 	/* Yours as a raised bubble on the right (`msg.user`), in her prose face so the two halves of
 	   the conversation read as one text. */
 	.bubble {
-		max-width: 46ch;
-		padding: calc(var(--space) * 3) calc(var(--space) * 4);
-		background: var(--surface-raised);
+		max-width: min(78%, 460px);
+		padding: 10px 14px;
 		border-radius: var(--radius-lg);
+		background: var(--surface-raised);
 		font-family: var(--font-body);
-		font-size: calc(var(--prose-size) - 0.5px);
-		line-height: 1.55;
+		font-size: calc(var(--prose-size) - 1px);
+		line-height: 1.5;
 		overflow-wrap: anywhere;
 	}
 
@@ -578,18 +530,6 @@
 	   idea `ActivityRow` already applies to a single row's own detail, one level up. */
 	.summary {
 		display: none;
-		align-items: baseline;
-		gap: 9px;
-		width: 100%;
-		padding: 2px 0;
-		text-align: left;
-		font-size: 13.5px;
-		color: var(--text-muted);
-	}
-
-	.summary .trail {
-		margin-left: auto;
-		color: var(--text-faint);
 	}
 
 	.entry {
@@ -597,7 +537,7 @@
 	}
 
 	.gutter.long .summary {
-		display: flex;
+		display: block;
 	}
 
 	.gutter.long .rows.collapsed > .entry:not(.latest) {
@@ -606,32 +546,11 @@
 
 	@media (max-width: 780px) {
 		.summary {
-			display: flex;
+			display: block;
 		}
 
 		.rows.collapsed > .entry:not(.latest) {
 			display: none;
-		}
-	}
-
-	.waiting {
-		display: flex;
-		align-items: center;
-		gap: calc(var(--space) * 2.5);
-		margin: 0;
-	}
-
-	/* The label beside the eye breathes (`thinking.label`), so waiting reads as attention even
-	   where the mark is too small to watch. */
-	.thinking {
-		color: var(--text-muted);
-		font-size: var(--ui-size);
-		animation: breathe var(--motion-thinking-label) infinite alternate;
-	}
-
-	@keyframes breathe {
-		to {
-			opacity: 0.45;
 		}
 	}
 
