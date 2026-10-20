@@ -20,6 +20,8 @@ import {
 import type { Attachment } from '$lib/attachments';
 import type { AnyEvent } from '$lib/api/events';
 import { frames } from '$lib/api/sse';
+import { t } from '$lib/i18n';
+import { notifications } from '$lib/notifications.svelte';
 import { reduce, type Turn } from '$lib/turn';
 
 export class ChatSession {
@@ -264,6 +266,7 @@ export class ChatSession {
 		this.draft = [];
 		const rest = this.messages.filter((existing) => existing.id !== persisted.id);
 		this.messages = [...rest, persisted].sort((a, b) => a.sequence - b.sequence);
+		notifications.turnFinished(this.chat?.title || t.notifications.finished);
 		// The user message was written server-side in the same request, so it may not be in the
 		// list yet. Refreshing is cheaper than guessing what it looked like.
 		void this.#refresh();

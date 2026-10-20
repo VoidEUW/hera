@@ -65,6 +65,8 @@ export const t = {
 		newProject: 'New project',
 		chats: 'Chats',
 		settings: 'Settings',
+		account: (name: string) => `${name} — Settings`,
+		accountLabel: 'Account',
 		collapse: 'Collapse the sidebar',
 		expand: 'Expand the sidebar',
 		openMenu: 'Open menu',
@@ -278,6 +280,8 @@ export const t = {
 		loadingModels: 'Loading models…',
 		loadingSkills: 'Loading skills…',
 		loadingMemory: 'Loading memories…',
+		account: 'Account',
+		general: 'General',
 		models: 'Models',
 		mind: 'Mind',
 		memory: 'Memory',
@@ -285,6 +289,21 @@ export const t = {
 		servers: 'Servers',
 		permissions: 'Permissions',
 		dreaming: 'Dreaming',
+		groupApp: 'App',
+		groupHera: 'Hera',
+		groupAdjust: 'Adjust',
+		// One line under each screen's heading: what it is for, not how to use it.
+		blurbAccount: 'Who you are to Hera: a name, an email and a picture.',
+		blurbGeneral: 'This browser and this machine: appearance, language, time zone, notifications.',
+		blurbMind: 'The text that shapes how she thinks and speaks, one region at a time.',
+		blurbMemory: 'What she knows about you, and how much room it takes.',
+		blurbModels: 'Where she runs. Any OpenAI-compatible endpoint.',
+		blurbDreaming: 'How she will reflect on herself — not built yet.',
+		blurbSkills: 'Packages of instructions she can be given for a kind of task.',
+		blurbServers: 'The MCP servers she can reach, and the tools each one brings.',
+		blurbPermissions: 'What she may do without asking.',
+		permissionsFallback: 'Anything not matched below:',
+		toolCount: (n: number) => `${n} ${n === 1 ? 'tool' : 'tools'}`,
 		soon: 'v0.3',
 		dreamingSoon:
 			'Dreaming and experience training arrive in v0.3. She will propose changes to her own evolvable mind regions, and nothing is written without you accepting it. Memory comes first, in v0.2 — she has to have something to reflect on.',
@@ -312,20 +331,28 @@ export const t = {
 		connected: 'Connected',
 		disconnected: 'Not running',
 		lastUsed: 'Last used',
-		never: 'Never used',
-		usedTimes: (n: number) => `Used ${n} ${n === 1 ? 'time' : 'times'}`,
+		useSkill: (id: string) => `Use ${id}`,
+		editSkill: (id: string) => `Edit ${id}`,
+		editSkillBlurb: 'The SKILL.md as it is on disk: frontmatter on top, the instructions below.',
+		skillSource: 'SKILL.md',
 		addSkill: 'Add a skill',
+		newSkill: 'New skill',
+		newSkillBlurb: 'Becomes a folder under ~/.hera/skills/, with this text as its SKILL.md.',
 		skillId: 'note-taking',
 		skillIdRule: 'Lowercase letters, digits and hyphens. It becomes the folder and the /command.',
-		skillDescription: 'Use when… — the line retrieval matches on',
 		create: 'Create',
+		deleteSkill: 'Delete',
+		deleteSure: (id: string) => `Delete ${id} and its folder? This cannot be undone.`,
+		deleteKeep: 'Keep it',
+		deleteYes: 'Delete skill',
+		loadingSource: 'Loading…',
+		skillsFolder: 'Skills are folders under ~/.hera/skills/. Find more in the',
+		skillsRepo: 'hera-skills repository',
 		cancel: 'Cancel',
 		version: (v: string) => `v${v.replace(/^v/, '')}`
 	},
 
 	models: {
-		blurb:
-			'Where she runs. Any OpenAI-compatible endpoint — LM Studio, llama.cpp, vLLM, Ollama, or a hosted API.',
 		active: 'Active',
 		activate: 'Use this one',
 		add: 'Add an endpoint',
@@ -377,13 +404,11 @@ export const t = {
 		modelName: 'Display name',
 		addModel: 'Add model',
 		removeModel: 'Remove',
-		setActiveModel: 'Use this model',
 		noModels: 'No models registered on this endpoint yet.',
 		search: 'Search models…',
 		alreadyAdded: 'Added',
 
 		options: 'Request options',
-		optionsOpen: 'Options',
 		optionsHint:
 			'Extra fields sent in the request body — for something this endpoint understands and Hera does not need to. Leave empty unless a model asks for one.',
 		optionsRawHint: 'The same data as the fields above, and anything else this server takes.',
@@ -431,15 +456,67 @@ export const t = {
 			unset: 'Unset'
 		},
 
+		maxTokens: 'Max output tokens',
+		maxTokensPlaceholder: 'Server default',
+		maxTokensHint:
+			'The most tokens one answer may run to, sent as max_tokens. Empty sends nothing, so the server’s own limit applies — some, like mlx_lm, stop at a few hundred by default and cut answers off mid-sentence. Overrides what the endpoint would otherwise use.',
+
 		contextLength: 'Context window',
 		contextLengthPlaceholder: 'e.g. 32768',
 		contextLengthHint:
 			'Tokens this model can hold, for the composer’s usage bar. Not probed — fill it in yourself; empty means no bar.',
 		contextLengthInvalid: 'This should be a whole number greater than zero, or empty.',
 
+		acceptsImages: 'Accepts images',
+		acceptsImagesHint:
+			'Whether this model can be shown a picture. Kept for later — nothing checks it yet, so images can still be attached to any model.',
+
 		toolCalling: 'Uses tools',
 		toolCallingHint:
 			'Turn off for a model that writes what looks like a tool call instead of making one for real — it will only ever answer in prose, but cleanly instead of with a broken attempt.'
+	},
+
+	notifications: {
+		finished: 'Hera has finished',
+		heading: 'Notifications',
+		toggle: 'Notify me when a turn finishes while this tab is hidden',
+		denied: 'The browser has blocked notifications for this site. Allow them in its site settings.',
+		unsupported: 'This browser cannot show notifications.'
+	},
+
+	account: {
+		name: 'Name',
+		namePlaceholder: 'What should she call you?',
+		email: 'Email',
+		emailPlaceholder: 'you@example.org',
+		emailInvalid: 'That does not look like an email address.',
+		avatar: 'Picture',
+		upload: 'Upload a picture',
+		replace: 'Replace picture',
+		remove: 'Remove picture',
+		avatarNote:
+			'PNG, JPEG, WebP or GIF, up to 12 MB. It is cropped to a square and kept in your Hera folder.',
+		tooBig: 'That picture is larger than 12 MB.',
+		notAnImage: 'Choose a PNG, JPEG, WebP or GIF picture.',
+		saved: 'Saved',
+		security: 'Sign-in',
+		securityNote: 'Hera has no login yet. These are drawn so you can see what is coming.',
+		password: 'Password',
+		twoFactor: 'Two-factor authentication',
+		passkeys: 'Passkeys',
+		later: 'Coming later'
+	},
+
+	general: {
+		language: 'Language',
+		languageNote:
+			'The language of this interface. Which language she answers in is the language region under Mind.',
+		timezoneNote: 'What she is told the date and time are. She is always told UTC as well.',
+		aboutHeading: 'About',
+		version: 'Version',
+		dataFolder: 'Data folder',
+		model: 'Model',
+		english: 'English'
 	},
 
 	profileMenu: {
@@ -480,21 +557,37 @@ export const t = {
 		open: 'Open',
 		/** The same button under something already drawn in the flow, where *Open* would read as
 		 * an offer to show what is plainly already there. */
+		copyCode: 'Copy code',
+		copiedCode: 'Copied',
+		showSource: 'Code',
+		showDrawn: 'Preview',
+		showSourceOf: (name: string) => `Show the code of ${name}`,
+		showDrawnOf: (name: string) => `Show ${name} as drawn`,
 		openFull: 'Full size',
 		download: 'Download',
 		/** The card's save control is a glyph, so its accessible name says *which* file — a turn
 		 * that published four of them otherwise offers four identical buttons. */
 		downloadOne: (name: string) => `Download ${name}`,
+		/** A diagram is saved as the page that draws it, not as its mermaid source: what somebody
+		 * saving a picture wants is the picture, and six lines of mermaid need a renderer they do
+		 * not have. The control says so, because *Download* on a diagram and *Download* on a page
+		 * would promise the same thing and give different ones. */
+		downloadDrawn: 'Download as a page',
+		downloadDrawnOne: (name: string) => `Download ${name} as a page`,
 		close: 'Close',
 		panel: 'Artifacts',
 		files: 'Everything published here',
 		none: 'Nothing chosen yet.',
 		loading: 'Fetching it…',
 		count: (n: number) => (n === 1 ? '1 artifact' : `${n} artifacts`),
-		/** A `.mmd` file is still a file she made, and its source is worth reading. Showing
-		 * nothing at all is what makes a renderer this build does not have look like an artifact
-		 * that came out broken. */
-		noMermaid: 'Mermaid diagrams are not drawn in this version — the source is below.'
+		/** Mermaid is fetched on demand, so the first diagram in a session waits on a download
+		 * that later ones do not. Saying what is happening beats an empty box. */
+		drawing: 'Drawing it…',
+		/** A diagram that did not parse. The mermaid message carries the line number, which is
+		 * the part a person can act on, and the source is shown under it — a `.mmd` file is
+		 * still a file she made, and showing nothing at all is what makes one bad line look
+		 * like an artifact that came out broken. */
+		notDrawn: (why: string) => `That diagram did not come out: ${why}. The source is below.`
 	},
 
 	chat: {
@@ -531,12 +624,17 @@ export const t = {
 	}
 } as const;
 
-export function greetingFor(date: Date = new Date()): string {
+export function greetingFor(date: Date = new Date(), name = ''): string {
 	const hour = date.getHours();
-	if (hour < 5) return t.greeting.night;
-	if (hour < 12) return t.greeting.morning;
-	if (hour < 18) return t.greeting.afternoon;
-	return t.greeting.evening;
+	const phrase =
+		hour < 5
+			? t.greeting.night
+			: hour < 12
+				? t.greeting.morning
+				: hour < 18
+					? t.greeting.afternoon
+					: t.greeting.evening;
+	return name ? `${phrase}, ${name}` : phrase;
 }
 
 /** "12 ms", "1.4 s" — a duration a person reads rather than a number they convert. */

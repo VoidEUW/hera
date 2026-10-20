@@ -38,9 +38,9 @@ hera-tools = { workspace = true }
 dev = [
     "pytest>=8.3",
     "pytest-asyncio>=0.24",
-    "coverage>=7.16.0",
-    "mypy>=1.11",
-    "ruff>=0.16.6",
+    "coverage>=7.16.2",
+    "mypy>=2.4.0",
+    "ruff>=0.17.1",
     "httpx>=0.27",
     # Needed at the workspace root for the pydantic mypy plugin to load.
     "pydantic>=2.13.5",
@@ -49,11 +49,11 @@ dev = [
     "types-PyYAML>=6.0",
     # Serves a real MCP server over HTTP in the hera_tools transport tests. It arrives with
     # the MCP SDK anyway; declared here so the suite does not depend on that staying true.
-    "uvicorn>=0.30",
+    "uvicorn>=0.54.0",
     # Drives the built interface in the end-to-end suite. CI installs the browser with
     # `uv run playwright install --with-deps chromium`; without this the command has no
     # package to come from.
-    "playwright>=1.49",
+    "playwright>=1.63.0",
 ]
 
 # ---------------------------------------------------------------------------

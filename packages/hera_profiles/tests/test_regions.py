@@ -15,6 +15,9 @@ from hera_profiles import (
     LAYOUT_REGIONS,
     LAYOUT_SLOTS,
     MIND_REGIONS,
+    SLOT_NOW,
+    SLOT_PROBLEMS,
+    SLOT_SKILLS,
     SLOTS,
     Tier,
     UnknownRegion,
@@ -89,4 +92,14 @@ class TestRegistryAgainstLayout:
         assert not unknown, f"{sorted(unknown)} would always render empty"
 
     def test_the_declared_slots_are_exactly_the_ones_the_layout_offers(self) -> None:
-        assert SLOTS == LAYOUT_SLOTS
+        """The layout offers the declared slots, less the three ADR 20 took out of it.
+
+        Equality was the assertion while the two agreed. They no longer do, on purpose: `skills`,
+        `now` and `problems` are still declared vocabulary -- `hera_chats` builds the strings
+        and sends them after the history -- but they are no longer slots in the frame, because a
+        slot whose text changes between turns invalidates the whole cache behind it.
+
+        Spelled as a difference rather than a loosened assertion so that a *fourth* slot quietly
+        leaving the layout still fails here.
+        """
+        assert SLOTS - {SLOT_SKILLS, SLOT_NOW, SLOT_PROBLEMS} == LAYOUT_SLOTS

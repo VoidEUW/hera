@@ -9,6 +9,8 @@ a server is connected is a settings screen that can be wrong.
 
 from __future__ import annotations
 
+import shutil
+
 from fastapi import APIRouter, HTTPException, status
 
 from hera_core import __version__, trust
@@ -27,12 +29,14 @@ from hera_core.schemas import (
     ServerOut,
     SkillIn,
     SkillOut,
+    SkillPatch,
+    SkillSource,
     SkillsOut,
 )
 from hera_home import home
 from hera_mcp import BUILTIN_SERVER_NAME
 from hera_permissions import Rule
-from hera_skillsets import SkillUsageRepository
+from hera_skillsets import SKILL_FILENAME, SkillUsageRepository
 
 router = APIRouter(tags=["system"])
 
@@ -64,14 +68,85 @@ def list_skills(owner: Owner, db: Db, container: Container) -> SkillsOut:
         # trusted.json costs the marks and says so.
         trusted, problem = trust.EMPTY, str(exc)
 
+    off = set(load_config().skills.disabled)
+
     return SkillsOut(
         skills=[
-            SkillOut.of(skill, usage.get(skill.id), trust=trusted.skill(skill.id, skill.digest))
+            SkillOut.of(
+                skill,
+                usage.get(skill.id),
+                trust=trusted.skill(skill.id, skill.digest),
+                enabled=skill.id not in off,
+            )
             for skill in catalogue.skills
         ],
         broken=[BrokenSkillOut.of(broken) for broken in catalogue.broken],
         trust_problem=problem,
     )
+
+
+@router.patch("/skills/{skill_id}", response_model=SkillOut)
+def patch_skill(skill_id: str, payload: SkillPatch, container: Container) -> SkillOut:
+    """Switch one skill on or off.
+
+    The switch lives in ``config.toml``, not in the skill's folder: `hera_skillsets` only reads
+    that directory, and a skill somebody else wrote is not ours to edit.
+    """
+    skill = container.library.get(skill_id)
+    if skill is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="no such skill")
+    save_config(load_config().with_skill_enabled(skill_id, payload.enabled))
+    return SkillOut.of(skill, enabled=payload.enabled)
+
+
+@router.get("/skills/{skill_id}/source", response_model=SkillSource)
+def read_skill_source(skill_id: str, container: Container) -> SkillSource:
+    """The skill's ``SKILL.md`` verbatim, for the editor."""
+    skill = container.library.get(skill_id)
+    if skill is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="no such skill")
+    file = container.library.path / skill_id / SKILL_FILENAME
+    return SkillSource(content=file.read_text(encoding="utf-8"))
+
+
+@router.put("/skills/{skill_id}/source", response_model=SkillOut)
+def write_skill_source(skill_id: str, payload: SkillSource, container: Container) -> SkillOut:
+    """Replace a skill's ``SKILL.md``.
+
+    The writing lives here for the reason :func:`create_skill` gives: `hera_skillsets` reads
+    this directory and does not write to it. The file is read straight back through the loader,
+    so what comes back is what the library made of it — including ``problems``, which is how a
+    typo in the frontmatter is reported rather than refused.
+    """
+    if container.library.get(skill_id) is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="no such skill")
+    (container.library.path / skill_id / SKILL_FILENAME).write_text(
+        payload.content, encoding="utf-8"
+    )
+    written = container.library.get(skill_id)
+    if written is None:  # pragma: no cover - the loader just read it
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="not saved")
+    return SkillOut.of(written, enabled=skill_id not in load_config().skills.disabled)
+
+
+@router.delete("/skills/{skill_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_skill(skill_id: str, container: Container) -> None:
+    """Delete a skill's folder, and forget that it was ever switched off.
+
+    Only a skill the library lists can be named, so the path is one the loader found rather
+    than one a request made up. A skills directory may be a symlink to somebody else's
+    checkout, so a linked skill loses the link and never the files behind it.
+    """
+    if container.library.get(skill_id) is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="no such skill")
+    directory = container.library.path / skill_id
+    if directory.is_symlink():
+        directory.unlink()
+    else:
+        shutil.rmtree(directory)
+    config = load_config()
+    if skill_id in config.skills.disabled:
+        save_config(config.with_skill_enabled(skill_id, True))
 
 
 @router.post("/skills", response_model=SkillOut, status_code=status.HTTP_201_CREATED)
@@ -100,11 +175,13 @@ def create_skill(payload: SkillIn, container: Container) -> SkillOut:
 
     description = " ".join(payload.description.split())
     body = payload.body.strip() or DRAFT_BODY
-    directory.mkdir(parents=True)
-    (directory / "SKILL.md").write_text(
-        f"---\nname: {payload.id}\ndescription: {description!r}\n---\n\n{body}\n",
-        encoding="utf-8",
+    text = (
+        payload.content
+        if payload.content.strip()
+        else f"---\nname: {payload.id}\ndescription: {description!r}\n---\n\n{body}\n"
     )
+    directory.mkdir(parents=True)
+    (directory / "SKILL.md").write_text(text, encoding="utf-8")
 
     # Read back rather than reported from the request: what the screen shows is what the
     # loader made of the file, including any problem it has with it.
@@ -200,7 +277,7 @@ async def health(container: Container) -> HealthOut:
         version=__version__,
         home=str(home()),
         model=container.model,
-        skills=len(container.library.catalogue()),
+        skills=len(container.router.library.catalogue()),
         servers=servers,
     )
 

@@ -14,7 +14,18 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { downloadUrl, extensionOf, kindOf, newest, sanitiseSvg, size, titleOf } from './artifacts';
+import {
+	downloadUrl,
+	extensionOf,
+	headingOf,
+	kindOf,
+	newest,
+	sanitiseSvg,
+	size,
+	stemOf,
+	svgProblem,
+	titleOf
+} from './artifacts';
 
 describe('kindOf', () => {
 	it('reads the renderer off the extension', () => {
@@ -54,6 +65,22 @@ describe('titleOf', () => {
 	});
 });
 
+describe('headingOf', () => {
+	it('capitalises every word', () => {
+		expect(headingOf('top-gdp-economies.mmd')).toBe('Top Gdp Economies');
+	});
+});
+
+describe('stemOf', () => {
+	it('drops the extension and keeps the name she gave it', () => {
+		// What another filename gets built out of: a diagram saved as the page that draws it
+		// changes the kind and nothing else.
+		expect(stemOf('handshake.mmd')).toBe('handshake');
+		expect(stemOf('README')).toBe('README');
+		expect(stemOf('.notes')).toBe('.notes');
+	});
+});
+
 describe('sanitiseSvg', () => {
 	it('keeps the drawing', () => {
 		const drawn = sanitiseSvg('<svg viewBox="0 0 8 8"><circle cx="4" cy="4" r="3"/></svg>');
@@ -74,6 +101,37 @@ describe('sanitiseSvg', () => {
 			'<svg><foreignObject><iframe src="http://x"></iframe></foreignObject></svg>'
 		);
 		expect(drawn).not.toContain('<iframe');
+	});
+
+	it('takes a perfectly innocent label out with it, which is why mermaid may not use one', () => {
+		// Not a security test — a constraint, pinned where somebody would look before changing
+		// `$lib/mermaid`'s configuration. The profile cannot tell a smuggled frame from a label,
+		// so it removes both, and mermaid's *default* label is exactly this: a `<foreignObject>`
+		// full of XHTML. A diagram drawn that way arrives with every box intact and every word
+		// gone, which is the shape of failure that reads as success. `htmlLabels: false` is the
+		// answer; widening this profile to `html` is the one that hands every artifact a frame.
+		const drawn = sanitiseSvg(
+			'<svg><foreignObject><div><span>Client hello</span></div></foreignObject>' +
+				'<text>Server hello</text></svg>'
+		);
+		expect(drawn).not.toContain('Client hello');
+		expect(drawn).toContain('Server hello');
+	});
+});
+
+describe('svgProblem', () => {
+	it('accepts a drawing', () => {
+		expect(svgProblem('<svg xmlns="http://www.w3.org/2000/svg"><circle r="4"/></svg>')).toBeNull();
+	});
+
+	it('says why markup that is not well-formed is refused', () => {
+		expect(svgProblem('<svg xmlns="http://www.w3.org/2000/svg"><circle></svg>')).toEqual(
+			expect.any(String)
+		);
+	});
+
+	it('refuses a document that is not an svg', () => {
+		expect(svgProblem('<html xmlns="http://www.w3.org/1999/xhtml"></html>')).toMatch(/svg/);
 	});
 });
 

@@ -1,5 +1,8 @@
 # Hera
 
+## THIS IS A DEPRECATED VERSION: REWORK IN HERA-RS
+[LINK](https://github.com/VoidEUW/hera-rs)
+
 A self-hosted agentic chat space. One server on your own machine, reachable from your desk and
 from your phone, talking to a **local** model over an OpenAI-compatible endpoint.
 

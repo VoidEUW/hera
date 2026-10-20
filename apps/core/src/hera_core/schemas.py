@@ -21,6 +21,7 @@ from __future__ import annotations
 import base64
 import binascii
 import json
+import re
 from datetime import date, datetime
 from typing import Any
 from uuid import UUID
@@ -29,6 +30,7 @@ from hera_skillsets.models import ID_PATTERN
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from hera_chats import Chat, Message, Project
+from hera_core.account import Account
 from hera_core.config import ProviderKind, validate_provider_name
 from hera_core.model_presets import PRESETS, ModelPreset
 from hera_memories import MAX_DESCRIPTION, MAX_TEXT
@@ -263,6 +265,12 @@ class ArtifactOut(BaseModel):
     modified_at: datetime
 
 
+class ArtifactProblem(BaseModel):
+    """The browser saying it could not draw an artifact — see :mod:`hera_core.problems`."""
+
+    message: str = Field(min_length=1, max_length=2000)
+
+
 class ArtifactContent(BaseModel):
     """One artifact's current content, for the panel that draws it.
 
@@ -447,9 +455,17 @@ class SkillOut(BaseModel):
     trust: str = "unknown"
     """``verified``, ``modified`` or ``unknown`` — see :mod:`hera_core.trust`."""
 
+    enabled: bool = True
+    """Off means not routed, not offered to `/slash`, not pinnable. The folder stays."""
+
     @classmethod
     def of(
-        cls, skill: Skill, usage: SkillUsage | None = None, *, trust: str = "unknown"
+        cls,
+        skill: Skill,
+        usage: SkillUsage | None = None,
+        *,
+        trust: str = "unknown",
+        enabled: bool = True,
     ) -> SkillOut:
         meta = skill.metadata
         return cls(
@@ -468,7 +484,18 @@ class SkillOut(BaseModel):
             homepage=meta.get("homepage", ""),
             digest=skill.digest,
             trust=trust,
+            enabled=enabled,
         )
+
+
+class SkillPatch(BaseModel):
+    enabled: bool
+
+
+class SkillSource(BaseModel):
+    """A skill's ``SKILL.md`` as written — frontmatter and body, the file a person would open."""
+
+    content: str = Field(max_length=200_000)
 
 
 class SkillIn(BaseModel):
@@ -482,6 +509,9 @@ class SkillIn(BaseModel):
     id: str = Field(min_length=1, max_length=64)
     description: str = Field(default="", max_length=1024)
     body: str = ""
+    content: str = Field(default="", max_length=200_000)
+    """A whole ``SKILL.md``, written verbatim when given — what the editor sends. Without it the
+    file is assembled from ``description`` and ``body``."""
 
     @field_validator("id")
     @classmethod
@@ -590,6 +620,7 @@ class ModelOut(BaseModel):
     options: dict[str, Any] = Field(default_factory=dict)
     context_length: int | None = None
     tool_calling: bool = True
+    accepts_images: bool = True
     reasoning_efforts: list[str] = Field(default_factory=list)
     """The ``reasoning_effort`` values this model accepts, asked of the endpoint rather than
     guessed from the id — and **empty means unknown, not "any"**.
@@ -621,10 +652,21 @@ class ModelOut(BaseModel):
     entered on this screen, or ``"none"``. Shown beside the control, because a person looking at it
     is entitled to know whether the endpoint said so or they did."""
     thinking_shape: str = "none"
-    """Which control this model wants — ``values``, ``budget``, ``toggle`` or ``none``. Decided
+    """Which control this model wants - ``values``, ``budget``, ``toggle`` or ``none``. Decided
     server-side so that the browser and the settings screen cannot disagree about it, and so that
     a model wanting both a list and a switch gets one control rather than two that contradict
     each other."""
+
+    tool_call_shape: str = "unknown"
+    """Whether this endpoint's chat template can render a tool declaration - ``template``,
+    ``none`` or ``unknown``.
+
+    A fact about the template and nothing more. It is **not** a claim that a call will come back
+    as a call: that needs an engine with a parser for the model's dialect, which no endpoint
+    publishes, and which for MiniCPM5-2B differs across the four engines it runs on (#145).
+    Reported rather than acted on -- nothing is reformatted on the strength of this field,
+    because silently changing how a model is asked to call a tool is the guessing ADR 18 exists
+    to stop."""
 
 
 class ProviderOut(BaseModel):
@@ -755,6 +797,10 @@ class ModelIn(BaseModel):
     """Whether this model is offered tools at all (ADR 19). Sent whole, like ``options`` above —
     editing a model without repeating a previously-set ``False`` here puts it back to ``True``."""
 
+    accepts_images: bool = True
+    """Whether this model can be shown a picture — see ``ModelEntry.accepts_images``. Sent whole,
+    for the same reason as ``tool_calling``."""
+
     @field_validator("options")
     @classmethod
     def _usable_options(cls, options: dict[str, Any]) -> dict[str, Any]:
@@ -875,3 +921,57 @@ class HealthOut(BaseModel):
     model: str
     skills: int
     servers: list[ServerOut]
+
+
+class AccountOut(BaseModel):
+    """Who the owner is.
+
+    ``avatar_version`` is zero when there is no picture, and otherwise the row's last-change
+    time. The interface puts it in the picture's query string, so a replaced picture is a
+    different address and a browser holding the old one has no reason to keep showing it.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    name: str
+    email: str
+    avatar_version: int
+
+    @classmethod
+    def of(cls, account: Account) -> AccountOut:
+        return cls(
+            name=account.name,
+            email=account.email,
+            avatar_version=int(account.updated_at.timestamp()) if account.avatar_type else 0,
+        )
+
+
+_EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
+class AccountPatch(BaseModel):
+    """``None`` means *leave it*; an empty string clears the field."""
+
+    name: str | None = Field(default=None, max_length=120)
+    email: str | None = Field(default=None, max_length=254)
+
+    @field_validator("name")
+    @classmethod
+    def _tidy_name(cls, name: str | None) -> str | None:
+        return None if name is None else name.strip()
+
+    @field_validator("email")
+    @classmethod
+    def _plausible_email(cls, email: str | None) -> str | None:
+        if email is None:
+            return None
+        email = email.strip()
+        if email and not _EMAIL.match(email):
+            raise ValueError("that does not look like an email address")
+        return email
+
+
+class AvatarIn(BaseModel):
+    """A picture as a data URL, the way an attachment arrives."""
+
+    data_url: str = Field(min_length=1)

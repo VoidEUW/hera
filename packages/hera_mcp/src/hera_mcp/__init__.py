@@ -19,6 +19,8 @@ arrives as :mod:`hera_mcp.ports`.
 
 from __future__ import annotations
 
+from mcp.server.mcpserver.exceptions import ToolError
+
 from hera_mcp.ports import (
     Artifacts,
     Hit,
@@ -60,5 +62,6 @@ __all__ = [
     "Scratchpad",
     "Searcher",
     "SkillLibrary",
+    "ToolError",
     "build_builtin_server",
 ]

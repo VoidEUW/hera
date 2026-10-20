@@ -2,7 +2,7 @@
 	/**
 	 * One modal shell for every sheet in the application (#99).
 	 *
-	 * The four sheets this replaces — Settings, ServerSheet, SkillPicker, ProfileMenu — each
+	 * The four sheets this replaces — Settings, ServerSheet, SkillPicker, the profile menu — each
 	 * carried their own copy of the scrim / sheet / Escape pattern, and the comments in each said
 	 * so. This is that copy, once.
 	 *
@@ -130,7 +130,16 @@
 		return () => opener?.focus?.();
 	});
 
+	/** Whether this sheet is the one on top. A sheet opened from inside another (the skill
+	 * editor over Settings) is later in the document, and it alone answers Escape, Tab and a
+	 * click outside — otherwise one keypress would close both. */
+	function topmost(): boolean {
+		const open = document.querySelectorAll('[role="dialog"]');
+		return open[open.length - 1] === sheet;
+	}
+
 	function onkeydown(event: KeyboardEvent) {
+		if (!topmost()) return;
 		if (event.key === 'Escape') {
 			// One Escape does one thing (#112's rule, arriving early). If a Select dropdown is open
 			// inside the sheet, closing it is what this Escape is for — the modal is the layer
@@ -197,7 +206,7 @@
 		let armed = false;
 		const arm = requestAnimationFrame(() => (armed = true));
 		const away = (event: MouseEvent) => {
-			if (!armed) return;
+			if (!armed || !topmost()) return;
 			// The propagation path rather than a captured `sheet` reference: the sheet that is
 			// live at event time is the only one that can answer `contains`, and a listener that
 			// outlived its own instance (a tab switch can unmount and remount Settings within one

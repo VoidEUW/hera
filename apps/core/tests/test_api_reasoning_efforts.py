@@ -18,6 +18,8 @@ from typing import Any
 
 import pytest
 from core_support import API
+from hera_providers.capabilities import NOTHING as CAPS_NOTHING
+from hera_providers.capabilities import Capabilities, EndpointCapabilities, ToolCallShape
 from hera_providers.thinking import NOTHING, Registry, Thinking
 from httpx import AsyncClient
 
@@ -157,4 +159,71 @@ class TestWhatIsReported:
                     "thinking_budget",
                     "thinking_source",
                     "thinking_shape",
+                    "tool_call_shape",
                 } <= set(model)
+
+
+class TestToolCallShapeOnTheWire:
+    """The detection reaching the browser, and staying a report rather than a switch (#145).
+
+    ``EndpointCapabilities`` is stubbed alongside the registry because the endpoint reads both: the
+    thinking probe has already populated the capabilities cache for this ``base_url`` by the time
+    the route asks, so the answer is free in production and absent here unless it is stubbed.
+    """
+
+    @staticmethod
+    def stub_caps(monkeypatch: pytest.MonkeyPatch, shape: ToolCallShape) -> None:
+        async def load(base_url: str, **_kwargs: Any) -> Capabilities:
+            return Capabilities(tool_call_shape=shape)
+
+        monkeypatch.setattr(EndpointCapabilities, "load", staticmethod(load))
+
+    async def test_a_template_with_a_tools_path_says_so(
+        self, client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        stub(monkeypatch, {})
+        self.stub_caps(monkeypatch, "template")
+        await register(client, "studio", "openai", "MiniCPM5-2B")
+
+        model = model_named((await client.get(f"{API}/providers")).json(), "studio", "MiniCPM5-2B")
+
+        assert model["tool_call_shape"] == "template"
+
+    async def test_a_server_declaring_no_says_none(
+        self, client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        stub(monkeypatch, {})
+        self.stub_caps(monkeypatch, "none")
+        await register(client, "studio", "openai", "MiniCPM5-2B")
+
+        model = model_named((await client.get(f"{API}/providers")).json(), "studio", "MiniCPM5-2B")
+
+        assert model["tool_call_shape"] == "none"
+
+    async def test_silence_is_reported_as_unknown_not_as_none(
+        self, client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # The one worth pinning. An endpoint that said nothing must not be reported as permissive,
+        # because "we don't know" and "it works" are different facts and the interface is expected
+        # to be able to tell them apart without a default.
+        stub(monkeypatch, {})
+        self.stub_caps(monkeypatch, CAPS_NOTHING.tool_call_shape)
+        await register(client, "studio", "openai", "MiniCPM5-2B")
+
+        model = model_named((await client.get(f"{API}/providers")).json(), "studio", "MiniCPM5-2B")
+
+        assert model["tool_call_shape"] == "unknown"
+
+    async def test_a_none_endpoint_still_offers_its_tools(
+        self, client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # Reported, never acted on: nothing about the tools this model is offered changes on the
+        # strength of the field, so a `none` answer is information and not a policy.
+        stub(monkeypatch, {})
+        self.stub_caps(monkeypatch, "none")
+        await register(client, "studio", "openai", "MiniCPM5-2B")
+
+        body = (await client.get(f"{API}/providers")).json()
+        entry = next(p for p in body["providers"] if p["name"] == "studio")
+
+        assert "MiniCPM5-2B" in [m["id"] for m in entry["models"]]

@@ -44,7 +44,10 @@ export type Mark = 'thinking' | 'skill' | 'search' | 'note' | 'memory' | 'artifa
  * quill is the one those two ADRs are built on: a scratchpad is where she thinks, unread, and an
  * artifact is what she puts up for you to read. Publishing a page, changing a line of it and
  * reading it back are one habit and share the mark — and it is what tells you she is *making
- * something* while the arguments of a long call are still arriving.
+ * something* while the arguments of a long call are still arriving. Drawing a diagram shares it
+ * too: `diagram_create` is its own tool because it is a different thing to *do*, but in the
+ * gutter it is the same habit, and a second mark there would make it look like a different
+ * capability rather than the same one with a picture at the end of it.
  */
 export function mark(qualified: string): Mark {
 	if (!qualified.startsWith(HERA)) return 'tool';
@@ -65,6 +68,7 @@ export function mark(qualified: string): Mark {
 		case 'artifact_create':
 		case 'artifact_edit':
 		case 'artifact_read':
+		case 'diagram_create':
 			return 'artifact';
 		default:
 			return 'tool';
@@ -118,7 +122,10 @@ const SUBJECT: Record<string, readonly string[]> = {
 	// that ends in an ellipsis.
 	artifact_create: ['name'],
 	artifact_edit: ['name'],
-	artifact_read: ['name']
+	artifact_read: ['name'],
+	// And here it is not a nicety either: `mermaid` is the whole picture, so the fallback would
+	// put a flow chart through a one-line row.
+	diagram_create: ['name']
 };
 
 /** The subject of one of her calls, or `''` when there is nothing worth showing. */

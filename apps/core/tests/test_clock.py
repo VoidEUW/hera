@@ -115,11 +115,18 @@ class TestThePreferencesScreen:
 class TestItReachesTheModel:
     async def test_the_date_is_in_the_prompt(self, client: AsyncClient, services: object) -> None:
         """The point of the whole thing: implicit, with no tool call to spend a round trip on,
-        and there before she decides whether she needs to look something up."""
+        and there before she decides whether she needs to look something up.
+
+        **Not in the system prompt any more.** It used to be, and that put a minute-granularity
+        timestamp in front of the whole conversation, so every tick of the minute invalidated the
+        history behind her and the KV cache with it. It is now a user-role note placed after the
+        history, which reaches her just as reliably and changes only what comes after everything
+        worth caching.
+        """
         chat_id = (await client.post(f"{API}/chats", json={})).json()["id"]
         await client.post(f"{API}/chats/{chat_id}/messages", json={"text": "what is going on"})
 
         provider = services.provider  # type: ignore[attr-defined]
-        system = provider.requests[0].messages[0].content
-        assert str(datetime.now(UTC).year) in system
-        assert "UTC" in system
+        asked = "\n".join(m.content or "" for m in provider.requests[0].messages)
+        assert str(datetime.now(UTC).year) in asked
+        assert "UTC" in asked

@@ -1,4 +1,4 @@
-# AGENTS.md — Hera
+# CLAUDE.md — Hera
 
 A map of this repository, not a changelog. Keep it short: the previous version of this file grew
 to 98 KB of accumulated history and stopped being readable. It is archived as
@@ -48,8 +48,8 @@ domain concept at all and must stay liftable into an unrelated project.
 
 **Two MCP packages, and the difference matters.** `hera_mcp` is the server she *is* —
 `hera__ask`, `hera__remember`, `hera__forget`, `hera__note`, `hera__skill`, `hera__search`, the
-three `hera__scratch_*`, the three `hera__artifact_*`, and the ports they take. `hera__ask` is the
-one that is never *run*:
+three `hera__scratch_*`, the three `hera__artifact_*`, `hera__diagram_create`, and the ports they
+take. `hera__ask` is the one that is never *run*:
 `hera_chats` recognises it by name (`ChatsSettings.asking_tools`, filled in by the application)
 and suspends the turn the way a permission card does, so a person's reply becomes that call's
 result. `hera_tools` is the client she *has*, and it does not know the other exists: it mounts
@@ -60,6 +60,13 @@ descriptions are prompt text; edit them in `hera_mcp` and her behaviour changes.
 nobody reads it, which is what lets her think out loud in it; `artifacts/` is what she publishes,
 and a person browses it. Same guard, same cleanup, opposite promises — `hera_core.chat_files` owns
 both adapters so the name check exists once.
+
+**A diagram is drawn, not published.** `hera__diagram_create` takes mermaid and a name, decides
+the `.mmd` extension itself, and puts the picture in the flow of the answer unless the call says
+`beside` — three things `artifact_create` left to a model that does not reliably notice them
+(ADR 5). It writes into the same `artifacts/` directory and `artifact_edit` changes it; what is
+separate is the *act*. Saving one converts it to a standalone HTML page, in the browser, because
+mermaid lays a diagram out by measuring its own text and the server cannot.
 
 **A tool learns which chat it is in from `_meta`, never from an argument** — [ADR 12](docs/adr/0012-a-chat-has-a-scratchpad.md).
 The model chooses arguments, so a `chat_id` field is one it would invent; a `ctx: Context`
@@ -109,7 +116,7 @@ columns, never `ForeignKey`; migrations live in `apps/core`.
 | `skills/<name>/SKILL.md` | skill packages |
 | `chats/<id>/scratch/` | her working files for one conversation. A cache, not something you keep — deleting the chat deletes it |
 | `chats/<id>/artifacts/` | what she publishes there: the filename is the identity, the extension is the kind. Goes with the chat too ([ADR 13](docs/adr/0013-an-artifact-is-a-file-she-publishes.md)) |
-| `mcp.json` | MCP servers, in the Codex-Desktop `mcpServers` shape |
+| `mcp.json` | MCP servers, in the Claude-Desktop `mcpServers` shape |
 | `config.toml` | registered model endpoints, written by the interface. A model in here may carry **`options`** — request-body fields merged in last and never read ([ADR 18](docs/adr/0018-a-model-may-carry-request-options.md)) |
 | `trusted.json` | **where trusted skills are recorded** — optional |
 

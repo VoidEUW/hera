@@ -172,7 +172,15 @@ export function reduce(events: AnyEvent[]): Turn {
 	};
 
 	for (const event of events) {
-		index += 1;
+		// Counted over the events that are *recorded*, not over the ones that arrive.
+		// `tool_call_started` is streamed and never persisted (`hera_chats` asserts both halves),
+		// so a position in the live list is one larger than the same position in the list that
+		// replaces it at `done` — and every key built from it changed the instant an answer
+		// finished. That is a card destroyed and built again: the artifact behind it refetched,
+		// a diagram redrawn from nothing, in the one frame where the turn was over. Skipping it
+		// here costs nothing, because the row for a call is keyed on the call id rather than on
+		// where it landed.
+		if (event.type !== 'tool_call_started') index += 1;
 		const key = `${event.type}-${index}`;
 
 		switch (event.type) {

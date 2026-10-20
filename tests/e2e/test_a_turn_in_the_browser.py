@@ -189,26 +189,6 @@ def test_a_chat_can_be_exported_from_the_rail(page: Any) -> None:
     assert "/export.md" in (export.get_attribute("href") or "")
 
 
-def test_a_chat_can_be_exported_from_the_header_toolbar(page: Any) -> None:
-    """The other door to the same route: a toolbar above the conversation itself, for anything
-    that acts on the whole chat rather than on one row in the rail. Export is the first tool in
-    it — worth its own control here because it should not cost opening the `⋯` menu on a chat
-    you are already reading."""
-    composer = page.locator("textarea").first
-    composer.fill("Explain Kerberos")
-    composer.press("Enter")
-    page.wait_for_url("**/chat/**", timeout=15_000)
-    page.wait_for_selector("text=ticket-granting ticket", timeout=30_000)
-
-    toolbar = page.get_by_role("toolbar", name="Conversation tools")
-    assert toolbar.count() == 1
-
-    export = toolbar.get_by_role("link", name="Export as Markdown")
-    assert export.count() == 1
-    assert export.get_attribute("download") is not None
-    assert "/export.md" in (export.get_attribute("href") or "")
-
-
 def test_the_composer_says_what_she_runs_on(page: Any) -> None:
     """The model is a control beside send rather than a setting two screens away, and the
     Enter hint gets out of the way as soon as there is something to send.
@@ -280,15 +260,31 @@ def test_a_skill_is_switched_on_for_one_chat(page: Any) -> None:
 
 
 def test_settings_holds_what_changes_her_behaviour(page: Any) -> None:
-    """Models first, because nothing works until she is pointed at one; then the two lists a
-    person comes back to. Dreaming is listed and disabled rather than hidden — a v0.2 feature
-    you can see coming is a promise, and one you cannot is a surprise."""
+    """Grouped by kind — App, Hera, Adjust — with Models the first thing she needs among hers.
+    Dreaming is listed and disabled rather than hidden — a v0.2 feature you can see coming
+    is a promise, and one you cannot is a surprise."""
     page.get_by_role("button", name="Settings").click()
     page.wait_for_selector("[role=dialog]", timeout=10_000)
 
     nav = page.locator("[role=dialog] nav.tabs button")
-    assert nav.all_inner_texts()[:4] == ["Models", "Skills", "Servers", "Permissions"]
-    assert "Dreaming" in nav.last.inner_text()
+    names = [text.split("\n")[0].strip() for text in nav.all_inner_texts()]
+    assert names == [
+        "Account",
+        "General",
+        "Mind",
+        "Memory",
+        "Models",
+        "Dreaming",
+        "Skills",
+        "Servers",
+        "Permissions",
+    ]
+
+    # The search field is in the sidebar, beside the navigation, and the title is in the content.
+    assert page.locator("[role=dialog] aside input[type=search]").count() == 1
+    assert page.locator("[role=dialog] h2").first.inner_text() == "Account"
+
+    page.get_by_role("button", name="Models", exact=True).click()
 
     # The endpoint is registered and editable, which is the whole point of this screen.
     page.wait_for_selector("text=Base URL", timeout=10_000)
@@ -313,18 +309,46 @@ def test_manage_servers_lands_on_the_servers_tab(page: Any) -> None:
     page.wait_for_selector("[role=dialog]", state="detached", timeout=10_000)
 
 
-def test_the_profile_card_holds_everything_that_is_not_about_her(page: Any) -> None:
-    """Appearance and where your data lives are not model behaviour, and mixing the two is how
-    a person ends up scrolling past six model fields to find a light-mode toggle."""
+def test_the_profile_card_is_the_way_into_settings(page: Any) -> None:
+    """There is one door, not two: the card at the foot of the rail opens Settings, and
+    appearance and where your data lives are on its General screen."""
+    assert page.locator("nav.rail button.action:has-text('Settings')").count() == 0
     page.locator("button.card").click()
     page.wait_for_selector("[role=dialog]", timeout=10_000)
 
-    menu = page.locator("[role=dialog]")
-    assert "APPEARANCE" in menu.inner_text().upper()
-    assert "ABOUT" in menu.inner_text().upper()
+    page.get_by_role("button", name="General", exact=True).click()
+    dialog = page.locator("[role=dialog]")
+    assert "APPEARANCE" in dialog.inner_text().upper()
+    assert "ABOUT" in dialog.inner_text().upper()
 
     page.keyboard.press("Escape")
     page.wait_for_selector("[role=dialog]", state="detached", timeout=10_000)
+
+
+def test_the_account_name_reaches_the_rail_card_and_the_greeting(page: Any) -> None:
+    """The Account screen is where Settings opens, and what is saved there is what the rail card
+    and the start screen call you — there is no second place that knows."""
+    page.locator("button.card").click()
+    page.wait_for_selector("[role=dialog]", timeout=10_000)
+
+    page.get_by_label("Name", exact=True).fill("Ada Lovelace")
+    page.get_by_label("Email", exact=True).fill("not an email")
+    assert page.get_by_role("button", name="Save").is_disabled()
+    page.get_by_label("Email", exact=True).fill("ada@example.org")
+    page.get_by_role("button", name="Save").click()
+    page.wait_for_selector("text=Saved", timeout=10_000)
+
+    # The three sign-in rows are drawn and cannot be used.
+    for row in ("Password", "Two-factor authentication", "Passkeys"):
+        assert page.get_by_role("button", name=row).is_disabled()
+
+    page.keyboard.press("Escape")
+    page.wait_for_selector("[role=dialog]", state="detached", timeout=10_000)
+    assert "Ada Lovelace" in page.locator("button.card").inner_text()
+    page.wait_for_selector(".greeting:has-text('Ada')", timeout=10_000)
+
+    page.reload(wait_until="networkidle")
+    assert "Ada Lovelace" in page.locator("button.card").inner_text()
 
 
 def test_a_file_can_be_attached_and_is_drawn_as_a_chip(page: Any, tmp_path: Any) -> None:
@@ -572,8 +596,11 @@ class TestWhatShePublishes:
         assert "allow-same-origin" not in sandbox
         assert "Theme workshop" in (frame.get_attribute("srcdoc") or "")
 
-        # And the file bar, which is what makes it reachable once the turn has scrolled away.
-        assert page.locator("nav[aria-label='Everything published here']").count() == 1
+        # And the selector in the header, which is what makes it reachable once the turn has
+        # scrolled away: it names the file being shown.
+        assert (
+            page.get_by_role("button", name="Artifacts").get_by_text("Theme Workshop").count() == 1
+        )
 
     def test_the_card_opens_it_again_after_it_is_closed(self, page: Any) -> None:
         """The drawer opening by itself is a convenience and the card is the door. Closing it
@@ -585,7 +612,7 @@ class TestWhatShePublishes:
 
         # The heading is the filename humanised — there is no title field anywhere for it to
         # disagree with, which is the decision this assertion pins.
-        assert page.get_by_text("Theme workshop", exact=True).count() == 1
+        assert page.get_by_text("Theme Workshop", exact=True).count() == 1
         page.get_by_role("button", name="Open").first.click()
         page.locator("iframe[title='theme-workshop.html']").wait_for(timeout=15_000)
 
@@ -665,7 +692,7 @@ class TestWhatShePublishes:
 
         # The row says what she did: `artifact edit` is the verb and the filename is the target.
         assert page.locator("text=artifact edit").count() >= 1
-        assert page.get_by_text("Theme workshop", exact=True).count() == 1
+        assert page.get_by_text("Theme Workshop", exact=True).count() == 1
 
 
 TALL_SCRIPT: list[Any] = [

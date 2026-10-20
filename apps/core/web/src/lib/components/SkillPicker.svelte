@@ -37,7 +37,9 @@
 	const filter = $derived(query.trim().toLowerCase());
 	const shown = $derived(
 		skills.filter(
-			(skill) => !filter || `${skill.id} ${skill.description}`.toLowerCase().includes(filter)
+			(skill) =>
+				skill.enabled &&
+				(!filter || `${skill.id} ${skill.description}`.toLowerCase().includes(filter))
 		)
 	);
 

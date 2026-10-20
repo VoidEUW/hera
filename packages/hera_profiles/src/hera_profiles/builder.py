@@ -54,7 +54,16 @@ A slot rather than a mind region: it is a *fact about this moment*, not a behavi
 should be able to edit. A region saying "it is Tuesday" would be wrong by Wednesday.
 """
 
-SLOTS: frozenset[str] = frozenset({SLOT_TOOLS, SLOT_SKILLS, SLOT_MEMORIES, SLOT_PROJECT, SLOT_NOW})
+SLOT_PROBLEMS = "problems"
+"""What the person's browser reported it could not draw, rendered by the application.
+
+A slot for the same reason as ``now``: a fact about this moment, not a behaviour. Empty — and so
+absent — almost always.
+"""
+
+SLOTS: frozenset[str] = frozenset(
+    {SLOT_TOOLS, SLOT_SKILLS, SLOT_MEMORIES, SLOT_PROJECT, SLOT_NOW, SLOT_PROBLEMS}
+)
 """Every slot the skeleton offers.
 
 Named constants rather than string literals at the call site: a typo in a binding key is
@@ -163,16 +172,21 @@ LAYOUT: tuple[Node, ...] = (
             Node(key="memory.recalled", title="Recalled", priority=55, slot=SLOT_MEMORIES),
         ),
     ),
-    Node(key="skills", title="Skills", priority=60, slot=SLOT_SKILLS),
+    # `skills` (priority 60), `context.now` (68) and `context.problems` (90) used to be nodes
+    # here, bound from `hera_chats`. None of them is any more: ADR 20 moved all three out of the
+    # frame and after the history, because a slot whose text can differ between two turns
+    # invalidates the entire cache behind it. `hera_chats.turn` now sends them inside the question's
+    # own message.
+    #
+    # The keys are deliberately absent rather than left bound-and-unused. An unbound slot renders to
+    # nothing, so keeping them would have cost nothing -- but a node that looks live is an
+    # invitation to bind it again, and that is precisely the change ADR 20 exists to prevent.
+    # The `SLOT_*` names stay exported, because they are the vocabulary the frame is described in.
     Node(
         key="context",
         title="Context",
         priority=70,
         children=(
-            # First in the group and low-priority on purpose: it is one line, and a model that
-            # does not know the date answers "what is current" from its training data — a whole
-            # class of confidently stale answers for thirty tokens.
-            Node(key="context.now", title="Right now", priority=68, slot=SLOT_NOW),
             Node(key="context.project", title="This project", priority=70, slot=SLOT_PROJECT),
             Node(key="context.user", title="About this person", priority=71, region="user_prefs"),
         ),

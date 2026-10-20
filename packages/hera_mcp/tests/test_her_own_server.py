@@ -739,3 +739,106 @@ class TestArtifacts:
         assert edit.description is not None
         assert "exactly once" in edit.description
         assert "artifact_read" in edit.description
+
+
+class TestDiagrams:
+    """A diagram is its own tool, and what that buys is two decisions taken away from the model:
+    the extension, and where the picture lands."""
+
+    async def test_it_writes_a_mermaid_file_into_the_conversation(
+        self, wired: MCPServer, artifacts: FakeArtifacts
+    ) -> None:
+        async with talking_to(wired) as client:
+            result = await client.call_tool(
+                "diagram_create",
+                {"name": "handshake", "mermaid": "flowchart TD\n  A --> B\n"},
+                meta=in_chat("c-1"),
+            )
+
+        assert not result.is_error
+        assert artifacts.chats == {"c-1": {"handshake.mmd": "flowchart TD\n  A --> B\n"}}
+
+    async def test_the_extension_is_not_asked_for(self, wired: MCPServer) -> None:
+        """The filename is the identity and the extension is the kind (ADR 13), so on a tool
+        whose whole subject is diagrams the kind is already known. Asking for it would be asking
+        a model to spell `.mmd` for no gain, and the schema is the place that decision is
+        visible: `name`, the picture, and where it goes."""
+        async with talking_to(wired) as client:
+            listing = await client.list_tools()
+
+        draw = next(t for t in listing.tools if t.name == "diagram_create")
+        assert sorted(draw.input_schema.get("properties", {})) == ["beside", "mermaid", "name"]
+
+    async def test_a_name_that_already_says_mmd_is_left_alone(
+        self, wired: MCPServer, artifacts: FakeArtifacts
+    ) -> None:
+        """Because a model that has seen `artifact_create` will sometimes write the extension
+        anyway, and `handshake.mmd.mmd` is what that looks like when nobody checks."""
+        async with talking_to(wired) as client:
+            await client.call_tool(
+                "diagram_create",
+                {"name": "handshake.mmd", "mermaid": "flowchart TD\n  A --> B\n"},
+                meta=in_chat("c-1"),
+            )
+
+        assert list(artifacts.chats["c-1"]) == ["handshake.mmd"]
+
+    async def test_it_is_drawn_in_the_flow_unless_the_call_says_beside(
+        self, wired: MCPServer
+    ) -> None:
+        """The whole reason this is not `artifact_create` with an extension in it. A diagram
+        belongs in the sentence it explains, and by the time you would go and open it that
+        sentence has scrolled away — so *in the flow* is what happens when the model says
+        nothing, which is what it says most of the time (ADR 5)."""
+        async with talking_to(wired) as client:
+            drawn = await client.call_tool(
+                "diagram_create",
+                {"name": "handshake", "mermaid": "flowchart TD\n  A --> B"},
+                meta=in_chat("c-1"),
+            )
+            aside = await client.call_tool(
+                "diagram_create",
+                {"name": "topology", "mermaid": "flowchart TD\n  A --> B", "beside": True},
+                meta=in_chat("c-1"),
+            )
+
+        assert drawn.structured_content is not None
+        assert drawn.structured_content[ARTIFACT_META]["inline"] is True
+        assert aside.structured_content is not None
+        assert aside.structured_content[ARTIFACT_META]["inline"] is False
+
+    async def test_the_card_is_told_the_filename_and_so_is_she(self, wired: MCPServer) -> None:
+        """She never chose the extension, so the answer has to say what the file ended up called
+        — it is what `artifact_edit` and `artifact_read` take in a later turn."""
+        async with talking_to(wired) as client:
+            result = await client.call_tool(
+                "diagram_create",
+                {"name": "handshake", "mermaid": "flowchart TD"},
+                meta=in_chat("c-1"),
+            )
+
+        assert said(result) == "drew handshake.mmd (12 bytes)"
+        assert result.structured_content == {
+            ARTIFACT_META: {"name": "handshake.mmd", "inline": True, "bytes": 12}
+        }
+
+    async def test_the_two_descriptions_send_a_diagram_to_one_of_them(
+        self, wired: MCPServer
+    ) -> None:
+        """Descriptions are prompt text and these two both make a file, which is exactly the
+        overlap `artifact_create` and `scratch_write` needed pulling apart. The line here is that
+        one of them draws and the other cannot: `artifact_create` says so and names the tool that
+        does, rather than leaving a model to infer it from an extension list."""
+        async with talking_to(wired) as client:
+            listing = await client.list_tools()
+
+        create = next(t for t in listing.tools if t.name == "artifact_create")
+        assert create.description is not None
+        assert "diagram_create" in create.description
+        # And it no longer offers a second way to do it, which is what made the choice a guess.
+        assert ".mmd" not in create.description
+
+        draw = next(t for t in listing.tools if t.name == "diagram_create")
+        assert draw.description is not None
+        assert "mermaid" in draw.description
+        assert "artifact_edit" in draw.description

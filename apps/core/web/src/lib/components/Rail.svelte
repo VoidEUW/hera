@@ -1,7 +1,8 @@
 <script lang="ts">
 	/**
 	 * The left rail: the mark, a new chat, projects that disclose their chats, then loose chats.
-	 * Settings sits directly above the profile card at the bottom, where the brief put it.
+	 * The profile card at the bottom is the way into Settings: one door, labelled with who you are,
+	 *and the place the account screen will live.
 	 *
 	 * Projects disclose inline rather than navigating, because finding a chat under the thing it
 	 * belongs to is genuinely easier than finding it in one flat list sorted by time.
@@ -18,7 +19,7 @@
 	 */
 	import { untrack } from 'svelte';
 	import { resolve } from '$app/paths';
-	import { API, api, type Chat, type Profile, type Project } from '$lib/api/client';
+	import { API, api, type Account, type Chat, type Project } from '$lib/api/client';
 	import { t } from '$lib/i18n';
 	import { Placeholder } from '$lib/loading.svelte';
 	import { disclose } from '$lib/motion';
@@ -31,7 +32,8 @@
 	interface Props {
 		chats: Chat[];
 		projects: Project[];
-		profile: Profile | null;
+		/** Who the owner is, once it has answered. Null still draws the card, as "Account". */
+		account: Account | null;
 		activeId?: string | null;
 		activeProjectId?: string | null;
 		/** Whether the workspace is still being fetched. An empty list and a list that has not
@@ -41,7 +43,8 @@
 		shape?: Shape;
 		onnew?: (projectId?: string) => void;
 		onsettings?: () => void;
-		onprofile?: () => void;
+		/** Settings is open: the card that opened it stays lit while it is. */
+		settingsOpen?: boolean;
 		onrename?: (id: string, title: string) => void;
 		ondelete?: (id: string) => void;
 		onmove?: (chatId: string, projectId: string | null) => void;
@@ -53,14 +56,14 @@
 	let {
 		chats,
 		projects,
-		profile,
+		account,
 		activeId = null,
 		activeProjectId = null,
 		loading = false,
 		shape = { chats: 3, projects: 2 },
 		onnew,
 		onsettings,
-		onprofile,
+		settingsOpen = false,
 		onrename,
 		ondelete,
 		onmove,
@@ -192,6 +195,8 @@
 		renaming = null;
 		creating = false;
 	}
+
+	const shown = $derived(account?.name || t.rail.accountLabel);
 
 	function initials(name: string): string {
 		return name
@@ -548,23 +553,36 @@
 	</ul>
 
 	<div class="foot">
-		<button class="action" type="button" onclick={() => onsettings?.()}>
-			<span class="glyph" aria-hidden="true">⚙</span>
-			{t.rail.settings}
-		</button>
-
 		{#if waiting}
 			<!-- The card is the last thing in a rail that is pinned to the bottom of the window,
-			     so arriving late moves Settings out from under the pointer. Hold its height. -->
+			     so arriving late moves it out from under the pointer. Hold its height. -->
 			<div class="card-waiting"><Skeleton rows={1} height={42} widths={[100]} /></div>
-		{:else if profile}
-			<!-- Everything that is about *you* rather than about her behaviour lives behind this:
-			     appearance, which of her answers, where your data is. Settings above is the other
-			     half, and keeping them apart is why neither of them is a scroll. -->
-			<button class="card" type="button" onclick={() => onprofile?.()}>
-				<span class="initials">{initials(profile.name)}</span>
-				<span class="label">{profile.name}</span>
-				<span class="chevron up" aria-hidden="true">▴</span>
+		{:else}
+			<!-- Who you are, and the way into Settings. There is no separate Settings button: the
+			     account screen is Settings' first page, so this is the door to press. It draws before
+			     the account has answered (as "Account") so a slow request cannot lock Settings away. -->
+			<button
+				class="card"
+				class:open={settingsOpen}
+				type="button"
+				aria-haspopup="dialog"
+				aria-expanded={settingsOpen}
+				aria-label={t.rail.account(shown)}
+				onclick={() => onsettings?.()}
+			>
+				{#if account?.avatar_version}
+					<img
+						class="initials avatar"
+						src={api.avatarUrl(account.avatar_version)}
+						alt=""
+						width="24"
+						height="24"
+					/>
+				{:else}
+					<span class="initials">{initials(account?.name ?? '') || '·'}</span>
+				{/if}
+				<span class="label">{shown}</span>
+				<span class="cog" aria-hidden="true">⚙</span>
 			</button>
 		{/if}
 	</div>
@@ -883,10 +901,66 @@
 		border: 1px solid var(--line);
 		border-radius: var(--radius);
 		font-size: 13.5px;
+		transition:
+			background var(--fade) var(--ease),
+			border-color var(--fade) var(--ease),
+			transform 120ms var(--ease);
 	}
 
-	.up {
+	/* A reaction to the pointer and to the keyboard alike: the border warms to brass, the
+	   ground lifts, the initials fill, and the cog on the far side turns a notch. */
+	.card:hover,
+	.card:focus-visible,
+	.card.open {
+		background: var(--surface);
+		border-color: var(--brass);
+	}
+
+	.card:active {
+		transform: scale(0.98);
+	}
+
+	/* While the modal is open the card stays lit and the cog keeps turning once, so the
+	   gesture that opened Settings is still visibly the one in charge of it. */
+	.card.open .cog {
+		animation: cog-turn 700ms var(--ease) 1;
+	}
+
+	.card:hover .initials,
+	.card:focus-visible .initials,
+	.card.open .initials {
+		background: var(--brass);
+		color: var(--ground);
+	}
+
+	.cog {
 		margin-left: auto;
+		font-size: 14px;
+		line-height: 1;
+		color: var(--text-faint);
+		transition:
+			transform 400ms var(--ease),
+			color var(--fade) var(--ease);
+	}
+
+	.card:hover .cog,
+	.card:focus-visible .cog,
+	.card.open .cog {
+		color: var(--brass);
+		transform: rotate(60deg);
+	}
+
+	@keyframes cog-turn {
+		from {
+			transform: rotate(-120deg);
+		}
+		to {
+			transform: rotate(60deg);
+		}
+	}
+
+	.avatar {
+		object-fit: cover;
 	}
 
 	.initials {
@@ -897,6 +971,9 @@
 		flex: none;
 		border-radius: 6px;
 		background: var(--surface-raised);
+		transition:
+			background var(--fade) var(--ease),
+			color var(--fade) var(--ease);
 		font-size: 11px;
 		letter-spacing: 0.04em;
 		color: var(--text-muted);

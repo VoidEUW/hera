@@ -83,11 +83,24 @@ def script() -> list[Any]:
 
 
 @pytest.fixture
+def stream_delay() -> float:
+    """How long the scripted model waits between fragments.
+
+    Nothing by default, because every test that is about *what* is on screen wants the answer
+    to arrive at once. A test about what happens **while** it arrives overrides this: at zero
+    the browser is handed a finished turn and renders it once, so a view that redraws itself on
+    every fragment looks exactly like one that does not.
+    """
+    return 0.0
+
+
+@pytest.fixture
 def server(
     built_interface: Path,
     tmp_path_factory: pytest.TempPathFactory,
     monkeypatch: pytest.MonkeyPatch,
     script: list[Any],
+    stream_delay: float,
 ) -> Iterator[str]:
     """A real server on a free port, with its own data directory.
 
@@ -113,7 +126,9 @@ def server(
     monkeypatch.setenv("HERA_STORAGE_URL", f"sqlite:///{home / 'hera.sqlite3'}")
 
     settings = CoreSettings()
-    services = build_services(settings, provider=FakeProvider(script), registry=None)
+    services = build_services(
+        settings, provider=FakeProvider(script, delay=stream_delay), registry=None
+    )
     prepare(services.database, services.mind, owner_id=settings.owner_id)
 
     port = free_port()

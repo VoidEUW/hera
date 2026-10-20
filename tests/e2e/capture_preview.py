@@ -520,7 +520,29 @@ def act_composer(page: Page, base: str, shots: Path, report: Report) -> None:
 #: The nav in the order the interface puts it, which `test_settings_is_one_size` asserts
 #: separately. Filmed by position rather than by name, because a name is a string in a
 #: translation file and a position is not.
-SETTINGS_TABS = ("Models", "Skills", "Servers", "Permissions", "Memory", "Mind", "Dreaming")
+SETTINGS_TABS = (
+    "Account",
+    "Models",
+    "General",
+    "Skills",
+    "Servers",
+    "Permissions",
+    "Memory",
+    "Mind",
+    "Dreaming",
+)
+
+
+def settled(page: Page) -> None:
+    """Wait for the Settings panel to stop being a loading placeholder.
+
+    Settings fetches its three data sets for itself and draws `Rows` -- bars of grey -- while it
+    does, so a screenshot taken in that window is a picture of a spinner, not of the screen. The
+    wait is on `aria-busy`, which is the part of the placeholder that means "not ready" and is a
+    promise rather than a style; a `wait_for_timeout` here is a guess, and a guess is what put
+    two loading screenshots in the walkthrough.
+    """
+    page.wait_for_selector("[role='dialog'] [aria-busy='true']", state="detached", timeout=15_000)
 
 
 def act_settings(page: Page, base: str, shots: Path, report: Report) -> None:
@@ -533,8 +555,8 @@ def act_settings(page: Page, base: str, shots: Path, report: Report) -> None:
         page.goto(base, wait_until="networkidle")
         page.get_by_role("button", name="Settings").first.click(timeout=5_000)
         page.wait_for_selector("[role='dialog']", timeout=10_000)
-        page.wait_for_timeout(500)
-        shoot(page, shots, "30-settings-models")
+        settled(page)
+        shoot(page, shots, "30-settings-account")
 
     nav = page.locator("[role='dialog'] nav.tabs")
     for index, tab in enumerate(SETTINGS_TABS[1:], start=1):
@@ -545,11 +567,7 @@ def act_settings(page: Page, base: str, shots: Path, report: Report) -> None:
             nav.get_by_role("button", name=tab).click(timeout=5_000)
             # The panel swaps in on a fetch, and a shot taken during the swap shows the old tab's
             # rows under the new tab's name -- which is the one thing this scene must not do.
-            # `aria-busy` rather than a class name: it is the part of the loading placeholder that
-            # means "not ready", and it is a promise rather than a style.
-            page.wait_for_selector(
-                "[role='dialog'] [aria-busy='true']", state="detached", timeout=10_000
-            )
+            settled(page)
             page.wait_for_timeout(700)
             shoot(page, shots, f"3{index}-settings-{tab.lower()}", full=True)
 
@@ -558,22 +576,23 @@ def act_settings(page: Page, base: str, shots: Path, report: Report) -> None:
         page.wait_for_timeout(300)
         page.get_by_role("button", name="Settings").first.click(timeout=5_000)
         page.wait_for_selector("[role='dialog'] input", timeout=5_000)
+        settled(page)
         page.locator("[role='dialog'] input").first.fill("kerberos")
         page.wait_for_timeout(600)
         shoot(page, shots, "39-settings-search")
 
 
 def act_profile(page: Page, base: str, shots: Path, report: Report) -> None:
-    """The profile menu, and the light theme it carries.
+    """Settings → General, and the light theme it carries.
 
     Light is a whole palette rather than an inversion, and the control for it is not in Settings:
-    it is here, on the card at the bottom of the rail, which is why the rail has to be on screen to
-    reach it.
+    it is on the General screen, reached through the card at the bottom of the rail.
     """
     with report.scene("profile-menu", "theme", page, shots):
         page.goto(base, wait_until="networkidle")
         page.locator("nav.rail button.card").first.click(timeout=5_000)
         page.wait_for_selector("[role='dialog']", timeout=10_000)
+        page.get_by_role("button", name="General", exact=True).click(timeout=5_000)
         page.wait_for_timeout(500)
         shoot(page, shots, "40-profile-menu")
 
@@ -592,6 +611,7 @@ def act_profile(page: Page, base: str, shots: Path, report: Report) -> None:
     with report.scene("back-to-dark", "theme", page, shots):
         page.locator("nav.rail button.card").first.click(timeout=5_000)
         page.wait_for_selector("[role='dialog']", timeout=10_000)
+        page.get_by_role("button", name="General", exact=True).click(timeout=5_000)
         page.get_by_role("button", name="Dark", exact=True).first.click(timeout=5_000)
         page.wait_for_timeout(500)
         page.keyboard.press("Escape")
@@ -603,19 +623,30 @@ def act_profile(page: Page, base: str, shots: Path, report: Report) -> None:
 
 
 def act_reduced_motion(page: Page, base: str, shots: Path, report: Report) -> None:
-    """A pass with motion off, which is both a look and a check.
+    """Motion off, shown on the two gestures the CSS override cannot reach.
 
-    ``docs/frontend.md`` claims reduced motion "removes every transition". Three of the primitives
-    that drive sheets and popups are JavaScript transitions, which the global CSS override does
-    not reach -- so this scene is the evidence either way, and a reviewer can see a dialog that
-    ought to be still and is not.
+    `docs/frontend.md` claims reduced motion "removes every transition". A `transition:` is
+    switched off by the media query for free; a Svelte transition is a `requestAnimationFrame`
+    loop that never asks, so a sheet and a dropdown are the two places the claim can be false
+    and both are fixed in `motion.ts` -- which makes them the two worth a frame. A still Settings
+    sheet would prove nothing about either, and says nothing at all about the sheet *arriving*.
     """
     with report.scene("reduced-motion", "accessibility", page, shots):
         page.goto(base, wait_until="networkidle")
         page.get_by_role("button", name="Settings").first.click(timeout=5_000)
         page.wait_for_selector("[role='dialog']", timeout=10_000)
-        page.wait_for_timeout(600)
+        settled(page)
         shoot(page, shots, "50-reduced-motion-settings")
+        page.keyboard.press("Escape")
+        page.wait_for_timeout(400)
+
+    with report.scene("reduced-motion-drawer", "accessibility", page, shots):
+        # The second of the two, and the one a person meets most: a dropdown that arrives
+        # instantly rather than sliding.
+        page.locator(".bar .model button.pill").first.click(timeout=5_000)
+        page.wait_for_selector("[role='listbox']", timeout=5_000)
+        page.wait_for_timeout(300)
+        shoot(page, shots, "51-reduced-motion-dropdown")
         page.keyboard.press("Escape")
 
 
@@ -643,7 +674,8 @@ def act_mobile(page: Page, base: str, shots: Path, report: Report, chat_url: str
         page.wait_for_timeout(400)
         page.get_by_role("button", name="Settings").first.click(timeout=5_000)
         page.wait_for_selector("[role='dialog']", timeout=10_000)
-        page.wait_for_timeout(600)
+        settled(page)
+        page.wait_for_timeout(500)
         shoot(page, shots, "73-phone-settings")
 
 

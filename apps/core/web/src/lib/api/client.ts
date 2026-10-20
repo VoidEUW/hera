@@ -158,6 +158,7 @@ export interface Skill {
 	resources: string[];
 	problems: string[];
 	hits: number;
+	enabled: boolean;
 	last_used_at: string | null;
 	author: string;
 	license: string;
@@ -205,6 +206,9 @@ export interface ModelEntry {
 	 * what looks like a tool call instead of making one for real — it answers in prose alone
 	 * rather than attempting a call it cannot make. */
 	tool_calling: boolean;
+	/** Whether this model can be shown a picture. Recorded for a later change to read; nothing
+	 * refuses an attachment on it yet. */
+	accepts_images: boolean;
 	/** The `reasoning_effort` values this model accepts, asked of the endpoint. **Empty means
 	 * unknown, not "any"** — so a reasoning control is drawn only when this is non-empty. The
 	 * values are not a shared vocabulary (OpenRouter carries `minimal`, `none` and `xhigh`, and a
@@ -229,6 +233,10 @@ export interface ModelEntry {
 	/** Which control this model wants — `values`, `budget`, `toggle` or `none`. Decided server-side
 	 * so the composer and the settings screen cannot disagree about it. */
 	thinking_shape: string;
+	/** Whether this endpoint's chat template can render a tool declaration — `template`, `none` or
+	 * `unknown`. A fact about the template and nothing more: it is *not* a claim that a call will
+	 * come back as a call, which needs an engine with a parser for this model's dialect (#145). */
+	tool_call_shape: string;
 }
 
 /** A known set of {@link ModelEntry.options}, offered on Settings → Models.
@@ -281,6 +289,14 @@ export interface Probe {
 	ok: boolean;
 	models: string[];
 	error: string;
+}
+
+export interface Account {
+	name: string;
+	email: string;
+	/** Zero when there is no picture; otherwise a version for {@link api.avatarUrl}, so a
+	 * replaced picture is a new address and a cached one cannot outlive it. */
+	avatar_version: number;
 }
 
 export interface Preferences {
@@ -378,6 +394,13 @@ export const api = {
 	 * earlier card draws, which ADR 13 makes deliberate. */
 	artifact: (chatId: string, name: string) =>
 		request<ArtifactContent>(`/chats/${chatId}/artifacts/${encodeURIComponent(name)}`),
+	/** Tell the server this artifact would not draw, so she hears about it on her next turn.
+	 * Only a browser can know: mermaid lays a diagram out by measuring text. */
+	reportArtifactProblem: (chatId: string, name: string, message: string) =>
+		request<void>(`/chats/${chatId}/artifacts/${encodeURIComponent(name)}/problem`, {
+			method: 'PUT',
+			body: JSON.stringify({ message })
+		}),
 
 	providers: () => request<Providers>('/providers'),
 	addProvider: (body: {
@@ -422,6 +445,7 @@ export const api = {
 			options?: Record<string, unknown>;
 			context_length?: number | null;
 			tool_calling?: boolean;
+			accepts_images?: boolean;
 		}
 	) =>
 		request<Providers>(`/providers/${name}/models`, { method: 'POST', body: JSON.stringify(body) }),
@@ -435,8 +459,27 @@ export const api = {
 
 	skills: () =>
 		request<{ skills: Skill[]; broken: BrokenSkill[]; trust_problem: string }>('/skills'),
-	createSkill: (body: { id: string; description?: string; body?: string }) =>
+	/** Creates a skill folder. `content` is a whole SKILL.md and is written as it is. */
+	createSkill: (body: { id: string; content: string }) =>
 		request<Skill>('/skills', { method: 'POST', body: JSON.stringify(body) }),
+	/** Deletes the skill's folder. Not undoable. */
+	deleteSkill: (id: string) =>
+		request<void>(`/skills/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+	/** The skill's SKILL.md verbatim, for the editor. */
+	skillSource: (id: string) =>
+		request<{ content: string }>(`/skills/${encodeURIComponent(id)}/source`),
+	/** Replaces the file. What comes back is what the loader made of it, `problems` included. */
+	saveSkillSource: (id: string, content: string) =>
+		request<Skill>(`/skills/${encodeURIComponent(id)}/source`, {
+			method: 'PUT',
+			body: JSON.stringify({ content })
+		}),
+	/** Off means not routed, not offered to `/slash`, not pinnable. The folder stays. */
+	setSkillEnabled: (id: string, enabled: boolean) =>
+		request<Skill>(`/skills/${encodeURIComponent(id)}`, {
+			method: 'PATCH',
+			body: JSON.stringify({ enabled })
+		}),
 
 	/** Everything she has written down (ADR 16). Switched-off ones included — the switch is
 	 * about what a turn costs, and a list that hid them would leave you unable to switch one
@@ -460,6 +503,15 @@ export const api = {
 	 * keeps the file — nothing a person told her is discarded without a person present. */
 	deleteMemory: (key: string) =>
 		request<void>(`/memories/${encodeURIComponent(key)}`, { method: 'DELETE' }),
+
+	account: () => request<Account>('/account'),
+	updateAccount: (patch: { name?: string; email?: string }) =>
+		request<Account>('/account', { method: 'PATCH', body: JSON.stringify(patch) }),
+	setAvatar: (data_url: string) =>
+		request<Account>('/account/avatar', { method: 'PUT', body: JSON.stringify({ data_url }) }),
+	removeAvatar: () => request<Account>('/account/avatar', { method: 'DELETE' }),
+	/** Where the avatar is served from — an `<img src>`, not fetched through `request`. */
+	avatarUrl: (version: number) => `${API}/account/avatar?v=${version}`,
 
 	preferences: () => request<Preferences>('/preferences'),
 	setTimezone: (timezone: string) =>

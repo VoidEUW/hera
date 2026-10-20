@@ -27,7 +27,8 @@ from fastapi.responses import Response
 
 from hera_core.chat_files import ChatFileRefused, FileArtifacts
 from hera_core.deps import Db, Owner, not_found, require_chat
-from hera_core.schemas import ArtifactContent, ArtifactOut
+from hera_core.problems import problems
+from hera_core.schemas import ArtifactContent, ArtifactOut, ArtifactProblem
 
 router = APIRouter(tags=["artifacts"])
 
@@ -59,6 +60,20 @@ async def read_artifact(chat_id: UUID, name: str, owner: Owner, db: Db) -> Artif
     chat = require_chat(db, chat_id, owner)
     text = await _content(chat_id=str(chat.id), name=name)
     return ArtifactContent(name=name, bytes=len(text.encode("utf-8")), text=text)
+
+
+@router.put("/chats/{chat_id}/artifacts/{name}/problem", status_code=status.HTTP_204_NO_CONTENT)
+def report_problem(
+    chat_id: UUID, name: str, payload: ArtifactProblem, owner: Owner, db: Db
+) -> None:
+    """The browser could not draw this artifact; tell her on the next turn.
+
+    A 404 for a file that is not there, like the read beside it. Reporting twice replaces the
+    first report rather than adding to it, so a card that fails on every re-render says it once.
+    """
+    chat = require_chat(db, chat_id, owner)
+    if not problems.report(str(chat.id), name, payload.message):
+        raise not_found("artifact")
 
 
 @router.get("/chats/{chat_id}/artifacts/{name}/download")

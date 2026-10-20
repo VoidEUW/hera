@@ -641,6 +641,25 @@ describe('what she published', () => {
 		expect(turn.inline.find((item) => item.kind === 'artifact')?.artifact?.inline).toBe(true);
 	});
 
+	it('draws a card for a diagram too, from its own tool', () => {
+		// `diagram_create` is a separate tool because drawing is a different act from publishing
+		// — but what comes back is the same file under the same key, so this side reads one
+		// shape. A second card variant for the same thing is what that separation must not cost.
+		const turn = reduce([
+			text('The handshake, then:'),
+			call('d1', 'hera__diagram_create', { name: 'handshake', mermaid: 'flowchart TD' }),
+			result('d1', 'hera__diagram_create', {
+				text: 'drew handshake.mmd (12 bytes)',
+				structured: { artifact: { name: 'handshake.mmd', inline: true, bytes: 12 } }
+			}),
+			closed()
+		]);
+
+		const card = turn.inline.find((item) => item.kind === 'artifact');
+		expect(card?.artifact).toEqual({ name: 'handshake.mmd', inline: true, bytes: 12 });
+		expect(turn.blocks.map((block) => block.kind)).toEqual(['prose', 'gutter', 'artifact']);
+	});
+
 	it('draws nothing for an edit, because the card already shows the file', () => {
 		// An artifact has one current state everywhere it appears (ADR 13): editing it in turn
 		// nine changes what the card in turn four draws, so a second card would be one file
@@ -680,6 +699,28 @@ describe('what she published', () => {
 
 		expect(turn.inline.filter((item) => item.kind === 'artifact')).toHaveLength(0);
 		expect(turn.activity.map((row) => row.kind)).toEqual(['tool']);
+	});
+
+	it('gives the card the same key streamed and reloaded', () => {
+		// The keys are what Svelte keeps a component by, so this is not a detail of the same
+		// property below: a card whose key changes at `done` is destroyed and built again, and
+		// everything it was holding goes with it — an artifact is refetched and a diagram is
+		// redrawn from nothing, in the one frame where the answer was supposed to be finished.
+		// The persisted list has no `tool_call_started` in it, so anything keyed on a position
+		// in the list shifts by one the moment the server's version lands.
+		const live = [
+			text('Here:'),
+			started('a1', 'hera__artifact_create'),
+			call('a1', 'hera__artifact_create', { name: 'page.html', content: 'x' }),
+			published('a1', 'page.html'),
+			text('That is the page.'),
+			closed()
+		];
+		const stored = live.filter((event) => event.type !== 'tool_call_started');
+
+		expect(reduce(stored).blocks.map((block) => block.key)).toEqual(
+			reduce(live).blocks.map((block) => block.key)
+		);
 	});
 
 	it('reduces to the same blocks streamed and reloaded', () => {
