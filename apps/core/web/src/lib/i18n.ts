@@ -627,6 +627,21 @@ export const t = {
 		detail: 'What the browser said'
 	},
 
+	/** `+error.svelte`: an address that leads nowhere, and a screen that could not be drawn. */
+	notFound: {
+		title: 'Nothing here',
+		body: 'This address does not lead to a chat, a project or a screen in Hera. It may have been deleted, or the link was mistyped.',
+		home: 'Back to the start'
+	},
+
+	broken: {
+		title: 'Something went wrong',
+		body: 'Hera could not draw this screen. Reloading usually helps; if it does not, the detail below is what to report.',
+		reload: 'Reload',
+		home: 'Back to the start',
+		detail: 'What went wrong'
+	},
+
 	/** The primitives in `lib/components/ui/`: words that belong to a control, not to a screen. */
 	ui: {
 		close: 'Close',

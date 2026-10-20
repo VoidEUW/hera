@@ -490,6 +490,14 @@ def act_rail(page: Page, base: str, shots: Path, report: Report) -> None:
         page.get_by_role("button", name="Expand the sidebar").click(timeout=5_000)
         page.wait_for_timeout(400)
 
+    with report.scene("not-found", "rail", page, shots):
+        # An address that leads nowhere: the router's error page, inside the shell.
+        page.goto(f"{base}/no-such-screen", wait_until="networkidle")
+        page.get_by_role("heading", name="Nothing here").wait_for(timeout=10_000)
+        page.wait_for_timeout(500)
+        shoot(page, shots, "19-not-found")
+        page.goto(base, wait_until="networkidle")
+
 
 def act_composer(page: Page, base: str, shots: Path, report: Report) -> None:
     """The controls in the composer's bar, each opened.
