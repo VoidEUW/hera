@@ -12,6 +12,7 @@
 	 */
 	import type { Snippet } from 'svelte';
 	import Icon from '../Icon.svelte';
+	import IconButton from '../IconButton.svelte';
 	import { sidebarContext } from './Sidebar.svelte';
 
 	interface Props {
@@ -36,7 +37,7 @@
 	}: Props = $props();
 
 	const context = sidebarContext();
-	const id = `group-${Math.random().toString(36).slice(2, 9)}`;
+	const id = $props.id();
 	const shut = $derived(!fixed && !open && !context.collapsed);
 </script>
 
@@ -58,9 +59,7 @@
 		{/if}
 		{#if count !== undefined}<span class="count">{count}</span>{/if}
 		{#if onadd}
-			<button class="add" type="button" aria-label={addLabel} title={addLabel} onclick={onadd}>
-				<Icon name="plus" />
-			</button>
+			<IconButton icon="plus" size="sm" label={addLabel ?? label} onclick={onadd} />
 		{/if}
 	</div>
 	<div class="entries" {id} inert={shut}>
@@ -127,23 +126,6 @@
 		font-size: 11px;
 		font-variant-numeric: tabular-nums;
 		line-height: 1.6;
-	}
-
-	.add {
-		display: grid;
-		place-items: center;
-		width: calc(var(--space) * 5.5);
-		height: calc(var(--space) * 5.5);
-		border-radius: var(--radius-sm);
-		color: var(--text-faint);
-		transition:
-			background var(--motion-entry-hover),
-			color var(--motion-entry-hover);
-	}
-
-	.add:hover {
-		background: var(--hover);
-		color: var(--text);
 	}
 
 	.entries {

@@ -28,6 +28,9 @@
 	import { API, api, type MemoryBudget, type MemoryItem } from '$lib/api/client';
 	import Checkbox from '$lib/components/ui/Checkbox.svelte';
 	import Input from '$lib/components/ui/Input.svelte';
+	import Pill from '$lib/components/ui/Pill.svelte';
+	import ProgressBar from '$lib/components/ui/ProgressBar.svelte';
+	import Textarea from '$lib/components/ui/Textarea.svelte';
 	import { t } from '$lib/i18n';
 	import { Placeholder } from '$lib/loading.svelte';
 	import Rows from './Rows.svelte';
@@ -159,16 +162,15 @@
 			<!-- Not a number in a corner. The one thing a person needs to know is how close they are,
 			     and a bar answers that before it is read. -->
 			<div class="gauge">
-				<div
-					class="track"
-					role="meter"
-					aria-valuenow={budget.used}
-					aria-valuemin={0}
-					aria-valuemax={budget.limit}
-					aria-label={t.memory.spaceLabel}
-				>
-					<div class="fill" class:tight={filled > 0.85} style:width={`${filled * 100}%`}></div>
-				</div>
+				<ProgressBar
+					meter
+					thick
+					value={budget.used}
+					max={budget.limit}
+					tone={filled > 0.85 ? 'danger' : 'live'}
+					label={t.memory.spaceLabel}
+					valuetext={t.memory.used(budget.used, budget.limit)}
+				/>
 				<p class="reading">
 					<strong>{t.memory.left(budget.limit - budget.used)}</strong>
 					<span class="of">{t.memory.used(budget.used, budget.limit)}</span>
@@ -188,14 +190,13 @@
 			<!-- A plain link at the export route. The browser knows how to save a file, and the
 			     response says `attachment` — the document is partly text a model wrote, and Hera's
 			     own origin is not where that gets rendered. -->
-			<a
-				class="action"
+			<Button
+				size="sm"
+				icon="download"
 				href={`${API}/memories/export/MEMORY.md`}
 				download="MEMORY.md"
-				rel="external"
+				external>{t.memory.export}</Button
 			>
-				{t.memory.export}
-			</a>
 		</div>
 
 		{#if !memories.length}
@@ -208,12 +209,11 @@
 					<li class="item" class:off={!memory.enabled}>
 						<div class="top">
 							<span class="key">{memory.key}</span>
-							{#if memory.scope === 'chat'}<span class="tag">{t.memory.hereOnly}</span>{/if}
-							<span class="tag quiet">
-								{memory.source === 'auto' ? t.memory.hers : t.memory.yours}
-							</span>
+							{#if memory.scope === 'chat'}<Pill tone="live">{t.memory.hereOnly}</Pill>{/if}
+							<Pill>{memory.source === 'auto' ? t.memory.hers : t.memory.yours}</Pill>
 							<span class="cost">{t.memory.tokens(memory.tokens)}</span>
 							<Checkbox
+								variant="switch"
 								checked={memory.enabled}
 								label={memory.enabled ? t.memory.on : t.memory.offOne}
 								ariaLabel={t.memory.useIt(memory.key)}
@@ -223,27 +223,23 @@
 
 						{#if editing === memory.key}
 							<div class="editor">
-								<label>
-									<span class="label">{t.memory.description}</span>
-									<Input
-										variant="editor"
-										value={draft.description}
-										onchange={(value) => (draft.description = value)}
-									/>
-								</label>
-								<label>
-									<span class="label">{t.memory.text}</span>
-									<textarea bind:value={draft.text} rows="4"></textarea>
-								</label>
-								<label>
-									<span class="label">{t.memory.why}</span>
-									<Input
-										variant="editor"
-										value={draft.why}
-										placeholder={t.memory.whyHint}
-										onchange={(value) => (draft.why = value)}
-									/>
-								</label>
+								<Input
+									label={t.memory.description}
+									value={draft.description}
+									onchange={(value) => (draft.description = value)}
+								/>
+								<Textarea
+									label={t.memory.text}
+									rows={4}
+									value={draft.text}
+									onchange={(value) => (draft.text = value)}
+								/>
+								<Input
+									label={t.memory.why}
+									value={draft.why}
+									placeholder={t.memory.whyHint}
+									onchange={(value) => (draft.why = value)}
+								/>
 								<p class="note">{t.memory.editNote}</p>
 							</div>
 						{:else}
@@ -258,25 +254,41 @@
 							{/if}
 							{#if editing === memory.key}
 								<span class="confirm">
-									<Button variant="highlighted" onclick={() => save(memory.key)}>
+									<Button variant="ghost" size="sm" onclick={() => (editing = '')}>
+										{t.memory.cancel}
+									</Button>
+									<Button variant="highlighted" size="sm" onclick={() => save(memory.key)}>
 										{t.memory.save}
 									</Button>
-									<button type="button" onclick={() => (editing = '')}>{t.memory.cancel}</button>
 								</span>
 							{:else if confirming === memory.key}
 								<span class="confirm">
 									{t.memory.deleteAsk}
-									<Button variant="danger-soft" onclick={() => remove(memory.key)}>
+									<Button variant="ghost" size="sm" onclick={() => (confirming = '')}>
+										{t.memory.cancel}
+									</Button>
+									<Button
+										variant="danger"
+										size="sm"
+										icon="trash"
+										onclick={() => remove(memory.key)}
+									>
 										{t.memory.delete}
 									</Button>
-									<button type="button" onclick={() => (confirming = '')}>{t.memory.cancel}</button>
 								</span>
 							{:else}
 								<span class="confirm">
-									<button type="button" onclick={() => edit(memory)}>{t.memory.edit}</button>
-									<button type="button" onclick={() => (confirming = memory.key)}>
+									<Button variant="ghost" size="sm" icon="edit" onclick={() => edit(memory)}>
+										{t.memory.edit}
+									</Button>
+									<Button
+										variant="danger-soft"
+										size="sm"
+										icon="trash"
+										onclick={() => (confirming = memory.key)}
+									>
 										{t.memory.delete}
-									</button>
+									</Button>
 								</span>
 							{/if}
 						</div>
@@ -322,29 +334,6 @@
 		gap: 7px;
 	}
 
-	/* The empty part has to read as a track, or a nearly-empty bar looks like a stray mark
-	   rather than like plenty of room. `--surface-raised` alone is too close to the panel it sits
-	   on, so the outline is what makes the shape legible when the fill is 0.4 % wide. */
-	.track {
-		height: 9px;
-		border: 1px solid var(--line);
-		border-radius: 999px;
-		background: var(--surface-raised);
-		overflow: hidden;
-	}
-
-	.fill {
-		height: 100%;
-		background: var(--brass);
-		transition: width var(--fade) var(--ease);
-	}
-
-	/* The only colour change on this screen, and it is at 85 %: the point where the next thing
-	   she tries to remember is likely to be refused, which is the moment to say something. */
-	.fill.tight {
-		background: var(--danger);
-	}
-
 	.reading {
 		display: flex;
 		align-items: baseline;
@@ -365,21 +354,7 @@
 
 	.head {
 		display: flex;
-	}
-
-	.action {
-		margin-left: auto;
-		padding: 4px 10px;
-		border: 1px solid var(--line);
-		border-radius: var(--radius);
-		font-size: 12.5px;
-		color: var(--text-muted);
-		text-decoration: none;
-	}
-
-	.action:hover {
-		color: var(--text);
-		border-color: var(--brass);
+		justify-content: flex-end;
 	}
 
 	.list {
@@ -392,9 +367,8 @@
 	}
 
 	.item {
-		padding: 11px 12px;
-		border: 1px solid var(--line);
-		border-left: 3px solid var(--brass);
+		padding: 12px 14px;
+		border: var(--border-width) solid var(--line);
 		border-radius: var(--radius);
 		background: var(--surface);
 	}
@@ -402,13 +376,12 @@
 	/* Kept, listed and legible — just not paid for. A memory switched off is greyed rather than
 	   hidden, because hiding it is how a person loses the ability to switch it back on. */
 	.item.off {
-		border-left-color: var(--line);
 		opacity: 0.62;
 	}
 
 	.top {
 		display: flex;
-		align-items: baseline;
+		align-items: center;
 		gap: 8px;
 	}
 
@@ -416,20 +389,6 @@
 		font-family: var(--font-mono);
 		font-size: 13px;
 		color: var(--text);
-	}
-
-	.tag {
-		padding: 1px 6px;
-		border-radius: 999px;
-		background: var(--surface-raised);
-		font-size: 11px;
-		color: var(--text-muted);
-	}
-
-	.tag.quiet {
-		background: none;
-		padding: 0;
-		color: var(--text-faint);
 	}
 
 	.cost {
@@ -459,36 +418,6 @@
 		margin-top: 8px;
 	}
 
-	.editor label {
-		display: flex;
-		flex-direction: column;
-		gap: 3px;
-	}
-
-	.label {
-		font-size: 11.5px;
-		color: var(--text-faint);
-	}
-
-	/* `Input.svelte`'s `'editor'` variant carries the matching look for the two text fields
-	   beside this — `<textarea>` is its own native control and stays outside that component. */
-	.editor textarea {
-		width: 100%;
-		padding: 6px 8px;
-		border: 1px solid var(--line);
-		border-radius: var(--radius);
-		background: var(--ground);
-		font-size: 13px;
-		color: var(--text);
-		font-family: inherit;
-		resize: vertical;
-	}
-
-	.editor textarea:focus {
-		outline: none;
-		border-color: var(--brass);
-	}
-
 	.note {
 		margin: 0;
 		font-size: 11.5px;
@@ -497,7 +426,7 @@
 
 	.foot {
 		display: flex;
-		align-items: baseline;
+		align-items: center;
 		gap: 10px;
 		margin-top: 8px;
 		font-size: 11.5px;
@@ -512,19 +441,10 @@
 
 	.confirm {
 		display: flex;
-		align-items: baseline;
-		gap: 8px;
-		margin-left: auto;
 		flex: none;
-	}
-
-	.confirm button {
-		font-size: 11.5px;
-		color: var(--text-faint);
-	}
-
-	.confirm button:hover {
-		color: var(--text);
+		align-items: center;
+		gap: 6px;
+		margin-left: auto;
 	}
 
 	.problem {

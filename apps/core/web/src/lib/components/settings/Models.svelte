@@ -17,10 +17,9 @@
 	 * `ModelOptions.svelte`.
 	 */
 	import Button from '$lib/components/ui/Button.svelte';
-	import Icon from '$lib/components/ui/Icon.svelte';
 	import { api, type ModelPreset, type Provider, type ProviderKind } from '$lib/api/client';
 	import Input from '$lib/components/ui/Input.svelte';
-	import Select from '$lib/components/ui/Select.svelte';
+	import Selector from '$lib/components/ui/Selector.svelte';
 	import { providers as disclosed } from '$lib/disclosure.svelte';
 	import { t } from '$lib/i18n';
 	import { Placeholder } from '$lib/loading.svelte';
@@ -120,92 +119,80 @@
 		<p class="error">{error}</p>
 	{/if}
 
-	{#each shown as entry (entry.name)}
-		<ProviderCard
-			{entry}
-			{active}
-			{presets}
-			open={isOpen(entry.name)}
-			ontoggle={() => disclosed.toggle(entry.name, entry.name === active || filter !== '')}
-			onchange={apply}
-			onerror={(message) => (error = message)}
-		/>
-	{:else}
-		<p class="empty">{t.models.none}</p>
-	{/each}
+	<div class="providers">
+		{#each shown as entry (entry.name)}
+			<ProviderCard
+				{entry}
+				{active}
+				{presets}
+				open={isOpen(entry.name)}
+				ontoggle={() => disclosed.toggle(entry.name, entry.name === active || filter !== '')}
+				onchange={apply}
+				onerror={(message) => (error = message)}
+			/>
+		{:else}
+			<p class="empty">{t.models.none}</p>
+		{/each}
+	</div>
 
 	{#if adding}
 		<section class="entry adding">
 			<h3>{t.models.add}</h3>
-			<label>
-				<span>{t.models.name}</span>
-				<Input
-					mono
-					value={fresh.name}
-					placeholder="studio"
-					onchange={(value) => (fresh = { ...fresh, name: value })}
-				/>
-				<small>{t.models.nameRule}</small>
-			</label>
-			<label>
-				<span>{t.models.kindLabel}</span>
-				<Select
-					choices={PROVIDER_KINDS.map((kind) => ({ value: kind, label: t.models.kind[kind] }))}
-					value={fresh.kind}
-					label={t.models.kindLabel}
-					field
-					onchange={(value) => (fresh = { ...fresh, kind: value as ProviderKind })}
-				/>
-			</label>
-			<label>
-				<span>{t.models.baseUrl}</span>
-				<Input
-					kind="url"
-					mono
-					value={fresh.base_url}
-					onchange={(value) => (fresh = { ...fresh, base_url: value })}
-				/>
-			</label>
-			<label>
-				<span>{t.models.modelId}</span>
-				<Input
-					mono
-					value={fresh.model_id}
-					placeholder="qwen3.6-35b"
-					onchange={(value) => (fresh = { ...fresh, model_id: value })}
-				/>
-			</label>
-			<label>
-				<span>{t.models.modelName}</span>
-				<Input
-					mono
-					value={fresh.model_name}
-					placeholder={t.models.modelId}
-					onchange={(value) => (fresh = { ...fresh, model_name: value })}
-				/>
-			</label>
-			<label>
-				<span>{t.models.apiKey}</span>
-				<Input
-					kind="password"
-					mono
-					value={fresh.api_key}
-					onchange={(value) => (fresh = { ...fresh, api_key: value })}
-				/>
-				<small>{t.models.keyBlank}</small>
-			</label>
+			<Input
+				mono
+				label={t.models.name}
+				help={t.models.nameRule}
+				value={fresh.name}
+				placeholder="studio"
+				onchange={(value) => (fresh = { ...fresh, name: value })}
+			/>
+			<Selector
+				caption={t.models.kindLabel}
+				choices={PROVIDER_KINDS.map((kind) => ({ value: kind, label: t.models.kind[kind] }))}
+				value={fresh.kind}
+				label={t.models.kindLabel}
+				onchange={(value) => (fresh = { ...fresh, kind: value as ProviderKind })}
+			/>
+			<Input
+				kind="url"
+				mono
+				label={t.models.baseUrl}
+				value={fresh.base_url}
+				onchange={(value) => (fresh = { ...fresh, base_url: value })}
+			/>
+			<Input
+				mono
+				label={t.models.modelId}
+				value={fresh.model_id}
+				placeholder="qwen3.6-35b"
+				onchange={(value) => (fresh = { ...fresh, model_id: value })}
+			/>
+			<Input
+				mono
+				label={t.models.modelName}
+				value={fresh.model_name}
+				placeholder={t.models.modelId}
+				onchange={(value) => (fresh = { ...fresh, model_name: value })}
+			/>
+			<Input
+				kind="password"
+				mono
+				label={t.models.apiKey}
+				help={t.models.keyBlank}
+				value={fresh.api_key}
+				onchange={(value) => (fresh = { ...fresh, api_key: value })}
+			/>
 			<div class="actions">
+				<Button variant="ghost" onclick={() => (adding = false)}>{t.settings.cancel}</Button>
 				<Button variant="highlighted" disabled={!fresh.name || !fresh.model_id} onclick={add}>
 					{t.models.add}
 				</Button>
-				<Button variant="ghost" onclick={() => (adding = false)}>Cancel</Button>
 			</div>
 		</section>
 	{:else}
-		<button class="ghost add" type="button" onclick={() => (adding = true)}>
-			<Icon name="plus" />
-			{t.models.add}
-		</button>
+		<div class="add">
+			<Button icon="plus" onclick={() => (adding = true)}>{t.models.add}</Button>
+		</div>
 	{/if}
 {/if}
 
@@ -230,23 +217,17 @@
 		font-weight: 500;
 	}
 
-	label {
-		display: block;
-		margin-bottom: 10px;
+	.providers {
+		display: flex;
+		flex-direction: column;
+		gap: 10px;
 	}
 
-	label > span {
-		display: block;
-		font-size: 12.5px;
-		color: var(--text-muted);
-		margin-bottom: 3px;
-	}
-
-	small {
-		display: block;
-		margin-top: 3px;
-		font-size: 12px;
-		color: var(--text-faint);
+	.adding {
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
+		max-width: 520px;
 	}
 
 	.actions {
@@ -255,27 +236,6 @@
 		gap: 8px;
 		margin-top: 12px;
 		flex-wrap: wrap;
-	}
-
-	button {
-		padding: 5px 12px;
-		border: 1px solid var(--line);
-		border-radius: var(--radius);
-		font-size: 13px;
-		color: var(--text-muted);
-		transition:
-			border-color var(--fade) var(--ease),
-			color var(--fade) var(--ease);
-	}
-
-	button:not(:disabled):hover {
-		border-color: var(--text-faint);
-		color: var(--text);
-	}
-
-	button:disabled {
-		opacity: 0.4;
-		cursor: default;
 	}
 
 	.add {

@@ -9,17 +9,14 @@
 
 <style>
 	.key {
-		display: inline-grid;
-		place-items: center;
-		min-width: calc(var(--space) * 5);
-		height: calc(var(--space) * 5);
-		padding: 0 calc(var(--space) * 1.25);
+		display: inline-flex;
+		align-items: center;
+		padding: 3px 5px;
 		border: var(--border-width) solid var(--line);
-		border-radius: var(--radius-sm);
+		border-radius: 4px;
 		background: var(--surface);
-		color: var(--text-muted);
-		font-family: var(--font-mono);
-		font-size: calc(var(--ui-size) - 3px);
-		line-height: 1;
+		color: var(--text-faint);
+		font: 500 10.5px/1 var(--font-mono);
+		white-space: nowrap;
 	}
 </style>

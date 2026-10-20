@@ -102,6 +102,10 @@ persisted event list at `done`.
 `src/lib/themes/`; those files are never edited by hand. A theme changes tokens — colour, faces,
 sizes, radii, motion slots — never structure. No literal colour, font, radius or duration in a
 component: a guard test fails on one, and on a token some registered theme does not define.
+Every control is a primitive in `lib/components/ui/`, ported from the Theme Builder's own markup;
+a feature component composes them and may not open a `<button>`, `<input>`, `<textarea>` or
+`<select>` itself, nor read `--brass` where the theme does not name it (`primitives.test.ts`).
+What Hera adds to a theme goes in the export's *Hera amendments* section.
 
 **Skill selection is code.** Never build a feature that depends on the model noticing a skill is
 relevant; the target model does not. See ADR 5.

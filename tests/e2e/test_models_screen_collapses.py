@@ -52,13 +52,13 @@ def models(page: Any) -> None:
 
 
 def header(page: Any, name: str) -> Any:
-    return page.locator(f"button.disclosure:has-text('{name}')")
+    return page.locator(f".provider > .box > .header button.toggle:has-text('{name}')")
 
 
 def test_only_the_active_provider_is_open_and_the_rest_fold(page: Any) -> None:
     models(page)
 
-    headers = page.locator("button.disclosure")
+    headers = page.locator(".provider > .box > .header button.toggle")
     assert headers.count() == 2
     opened = [h.get_attribute("aria-expanded") for h in headers.all()]
     assert sorted(opened) == ["false", "true"]
@@ -96,8 +96,8 @@ def test_a_model_row_opens_its_own_options_and_only_one_at_a_time(page: Any, ser
     # There is no Options button any more.
     assert page.get_by_role("button", name="Options", exact=True).count() == 0
 
-    studio = page.locator("section.entry:has(button.disclosure:has-text('studio'))")
-    rows = studio.locator("button.toggle")
+    studio = page.locator(".provider:has(> .box > .header button.toggle:has-text('studio'))")
+    rows = studio.locator(".registered button.toggle")
     assert rows.count() == 2
 
     rows.nth(0).click()

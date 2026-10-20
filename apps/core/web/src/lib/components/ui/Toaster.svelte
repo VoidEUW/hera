@@ -11,6 +11,7 @@
 	import { t } from '$lib/i18n';
 	import { reveal, slot, still } from '$lib/motion';
 	import { toasts } from '$lib/toasts.svelte';
+	import CloseButton from './CloseButton.svelte';
 	import Icon from './Icon.svelte';
 </script>
 
@@ -39,14 +40,12 @@
 					}}>{toast.action.label}</button
 				>
 			{/if}
-			<button
-				class="dismiss"
-				type="button"
-				aria-label={t.ui.dismiss}
+			<CloseButton
+				size="sm"
+				inverse
+				label={t.ui.dismiss}
 				onclick={() => toasts.dismiss(toast.id)}
-			>
-				<Icon name="x" size="calc(var(--icon-size) - 2px)" />
-			</button>
+			/>
 		</div>
 	{/each}
 </div>
@@ -54,38 +53,30 @@
 <style>
 	.toaster {
 		position: fixed;
-		top: calc(var(--space) * 4);
+		top: 16px;
 		left: 50%;
 		z-index: 100;
 		display: flex;
 		flex-direction: column;
 		align-items: center;
-		gap: calc(var(--space) * 2);
+		gap: 8px;
 		transform: translateX(-50%);
 		pointer-events: none;
 	}
 
+	/* The open look: an inverted text-on-ink bar, no border. The icon is the bar's own colour. */
 	.toast {
 		display: flex;
 		align-items: center;
-		gap: calc(var(--space) * 2.5);
+		gap: 9px;
 		max-width: min(90vw, 480px);
-		padding: calc(var(--space) * 2.5) calc(var(--space) * 2.5) calc(var(--space) * 2.5)
-			calc(var(--space) * 3.5);
-		border-radius: var(--radius);
+		padding: 7px 6px 7px 12px;
+		border-radius: var(--radius-sm);
 		background: var(--text);
 		color: var(--ground);
-		box-shadow: var(--shadow);
-		font-size: var(--ui-size);
+		box-shadow: var(--shadow-sm);
+		font-size: 12.5px;
 		pointer-events: auto;
-	}
-
-	.success :global(.icon) {
-		color: var(--laurel);
-	}
-
-	.failure :global(.icon:first-child) {
-		color: var(--danger);
 	}
 
 	.message {
@@ -93,24 +84,9 @@
 	}
 
 	.action {
-		color: var(--ground);
+		color: inherit;
 		font-weight: 600;
 		text-decoration: underline;
 		text-underline-offset: 2px;
-	}
-
-	.dismiss {
-		display: grid;
-		place-items: center;
-		width: calc(var(--space) * 6);
-		height: calc(var(--space) * 6);
-		border-radius: 50%;
-		color: var(--ground);
-		opacity: 0.6;
-		transition: opacity var(--fade) var(--ease);
-	}
-
-	.dismiss:hover {
-		opacity: 1;
 	}
 </style>

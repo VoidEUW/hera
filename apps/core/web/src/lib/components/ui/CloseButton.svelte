@@ -1,71 +1,90 @@
 <script lang="ts">
 	/**
-	 * The way out of a dialog, a side view, a chip or a toast (the theme's `hera/close-button`):
-	 * a filled round button with an ×, and a hit area that is never smaller than the target a
-	 * thumb needs, whatever the drawing's size.
+	 * The way out of a dialog, a side view, a chip or a toast (the theme's `hera/close-button`,
+	 * float look): a filled round button with an ×, growing a little on hover (`close.hover`).
+	 * `sm` is the × on an attachment or in a search field; `lg` a full-screen sheet's.
 	 *
-	 * `sm` is borderless and unfilled — the × on a chip or an attachment, where a filled disc
-	 * would be heavier than the thing it removes.
+	 * `inverse` is the toast's: on an inverted bar the disc is the bar's own colour and the ×
+	 * takes the bar's text colour, faded, so the way out is there without being a second object.
 	 */
 	import { t } from '$lib/i18n';
 	import Icon from './Icon.svelte';
+	import { tooltip } from '$lib/tooltip';
 
 	interface Props {
 		size?: 'sm' | 'md' | 'lg';
-		/** What closing means here, for a screen reader — "Close settings", "Remove file". */
+		/** What closing means here — "Close settings", "Remove brief.pdf". */
 		label?: string;
+		inverse?: boolean;
 		onclick?: (event: MouseEvent) => void;
-		class?: string;
 	}
 
-	let { size = 'md', label = t.ui.close, onclick, class: extra = '' }: Props = $props();
+	let { size = 'md', label = t.ui.close, inverse = false, onclick }: Props = $props();
 </script>
 
-<button class="close {size} {extra}" type="button" aria-label={label} title={label} {onclick}>
+<button
+	class="close {size}"
+	class:inverse
+	type="button"
+	aria-label={label}
+	use:tooltip={label}
+	{onclick}
+>
 	<Icon name="x" />
 </button>
 
 <style>
 	.close {
-		--diameter: calc(var(--space) * 7.5);
+		position: relative;
 		display: inline-grid;
-		place-items: center;
 		flex: none;
-		width: var(--diameter);
-		height: var(--diameter);
+		place-items: center;
+		width: 28px;
+		height: 28px;
+		border: var(--border-width) solid transparent;
 		border-radius: 50%;
 		background: var(--surface-raised);
 		color: var(--text-muted);
-		cursor: pointer;
+		--icon-size: 14px;
 		transition:
 			transform var(--motion-close-hover),
-			background var(--fade) var(--ease),
-			color var(--fade) var(--ease);
+			background-color var(--motion-close-hover),
+			color var(--motion-close-hover);
 	}
 
 	.close:hover {
 		transform: scale(1.1);
-		background: var(--hover);
 		color: var(--text);
 	}
 
-	.lg {
-		--diameter: calc(var(--space) * 9);
-	}
-
 	.sm {
-		--diameter: calc(var(--space) * 5);
-		background: transparent;
+		width: 22px;
+		height: 22px;
+		border: 0;
+		--icon-size: 12px;
 	}
 
-	/* The visible disc is small; the target is not. */
+	.lg {
+		width: 36px;
+		height: 36px;
+		--icon-size: 16px;
+	}
+
+	.inverse {
+		background: transparent;
+		color: inherit;
+		opacity: 0.6;
+	}
+
+	.inverse:hover {
+		color: inherit;
+		opacity: 1;
+	}
+
+	/* The drawn disc can be small; the target is not. */
 	.close::after {
 		content: '';
 		position: absolute;
-		inset: calc(var(--space) * -2);
-	}
-
-	.close {
-		position: relative;
+		inset: -6px;
 	}
 </style>

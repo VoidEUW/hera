@@ -22,8 +22,11 @@
 	import Button from '$lib/components/ui/Button.svelte';
 	import { untrack } from 'svelte';
 	import { api, type Skill } from '$lib/api/client';
+	import FileEditor from '$lib/components/ui/FileEditor.svelte';
 	import Input from '$lib/components/ui/Input.svelte';
 	import Modal from '$lib/components/ui/Modal.svelte';
+	import Pill from '$lib/components/ui/Pill.svelte';
+	import Spinner from '$lib/components/ui/Spinner.svelte';
 	import { t } from '$lib/i18n';
 
 	interface Props {
@@ -53,6 +56,9 @@
 	let error = $state<string | null>(null);
 	let saving = $state(false);
 	let confirming = $state(false);
+	/** The Edit switch: a skill opens read-only and is changed on purpose; a new one is nothing
+	 * but an edit, so it opens with the switch on. */
+	let writing = $state(untrack(() => skill === null));
 
 	const isNew = $derived(current === null);
 	const changed = $derived(isNew ? id.trim() !== '' : original !== null && draft !== original);
@@ -116,109 +122,109 @@
 	}
 </script>
 
+<!-- The theme's file editor as a dialog (`hera/file-editor`, kind skill): the SKILL.md with its
+     Edit switch, and a footer that says what state it is in — read only, unsaved, saved — beside
+     its trust mark, Delete, Cancel and Save. -->
 <Modal
 	label={isNew ? t.settings.newSkill : t.settings.editSkill(name)}
-	title={isNew ? t.settings.newSkill : t.settings.editSkill(name)}
-	caption={isNew ? t.settings.newSkillBlurb : t.settings.editSkillBlurb}
 	placement="centre"
-	width="min(760px, 94vw)"
+	width="min(900px, 94vw)"
 	sheetclass="skill-editor"
+	closeButton={false}
 	{onclose}
 >
 	<div class="body">
 		{#if isNew}
 			<Input
 				mono
-				value={id}
+				label={t.settings.skillIdLabel}
 				placeholder={t.settings.skillId}
-				ariaLabel={t.settings.skillId}
+				help={t.settings.skillIdRule}
+				value={id}
 				onchange={typed}
 			/>
-			<p class="caption rule">{t.settings.skillIdRule}</p>
 		{/if}
 
 		{#if original === null && !error}
-			<p class="caption">{t.settings.loadingSource}</p>
+			<div class="loading"><Spinner size={16} label={t.settings.loadingSource} /></div>
 		{:else}
-			<textarea
-				bind:value={draft}
-				aria-label={t.settings.skillSource}
-				spellcheck="false"
-				disabled={original === null}></textarea>
+			<FileEditor
+				kind="skill"
+				name={isNew ? t.settings.newSkill : `${name}/SKILL.md`}
+				meta={isNew ? t.settings.newSkillBlurb : t.settings.editSkillBlurb}
+				text={draft}
+				bind:editing={writing}
+				onchange={(value) => (draft = value)}
+				{onclose}
+			>
+				{#snippet footer()}
+					<span>
+						{#if !writing}{t.settings.readOnly}{:else if changed}{t.settings.unsaved}{:else}{t
+								.settings.editingNow}{/if}
+					</span>
+					{#if current && current.trust !== 'unknown'}
+						<Pill tone={current.trust === 'verified' ? 'authority' : 'danger'}>
+							{current.trust === 'verified' ? t.settings.verified : t.settings.modified}
+						</Pill>
+					{/if}
+				{/snippet}
+			</FileEditor>
 		{/if}
 
 		{#if error}
-			<p class="problem caption">{error}</p>
+			<p class="problem">{error}</p>
 		{/if}
 		{#each problems as problem (problem)}
-			<p class="problem caption">{problem}</p>
+			<p class="problem">{problem}</p>
 		{/each}
 	</div>
 
-	<footer>
+	{#snippet footer()}
 		{#if confirming}
-			<p class="sure caption">{t.settings.deleteSure(name)}</p>
+			<p class="sure">{t.settings.deleteSure(name)}</p>
 			<Button variant="ghost" onclick={() => (confirming = false)}>
 				{t.settings.deleteKeep}
 			</Button>
-			<Button variant="danger" disabled={saving} onclick={remove}>
+			<Button variant="danger" icon="trash" disabled={saving} onclick={remove}>
 				{t.settings.deleteYes}
 			</Button>
 		{:else}
 			{#if !isNew}
-				<Button variant="danger-soft" onclick={() => (confirming = true)}>
+				<Button variant="danger-soft" icon="trash" onclick={() => (confirming = true)}>
 					{t.settings.deleteSkill}
 				</Button>
 			{/if}
 			<span class="spacer"></span>
 			<Button variant="ghost" onclick={onclose}>{t.settings.cancel}</Button>
-			<Button variant="highlighted" disabled={!changed || saving} onclick={save}>
+			<Button variant="highlighted" busy={saving} disabled={!changed} onclick={save}>
 				{isNew ? t.settings.create : t.settings.save}
 			</Button>
 		{/if}
-	</footer>
+	{/snippet}
 </Modal>
 
 <style>
 	:global(.sheet.skill-editor) {
-		height: min(80vh, 680px);
+		height: min(84vh, 720px);
 	}
 
 	.body {
 		display: flex;
 		flex: 1;
 		flex-direction: column;
-		gap: 8px;
+		gap: 12px;
 		min-height: 0;
-		padding: 16px 20px 0;
+		padding: 20px 22px 14px;
 	}
 
-	textarea {
+	.body > :global(.fe) {
 		flex: 1;
-		min-height: 0;
-		width: 100%;
-		padding: 10px 12px;
-		resize: none;
-		background: var(--surface);
-		border: 1px solid var(--line);
-		border-radius: var(--radius);
-		color: var(--text);
-		font-family: var(--font-mono);
-		font-size: 13px;
-		line-height: 1.55;
-		tab-size: 2;
 	}
 
-	textarea:focus-visible {
-		outline: none;
-		border-color: var(--brass);
-	}
-
-	footer {
-		display: flex;
-		align-items: center;
-		gap: 8px;
-		padding: 14px 20px;
+	.loading {
+		display: grid;
+		flex: 1;
+		place-items: center;
 	}
 
 	.spacer {
@@ -229,15 +235,12 @@
 		flex: 1;
 		margin: 0;
 		color: var(--danger);
-	}
-
-	.rule {
-		margin: 0;
-		color: var(--text-faint);
+		font-size: 13px;
 	}
 
 	.problem {
 		margin: 0;
 		color: var(--danger);
+		font-size: 12px;
 	}
 </style>

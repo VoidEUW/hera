@@ -43,7 +43,7 @@ def skills(page: Any) -> None:
 def test_a_skill_is_switched_off_and_stays_off(page: Any, server: str) -> None:
     skills(page)
 
-    box = page.get_by_role("checkbox", name="Use tdd")
+    box = page.get_by_role("switch", name="Use tdd")
     assert box.is_checked()
     box.click()
     assert not box.is_checked()
@@ -76,7 +76,10 @@ def test_a_skill_is_edited_in_place_over_settings(page: Any, server: str) -> Non
     assert page.get_by_role("dialog", name="Settings").is_visible()
 
     page.get_by_role("button", name="Edit tdd").click()
-    box = page.get_by_role("dialog", name="Edit tdd").get_by_role("textbox", name="SKILL.md")
+    editor = page.get_by_role("dialog", name="Edit tdd")
+    # A skill opens read-only (the file editor's Edit switch); changing it is a choice.
+    editor.get_by_role("switch", name="Edit").click()
+    box = editor.get_by_role("textbox", name="SKILL.md")
     box.fill(box.input_value().replace("Red, green.", "Red, green, refactor."))
     page.get_by_role("dialog", name="Edit tdd").get_by_role("button", name="Save").click()
     page.get_by_role("dialog", name="Edit tdd").wait_for(state="detached", timeout=10_000)

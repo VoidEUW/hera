@@ -31,11 +31,11 @@
 	 */
 	import { api, type ArtifactContent } from '$lib/api/client';
 	import { extensionOf, hasSource, kindOf, sanitiseSvg, svgProblem } from '$lib/artifacts';
-	import { escape, highlight } from '$lib/highlight';
 	import { t } from '$lib/i18n';
 	import { draw } from '$lib/mermaid';
 	import { artifacts } from '$lib/stores/artifacts.svelte';
-	import Icon from './ui/Icon.svelte';
+	import CodeView from './ui/CodeView.svelte';
+	import Spinner from './ui/Spinner.svelte';
 	import Prose from './Prose.svelte';
 
 	interface Props {
@@ -47,9 +47,12 @@
 		/** Show the code instead of the drawn thing. Only means something for a kind that has
 		 * both — `hasSource` — and is ignored for the rest. */
 		source?: boolean;
+		/** Inside the side view, whose header already carries the name, copy and download: the
+		 * code view drops its own bar. */
+		bare?: boolean;
 	}
 
-	let { chatId, name, height = '420px', source = false }: Props = $props();
+	let { chatId, name, height = '420px', source = false, bare = false }: Props = $props();
 
 	/** The height a drawing is shrunk to fit, when the box has a fixed one — a card in the
 	 * transcript. The drawer's `100%` is not a height to fit to: it scrolls what it cannot show. */
@@ -78,42 +81,6 @@
 
 	const kind = $derived(kindOf(wanted));
 	const asCode = $derived(source && hasSource(wanted));
-
-	/** The source as HTML — plain and escaped at once, coloured when the grammar has arrived. */
-	let lit = $state('');
-
-	/** Whether the last press worked — the icon says so for a moment, then goes back. */
-	let copied = $state(false);
-	let reset: ReturnType<typeof setTimeout> | undefined;
-
-	async function copy() {
-		try {
-			await navigator.clipboard.writeText(content?.text ?? '');
-		} catch {
-			return;
-		}
-		copied = true;
-		clearTimeout(reset);
-		reset = setTimeout(() => (copied = false), 1500);
-	}
-	/** `1\n2\n3…`, one per line of the file; a final newline ends a line rather than starting one. */
-	const numbers = $derived.by(() => {
-		const count = (content?.text ?? '').replace(/\n$/, '').split('\n').length;
-		return Array.from({ length: count }, (_, at) => at + 1).join('\n');
-	});
-
-	$effect(() => {
-		const text = content?.text ?? '';
-		const extension = extensionOf(wanted);
-		lit = escape(text);
-		let current = true;
-		highlight(text, extension).then((html) => {
-			if (current) lit = html;
-		});
-		return () => {
-			current = false;
-		};
-	});
 
 	$effect(() => {
 		// Re-runs when the file changes and when something published changed. `wanted` and `chat`
@@ -180,38 +147,23 @@
 </script>
 
 {#snippet lines()}
-	<!-- The numbers are their own column rather than a counter on each line: highlighting wraps
-	     tokens in spans that may run across a newline, so the text cannot be cut into line
-	     elements without cutting them too. The price is that a line must not wrap, or the two
-	     columns stop agreeing about where a line is — so this one scrolls sideways. -->
-	<!-- Zero tall and sticky, so the button rides in the corner of the box while the code
-	     scrolls under it, instead of scrolling away with the first line. -->
-	<div class="corner">
-		<button
-			type="button"
-			class="copy"
-			title={copied ? t.artifact.copiedCode : t.artifact.copyCode}
-			aria-label={t.artifact.copyCode}
-			onclick={copy}
-		>
-			<Icon name={copied ? 'check' : 'copy'} />
-		</button>
-	</div>
-	<div class="lines">
-		<pre class="numbers mono" aria-hidden="true">{numbers}</pre>
-		<!-- eslint-disable-next-line svelte/no-at-html-tags -- escaped in $lib/highlight -->
-		<pre class="mono"><code>{@html lit}</code></pre>
+	<div class="code" class:bare style:max-height={height}>
+		<CodeView
+			text={content?.text ?? ''}
+			extension={extensionOf(wanted)}
+			name={bare ? undefined : wanted}
+			notice={undrawable ? t.artifact.notDrawn(undrawable) : undefined}
+			{bare}
+		/>
 	</div>
 {/snippet}
 
 {#if failure}
 	<p class="failed">{failure}</p>
 {:else if !content}
-	<p class="waiting">{t.artifact.loading}</p>
+	<p class="waiting"><Spinner size={16} label={t.artifact.loading} /></p>
 {:else if asCode}
-	<div class="source" style:max-height={height}>
-		{@render lines()}
-	</div>
+	{@render lines()}
 {:else if kind === 'html'}
 	<iframe title={wanted} class="frame" style:height sandbox="allow-scripts" srcdoc={content.text}
 	></iframe>
@@ -227,19 +179,14 @@
 	     and a faint caption written for the page surface is not written for that — so while the
 	     renderer is on its way this reads exactly like the line above it, and there is no empty
 	     white strip standing in for a diagram that has not been laid out yet. -->
-	<p class="waiting">{t.artifact.drawing}</p>
+	<p class="waiting"><Spinner size={16} label={t.artifact.drawing} /></p>
 {:else if kind === 'mermaid' && !undrawable}
 	<div class="drawing" style:max-height={height} style:--fit={fit}>
 		<!-- eslint-disable-next-line svelte/no-at-html-tags -- sanitised in $lib/mermaid -->
 		{@html diagram}
 	</div>
 {:else}
-	<div class="source" style:max-height={height}>
-		{#if undrawable}
-			<p class="caption">{t.artifact.notDrawn(undrawable)}</p>
-		{/if}
-		{@render lines()}
-	</div>
+	{@render lines()}
 {/if}
 
 <style>
@@ -247,13 +194,12 @@
 		display: block;
 		width: 100%;
 		background: var(--canvas);
-		border: 1px solid var(--line);
+		border: var(--border-width) solid var(--line);
 		border-radius: var(--radius);
 	}
 
 	.drawing,
-	.document,
-	.source {
+	.document {
 		overflow: auto;
 		overscroll-behavior: contain;
 		border-radius: var(--radius);
@@ -295,7 +241,7 @@
 		grid-template-columns: minmax(0, 1fr);
 		padding: 12px;
 		background: var(--canvas);
-		border: 1px solid var(--line);
+		border: var(--border-width) solid var(--line);
 	}
 
 	.drawing :global(svg) {
@@ -310,146 +256,23 @@
 		max-height: calc(var(--fit, 100000px) - 26px);
 	}
 
-	/* A column, so the lines can be told to take whatever height the caption leaves — the gutter
-	   then runs to the bottom of the box however short the file is. */
-	.source {
+	/* Source in a card gets the card's frame; in the side view it runs to the panel's edges. */
+	.code {
 		display: flex;
 		flex-direction: column;
-		background: var(--surface);
-		border: 1px solid var(--line);
+		overflow: hidden;
+		border: var(--border-width) solid var(--line);
+		border-radius: var(--radius-sm);
 	}
 
-	.corner {
-		position: sticky;
-		top: 0;
-		left: 0;
-		z-index: 1;
-		display: flex;
-		flex: none;
-		justify-content: flex-end;
-		height: 0;
+	.code > :global(.cv) {
+		flex: 1;
+		min-height: 0;
 	}
 
-	.copy {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		width: 27px;
-		height: 27px;
-		margin: 6px 8px 0 0;
-		border: 1px solid var(--line);
-		border-radius: var(--radius);
-		background: var(--surface);
-		color: var(--text-faint);
-		transition:
-			color var(--fade) var(--ease),
-			border-color var(--fade) var(--ease);
-	}
-
-	.copy:hover {
-		color: var(--text);
-		border-color: var(--brass);
-	}
-
-	.lines {
-		display: grid;
-		grid-template-columns: auto 1fr;
-		flex: 1 0 auto;
-	}
-
-	/* Token colours are the `--syntax-*` tokens in `app.css`, mixed with the page's own text
-	   colour so they keep their contrast on whichever theme is up. Every source view shares them,
-	   which is what `$lib/highlight` being reusable is for. */
-	.source :global(.hljs-comment),
-	.source :global(.hljs-quote) {
-		color: var(--text-faint);
-		font-style: italic;
-	}
-
-	.source :global(.hljs-keyword),
-	.source :global(.hljs-selector-tag),
-	.source :global(.hljs-literal),
-	.source :global(.hljs-doctag) {
-		color: var(--syntax-keyword);
-	}
-
-	.source :global(.hljs-string),
-	.source :global(.hljs-regexp),
-	.source :global(.hljs-addition) {
-		color: var(--syntax-string);
-	}
-
-	.source :global(.hljs-number),
-	.source :global(.hljs-symbol),
-	.source :global(.hljs-bullet),
-	.source :global(.hljs-meta) {
-		color: var(--syntax-number);
-	}
-
-	.source :global(.hljs-title),
-	.source :global(.hljs-function),
-	.source :global(.hljs-section),
-	.source :global(.hljs-name),
-	.source :global(.hljs-selector-class),
-	.source :global(.hljs-selector-id) {
-		color: var(--syntax-title);
-	}
-
-	.source :global(.hljs-attr),
-	.source :global(.hljs-attribute),
-	.source :global(.hljs-variable),
-	.source :global(.hljs-built_in),
-	.source :global(.hljs-type),
-	.source :global(.hljs-property) {
-		color: var(--syntax-attribute);
-	}
-
-	.source :global(.hljs-deletion) {
-		color: var(--syntax-deletion);
-	}
-
-	.source :global(.hljs-emphasis) {
-		font-style: italic;
-	}
-
-	.source :global(.hljs-strong) {
-		font-weight: 600;
-	}
-
-	/* Both columns — the numbers and the code — on one font and one line height, stated here
-	   rather than inherited. The `<code>` inside the right-hand `<pre>` is otherwise set in the
-	   browser's own `monospace` (the UA sheet gives `code` a family, and `.mono` sits on the
-	   `<pre>`, not on it), so the two columns were two fonts with two line heights and the
-	   numbers drifted away from their lines further down a file (#171). */
-	.source pre {
-		margin: 0;
-		padding: 10px 12px;
-		white-space: pre;
-		font-family: var(--font-mono);
-		font-size: calc(var(--ui-size) - 0.5px);
-		line-height: 1.55;
-	}
-
-	.source code {
-		font: inherit;
-	}
-
-	/* Stretched by the grid to the full height of the box. Sticky, so it stays put while a long
-	   line is scrolled sideways. */
-	.source .numbers {
-		position: sticky;
-		left: 0;
-		text-align: right;
-		user-select: none;
-		color: var(--text-faint);
-		background: var(--surface);
-		border-right: 1px solid var(--line);
-	}
-
-	.source .caption {
-		margin: 0;
-		padding: 8px 12px 0;
-		color: var(--text-faint);
+	.code.bare {
+		border: 0;
+		border-radius: 0;
 	}
 
 	.waiting,

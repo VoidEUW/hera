@@ -1,57 +1,98 @@
 /**
- * The guard from #99: "every selector in the application is `Select.svelte`" stays true.
+ * The guards that keep the interface one set of components (ADR 21, and the overhaul after it).
  *
- * The three native `<select>`s in `settings/Models.svelte` are gone; this is what keeps them
- * gone. A grep rather than a render test, because the thing being guarded against is not
- * behaviour but *drift* — somebody adding a field to a settings screen and reaching for the
- * platform control out of habit — and drift is exactly what a plain text search catches.
+ * **Every control is a primitive.** A `.svelte` file outside `lib/components/ui/` may not open a
+ * `<button>`, `<input>`, `<textarea>` or `<select>` of its own: it composes `Button`, `IconButton`,
+ * `Input`, `Selector` and the rest. The drift this catches is the one the overhaul removed — a
+ * settings screen reaching for the platform control, or a hand-styled button with its own hover,
+ * out of habit — and drift is exactly what a plain text search catches.
  *
- * The files are read through `import.meta.glob` with `?raw` rather than `node:fs`, so the test
- * runs through Vite's own pipeline and needs no node types.
+ * **Brass stays where the theme puts it.** `--brass` is her authority, and the theme names where
+ * that is said: highlighted buttons, toggles and chips that are on, the authority pill, the check
+ * on a chosen menu row, an icon button's momentary "done", the ocellus, and the question and
+ * permission cards. Anywhere else, yellow is a highlight nobody asked for.
  *
- * Comments are allowed to mention `<select` — `Select.svelte`'s docstring tells the story of
- * the native one it replaced, and `Composer.svelte`'s CSS says the same — so JS/CSS comment
- * spans are stripped before the scan rather than pattern-matched line by line. The point is
- * that no *element* ships, and an element is what is left when the comments are gone.
- *
- * The match is lowercase and word-boundary aware on purpose, and not case-insensitive: a
- * Svelte *element* is always lowercase (`<select>`), a *component* is always capitalized
- * (`<Select`), and an `i` flag would flag all ten of the component's call sites as offenders.
+ * The files are read through `import.meta.glob` with `?raw`, so the test runs through Vite's own
+ * pipeline. Comments are stripped first: the story of the control a primitive replaced is worth
+ * keeping in the source, and the guard should not make mentioning it illegal.
  */
 
 import { describe, expect, it } from 'vitest';
 
-const SOURCES = import.meta.glob('/src/**/*.svelte', {
+const SOURCES = import.meta.glob(['/src/**/*.svelte', '/src/**/*.css'], {
 	query: '?raw',
 	import: 'default',
 	eager: true
 }) as Record<string, string>;
 
-/** Drop every comment span the file could carry: `// …` to end of line, `/* … *\/`
- * blocks (CSS and JS), and `<!-- … -->` HTML comments — each replaced by its own newlines so
- * the line numbers reported below still name the element's line. Backtick mentions of
- * `<select>` inside those comments are what this is for: the story of the native control is
- * worth keeping in the source, and the guard should not make mentioning it illegal. */
+/** Drop every comment span, each replaced by its own newlines so line numbers stay true. */
 function uncomment(source: string): string {
 	return source
 		.replace(/\/\*[\s\S]*?\*\//g, (span) => span.replace(/[^\n]/g, ''))
-		.replace(/(^|[^:])\/\/.*$/gm, '$1')
+		.replace(/(^|[^:'"`])\/\/.*$/gm, '$1')
 		.replace(/<!--[\s\S]*?-->/g, (span) => span.replace(/[^\n]/g, ''));
 }
 
-describe('every selector is Select', () => {
-	it('no .svelte file under src/ opens a native <select> element', () => {
-		const offenders: string[] = [];
-		for (const [path, source] of Object.entries(SOURCES)) {
-			const stripped = uncomment(source);
-			// Line numbers are counted on the stripped text — they still land on the element's
-			// line, because comment removal collapses spans but never inserts newlines.
-			stripped.split('\n').forEach((line: string, index: number) => {
-				if (/<select\b/.test(line)) {
-					offenders.push(`${path}:${index + 1}: ${line.trim()}`);
-				}
-			});
-		}
-		expect(offenders, offenders.join('\n')).toEqual([]);
+/** The markup of a component: what is left without its script and its style. */
+function markup(source: string): string {
+	return uncomment(source)
+		.replace(/<script[\s\S]*?<\/script>/g, (span) => span.replace(/[^\n]/g, ''))
+		.replace(/<style[\s\S]*?<\/style>/g, (span) => span.replace(/[^\n]/g, ''));
+}
+
+function offenders(files: [string, string][], pattern: RegExp): string[] {
+	return files.flatMap(([path, text]) =>
+		text
+			.split('\n')
+			.flatMap((line, index) =>
+				pattern.test(line) ? [`${path}:${index + 1}: ${line.trim()}`] : []
+			)
+	);
+}
+
+const UI = '/src/lib/components/ui/';
+
+describe('every control is a primitive', () => {
+	it('no component outside ui/ opens a button, input, textarea or select of its own', () => {
+		const features = Object.entries(SOURCES)
+			.filter(([path]) => path.endsWith('.svelte') && !path.startsWith(UI))
+			.map(([path, source]): [string, string] => [path, markup(source)]);
+		const found = offenders(features, /<(button|input|textarea|select)\b/);
+		expect(found, found.join('\n')).toEqual([]);
+	});
+
+	it('no native select anywhere — a choice is a Selector', () => {
+		const all = Object.entries(SOURCES)
+			.filter(([path]) => path.endsWith('.svelte'))
+			.map(([path, source]): [string, string] => [path, markup(source)]);
+		const found = offenders(all, /<select\b/);
+		expect(found, found.join('\n')).toEqual([]);
+	});
+});
+
+describe('brass stays where the theme puts it', () => {
+	const ALLOWED = new Set([
+		`${UI}Button.svelte`,
+		`${UI}Toggle.svelte`,
+		`${UI}Chip.svelte`,
+		`${UI}Pill.svelte`,
+		`${UI}MenuItem.svelte`,
+		`${UI}IconButton.svelte`,
+		`${UI}Ocellus.svelte`,
+		'/src/lib/components/QuestionCard.svelte',
+		'/src/lib/components/PermissionCard.svelte'
+	]);
+
+	it('only the components the theme names read --brass', () => {
+		const styles = Object.entries(SOURCES)
+			.filter(([path]) => !path.startsWith('/src/lib/themes/') && !ALLOWED.has(path))
+			.map(([path, source]): [string, string] => [
+				path,
+				path.endsWith('.css')
+					? uncomment(source)
+					: uncomment(/<style[^>]*>([\s\S]*?)<\/style>/.exec(source)?.[1] ?? '')
+			]);
+		const found = offenders(styles, /var\(--brass/);
+		expect(found, found.join('\n')).toEqual([]);
 	});
 });

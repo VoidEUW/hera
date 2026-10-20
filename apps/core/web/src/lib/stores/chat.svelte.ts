@@ -190,6 +190,18 @@ export class ChatSession {
 		await this.#consume(() => redoMessage(this.chat!.id, messageId, text, this.#begin()));
 	}
 
+	/** Give up on a turn that stopped arriving and ask the same question again — the Retry on a
+	 * stalled spinner. Stopping closes the turn server-side as `cancelled`; the conversation is
+	 * re-read so the question has the id the server gave it, and that question is asked again. */
+	async retry() {
+		if (!this.chat) return;
+		this.stop();
+		this.draft = [];
+		await this.#refresh();
+		const asked = [...this.messages].reverse().find((entry) => entry.role === 'user');
+		if (asked) await this.redo(asked.id);
+	}
+
 	async answer(callIds: string[], allow: boolean, remember = false) {
 		if (!this.chat || this.streaming) return;
 		await this.#consume(() =>

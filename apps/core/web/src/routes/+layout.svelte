@@ -6,7 +6,8 @@
 	 * chats does not re-fetch the sidebar — and so a new chat appears in the list the moment it
 	 * is created rather than on the next load.
 	 */
-	import Icon from '$lib/components/ui/Icon.svelte';
+	import IconButton from '$lib/components/ui/IconButton.svelte';
+	import Scrim from '$lib/components/ui/Scrim.svelte';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
@@ -115,26 +116,19 @@
 	     control that brings it on screen, placed once here rather than in every route's own
 	     header because it has to reach the start screen (no header at all), the chat screen and
 	     the project screen alike. -->
-		<button
-			class="menu"
-			type="button"
-			aria-label={t.rail.openMenu}
-			onclick={() => (workspace.railOpen = true)}
-		>
-			<Icon name="menu" />
-		</button>
+		<div class="menu">
+			<IconButton
+				icon="menu"
+				label={t.rail.openMenu}
+				bordered
+				onclick={() => (workspace.railOpen = true)}
+			/>
+		</div>
 
 		{#if workspace.railOpen}
-			<!-- The exact scrim Settings and the profile menu already use, so a sheet reads as one
-		     idea across the application rather than three implementations of it. -->
-			<div
-				class="scrim"
-				role="button"
-				tabindex="-1"
-				aria-label={t.rail.closeMenu}
-				onclick={() => (workspace.railOpen = false)}
-				onkeydown={(event) => event.key === 'Enter' && (workspace.railOpen = false)}
-			></div>
+			<!-- The same scrim every dialog uses, so a sheet reads as one idea across the
+			     application. -->
+			<Scrim onclick={() => (workspace.railOpen = false)} />
 		{/if}
 
 		<!-- On a phone the sidebar opens as a sheet, and then it *is* a dialog: focus moves in, Tab
@@ -207,15 +201,6 @@
 		display: none;
 	}
 
-	.scrim {
-		position: fixed;
-		inset: 0;
-		background: var(--scrim);
-		border: 0;
-		animation: fade var(--fade) var(--ease);
-		z-index: 10;
-	}
-
 	@keyframes fade {
 		from {
 			opacity: 0;
@@ -250,20 +235,13 @@
 		}
 
 		.menu {
-			display: flex;
-			align-items: center;
-			justify-content: center;
+			display: block;
 			position: fixed;
-			top: max(12px, env(safe-area-inset-top));
-			left: max(12px, env(safe-area-inset-left));
-			width: 40px;
-			height: 40px;
-			border: 1px solid var(--line);
-			border-radius: var(--radius);
-			background: var(--surface);
-			color: var(--text-muted);
-			font-size: 16px;
+			top: max(14px, env(safe-area-inset-top));
+			left: max(14px, env(safe-area-inset-left));
 			z-index: 9;
+			border-radius: 50%;
+			background: var(--surface);
 		}
 	}
 </style>

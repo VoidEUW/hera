@@ -87,10 +87,11 @@
 		--pad: 3px;
 		position: relative;
 		display: inline-grid;
+		flex: none;
 		grid-template-columns: repeat(var(--count), minmax(0, 1fr));
 		padding: var(--pad);
 		border: var(--border-width) solid var(--line);
-		border-radius: var(--chip-radius);
+		border-radius: calc(var(--radius-sm) + 3px);
 		background: var(--ground);
 	}
 
@@ -100,7 +101,7 @@
 		bottom: var(--pad);
 		left: var(--pad);
 		width: calc((100% - 2 * var(--pad)) / var(--count));
-		border-radius: var(--chip-radius);
+		border-radius: var(--radius-sm);
 		background: var(--surface-raised);
 		box-shadow: var(--shadow-sm);
 		transform: translateX(calc(100% * var(--index)));
@@ -109,23 +110,24 @@
 
 	button {
 		position: relative;
+		z-index: 1;
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
-		gap: calc(var(--space) * 1.5);
+		gap: 6px;
 		height: calc(var(--space) * 7.5);
-		padding: 0 calc(var(--space) * 4);
-		border-radius: var(--chip-radius);
+		padding: 0 14px;
+		border-radius: var(--radius-sm);
 		color: var(--text-muted);
-		font-size: var(--ui-size);
+		font-size: 12.5px;
 		white-space: nowrap;
-		transition: color var(--fade) var(--ease);
+		transition: color var(--motion-indicator-move);
 	}
 
 	.sm button {
 		height: calc(var(--space) * 6);
-		padding: 0 calc(var(--space) * 3);
-		font-size: calc(var(--ui-size) - 1px);
+		padding: 0 10px;
+		font-size: 12px;
 	}
 
 	button:hover,

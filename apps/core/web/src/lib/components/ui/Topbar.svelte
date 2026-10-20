@@ -23,20 +23,22 @@
 	.topbar {
 		display: flex;
 		align-items: center;
-		justify-content: space-between;
-		gap: calc(var(--space) * 4);
+		gap: 10px;
 		flex: none;
+		min-width: 0;
 		height: calc(var(--space) * 13);
-		padding: 0 calc(var(--space) * 6);
+		padding: 0 12px 0 24px;
+		background: var(--ground);
 	}
 
 	.title {
+		flex: 1;
 		min-width: 0;
 		margin: 0;
 		overflow: hidden;
 		color: var(--text);
 		font-family: var(--font-ui);
-		font-size: calc(var(--ui-size) + 1px);
+		font-size: 14px;
 		font-weight: 500;
 		text-overflow: ellipsis;
 		white-space: nowrap;
@@ -62,6 +64,6 @@
 		display: flex;
 		flex: none;
 		align-items: center;
-		gap: calc(var(--space) * 2);
+		gap: 4px;
 	}
 </style>

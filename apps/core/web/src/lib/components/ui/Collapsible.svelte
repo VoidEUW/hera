@@ -1,55 +1,71 @@
 <script lang="ts">
 	/**
-	 * A filled box whose header discloses its content (the theme's `hera/collapsible`): provider
-	 * cards, model rows, advanced settings.
+	 * A bordered box whose header discloses its content (the theme's `hera/collapsible`, soft look):
+	 * provider cards, model rows, advanced settings.
 	 *
-	 * The body animates with `grid-template-rows: 0fr ↔ 1fr` plus opacity — the theme's one
-	 * disclosure gesture (`collapse.disclose`) — and stays in the document while shut, `inert`,
-	 * so a field inside keeps its value and its state when the box closes and opens again. The
-	 * header is the button; anything in `actions` sits beside it rather than inside it, because a
-	 * button inside a button is a click nobody can predict.
+	 * The body animates with `grid-template-rows: 0fr ↔ 1fr` plus opacity (`collapse.disclose`), and
+	 * stays in the document while shut, `inert`, so a field inside keeps its value when the box
+	 * closes and opens again. `lazy` instead renders the body only while it is open — for a box
+	 * whose content fetches something or holds a draft, so a list of twenty closed boxes fetches
+	 * nothing and closing one *is* discarding what was typed in it. The
+	 * header is the button; `actions` sit beside it rather than inside it, because a button inside a
+	 * button is a click nobody can predict.
 	 */
 	import type { Snippet } from 'svelte';
 	import Icon from './Icon.svelte';
 
 	interface Props {
 		open?: boolean;
+		lazy?: boolean;
 		title: Snippet;
 		subtitle?: Snippet;
 		/** Controls that belong on the header row but are not the disclosure. */
 		actions?: Snippet;
+		ontoggle?: (open: boolean) => void;
 		children: Snippet;
 	}
 
-	let { open = $bindable(false), title, subtitle, actions, children }: Props = $props();
+	let {
+		open = $bindable(false),
+		lazy = false,
+		title,
+		subtitle,
+		actions,
+		ontoggle,
+		children
+	}: Props = $props();
 
-	const id = `collapsible-${Math.random().toString(36).slice(2, 9)}`;
+	const id = $props.id();
+
+	function toggle() {
+		open = !open;
+		ontoggle?.(open);
+	}
 </script>
 
 <section class="box" class:open>
 	<div class="header">
-		<button
-			type="button"
-			class="toggle"
-			aria-expanded={open}
-			aria-controls={id}
-			onclick={() => (open = !open)}
-		>
+		<button type="button" class="toggle" aria-expanded={open} aria-controls={id} onclick={toggle}>
 			<span class="chevron"><Icon name="chevR" /></span>
 			<span class="titles">
-				<span class="title">{@render title()}</span>
-				{#if subtitle}<span class="subtitle">{@render subtitle()}</span>{/if}
+				<b>{@render title()}</b>
+				{#if subtitle}<small>{@render subtitle()}</small>{/if}
 			</span>
 		</button>
 		{#if actions}<div class="actions">{@render actions()}</div>{/if}
 	</div>
 	<div class="body" {id} inert={!open}>
-		<div class="inner">{@render children()}</div>
+		<div>
+			<div class="inner">
+				{#if !lazy || open}{@render children()}{/if}
+			</div>
+		</div>
 	</div>
 </section>
 
 <style>
 	.box {
+		overflow: hidden;
 		border: var(--border-width) solid var(--line);
 		border-radius: var(--radius);
 		background: var(--surface);
@@ -58,22 +74,22 @@
 	.header {
 		display: flex;
 		align-items: center;
-		gap: calc(var(--space) * 2);
-		padding-right: calc(var(--space) * 3);
+		gap: 8px;
+		padding-right: 12px;
 	}
 
 	.toggle {
 		display: flex;
 		flex: 1;
-		min-width: 0;
 		align-items: center;
-		gap: calc(var(--space) * 2.5);
-		padding: calc(var(--space) * 3);
+		gap: 10px;
+		min-width: 0;
+		padding: 12px 14px;
 		text-align: left;
 	}
 
 	.chevron {
-		display: flex;
+		display: inline-grid;
 		color: var(--text-faint);
 		transition: transform var(--motion-collapse-disclose);
 	}
@@ -83,26 +99,34 @@
 	}
 
 	.titles {
-		display: flex;
+		flex: 1;
 		min-width: 0;
-		flex-direction: column;
-		gap: 2px;
 	}
 
-	.title {
+	b {
+		display: block;
+		overflow: hidden;
 		color: var(--text);
+		font-size: 13.5px;
 		font-weight: 500;
+		text-overflow: ellipsis;
+		white-space: nowrap;
 	}
 
-	.subtitle {
+	small {
+		display: block;
+		overflow: hidden;
 		color: var(--text-faint);
-		font-size: calc(var(--ui-size) - 1.5px);
+		font-size: 12px;
+		text-overflow: ellipsis;
+		white-space: nowrap;
 	}
 
 	.actions {
 		display: flex;
+		flex: none;
 		align-items: center;
-		gap: calc(var(--space) * 2);
+		gap: 8px;
 	}
 
 	.body {
@@ -114,17 +138,22 @@
 			opacity var(--motion-collapse-disclose);
 	}
 
+	.body > div {
+		min-height: 0;
+		overflow: hidden;
+	}
+
 	.open .body {
 		grid-template-rows: 1fr;
 		opacity: 1;
 	}
 
 	.inner {
-		min-height: 0;
-		overflow: hidden;
-	}
-
-	.open .inner {
-		padding: 0 calc(var(--space) * 3) calc(var(--space) * 3);
+		display: flex;
+		flex-direction: column;
+		gap: 10px;
+		padding: 0 14px 14px 38px;
+		color: var(--text-muted);
+		font-size: 13px;
 	}
 </style>

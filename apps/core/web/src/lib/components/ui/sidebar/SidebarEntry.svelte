@@ -5,8 +5,9 @@
 	 * project, a settings section, the account.
 	 *
 	 * A link when it goes somewhere (`href`, already resolved by the caller), a button when it
-	 * does something. Active is a 2 px brass bar on the left edge with a faint fill
-	 * (`entry.active`) — brass, because the chat you are in is her authority's one mark here.
+	 * does something. Active is a 2 px laurel bar on the left edge with a faint fill
+	 * (`entry.active`). The export draws it brass; Hera's amendment makes it laurel, because the
+	 * chat you are in is where her attention is, and brass beside every title read as a highlight.
 	 *
 	 * The trailing action shows on hover, on keyboard focus anywhere in the row, and while it is
 	 * `pinned` (its menu is open) — a control that only appears under a pointer is one a keyboard
@@ -152,13 +153,20 @@
 	.active .entry::before {
 		content: '';
 		position: absolute;
-		top: 22%;
-		bottom: 22%;
+		top: 7px;
+		bottom: 7px;
 		left: 0;
 		width: 2px;
-		border-radius: 1px;
-		background: var(--brass);
+		border-radius: 2px;
+		background: var(--laurel);
+		animation: bar-in var(--motion-entry-active);
 		transition: opacity var(--motion-entry-active);
+	}
+
+	@keyframes bar-in {
+		from {
+			opacity: 0;
+		}
 	}
 
 	.lead {

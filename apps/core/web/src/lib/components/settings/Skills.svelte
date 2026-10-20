@@ -16,7 +16,9 @@
 	 * one that was never installed, and "why is my skill not being used" is what this screen is
 	 * for.
 	 */
-	import Icon from '$lib/components/ui/Icon.svelte';
+	import Avatar from '$lib/components/ui/Avatar.svelte';
+	import Button from '$lib/components/ui/Button.svelte';
+	import Pill from '$lib/components/ui/Pill.svelte';
 	import { api, type BrokenSkill, type Skill } from '$lib/api/client';
 	import Checkbox from '$lib/components/ui/Checkbox.svelte';
 	import SkillEditor from './SkillEditor.svelte';
@@ -123,30 +125,30 @@
 
 	{#each shown as skill (skill.id)}
 		<section class="row" class:off={!skill.enabled}>
-			<span class="icon" class:emoji={!!skill.icon} aria-hidden="true">{mark(skill)}</span>
+			<span class="icon"><Avatar name={mark(skill)} size={30} /></span>
 
 			<div class="detail">
 				<div class="head">
 					<h3>{skill.id}</h3>
 					{#if skill.trust !== 'unknown'}
-						<span class="trust" data-trust={skill.trust} title={skill.digest}>
-							<Icon name={skill.trust === 'verified' ? 'check' : 'alert'} />
+						<Pill tone={skill.trust === 'verified' ? 'authority' : 'danger'} dot>
 							{skill.trust === 'verified' ? t.settings.verified : t.settings.modified}
-						</span>
+						</Pill>
 					{/if}
 					<span class="right">
 						{#if skill.version}
 							<span class="version mono">{t.settings.version(skill.version)}</span>
 						{/if}
-						<button
-							class="edit"
-							type="button"
+						<Button
+							size="sm"
+							icon="edit"
 							aria-label={t.settings.editSkill(skill.id)}
 							onclick={() => (editing = skill)}
 						>
 							{t.message.edit}
-						</button>
+						</Button>
 						<Checkbox
+							variant="switch"
 							checked={skill.enabled}
 							ariaLabel={t.settings.useSkill(skill.id)}
 							onchange={() => toggle(skill)}
@@ -159,7 +161,7 @@
 				{#if facts(skill).length}
 					<p class="facts caption">
 						<span class="author">{facts(skill)[0]}</span>
-						{#if facts(skill).length > 1}<span class="license">{facts(skill)[1]}</span>{/if}
+						{#if facts(skill).length > 1}<Pill>{facts(skill)[1]}</Pill>{/if}
 					</p>
 				{/if}
 
@@ -174,11 +176,11 @@
 
 	{#each broken as item (item.id)}
 		<section class="row">
-			<span class="icon bad" aria-hidden="true">!</span>
+			<span class="icon"><Avatar icon="alert" size={30} /></span>
 			<div class="detail">
 				<div class="head">
 					<h3>{item.id}</h3>
-					<span class="caption problem">{t.settings.broken}</span>
+					<Pill tone="danger">{t.settings.broken}</Pill>
 				</div>
 				<p class="caption problem">{item.reason}</p>
 			</div>
@@ -189,10 +191,9 @@
 		<p class="note caption">{t.settings.trustNote}</p>
 	{/if}
 
-	<button class="add" type="button" onclick={() => (editing = null)}>
-		<Icon name="plus" />
-		{t.settings.addSkill}
-	</button>
+	<div class="add">
+		<Button icon="plus" onclick={() => (editing = null)}>{t.settings.addSkill}</Button>
+	</div>
 
 	<p class="note caption">
 		{t.settings.skillsFolder}
@@ -237,33 +238,13 @@
 	}
 
 	.icon {
-		display: grid;
-		place-items: center;
-		width: 30px;
-		height: 30px;
 		flex: none;
 		margin-top: 1px;
-		border: 1px solid var(--line);
-		border-radius: 8px;
-		background: var(--surface);
-		color: var(--brass);
-		font-family: var(--font-display);
-		font-size: 14px;
-	}
-
-	/* An emoji is already a picture and should not be set in the display face. */
-	.icon.emoji {
-		font-family: var(--font-ui);
-		font-size: 15px;
-	}
-
-	.icon.bad {
-		color: var(--danger);
 	}
 
 	.head {
 		display: flex;
-		align-items: baseline;
+		align-items: center;
 		gap: 10px;
 	}
 
@@ -281,65 +262,13 @@
 		flex: none;
 	}
 
-	/* On the right, in one column, so a row of skills can be compared with whatever a
-	   repository says is current. */
-	.edit {
-		padding: 6px 14px;
-		line-height: 1;
-		border: 1px solid var(--line);
-		border-radius: var(--radius);
-		font-size: 12px;
-		color: var(--text-muted);
-		transition:
-			border-color var(--fade) var(--ease),
-			color var(--fade) var(--ease);
-	}
-
-	.edit:hover,
-	.edit:focus-visible {
-		border-color: var(--brass);
-		color: var(--brass);
-	}
-
 	.add {
-		display: flex;
-		align-items: center;
-		gap: 8px;
-		width: 100%;
 		margin-top: 14px;
-		padding: 8px 12px;
-		border: 1px dashed var(--line);
-		border-radius: var(--radius);
-		font-size: 13px;
-		color: var(--text-muted);
-		transition:
-			border-color var(--fade) var(--ease),
-			color var(--fade) var(--ease);
-	}
-
-	.add:hover {
-		border-color: var(--brass);
-		color: var(--brass);
 	}
 
 	.version {
 		font-size: 12px;
 		color: var(--text-muted);
-	}
-
-	.trust {
-		display: inline-flex;
-		align-items: baseline;
-		gap: 4px;
-		font-size: 12px;
-	}
-
-	.trust[data-trust='verified'] {
-		color: var(--brass);
-	}
-
-	.trust[data-trust='modified'] {
-		color: var(--danger);
 	}
 
 	.facts {
@@ -351,14 +280,6 @@
 
 	.author {
 		color: var(--text-muted);
-	}
-
-	.license {
-		padding: 0 5px;
-		border: 1px solid var(--line);
-		border-radius: 4px;
-		font-size: 11px;
-		color: var(--text-faint);
 	}
 
 	.problem {

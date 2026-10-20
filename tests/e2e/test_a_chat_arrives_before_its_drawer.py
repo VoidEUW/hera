@@ -134,5 +134,6 @@ def test_the_drawer_opens_the_one_she_made_last(server: str, home: Path, page: A
     page.goto(f"{server}/chat/{chat['id']}")
 
     drawer = page.wait_for_selector("aside", timeout=15_000)
-    assert drawer.wait_for_selector("h2", timeout=5_000).inner_text() == "Beta"
+    # The side view's header names the file it shows (`hera/side-view`).
+    assert drawer.wait_for_selector(".name", timeout=5_000).inner_text() == "beta.md"
     assert page.get_by_text("Nothing chosen yet.").count() == 0

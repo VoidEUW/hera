@@ -41,6 +41,9 @@ export const t = {
 		thinkingOn: 'She is thinking. Click to turn it off.',
 		thinkingOff: 'Not thinking. Click to turn it on.',
 		budgetTitle: 'Thinking budget, in tokens',
+		budget: (tokens: number) =>
+			`${tokens % 1024 === 0 ? `${tokens / 1024}k` : tokens.toLocaleString()} thinking`,
+		tokens: 'tokens',
 		effort: {
 			// Only "absent from options" is a phrase. The values themselves are the endpoint's own
 			// vocabulary -- `xhigh`, `minimal`, `none` are wire values a server matches on, so
@@ -59,8 +62,9 @@ export const t = {
 	},
 
 	rail: {
+		search: 'Search chats',
+		results: 'Results',
 		newChat: 'New chat',
-		search: 'Search',
 		projects: 'Projects',
 		newProject: 'New project',
 		chats: 'Chats',
@@ -137,6 +141,7 @@ export const t = {
 		retrieved: 'skill · matched this turn',
 		lines: (n: number) => `${n} lines — scroll for the rest`,
 		didThings: (n: number) => (n === 1 ? '1 thing she did' : `${n} things she did`),
+		did: 'did',
 		unknown: 'Something this version does not know how to show'
 	},
 
@@ -149,6 +154,7 @@ export const t = {
 	},
 
 	permission: {
+		heading: 'Permission',
 		title: (action: string) => `Run ${action}?`,
 		titleFrom: (action: string, server: string) => `Run ${action} from ${server}?`,
 		allowOnce: 'Allow once',
@@ -160,6 +166,7 @@ export const t = {
 	},
 
 	question: {
+		answered: 'Answered',
 		asked: 'asked you',
 		nothing: 'She asked something, and it arrived empty.',
 		placeholder: 'Answer…',
@@ -258,7 +265,8 @@ export const t = {
 		search: 'Search skills',
 		close: 'Close',
 		nothing: 'No description — retrieval can never find this one.',
-		pick: 'Choose skills'
+		pick: 'Choose skills',
+		fromProfile: 'Pinned by the profile'
 	},
 
 	servers: {
@@ -269,7 +277,10 @@ export const t = {
 		toolSingular: 'tool',
 		toolPlural: 'tools',
 		none: 'No servers connected. Add one in Settings to give her more tools.',
-		configure: 'Manage servers'
+		configure: 'Manage servers',
+		heading: 'MCP servers',
+		connected: 'connected',
+		notConnected: 'not connected'
 	},
 
 	settings: {
@@ -343,6 +354,7 @@ export const t = {
 		newSkill: 'New skill',
 		newSkillBlurb: 'Becomes a folder under ~/.hera/skills/, with this text as its SKILL.md.',
 		skillId: 'note-taking',
+		skillIdLabel: 'Id',
 		skillIdRule: 'Lowercase letters, digits and hyphens. It becomes the folder and the /command.',
 		create: 'Create',
 		deleteSkill: 'Delete',
@@ -350,6 +362,9 @@ export const t = {
 		deleteKeep: 'Keep it',
 		deleteYes: 'Delete skill',
 		loadingSource: 'Loading…',
+		readOnly: 'Read only · turn on Edit to change it',
+		unsaved: 'Unsaved changes',
+		editingNow: 'Editing',
 		skillsFolder: 'Skills are folders under ~/.hera/skills/. Find more in the',
 		skillsRepo: 'hera-skills repository',
 		cancel: 'Cancel',
@@ -357,6 +372,8 @@ export const t = {
 	},
 
 	models: {
+		sameId: 'Id and name are the same',
+		logoPick: 'Choose a picture',
 		active: 'Active',
 		activate: 'Use this one',
 		add: 'Add an endpoint',
@@ -580,6 +597,8 @@ export const t = {
 		downloadDrawnOne: (name: string) => `Download ${name} as a page`,
 		close: 'Close',
 		panel: 'Artifacts',
+		view: 'Preview or source',
+		toggle: 'Toggle side view',
 		files: 'Everything published here',
 		none: 'Nothing chosen yet.',
 		loading: 'Fetching it…',
@@ -643,6 +662,46 @@ export const t = {
 	},
 
 	/** The primitives in `lib/components/ui/`: words that belong to a control, not to a screen. */
+	voice: {
+		listening: 'Listening',
+		muted: 'Muted',
+		mute: 'Mute',
+		unmute: 'Unmute',
+		end: 'End'
+	},
+	imagegen: {
+		queued: 'Queued',
+		waiting: 'Waiting for the image model',
+		step: (step: number, steps: number, percent: number) => `Step ${step} / ${steps} · ${percent}%`,
+		failedAt: (step: number) => `Failed at step ${step}`,
+		failed: 'Generation failed',
+		done: (summary: string) => (summary ? `Done · ${summary}` : 'Done')
+	},
+	auth: {
+		mode: 'Sign in or register',
+		signIn: 'Sign in',
+		register: 'Register',
+		signInTitle: 'Sign in to Hera',
+		registerTitle: 'Create your account',
+		signInBlurb: 'Your chats stay on this machine either way.',
+		registerBlurb: 'One account for every machine she runs on.',
+		name: 'Name',
+		email: 'Email',
+		password: 'Password',
+		passwordPlaceholder: 'At least 12 characters',
+		passwordHelp: 'Or skip it and use a passkey.',
+		continue: 'Continue',
+		create: 'Create account',
+		or: 'or',
+		signInPasskey: 'Sign in with a passkey',
+		registerPasskey: 'Register with a passkey'
+	},
+	errorPage: {
+		offline: 'Offline',
+		server: 'Server error',
+		'not-found': '404 · Not found',
+		model: 'Model unreachable'
+	},
 	ui: {
 		close: 'Close',
 		dismiss: 'Dismiss',
@@ -653,7 +712,21 @@ export const t = {
 		characters: 'characters',
 		open: 'Open',
 		closeSection: 'Collapse',
-		openSection: 'Expand'
+		openSection: 'Expand',
+		clearSearch: 'Clear search',
+		copy: 'Copy',
+		copied: 'Copied',
+		download: 'Download',
+		edit: 'Edit',
+		preview: 'Preview',
+		source: 'Source',
+		zoomIn: 'Zoom in',
+		zoomOut: 'Zoom out',
+		resetZoom: 'Reset zoom',
+		remove: (name: string) => `Remove ${name}`,
+		uploading: 'uploading',
+		stalledFor: (seconds: number) => `Nothing has arrived for ${seconds} seconds.`,
+		startedAgo: (seconds: number) => `Started ${seconds} seconds ago`
 	}
 } as const;
 

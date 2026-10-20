@@ -4,7 +4,7 @@
 	 *
 	 * The native range input carried the OS's own groove and knob — thin, grey, and matching
 	 * nothing else in the interface, the same gap `Checkbox.svelte` and `Select.svelte` closed
-	 * for their controls. This draws the track: a hairline groove, a brass fill from the low end
+	 * for their controls. This draws the track: a hairline groove, a laurel fill from the low end
 	 * to the thumb, and a thumb that grows on hover the way a button does.
 	 *
 	 * The input stays a real `<input type="range">` underneath — only its track and thumb are
@@ -76,7 +76,7 @@
 	.slider::-webkit-slider-runnable-track {
 		height: var(--track);
 		border-radius: 999px;
-		background: linear-gradient(to right, var(--brass) var(--fill), var(--line) var(--fill));
+		background: linear-gradient(to right, var(--laurel) var(--fill), var(--line) var(--fill));
 	}
 
 	.slider::-webkit-slider-thumb {
@@ -85,9 +85,9 @@
 		height: var(--thumb);
 		margin-top: calc((var(--track) - var(--thumb)) / 2);
 		border-radius: 50%;
-		background: var(--brass);
+		background: var(--text);
 		border: 2px solid var(--ground);
-		box-shadow: 0 0 0 1px var(--brass);
+		box-shadow: 0 0 0 1px var(--line);
 		transition: transform var(--fade) var(--ease);
 	}
 
@@ -101,12 +101,12 @@
 
 	.slider:focus-visible::-webkit-slider-thumb {
 		box-shadow:
-			0 0 0 1px var(--brass),
-			0 0 0 4px var(--brass-soft);
+			0 0 0 1px var(--laurel),
+			0 0 0 4px var(--laurel-soft);
 	}
 
 	/* Firefox: `-moz-range-progress` is a real pseudo-element here, so the fill needs no gradient
-	   trick — it is drawn brass up to the thumb and the track stays `--line` underneath it. */
+	   trick — it is drawn laurel up to the thumb and the track stays `--line` underneath it. */
 	.slider::-moz-range-track {
 		height: var(--track);
 		border-radius: 999px;
@@ -116,16 +116,16 @@
 	.slider::-moz-range-progress {
 		height: var(--track);
 		border-radius: 999px;
-		background: var(--brass);
+		background: var(--laurel);
 	}
 
 	.slider::-moz-range-thumb {
 		width: var(--thumb);
 		height: var(--thumb);
 		border-radius: 50%;
-		background: var(--brass);
+		background: var(--text);
 		border: 2px solid var(--ground);
-		box-shadow: 0 0 0 1px var(--brass);
+		box-shadow: 0 0 0 1px var(--line);
 		transition: transform var(--fade) var(--ease);
 	}
 
@@ -139,7 +139,7 @@
 
 	.slider:focus-visible::-moz-range-thumb {
 		box-shadow:
-			0 0 0 1px var(--brass),
-			0 0 0 4px var(--brass-soft);
+			0 0 0 1px var(--laurel),
+			0 0 0 4px var(--laurel-soft);
 	}
 </style>

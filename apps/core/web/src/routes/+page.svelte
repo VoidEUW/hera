@@ -13,7 +13,7 @@
 	import type { Attachment } from '$lib/attachments';
 	import Backdrop from '$lib/components/Backdrop.svelte';
 	import Composer from '$lib/components/Composer.svelte';
-	import Ocellus from '$lib/components/Ocellus.svelte';
+	import Ocellus from '$lib/components/ui/Ocellus.svelte';
 	import { greetingFor, t } from '$lib/i18n';
 	import { workspace } from '$lib/stores/workspace.svelte';
 

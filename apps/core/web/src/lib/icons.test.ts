@@ -45,9 +45,12 @@ describe('a component', () => {
 		const drawers = new Set([
 			'lib/components/ui/Icon.svelte',
 			// The signature, which is not an icon and may not become one (docs/frontend.md).
-			'lib/components/Ocellus.svelte',
-			// A progress arc, not an icon: its stroke is animated, which an icon's never is.
-			'lib/components/ui/Spinner.svelte'
+			'lib/components/ui/Ocellus.svelte',
+			// Arcs, not icons: a stroke that is animated or filled to a share, which an icon's
+			// never is.
+			'lib/components/ui/Spinner.svelte',
+			'lib/components/ui/SendButton.svelte',
+			'lib/components/ui/ContextMeter.svelte'
 		]);
 		const offenders = components(src)
 			.filter((path) => !drawers.has(relative(src, path)))

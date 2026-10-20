@@ -166,6 +166,21 @@ export function fontPackage(family: string): string {
 	return `@fontsource-variable/${family.trim().toLowerCase().replace(/\s+/g, '-')}`;
 }
 
+/**
+ * Every motion slot again as its duration alone, `--motion-<slot>-d`, beside the slot itself. A
+ * slot is a `transition`/`animation` shorthand (`242ms var(--ease)`), and a shorthand cannot be
+ * multiplied: the spinner turns once per 1.7 loops, which needs the number on its own. This splits
+ * what the export wrote; it does not compute anything the builder did not.
+ */
+export function withDurations(shared: Declaration[]): Declaration[] {
+	return shared.flatMap((d) => {
+		if (!/^--motion-[a-z0-9-]+$/.test(d.name)) return [d];
+		const duration = d.value.split(/\s+/)[0];
+		if (!/^\d+(\.\d+)?m?s$/.test(duration)) return [d];
+		return [d, { name: `${d.name}-d`, value: duration, comment: '' }];
+	});
+}
+
 function rule(selectors: string[], body: Declaration[]): string {
 	const lines = body.map((d) => `\t${d.name}: ${d.value};${d.comment ? ' ' + d.comment : ''}`);
 	return `${selectors.join(',\n')} {\n${lines.join('\n')}\n}\n`;
@@ -188,7 +203,7 @@ export function renderTheme(theme: ThemeExport, isDefault: boolean, source: stri
 		: [`${palette}[data-theme='light']`];
 	return [
 		HEADER(theme, source),
-		rule(shared, theme.shared),
+		rule(shared, withDurations(theme.shared)),
 		rule(dark, [...theme.dark, { name: 'color-scheme', value: 'dark', comment: '' }]),
 		rule(light, [...theme.light, { name: 'color-scheme', value: 'light', comment: '' }])
 	].join('\n');

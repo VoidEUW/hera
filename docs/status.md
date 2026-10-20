@@ -8,6 +8,29 @@ first, then deepen
 
 ## Now: v0.2.1
 
+### Every component is the theme's own
+
+#182 imported Heaven's tokens but kept the old components re-skinned, and they are what was
+inconsistent. The follow-up replaces them, ported 1:1 from the Theme Builder's own markup and CSS
+and resolved through the export's looks and parts:
+
+- **Selectors** are the builder's: a filled trigger or a chip, opening the one shared menu with
+  headings, descriptions and the brass check on the chosen row. The model selector is a chip in
+  the composer grouped by endpoint (`ModelSelector`); skills and servers are menus too, so
+  `SkillPicker` and `ServerSheet` are gone.
+- **Waiting**: the thinking indicator pulses (`thinking.loop: pulse`) instead of the plume burst;
+  the spinner is the material arc; after 30 s of silence a turn shows the stall box with Wait and
+  Retry; the send button's ring is the builder's.
+- **The context meter** moved out of the composer into the top bar, as a small ring with numbers.
+- **Yellow** is only where the theme names it — and the active chat's bar is laurel, a Hera
+  amendment written into the export.
+- **New primitives** for what the theme draws and Hera lacked: IconButton, SearchBar, NumberField,
+  Field, FileButton, Toggle, Scrim, TraceRow, Thinking, StallBox, ContextMeter, AttachmentChip,
+  CodeView (VS Code colours), FileEditor (the skill editor), Swatches — and VoiceCall, ImageGen and
+  Auth, on `/design` only until they have a backend.
+- **Guard** (`primitives.test.ts`): no `<button>`, `<input>`, `<textarea>` or `<select>` outside
+  `ui/`, and `--brass` read only where the theme names it.
+
 ### The interface is on a theme ([issue #182](https://github.com/VoidEUW/hera/issues/182), [ADR 21](adr/0021-a-theme-is-imported-data.md))
 
 The UI rework base. One branch, seven steps, each leaving the app working:
@@ -36,8 +59,7 @@ theme carries every declaration of its export; every theme defines what the defa
 every token read is defined somewhere; no literal colour or duration in a component; no `<svg>`
 outside `Icon` (and the ocellus and the spinner); no icon spelled as a text glyph.
 
-**Left for the issues to pick up:** ProviderCard and ModelRow keep their own disclosure (they mount
-their body only when open); `$lib` is still a deprecated alias rather than `#lib` imports; the
+**Left for the issues to pick up:** `$lib` is still a deprecated alias rather than `#lib` imports; the
 spec's word-by-word blur on her prose (`prose.stream`) is not done — the caret is; Chromium warns
 about unused preloads on a hard navigation while the service worker is in control.
 
@@ -452,6 +474,7 @@ Rules that would otherwise rot are tests, not prose:
 | `test_docs.py` | a decision record is unindexed, misnumbered, or has no status |
 | `web/src/lib/themes/themes.test.ts` | a generated theme drifts from its export, a theme lacks a token another defines, a component reads an undefined token or names a colour or a duration of its own |
 | `web/src/lib/icons.test.ts` | a component draws its own `<svg>` or spells an icon as a text glyph |
+| `web/src/lib/components/primitives.test.ts` | a component outside `ui/` opens its own `<button>`, `<input>`, `<textarea>` or `<select>`, or anything but the theme's named components reads `--brass` |
 
 ## CI
 

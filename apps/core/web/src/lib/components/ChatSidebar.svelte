@@ -24,13 +24,14 @@
 	import { colourOf } from '$lib/projects';
 	import { sidebar } from '$lib/stores/sidebar.svelte';
 	import type { Shape } from '$lib/stores/workspace.svelte';
-	import Ocellus from './Ocellus.svelte';
 	import Avatar from './ui/Avatar.svelte';
-	import Icon from './ui/Icon.svelte';
+	import IconButton from './ui/IconButton.svelte';
 	import Input from './ui/Input.svelte';
 	import Menu from './ui/Menu.svelte';
 	import MenuItem from './ui/MenuItem.svelte';
 	import MenuNote from './ui/MenuNote.svelte';
+	import Ocellus from './ui/Ocellus.svelte';
+	import SearchBar from './ui/SearchBar.svelte';
 	import Skeleton from './ui/Skeleton.svelte';
 	import Sidebar from './ui/sidebar/Sidebar.svelte';
 	import SidebarEntry from './ui/sidebar/SidebarEntry.svelte';
@@ -101,6 +102,21 @@
 	let anchors = $state<Record<string, HTMLElement | null>>({});
 
 	const loose = $derived(chats.filter((chat) => !chat.project_id));
+
+	/** The search bar's filter: titles containing it, across every project, in one list. */
+	let query = $state('');
+	let searchField = $state<HTMLInputElement | null>(null);
+	const found = $derived.by(() => {
+		const needle = query.trim().toLowerCase();
+		return needle ? chats.filter((chat) => chat.title.toLowerCase().includes(needle)) : null;
+	});
+
+	/** ⌘K / Ctrl+K focuses the search from anywhere — the shortcut its hint shows. */
+	function shortcut(event: KeyboardEvent) {
+		if (event.key.toLowerCase() !== 'k' || !(event.metaKey || event.ctrlKey) || folded) return;
+		event.preventDefault();
+		searchField?.focus();
+	}
 
 	/* The shape of the rows that are coming, held long enough that a list arrives rather than
 	   appearing (`$lib/loading`). */
@@ -203,17 +219,15 @@
 {/snippet}
 
 {#snippet more(kind: Kind, id: string, label: string)}
-	<button
-		bind:this={anchors[`${kind}:${id}`]}
-		class="more"
-		type="button"
-		aria-label={label}
+	<IconButton
+		bind:ref={anchors[`${kind}:${id}`]}
+		icon="more"
+		size="sm"
+		{label}
 		aria-haspopup="menu"
 		aria-expanded={is(menuFor, kind, id)}
 		onclick={() => toggleMenu(kind, id)}
-	>
-		<Icon name="more" />
-	</button>
+	/>
 {/snippet}
 
 {#snippet chatRow(chat: Chat, nested: boolean)}
@@ -255,14 +269,17 @@
 				{#each projects as project (project.id)}
 					<MenuItem
 						icon="folder"
-						role="menuitemradio"
-						current={chat.project_id === project.id}
+						trail="check"
+						on={chat.project_id === project.id}
+						disabled={chat.project_id === project.id}
 						onclick={() => move(chat.id, project.id)}>{project.name}</MenuItem
 					>
 				{/each}
 				<MenuItem
-					role="menuitemradio"
-					current={chat.project_id === null}
+					icon="chat"
+					trail="check"
+					on={chat.project_id === null}
+					disabled={chat.project_id === null}
 					onclick={() => move(chat.id, null)}>{t.rail.noProject}</MenuItem
 				>
 			{:else}
@@ -362,6 +379,8 @@
 	{/if}
 {/snippet}
 
+<svelte:window onkeydown={shortcut} />
+
 <Sidebar variant="chat" label={t.appName} collapsed={folded} resizable={!sheet}>
 	{#snippet head()}
 		<div class="brand-row">
@@ -370,90 +389,107 @@
 				<span class="display wordmark">{t.appName}</span>
 			</a>
 			{#if !sheet}
-				<button
-					class="fold"
-					type="button"
-					aria-label={folded ? t.rail.expand : t.rail.collapse}
-					title={folded ? t.rail.expand : t.rail.collapse}
+				<IconButton
+					icon="panel"
+					label={folded ? t.rail.expand : t.rail.collapse}
 					aria-pressed={folded}
 					onclick={() => sidebar.toggle()}
-				>
-					<Icon name="panel" />
-				</button>
+				/>
 			{/if}
 		</div>
 		<SidebarEntry icon="plus" label={t.rail.newChat} onclick={() => onnew?.()} />
+		{#if !folded}
+			<div class="search">
+				<SearchBar
+					bind:ref={searchField}
+					value={query}
+					placeholder={t.rail.search}
+					shortcut="⌘K"
+					onchange={(value) => (query = value)}
+				/>
+			</div>
+		{/if}
 	{/snippet}
 
-	<!-- Always shown, even with no projects: a heading with an add button under it is how you
-	     find out projects are a thing. -->
-	<SidebarGroup
-		label={t.rail.projects}
-		count={waiting ? undefined : projects.length}
-		addLabel={t.rail.newProject}
-		onadd={startCreate}
-		bind:open={projectsOpen}
-	>
-		{#if waiting}
-			<div class="waiting">
-				<Skeleton
-					rows={shape.projects}
-					height={15}
-					gap={ROW_GAP}
-					widths={[70, 52, 63]}
-					label={t.rail.loadingProjects}
-				/>
-			</div>
-		{:else}
-			{#each projects as project (project.id)}
-				{@render projectRow(project)}
-			{/each}
-			{#if creating}
-				<div class="item">
-					<Input
-						variant="inline"
-						class="rename"
-						autofocus
-						value={draft}
-						ariaLabel={t.rail.newProject}
-						placeholder={t.rail.projectNamePlaceholder}
-						onchange={(value) => (draft = value)}
-						onblur={commitCreate}
-						onkeydown={(event) => {
-							if (event.key === 'Enter') commitCreate();
-							if (event.key === 'Escape') creating = false;
-						}}
-					/>
-				</div>
-			{:else if !projects.length && !folded}
-				<p class="hint">{t.rail.noProjects}</p>
-			{/if}
-		{/if}
-	</SidebarGroup>
-
-	<SidebarGroup
-		label={t.rail.chats}
-		count={waiting ? undefined : loose.length}
-		bind:open={chatsOpen}
-	>
-		{#if waiting}
-			<div class="waiting">
-				<Skeleton
-					rows={shape.chats}
-					height={15}
-					gap={ROW_GAP}
-					widths={[82, 64, 74]}
-					label={t.rail.loadingChats}
-				/>
-			</div>
-		{:else}
-			{#each loose as chat (chat.id)}
+	{#if found}
+		<SidebarGroup label={t.rail.results} count={found.length} fixed>
+			{#each found as chat (chat.id)}
 				{@render chatRow(chat, false)}
 			{:else}
-				{#if !folded}<p class="hint">{t.rail.noChats}</p>{/if}
+				<p class="hint">{t.settings.noMatch}</p>
 			{/each}
-		{/if}
-	</SidebarGroup>
+		</SidebarGroup>
+	{:else}
+		<!-- Always shown, even with no projects: a heading with an add button under it is how you
+	     find out projects are a thing. -->
+		<SidebarGroup
+			label={t.rail.projects}
+			count={waiting ? undefined : projects.length}
+			addLabel={t.rail.newProject}
+			onadd={startCreate}
+			bind:open={projectsOpen}
+		>
+			{#if waiting}
+				<div class="waiting">
+					<Skeleton
+						rows={shape.projects}
+						height={15}
+						gap={ROW_GAP}
+						widths={[70, 52, 63]}
+						label={t.rail.loadingProjects}
+					/>
+				</div>
+			{:else}
+				{#each projects as project (project.id)}
+					{@render projectRow(project)}
+				{/each}
+				{#if creating}
+					<div class="item">
+						<Input
+							variant="inline"
+							class="rename"
+							autofocus
+							value={draft}
+							ariaLabel={t.rail.newProject}
+							placeholder={t.rail.projectNamePlaceholder}
+							onchange={(value) => (draft = value)}
+							onblur={commitCreate}
+							onkeydown={(event) => {
+								if (event.key === 'Enter') commitCreate();
+								if (event.key === 'Escape') creating = false;
+							}}
+						/>
+					</div>
+				{:else if !projects.length && !folded}
+					<p class="hint">{t.rail.noProjects}</p>
+				{/if}
+			{/if}
+		</SidebarGroup>
+
+		<SidebarGroup
+			label={t.rail.chats}
+			count={waiting ? undefined : loose.length}
+			bind:open={chatsOpen}
+		>
+			{#if waiting}
+				<div class="waiting">
+					<Skeleton
+						rows={shape.chats}
+						height={15}
+						gap={ROW_GAP}
+						widths={[82, 64, 74]}
+						label={t.rail.loadingChats}
+					/>
+				</div>
+			{:else}
+				{#each loose as chat (chat.id)}
+					{@render chatRow(chat, false)}
+				{:else}
+					{#if !folded}<p class="hint">{t.rail.noChats}</p>{/if}
+				{/each}
+			{/if}
+		</SidebarGroup>
+	{/if}
 
 	{#snippet foot()}
 		{#if waiting}
@@ -522,24 +558,8 @@
 		padding-left: calc(var(--sb-ix) - 3px);
 	}
 
-	.fold,
-	.more {
-		display: grid;
-		place-items: center;
-		width: calc(var(--space) * 6);
-		height: calc(var(--space) * 6);
-		border-radius: var(--radius-sm);
-		color: var(--text-faint);
-		transition:
-			background var(--motion-entry-hover),
-			color var(--motion-entry-hover);
-	}
-
-	.fold:hover,
-	.more:hover,
-	.more[aria-expanded='true'] {
-		background: var(--hover);
-		color: var(--text);
+	.search {
+		margin: calc(var(--space) * 1.5) 0 calc(var(--space) * 1);
 	}
 
 	.item {

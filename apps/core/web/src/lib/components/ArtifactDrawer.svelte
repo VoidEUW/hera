@@ -17,13 +17,17 @@
 	 * four to find the card that opens the file it just changed.
 	 */
 	import { api } from '$lib/api/client';
-	import { headingOf, newest } from '$lib/artifacts';
+	import { downloadUrl, hasSource, kindOf, newest } from '$lib/artifacts';
 	import { t } from '$lib/i18n';
+	import { saveDiagram } from '$lib/mermaid';
 	import { slot, still } from '$lib/motion';
 	import { artifacts } from '$lib/stores/artifacts.svelte';
+	import { toasts } from '$lib/toasts.svelte';
 	import ArtifactView from './ArtifactView.svelte';
 	import CloseButton from './ui/CloseButton.svelte';
 	import Icon from './ui/Icon.svelte';
+	import IconButton from './ui/IconButton.svelte';
+	import Segmented from './ui/Segmented.svelte';
 
 	interface Props {
 		chatId: string;
@@ -74,6 +78,23 @@
 
 	const chosen = $derived(artifacts.name);
 
+	let copied = $state(false);
+
+	/** Copy the file as it is now. Fetched rather than taken from the view: the view may be
+	 * showing a drawing, and what a person copies from a side view is the file. */
+	async function copy() {
+		if (!chosen) return;
+		try {
+			const content = await api.artifact(chatId, chosen);
+			await navigator.clipboard.writeText(content.text);
+		} catch {
+			return;
+		}
+		copied = true;
+		toasts.show(t.ui.copied);
+		setTimeout(() => (copied = false), 1400);
+	}
+
 	$effect(() => {
 		// The listing is re-read when something published changes, so a file created in the turn
 		// you are watching appears in the bar without a reload.
@@ -108,16 +129,52 @@
 </script>
 
 <aside class="drawer" in:reveal={{ delay: AFTER }} out:reveal aria-label={t.artifact.panel}>
+	<!-- The side view's header (`hera/side-view`): the file, Preview / Source when it has both, then
+	     copy, download and close. Everything that acts on *which file* is here, beside its name. -->
 	<header class="top">
-		<span class="mark"><Icon name="file" /></span>
-		<h2 class="title">{chosen ? headingOf(chosen) : t.artifact.panel}</h2>
+		<span class="name">
+			<Icon name="file" />
+			<span>{chosen ?? t.artifact.panel}</span>
+		</span>
+		{#if chosen}
+			{#if hasSource(chosen)}
+				<Segmented
+					size="sm"
+					label={t.artifact.view}
+					value={artifacts.source ? 'source' : 'preview'}
+					options={[
+						{ value: 'preview', label: t.ui.preview },
+						{ value: 'source', label: t.ui.source }
+					]}
+					onchange={(next) => (artifacts.source = next === 'source')}
+				/>
+			{/if}
+			<IconButton icon={copied ? 'check' : 'copy'} on={copied} label={t.ui.copy} onclick={copy} />
+			{#if kindOf(chosen) === 'mermaid'}
+				<!-- A diagram is saved as the page that draws it — a conversion only a browser can do
+				     (`$lib/mermaid`), so this one is a fetch and a blob, not a link. -->
+				<IconButton
+					icon="download"
+					label={t.artifact.downloadDrawnOne(chosen)}
+					onclick={() => saveDiagram(chatId, chosen)}
+				/>
+			{:else}
+				<IconButton
+					icon="download"
+					label={t.artifact.downloadOne(chosen)}
+					href={downloadUrl(chatId, chosen)}
+					download={chosen}
+					external
+				/>
+			{/if}
+		{/if}
 		<CloseButton label={t.artifact.close} onclick={() => artifacts.close()} />
 	</header>
 
 	<div class="body">
 		{#if chosen}
 			{#key chosen}
-				<ArtifactView {chatId} name={chosen} height="100%" source={artifacts.source} />
+				<ArtifactView {chatId} name={chosen} height="100%" source={artifacts.source} bare />
 			{/key}
 		{:else if failure}
 			<p class="failed">{failure}</p>
@@ -128,28 +185,45 @@
 </aside>
 
 <style>
-	/* The side view (the theme's `hera/side-view`): a filled `--surface` panel, floating on the
-	   ground like the sidebar on the other edge, so the two sides of the screen are one family. */
+	/* The side view (the theme's `hera/side-view`, soft look): a filled `--surface` panel against
+	   the transcript's right edge, a hairline between them. It takes its width over `drawer.open`
+	   and the transcript reflows beside it. */
 	.drawer {
 		display: flex;
+		flex: none;
 		flex-direction: column;
 		width: min(46vw, 720px);
-		flex: none;
-		margin: calc(var(--space) * 2);
-		border-radius: var(--radius-lg);
-		background: var(--surface);
-		box-shadow: var(--shadow-sm);
 		overflow: hidden;
+		border-left: var(--border-width) solid var(--line);
+		background: var(--surface);
 	}
 
 	/* No rule under the header (the theme's `drw.header: none`): the title, the tools and the
 	   body read as one panel. */
 	.top {
 		display: flex;
+		flex: none;
 		align-items: center;
 		gap: 8px;
-		flex: none;
-		padding: calc(var(--space) * 3) calc(var(--space) * 3.5);
+		min-height: 52px;
+		padding: 10px 10px 10px 14px;
+	}
+
+	.name {
+		display: flex;
+		flex: 1;
+		align-items: center;
+		gap: 8px;
+		min-width: 0;
+		overflow: hidden;
+		font-size: 13px;
+		font-weight: 500;
+		white-space: nowrap;
+	}
+
+	.name span {
+		overflow: hidden;
+		text-overflow: ellipsis;
 	}
 
 	/* Beside the transcript at 46vw of a phone width is not a panel, it is the whole screen with
@@ -172,24 +246,6 @@
 		}
 	}
 
-	.mark {
-		display: flex;
-		color: var(--brass);
-	}
-
-	/* The gap belongs after the title, not before the first control. `:first-of-type` counts per
-	   element, so an `<a>` and a `<button>` in this row were each the first of theirs and both
-	   took the space — which put a hole between Download and Close. */
-	.title {
-		margin: 0 auto 0 0;
-		font-family: var(--font-display);
-		font-size: 15px;
-		font-weight: 500;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-	}
-
 	/* The body owns the height it is given, so an HTML artifact's frame fills the panel rather
 	   than being a fixed box inside a taller one. */
 	.body {
@@ -207,7 +263,7 @@
 	.body :global(.frame),
 	.body :global(.drawing),
 	.body :global(.document),
-	.body :global(.source) {
+	.body :global(.code) {
 		flex: 1;
 		min-height: 0;
 		border: 0;

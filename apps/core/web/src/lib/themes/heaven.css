@@ -27,53 +27,101 @@
 	--fade: 132ms;
 	--disclose: 176ms;
 	--motion-sidebar-collapse: 242ms var(--ease); /* width */
+	--motion-sidebar-collapse-d: 242ms;
 	--motion-group-disclose: 176ms var(--ease); /* height-fade */
+	--motion-group-disclose-d: 176ms;
 	--motion-entry-hover: 132ms var(--ease); /* tint */
+	--motion-entry-hover-d: 132ms;
 	--motion-entry-active: 132ms var(--ease); /* bar */
+	--motion-entry-active-d: 132ms;
 	--motion-topbar-title: 198ms var(--ease); /* crossfade */
+	--motion-topbar-title-d: 198ms;
 	--motion-search-focus: 0ms var(--ease); /* none */
+	--motion-search-focus-d: 0ms;
 	--motion-field-focus: 132ms var(--ease); /* underline */
+	--motion-field-focus-d: 132ms;
 	--motion-composer-focus: 242ms var(--ease); /* ring */
+	--motion-composer-focus-d: 242ms;
 	--motion-menu-enter: 198ms var(--ease-spring); /* scale */
+	--motion-menu-enter-d: 198ms;
 	--motion-indicator-move: 242ms var(--ease-emphasized); /* slide */
+	--motion-indicator-move-d: 242ms;
 	--motion-tooltip-enter: 330ms var(--ease); /* fade */
+	--motion-tooltip-enter-d: 330ms;
 	--motion-modal-enter: 330ms var(--ease); /* zoom */
+	--motion-modal-enter-d: 330ms;
 	--motion-toast-enter: 330ms var(--ease); /* rise */
+	--motion-toast-enter-d: 330ms;
 	--motion-button-hover: 132ms var(--ease); /* lift */
+	--motion-button-hover-d: 132ms;
 	--motion-button-press: 88ms var(--ease); /* sink */
+	--motion-button-press-d: 88ms;
 	--motion-close-hover: 275ms var(--ease); /* scale */
+	--motion-close-hover-d: 275ms;
 	--motion-switch-toggle: 198ms var(--ease-emphasized); /* slide */
+	--motion-switch-toggle-d: 198ms;
 	--motion-collapse-disclose: 220ms var(--ease); /* height-fade */
+	--motion-collapse-disclose-d: 220ms;
 	--motion-spinner-loop: 1540ms var(--ease-emphasized); /* material */
+	--motion-spinner-loop-d: 1540ms;
 	--motion-spinner-stall: 3520ms linear; /* fade */
+	--motion-spinner-stall-d: 3520ms;
 	--motion-bar-indeterminate: 1980ms var(--ease-emphasized); /* shimmer */
+	--motion-bar-indeterminate-d: 1980ms;
 	--motion-skeleton-sweep: 1760ms linear; /* sweep */
+	--motion-skeleton-sweep-d: 1760ms;
 	--motion-thinking-loop: 3520ms var(--ease-emphasized); /* pulse */
+	--motion-thinking-loop-d: 3520ms;
 	--motion-trace-disclose: 176ms var(--ease); /* height-fade */
+	--motion-trace-disclose-d: 176ms;
 	--motion-thought-stream: 418ms var(--ease-emphasized); /* fade */
+	--motion-thought-stream-d: 418ms;
 	--motion-tool-running: 1320ms var(--ease-emphasized); /* eye */
+	--motion-tool-running-d: 1320ms;
 	--motion-tool-done: 605ms var(--ease-spring); /* draw */
+	--motion-tool-done-d: 605ms;
 	--motion-prose-stream: 242ms var(--ease); /* blur */
+	--motion-prose-stream-d: 242ms;
 	--motion-stream-caret: 1540ms linear; /* bar */
+	--motion-stream-caret-d: 1540ms;
 	--motion-message-enter: 330ms var(--ease); /* fade */
+	--motion-message-enter-d: 330ms;
 	--motion-message-actions: 132ms var(--ease); /* fade */
+	--motion-message-actions-d: 132ms;
 	--motion-artifact-enter: 550ms var(--ease); /* fade */
+	--motion-artifact-enter-d: 550ms;
 	--motion-card-enter: 242ms var(--ease); /* fade */
+	--motion-card-enter-d: 242ms;
 	--motion-drawer-open: 264ms var(--ease); /* width */
+	--motion-drawer-open-d: 264ms;
 	--motion-send-morph: 220ms var(--ease-emphasized); /* morph */
+	--motion-send-morph-d: 220ms;
 	--motion-voice-wave: 990ms var(--ease-emphasized); /* bars */
+	--motion-voice-wave-d: 990ms;
 	--motion-trace-row: 220ms var(--ease); /* fade */
+	--motion-trace-row-d: 220ms;
 	--motion-trace-line: 462ms var(--ease-emphasized); /* grow */
+	--motion-trace-line-d: 462ms;
 	--motion-tool-error: 0ms var(--ease); /* none */
+	--motion-tool-error-d: 0ms;
 	--motion-imagegen-progress: 242ms var(--ease); /* blur */
+	--motion-imagegen-progress-d: 242ms;
 	--motion-imagegen-reveal: 528ms var(--ease-emphasized); /* unblur */
+	--motion-imagegen-reveal-d: 528ms;
 	--motion-imagegen-error: 330ms var(--ease); /* fade */
+	--motion-imagegen-error-d: 330ms;
 	--motion-error-enter: 352ms var(--ease); /* rise */
+	--motion-error-enter-d: 352ms;
 	--motion-spinner-accent: 0ms linear; /* none */
+	--motion-spinner-accent-d: 0ms;
 	--motion-spinner-label: 1540ms linear; /* plain */
+	--motion-spinner-label-d: 1540ms;
 	--motion-thinking-label: 1650ms var(--ease-emphasized); /* pulse */
+	--motion-thinking-label-d: 1650ms;
 	--motion-settings-switch: 198ms var(--ease); /* fade */
+	--motion-settings-switch-d: 198ms;
 	--motion-sidebar-resize: 154ms var(--ease); /* fade */
+	--motion-sidebar-resize-d: 154ms;
 }
 
 :root,

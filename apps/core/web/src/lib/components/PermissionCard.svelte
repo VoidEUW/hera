@@ -13,6 +13,7 @@
 	 * wonder whether a decision stuck.
 	 */
 	import Button from './ui/Button.svelte';
+	import Pill from './ui/Pill.svelte';
 	import Icon from './ui/Icon.svelte';
 	import Kbd from './ui/Kbd.svelte';
 	import type { PermissionRequired } from '$lib/api/events';
@@ -30,18 +31,18 @@
 
 	let { card, decided = null, busy = false, onanswer }: Props = $props();
 
-	/** The three answers, each with its key (the theme's boxed option keys). Allowing is her
-	 * authority being granted, so the first is brass; denying is the soft danger, because it is a
-	 * refusal rather than a destruction. */
+	/** The three answers, each with its key (the theme's boxed option keys): Allow once, Always
+	 * allow — the one the card leads with, brass, because it is her authority being granted for
+	 * good — and Deny, the soft danger, because it is a refusal rather than a destruction. */
 	const CHOICES = [
+		{ key: '1', label: t.permission.allowOnce, variant: 'neutral', allow: true, remember: false },
 		{
-			key: '1',
-			label: t.permission.allowOnce,
+			key: '2',
+			label: t.permission.alwaysAllow,
 			variant: 'highlighted',
 			allow: true,
-			remember: false
+			remember: true
 		},
-		{ key: '2', label: t.permission.alwaysAllow, variant: 'neutral', allow: true, remember: true },
 		{ key: '3', label: t.permission.deny, variant: 'danger-soft', allow: false, remember: false }
 	] as const;
 
@@ -78,26 +79,33 @@
 
 <svelte:window {onkeydown} />
 
+<!-- The theme's permission card (`hera/question-card`, `qc.frame: none`, `qc.keys: boxed`): a
+     brass capital header with the shield, what she wants to run as a sentence, exactly what will
+     run in a mono box on the ground, then the three answers with their keys. -->
 <aside class="card" class:settled={!!decided}>
+	<p class="head">
+		<Icon name="shield" />
+		<span>{t.permission.heading}</span>
+		{#if decided}
+			<Pill tone={decided.allowed ? 'live' : 'danger'}>{outcome}</Pill>
+		{/if}
+	</p>
+
 	<p class="title">
-		<span class="mark"><Icon name="shield" /></span>
 		{named.server
 			? t.permission.titleFrom(named.action, named.server)
 			: t.permission.title(named.action)}
 	</p>
-
-	<p class="qualified mono">{named.qualified}</p>
-
-	{#if args}
-		<p class="args mono">{args}</p>
-	{/if}
 	{#if card.reason}
 		<p class="reason">{card.reason}</p>
 	{/if}
 
-	{#if decided}
-		<p class="outcome">{outcome}</p>
-	{:else}
+	<div class="command">
+		<span class="qualified">{named.qualified}</span>
+		{#if args}<span>{args}</span>{/if}
+	</div>
+
+	{#if !decided}
 		<div class="actions">
 			{#each CHOICES as choice (choice.key)}
 				<Button
@@ -117,19 +125,13 @@
 </aside>
 
 <style>
-	/* No frame (the theme's `qc.frame: none`): the card is the question in the flow of the
-	   answer, marked by its brass icon and its keys rather than boxed off from it. */
 	.card {
-		margin: calc(var(--space) * 4) 0;
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
 		max-width: var(--measure);
+		margin: calc(var(--space) * 4) 0;
 		animation: card-in var(--motion-card-enter);
-		/* Answering is the card settling: the three buttons leave and the card takes on the quieter
-		   surface it keeps for the rest of the conversation's life. Both halves of that used to
-		   happen in one frame, so the decision read as the card being replaced rather than as the
-		   card being answered. */
-		transition:
-			background-color var(--fade) var(--ease),
-			opacity var(--fade) var(--ease);
 	}
 
 	@keyframes card-in {
@@ -138,64 +140,57 @@
 		}
 	}
 
-	.settled {
-		opacity: 0.85;
+	.head {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		margin: 0;
+		color: var(--brass);
+		font-size: 11px;
+		font-weight: 600;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+	}
+
+	.settled .head {
+		color: var(--text-faint);
 	}
 
 	.title {
 		margin: 0;
 		font-family: var(--font-body);
 		font-size: 16px;
-		display: flex;
-		gap: 8px;
-		align-items: baseline;
-	}
-
-	.mark {
-		display: flex;
-		align-self: center;
-		color: var(--brass);
-	}
-
-	.qualified {
-		margin: 4px 0 0;
-		font-size: 12px;
-		color: var(--text-faint);
-	}
-
-	.args {
-		margin: 6px 0 0;
-		color: var(--text-muted);
-		overflow-wrap: anywhere;
+		line-height: 1.5;
 	}
 
 	.reason {
-		margin: 6px 0 0;
-		font-size: 13px;
+		margin: 0;
 		color: var(--text-muted);
+		font-size: 13px;
 	}
 
-	/* What was decided, said once and kept. It replaces the buttons, so it is the half of the
-	   answer that arrives — faded rather than instant, so the card is seen to change its mind
-	   about asking. */
-	.outcome {
-		margin: 10px 0 0;
-		font-size: 12.5px;
-		color: var(--brass);
-		animation: fade var(--fade) var(--ease);
+	/* Exactly what will run (`.pc .cmd`): mono, on the ground, in a hairline box. */
+	.command {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+		padding: 9px 12px;
+		overflow-x: auto;
+		border: var(--border-width) solid var(--line);
+		border-radius: var(--radius-sm);
+		background: var(--ground);
+		color: var(--text);
+		font: 12.5px var(--font-mono);
+		overflow-wrap: anywhere;
 	}
 
-	@keyframes fade {
-		from {
-			opacity: 0;
-		}
+	.qualified {
+		color: var(--text-faint);
 	}
 
 	.actions {
 		display: flex;
-		gap: 8px;
-		justify-content: flex-end;
-		margin-top: 14px;
 		flex-wrap: wrap;
+		gap: 8px;
 	}
 </style>

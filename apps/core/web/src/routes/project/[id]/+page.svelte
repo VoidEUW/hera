@@ -18,9 +18,11 @@
 	import { page } from '$app/state';
 	import { untrack } from 'svelte';
 	import type { Project } from '$lib/api/client';
-	import Select from '$lib/components/ui/Select.svelte';
+	import Selector from '$lib/components/ui/Selector.svelte';
 	import Skeleton from '$lib/components/ui/Skeleton.svelte';
-	import SkillPicker from '$lib/components/SkillPicker.svelte';
+	import SkillMenu from '$lib/components/SkillMenu.svelte';
+	import Pill from '$lib/components/ui/Pill.svelte';
+	import Swatches from '$lib/components/ui/Swatches.svelte';
 	import { t } from '$lib/i18n';
 	import { Placeholder } from '$lib/loading.svelte';
 	import { PROJECT_COLOURS, colourOf } from '$lib/projects';
@@ -30,12 +32,11 @@
 	const chats = $derived(workspace.chats.filter((chat) => chat.project_id === page.params.id));
 
 	/** The instructions being edited. Seeded from the project and owned here afterwards, the same
-	 * arrangement `SkillPicker` uses: following the prop while somebody is typing into it would
+	 * arrangement `SkillMenu` uses: following the prop while somebody is typing into it would
 	 * discard the sentence they are halfway through the moment anything else refreshed the rail. */
 	let draft = $state('');
 	let seeded = $state<string | null>(null);
 	let saved = $state(false);
-	let picking = $state(false);
 
 	// Not an $effect: this both reads and writes state the derived value above depends on, which
 	// is the shape that ends in effect_update_depth_exceeded — a blank page with nothing on it to
@@ -69,7 +70,6 @@
 	}
 
 	async function pickSkills(current: Project, names: string[]) {
-		picking = false;
 		await workspace.patchProject(current.id, { pinned_skills: names });
 	}
 
@@ -113,7 +113,7 @@
 				<Button variant="highlighted" disabled={!dirty} onclick={() => saveInstructions(project)}>
 					{t.project.save}
 				</Button>
-				{#if saved}<span class="caption saved">{t.project.saved}</span>{/if}
+				{#if saved}<Pill tone="live">{t.project.saved}</Pill>{/if}
 			</div>
 		</section>
 
@@ -122,13 +122,14 @@
 			<p class="caption">{t.project.skillsHint}</p>
 			<div class="chips">
 				{#each project.pinned_skills as name (name)}
-					<span class="chip">{name}</span>
-				{:else}
-					<span class="caption">—</span>
+					<Pill>{name}</Pill>
 				{/each}
-				<Button variant="ghost" size="sm" onclick={() => (picking = true)}>
-					{t.project.chooseSkills}
-				</Button>
+				<SkillMenu
+					pinned={project.pinned_skills}
+					heading={t.project.skills}
+					placement="below"
+					onpick={(names) => pickSkills(project, names)}
+				/>
 			</div>
 		</section>
 
@@ -136,13 +137,13 @@
 			<div>
 				<h2>{t.project.defaultProfile}</h2>
 				<p class="caption">{t.project.defaultProfileHint}</p>
-				<Select
+				<Selector
 					choices={[
 						{ value: '', label: t.project.noDefaultProfile },
 						...workspace.profiles.map((profile) => ({
 							value: profile.id,
 							label: profile.name,
-							hint: profile.description
+							description: profile.description
 						}))
 					]}
 					value={project.default_profile_id ?? ''}
@@ -157,25 +158,22 @@
 				     makes: a feature you can see coming is a promise, one you cannot is a
 				     surprise. Nothing reads this column in v0.2. -->
 				<p class="caption">{t.project.defaultAgentSoon}</p>
-				<Select choices={[]} value="" label={t.project.defaultAgent} disabled />
+				<Selector choices={[]} value="" label={t.project.defaultAgent} disabled />
 			</div>
 		</section>
 
 		<section>
 			<h2>{t.project.colour}</h2>
-			<div class="colours">
-				{#each PROJECT_COLOURS as name (name)}
-					<button
-						class="swatch"
-						class:chosen={project.color === name}
-						type="button"
-						style:background={colourOf(name) ?? 'var(--text-faint)'}
-						aria-label={name || t.project.colour}
-						aria-pressed={project.color === name}
-						onclick={() => workspace.patchProject(project.id, { color: name })}
-					></button>
-				{/each}
-			</div>
+			<Swatches
+				label={t.project.colour}
+				value={project.color ?? ''}
+				swatches={PROJECT_COLOURS.map((name) => ({
+					value: name,
+					label: name || t.project.colour,
+					colour: colourOf(name) ?? 'var(--text-faint)'
+				}))}
+				onchange={(name) => workspace.patchProject(project.id, { color: name })}
+			/>
 		</section>
 
 		<section>
@@ -197,14 +195,6 @@
 		<p>{t.project.notFound}</p>
 		<Button variant="highlighted" onclick={() => goto(resolve('/'))}>{t.rail.newChat}</Button>
 	</div>
-{/if}
-
-{#if picking && project}
-	<SkillPicker
-		pinned={project.pinned_skills}
-		onclose={() => (picking = false)}
-		onpick={(names) => pickSkills(project, names)}
-	/>
 {/if}
 
 <style>
@@ -292,11 +282,6 @@
 		margin-top: 8px;
 	}
 
-	.saved {
-		margin: 0;
-		color: var(--laurel);
-	}
-
 	.pair {
 		display: flex;
 		gap: 28px;
@@ -308,32 +293,6 @@
 		align-items: center;
 		gap: 6px;
 		flex-wrap: wrap;
-	}
-
-	.chip {
-		padding: 3px 9px;
-		background: var(--surface-raised);
-		border-radius: 999px;
-		font-size: 12.5px;
-		color: var(--text-muted);
-	}
-
-	.colours {
-		display: flex;
-		gap: 8px;
-	}
-
-	.swatch {
-		width: 20px;
-		height: 20px;
-		border-radius: 50%;
-		border: 2px solid transparent;
-		box-shadow: 0 0 0 1px var(--line);
-	}
-
-	.swatch.chosen {
-		border-color: var(--ground);
-		box-shadow: 0 0 0 2px var(--brass);
 	}
 
 	.chats {

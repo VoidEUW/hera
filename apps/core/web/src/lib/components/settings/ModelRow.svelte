@@ -1,17 +1,16 @@
 <script lang="ts">
 	/**
-	 * One registered model: a row that opens its own options when you click it.
+	 * One registered model (the theme's `hera/collapsible`, "model rows"): its name and id on the
+	 * header, how many options it carries and whether it is the one in use as pills, Remove beside
+	 * the header rather than inside it, and its options inside once opened.
 	 *
-	 * The toggle is a real `<button>` that takes all the width the row has to spare, so a click
-	 * anywhere on the row's body opens or closes it, and Enter and Space do the same from the
-	 * keyboard. **Remove** is a *sibling* of that button, not children: a
-	 * control inside a control is invalid, and it would make the whole row announce twice.
-	 *
-	 * Whether the editor is open is the parent's to say. A provider has one open model at a
+	 * `lazy`, because the options editor reads presets and holds a draft — twenty closed rows should
+	 * cost nothing. Whether a row is open is the parent's to say: a provider has one open model at a
 	 * time, so that is one value there rather than a flag in every row.
 	 */
 	import Button from '$lib/components/ui/Button.svelte';
-	import Icon from '$lib/components/ui/Icon.svelte';
+	import Collapsible from '$lib/components/ui/Collapsible.svelte';
+	import Pill from '$lib/components/ui/Pill.svelte';
 	import type { ModelEntry, ModelPreset, Provider } from '$lib/api/client';
 	import { t } from '$lib/i18n';
 	import ModelOptions from './ModelOptions.svelte';
@@ -19,8 +18,7 @@
 	interface Props {
 		provider: string;
 		model: ModelEntry;
-		/** Whether this is the model her turns run on. Switching it is the composer's job, where she is
-		 * picked per message; there is no second switch here. */
+		/** Whether this is the model her turns run on. Switching it is the composer's job. */
 		current: boolean;
 		open: boolean;
 		presets: ModelPreset[];
@@ -36,124 +34,21 @@
 	const count = $derived(Object.keys(model.options).length);
 </script>
 
-<li class:on={current}>
-	<div class="row">
-		<button class="toggle" type="button" aria-expanded={open} onclick={ontoggle}>
-			<span class="start">
-				<span class="chevron" class:open><Icon name="chevR" /></span>
-				<span class="name">{model.name}</span>
-				{#if count}<span class="badge quiet">{t.models.optionsSet(count)}</span>{/if}
-			</span>
-			<span class="id">{model.name !== model.id ? model.id : ''}</span>
-			<span class="end"
-				>{#if current}<span class="badge">{t.models.active}</span>{/if}</span
-			>
-		</button>
-		<Button variant="danger-soft" size="sm" onclick={onremove}>{t.models.removeModel}</Button>
-	</div>
-
-	{#if open}
+<li>
+	<Collapsible {open} lazy ontoggle={() => ontoggle()}>
+		{#snippet title()}{model.name}{/snippet}
+		{#snippet subtitle()}{model.name !== model.id ? model.id : t.models.sameId}{/snippet}
+		{#snippet actions()}
+			{#if count}<Pill>{t.models.optionsSet(count)}</Pill>{/if}
+			{#if current}<Pill tone="authority">{t.models.active}</Pill>{/if}
+			<Button variant="danger-soft" size="sm" onclick={onremove}>{t.models.removeModel}</Button>
+		{/snippet}
 		<ModelOptions {provider} {model} {presets} {onsaved} {onerror} onclose={ontoggle} />
-	{/if}
+	</Collapsible>
 </li>
 
 <style>
 	li {
-		padding: 6px 8px;
-		background: var(--surface);
-		border: 1px solid var(--line);
-		border-radius: var(--radius);
-	}
-
-	li.on {
-		border-color: var(--brass);
-	}
-
-	.row {
-		display: flex;
-		align-items: center;
-		gap: 8px;
-	}
-
-	/* No border and no padding of its own: the row is the box, and this is the part of it that
-	   answers a click. Negative margins let the hit area reach the row's edge. */
-	.toggle {
-		flex: 1;
-		min-width: 0;
-		display: grid;
-		grid-template-columns: 16rem minmax(0, 1fr) auto;
-		align-items: center;
-		gap: 12px;
-		margin: -6px 0 -6px -8px;
-		padding: 6px 0 6px 8px;
-		border: 0;
-		border-radius: var(--radius) 0 0 var(--radius);
-		text-align: left;
-		font-size: 13px;
-		color: var(--text);
-		cursor: pointer;
-	}
-
-	.toggle:hover .name {
-		color: var(--brass);
-	}
-
-	.chevron {
-		width: 12px;
-		flex: none;
-		font-size: 14px;
-		line-height: 1;
-		color: var(--text-faint);
-		transition: transform var(--fade) var(--ease);
-	}
-
-	.chevron.open {
-		transform: rotate(90deg);
-	}
-
-	.start,
-	.end {
-		display: flex;
-		align-items: baseline;
-		gap: 8px;
-		min-width: 0;
-	}
-
-	.end {
-		justify-content: flex-end;
-	}
-
-	.name {
-		min-width: 0;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-		font-size: 13px;
-		color: var(--text);
-		transition: color var(--fade) var(--ease);
-	}
-
-	/* The id starts at the same place on every row — the name column is a fixed width — in the
-	   body face and italic: a model id is a name, not code, and monospace made it read like a field
-	   somebody had forgotten to fill in. */
-	.id {
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-		font-size: 12.5px;
-		font-style: italic;
-		color: var(--text-faint);
-	}
-
-	.badge {
-		flex: none;
-		font-size: 11px;
-		letter-spacing: 0.06em;
-		text-transform: uppercase;
-		color: var(--brass);
-	}
-
-	.badge.quiet {
-		color: var(--text-faint);
+		list-style: none;
 	}
 </style>

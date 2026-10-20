@@ -2,58 +2,64 @@
 	/**
 	 * Hers: the send button (the theme's `hera/send-button`), pomegranate because sending is the
 	 * one action that is her. While she works it becomes Stop — the arrow lifts and shrinks out,
-	 * the stop square grows in, and a ring turns around the button (`send.morph`) — so the same
-	 * place in the composer always holds the one thing you can do next.
+	 * the stop square grows in, and a pomegranate ring spins around the button (`send.morph`) — so
+	 * the same place in the composer always holds the one thing you can do next. `cancelling` is
+	 * the beat between pressing Stop and the turn closing: square and ring go, nothing is offered.
 	 *
-	 * One element across both states rather than two buttons swapped in and out, so focus stays
-	 * where it was when a turn starts or ends under the keyboard.
+	 * One element across every state rather than buttons swapped in and out, so focus stays where
+	 * it was when a turn starts or ends under the keyboard.
 	 */
 	import { t } from '$lib/i18n';
 	import Icon from './Icon.svelte';
+	import { tooltip } from '$lib/tooltip';
 
 	interface Props {
 		busy: boolean;
+		cancelling?: boolean;
 		disabled?: boolean;
 		onsend: () => void;
 		onstop: () => void;
 	}
 
-	let { busy, disabled = false, onsend, onstop }: Props = $props();
+	let { busy, cancelling = false, disabled = false, onsend, onstop }: Props = $props();
+	const label = $derived(busy ? t.composer.stop : t.composer.send);
 </script>
 
 <button
 	class="send"
-	class:busy
+	class:run={busy && !cancelling}
+	class:cancel={cancelling}
 	type="button"
-	disabled={!busy && disabled}
-	aria-label={busy ? t.composer.stop : t.composer.send}
-	title={busy ? t.composer.stop : t.composer.send}
+	disabled={cancelling || (!busy && disabled)}
+	aria-label={label}
+	use:tooltip={label}
 	onclick={() => (busy ? onstop() : onsend())}
 >
-	<span class="arrow"><Icon name="arrowUp" /></span>
-	<span class="square" aria-hidden="true"></span>
-	{#if busy}<span class="ring" aria-hidden="true"></span>{/if}
+	<span class="go"><Icon name="arrowUp" /></span>
+	<span class="stop"><Icon name="stop" /></span>
+	<svg class="ring" viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="18" /></svg>
 </button>
 
 <style>
 	.send {
-		--diameter: calc(var(--space) * 7.5);
 		position: relative;
-		display: grid;
-		place-items: center;
+		display: inline-grid;
 		flex: none;
-		width: var(--diameter);
-		height: var(--diameter);
+		place-items: center;
+		width: 32px;
+		height: 32px;
 		border-radius: 50%;
 		background: var(--pomegranate);
 		color: var(--on-pomegranate);
 		transition:
-			transform var(--motion-button-hover),
-			opacity var(--fade) var(--ease);
+			background-color var(--motion-send-morph),
+			opacity var(--motion-send-morph),
+			transform var(--motion-button-press),
+			box-shadow var(--motion-button-hover);
 	}
 
 	.send:hover:not(:disabled) {
-		transform: translateY(-1px);
+		box-shadow: inset 0 0 0 100px var(--hover);
 	}
 
 	.send:active:not(:disabled) {
@@ -61,49 +67,65 @@
 	}
 
 	.send:disabled {
-		opacity: 0.4;
-		cursor: default;
+		opacity: 0.42;
+		cursor: not-allowed;
 	}
 
-	.arrow,
-	.square {
+	.go,
+	.stop {
+		display: flex;
 		grid-area: 1 / 1;
+		--icon-stroke: 2.2;
 		transition:
 			transform var(--motion-send-morph),
 			opacity var(--motion-send-morph);
 	}
 
-	.arrow {
-		display: flex;
-	}
-
-	.square {
-		width: 9px;
-		height: 9px;
-		border-radius: 2px;
-		background: currentColor;
+	.stop {
 		opacity: 0;
-		transform: scale(0.2);
+		transform: scale(0.4);
 	}
 
-	.busy .arrow {
+	.ring {
+		position: absolute;
+		inset: -4px;
+		width: 40px;
+		height: 40px;
 		opacity: 0;
-		transform: translateY(-6px) scale(0.5);
+		pointer-events: none;
+		transition: opacity var(--motion-send-morph);
 	}
 
-	.busy .square {
+	/* `send.morph`'s ring turns once every five morphs — 1.1 s at Heaven's speed. */
+	.ring circle {
+		fill: none;
+		stroke: var(--pomegranate);
+		stroke-width: 2;
+		stroke-linecap: round;
+		stroke-dasharray: 22 120;
+		transform-box: fill-box;
+		transform-origin: center;
+		animation: turn calc(var(--motion-send-morph-d) * 5) linear infinite;
+	}
+
+	.run .go {
+		opacity: 0;
+		transform: scale(0.4) translateY(-6px);
+	}
+
+	.run .stop {
 		opacity: 1;
 		transform: none;
 	}
 
-	/* A ring turning around the button while she works, in her own colour. */
-	.ring {
-		position: absolute;
-		inset: -4px;
-		border: 2px solid var(--pomegranate-soft);
-		border-top-color: var(--pomegranate);
-		border-radius: 50%;
-		animation: turn var(--motion-spinner-loop) infinite;
+	.run .ring {
+		opacity: 1;
+	}
+
+	.cancel .go,
+	.cancel .stop {
+		opacity: 0;
+		transform: scale(0.2);
 	}
 
 	@keyframes turn {
@@ -113,8 +135,9 @@
 	}
 
 	@media (prefers-reduced-motion: reduce) {
-		.ring {
-			border-color: var(--pomegranate);
+		.ring circle {
+			animation: none;
+			stroke-dasharray: none;
 		}
 	}
 </style>

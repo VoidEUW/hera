@@ -1,39 +1,64 @@
 <script lang="ts">
 	/**
-	 * How far along something is (the theme's `hera/progress-bar`): determinate when there is a
-	 * number — an upload, a download — and indeterminate when there is not, which shimmers rather
-	 * than pretending to a value (`bar.indeterminate`).
+	 * How far along or how full something is (the theme's `hera/progress-bar`, soft look): a 4px
+	 * rounded bar, 6px `thick`. Determinate when there is a number — an upload, a download, how
+	 * much of the memory budget is spent — and indeterminate when there is not, which sweeps a soft
+	 * laurel highlight across the track rather than pretending to a value (`bar.indeterminate`).
+	 *
+	 * `meter` is for a quantity rather than a task — space used, not work done — and `tone="danger"`
+	 * is a quantity that has gone past where it should be.
 	 */
 	interface Props {
-		/** 0 to 1. Omit for indeterminate. */
+		/** 0 to `max`. Omit for indeterminate. */
 		value?: number;
-		/** The accessible name: what is progressing. */
+		/** What `value` is out of. A meter of tokens says so, so a screen reader hears the real
+		 * numbers rather than a percentage. */
+		max?: number;
+		/** The accessible name: what is progressing, or what is being measured. */
 		label: string;
 		thick?: boolean;
+		meter?: boolean;
+		tone?: 'live' | 'danger';
+		/** For a meter: the reading a screen reader hears, "3 200 of 4 000 tokens". */
+		valuetext?: string;
 	}
 
-	let { value, label, thick = false }: Props = $props();
+	let {
+		value,
+		max = 1,
+		label,
+		thick = false,
+		meter = false,
+		tone = 'live',
+		valuetext
+	}: Props = $props();
 
-	const clamped = $derived(value === undefined ? undefined : Math.min(1, Math.max(0, value)));
+	const clamped = $derived(
+		value === undefined || max <= 0 ? undefined : Math.min(1, Math.max(0, value / max))
+	);
+	/** Percent for a plain share, the real numbers when the caller gave a `max`. */
+	const scale = $derived(max === 1 ? 100 : max);
 </script>
 
 <div
-	class="bar"
+	class="bar {tone}"
 	class:thick
 	class:indeterminate={clamped === undefined}
-	role="progressbar"
+	role={meter ? 'meter' : 'progressbar'}
 	aria-label={label}
 	aria-valuemin={0}
-	aria-valuemax={100}
-	aria-valuenow={clamped === undefined ? undefined : Math.round(clamped * 100)}
+	aria-valuemax={scale}
+	aria-valuenow={clamped === undefined ? undefined : Math.round(clamped * scale)}
+	aria-valuetext={valuetext}
 	style:--value={clamped ?? 0}
 >
-	<span class="fill"></span>
+	<i></i>
 </div>
 
 <style>
 	.bar {
 		position: relative;
+		width: 100%;
 		height: 4px;
 		overflow: hidden;
 		border-radius: var(--chip-radius);
@@ -41,30 +66,45 @@
 	}
 
 	.thick {
-		height: 8px;
+		height: 6px;
 	}
 
-	.fill {
+	i {
 		position: absolute;
 		inset: 0 auto 0 0;
 		width: calc(var(--value) * 100%);
 		border-radius: inherit;
 		background: var(--laurel);
-		transition: width var(--disclose) var(--ease);
+		transition:
+			width var(--motion-bar-indeterminate),
+			background-color var(--motion-bar-indeterminate);
 	}
 
-	.indeterminate .fill {
-		width: 40%;
-		background: linear-gradient(90deg, transparent, var(--laurel), transparent);
-		animation: shimmer var(--motion-bar-indeterminate) infinite;
+	.danger i {
+		background: var(--danger);
 	}
 
-	@keyframes shimmer {
+	.indeterminate i {
+		width: 100%;
+		background: linear-gradient(90deg, transparent 0%, var(--laurel) 50%, transparent 100%)
+			no-repeat;
+		background-size: 50% 100%;
+		animation: shine var(--motion-bar-indeterminate) infinite;
+	}
+
+	@keyframes shine {
 		from {
-			transform: translateX(-100%);
+			background-position: 150% 0;
 		}
 		to {
-			transform: translateX(250%);
+			background-position: -50% 0;
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.indeterminate i {
+			animation: none;
+			background-position: 50% 0;
 		}
 	}
 </style>

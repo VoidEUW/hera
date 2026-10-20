@@ -24,14 +24,15 @@
 <style>
 	.pill {
 		display: inline-flex;
+		flex: none;
 		align-items: center;
-		gap: calc(var(--space) * 1.25);
-		height: calc(var(--space) * 5.5);
-		padding: 0 calc(var(--space) * 2.5);
+		gap: 5px;
+		height: 20px;
+		padding: 0 8px;
 		border-radius: var(--chip-radius);
 		background: var(--hover);
 		color: var(--text-muted);
-		font-size: calc(var(--ui-size) - 2px);
+		font-size: 11px;
 		font-weight: 500;
 		white-space: nowrap;
 	}

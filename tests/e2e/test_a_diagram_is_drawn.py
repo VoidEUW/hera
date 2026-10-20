@@ -159,7 +159,7 @@ class TestADiagramIsDrawn:
         assert drawing.locator("foreignObject").count() == 0
 
         # And it really is drawn rather than shown as text -- the source view is the other branch.
-        assert page.locator(".source pre").count() == 0
+        assert page.locator(".hers .cv").count() == 0
 
     def test_it_lands_in_the_answer_without_the_call_asking_for_that(self, page: Any) -> None:
         """The reason `diagram_create` exists rather than a fourth argument on `artifact_create`.
@@ -314,12 +314,12 @@ class TestADiagramThatDoesNotParse:
     def test_it_falls_back_to_the_source_and_says_why(self, page: Any) -> None:
         publish(page)
 
-        source = page.locator(".hers .source code")
+        source = page.locator(".hers .code .cv code")
         source.wait_for(timeout=30_000)
         assert "steps: hello, hello back, done" in (source.inner_text() or "")
 
         # The caption carries mermaid's own message, which is the part naming what went wrong.
-        caption = page.locator(".hers .source .caption")
+        caption = page.locator(".hers .code .notice")
         assert caption.count() == 1
         assert "did not come out" in (caption.inner_text() or "")
 

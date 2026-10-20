@@ -15,7 +15,11 @@
 	 * is chosen or explicitly cleared.
 	 */
 	import Button from '$lib/components/ui/Button.svelte';
-	import Icon from '$lib/components/ui/Icon.svelte';
+	import Collapsible from '$lib/components/ui/Collapsible.svelte';
+	import FileButton from '$lib/components/ui/FileButton.svelte';
+	import NumberField from '$lib/components/ui/NumberField.svelte';
+	import Pill from '$lib/components/ui/Pill.svelte';
+	import SearchBar from '$lib/components/ui/SearchBar.svelte';
 	import {
 		api,
 		type ModelPreset,
@@ -24,7 +28,7 @@
 		type ProviderKind
 	} from '$lib/api/client';
 	import Input from '$lib/components/ui/Input.svelte';
-	import Select from '$lib/components/ui/Select.svelte';
+	import Selector from '$lib/components/ui/Selector.svelte';
 	import { t } from '$lib/i18n';
 	import { kindFallbackIcon, kindIcon, PROVIDER_KINDS } from '$lib/providers';
 	import ModelRow from './ModelRow.svelte';
@@ -46,7 +50,13 @@
 	let { entry, active, presets, open, ontoggle, onchange, onerror }: Props = $props();
 
 	const isActive = $derived(entry.name === active);
-	const bodyId = $derived(`provider-${entry.name}`);
+	function host(url: string): string {
+		try {
+			return new URL(url).host;
+		} catch {
+			return url;
+		}
+	}
 
 	// Typing in a field must not fight the list refreshing under it, so edits are held here
 	// until Save. `logo_data_url` rides along: a staged upload is not a fact about the endpoint
@@ -131,10 +141,8 @@
 		draft = { ...draft, [field]: value };
 	}
 
-	function readLogo(event: Event) {
-		const input = event.currentTarget as HTMLInputElement;
-		const file = input.files?.[0];
-		input.value = '';
+	function readLogo(files: FileList) {
+		const file = files[0];
 		if (!file) return;
 		const reader = new FileReader();
 		reader.onload = () => {
@@ -186,58 +194,54 @@
 	}
 </script>
 
-<section class="entry" class:current={isActive}>
-	<header>
-		<h3>
-			<button
-				class="disclosure"
-				type="button"
-				aria-expanded={open}
-				aria-controls={bodyId}
-				onclick={ontoggle}
-			>
-				<span class="chevron" class:open><Icon name="chevR" /></span>
+<!-- One endpoint (the theme's `hera/collapsible`, "provider cards"): its logo and name on the
+     header, the host under it, Active or Activate beside it; the fields, its models and the probe
+     inside once opened. -->
+<div class="provider">
+	<Collapsible {open} lazy ontoggle={() => ontoggle()}>
+		{#snippet title()}
+			<span class="named">
 				<img
 					class="logo"
 					src={logoPreview(entry) || kindIcon(effectiveKind)}
 					alt=""
-					aria-hidden="true"
 					onerror={onLogoError(effectiveKind)}
 				/>
-				<span class="title">{entry.name}</span>
-				{#if isActive}<span class="badge">{t.models.active}</span>{/if}
-			</button>
-		</h3>
-		{#if !isActive}
-			<Button variant="ghost" onclick={activate}>{t.models.activate}</Button>
-		{/if}
-	</header>
+				{entry.name}
+			</span>
+		{/snippet}
+		{#snippet subtitle()}{host(entry.base_url)} · {t.models.kind[effectiveKind]}{/snippet}
+		{#snippet actions()}
+			{#if isActive}
+				<Pill tone="authority">{t.models.active}</Pill>
+			{:else}
+				<Button size="sm" onclick={activate}>{t.models.activate}</Button>
+			{/if}
+		{/snippet}
 
-	{#if open}
-		<div class="body" id={bodyId}>
-			<label>
-				<span>{t.models.kindLabel}</span>
-				<Select
-					choices={PROVIDER_KINDS.map((kind) => ({ value: kind, label: t.models.kind[kind] }))}
-					value={current(entry, 'kind')}
-					label={t.models.kindLabel}
-					field
-					onchange={(value) => edit('kind', value)}
-				/>
-			</label>
+		<div class="body">
+			<Selector
+				caption={t.models.kindLabel}
+				choices={PROVIDER_KINDS.map((kind) => ({ value: kind, label: t.models.kind[kind] }))}
+				value={current(entry, 'kind')}
+				label={t.models.kindLabel}
+				onchange={(value) => edit('kind', value)}
+			/>
 
 			{#if effectiveKind === 'custom'}
-				<label class="logo-field">
-					<span>{t.models.logo}</span>
+				<div class="logo-field">
+					<span class="label">{t.models.logo}</span>
 					<div class="logo-row">
 						{#if logoPreview(entry)}
 							<img class="logo-preview" src={logoPreview(entry)} alt="" />
 						{/if}
-						<input
-							type="file"
+						<FileButton
+							icon="image"
+							label={t.models.logo}
 							accept="image/png,image/jpeg,image/webp,image/gif"
-							onchange={(e) => readLogo(e)}
-						/>
+							size="sm"
+							onfiles={readLogo}>{t.models.logoPick}</FileButton
+						>
 						{#if logoPreview(entry)}
 							<Button variant="ghost" size="sm" onclick={() => clearLogo()}>
 								{t.models.logoClear}
@@ -245,72 +249,68 @@
 						{/if}
 					</div>
 					<small>{t.models.logoHint}</small>
-				</label>
+				</div>
 			{/if}
 
-			<label>
-				<span>{t.models.baseUrl}</span>
-				<Input
-					kind="url"
-					mono
-					value={current(entry, 'base_url')}
-					onchange={(value) => edit('base_url', value)}
-				/>
-			</label>
+			<Input
+				kind="url"
+				mono
+				label={t.models.baseUrl}
+				value={current(entry, 'base_url')}
+				onchange={(value) => edit('base_url', value)}
+			/>
 
-			<label>
-				<span>{t.models.apiKey}</span>
-				<Input
-					kind="password"
-					mono
-					placeholder={entry.api_key_set ? '••••••••' : ''}
-					value={draft.api_key ?? ''}
-					onchange={(value) => edit('api_key', value)}
-				/>
-				<small>{entry.api_key_set ? t.models.keyStored : t.models.keyBlank}</small>
-			</label>
+			<Input
+				kind="password"
+				mono
+				label={t.models.apiKey}
+				help={entry.api_key_set ? t.models.keyStored : t.models.keyBlank}
+				placeholder={entry.api_key_set ? '••••••••' : ''}
+				value={draft.api_key ?? ''}
+				onchange={(value) => edit('api_key', value)}
+			/>
 
-			<label>
-				<span>{t.models.embeddingModel}</span>
-				<Input
-					mono
-					value={current(entry, 'embedding_model')}
-					onchange={(value) => edit('embedding_model', value)}
-				/>
-				<small>{t.models.embeddingHint}</small>
-			</label>
+			<Input
+				mono
+				label={t.models.embeddingModel}
+				help={t.models.embeddingHint}
+				value={current(entry, 'embedding_model')}
+				onchange={(value) => edit('embedding_model', value)}
+			/>
 
-			<label>
-				<span>{t.models.timeout}</span>
-				<input
-					type="number"
-					min="1"
-					step="10"
-					value={seconds(entry)}
-					oninput={(e) => {
-						const parsed = Number(e.currentTarget.value);
-						if (Number.isFinite(parsed) && parsed > 0) edit('timeout_s', parsed);
-					}}
-				/>
-				<small>{t.models.timeoutHint}</small>
-			</label>
+			<NumberField
+				label={t.models.timeout}
+				help={t.models.timeoutHint}
+				unit="s"
+				min={1}
+				step={10}
+				value={seconds(entry)}
+				onchange={(value) => {
+					if (value !== null && value > 0) edit('timeout_s', value);
+				}}
+			/>
 
 			<div class="actions">
-				<Button variant="highlighted" disabled={Object.keys(draft).length === 0} onclick={save}>
-					{t.settings.save}
+				<Button variant="danger-soft" size="sm" icon="trash" onclick={remove}>
+					{t.models.remove}
 				</Button>
-				<Button variant="ghost" onclick={runProbe}>
+				<span class="space"></span>
+				{#if saved}<Pill tone="live">{t.models.saved}</Pill>{/if}
+				<Button size="sm" icon="refresh" busy={result === 'running'} onclick={runProbe}>
 					{result === 'running' ? t.models.testing : t.models.test}
 				</Button>
-				{#if saved}
-					<span class="ok">{t.models.saved}</span>
-				{/if}
-				<button class="ghost danger" type="button" onclick={remove}>
-					{t.models.remove}
-				</button>
+				<Button
+					variant="highlighted"
+					size="sm"
+					disabled={Object.keys(draft).length === 0}
+					onclick={save}
+				>
+					{t.settings.save}
+				</Button>
 			</div>
 
 			<div class="models">
+				<span class="label">{t.models.modelsHeading}</span>
 				{#if entry.models.length}
 					<ul class="registered" aria-label={t.models.modelsHeading}>
 						{#each entry.models as model (model.id)}
@@ -335,16 +335,18 @@
 					<Input
 						mono
 						placeholder={t.models.modelId}
+						ariaLabel={t.models.modelId}
 						value={newModel.id}
 						onchange={(value) => (newModel = { ...newModel, id: value })}
 					/>
 					<Input
 						mono
 						placeholder={t.models.modelName}
+						ariaLabel={t.models.modelName}
 						value={newModel.name}
 						onchange={(value) => (newModel = { ...newModel, name: value })}
 					/>
-					<Button variant="ghost" size="sm" disabled={!newModel.id.trim()} onclick={addModel}>
+					<Button size="sm" icon="plus" disabled={!newModel.id.trim()} onclick={addModel}>
 						{t.models.addModel}
 					</Button>
 				</div>
@@ -352,35 +354,24 @@
 
 			{#if result && result !== 'running'}
 				{#if result.ok}
-					<p class="ok">{t.models.reachable(result.models.length)}</p>
-					<label class="search">
-						<span class="sr-only">{t.models.search}</span>
-						<Input
-							kind="search"
-							mono
-							placeholder={t.models.search}
-							value={probeQuery}
-							onchange={(value) => (probeQuery = value)}
-						/>
-					</label>
+					<Pill tone="live">{t.models.reachable(result.models.length)}</Pill>
+					<SearchBar
+						placeholder={t.models.search}
+						value={probeQuery}
+						onchange={(value) => (probeQuery = value)}
+					/>
 					<ul class="probed">
 						{#each probeShown() as id (id)}
 							{@const already = entry.models.some((m) => m.id === id)}
 							<li>
-								<button
-									class="row"
-									class:on={already}
-									type="button"
-									disabled={already}
-									onclick={() => pickFromProbe(id)}
-								>
-									<span class="mark"
-										>{#if already}<Icon name="check" />{/if}</span
-									>
-									<code class="id">{id}</code>
-									{#if !already}<span class="add-hint">{t.models.pick}</span>{/if}
-									{#if already}<span class="caption">{t.models.alreadyAdded}</span>{/if}
-								</button>
+								<code class="id">{id}</code>
+								{#if already}
+									<Pill tone="live">{t.models.alreadyAdded}</Pill>
+								{:else}
+									<Button variant="ghost" size="sm" icon="plus" onclick={() => pickFromProbe(id)}>
+										{t.models.pick}
+									</Button>
+								{/if}
 							</li>
 						{:else}
 							<li class="empty">{t.settings.noMatch}</li>
@@ -391,135 +382,40 @@
 				{/if}
 			{/if}
 		</div>
-	{/if}
-</section>
+	</Collapsible>
+</div>
 
 <style>
-	.empty {
-		margin: 0 0 16px;
-		max-width: 60ch;
-		font-family: var(--font-body);
-		font-size: 15px;
-		line-height: 1.6;
-		color: var(--text-muted);
-	}
-
-	.entry {
-		padding: 16px 0;
-		border-bottom: 1px solid var(--line);
-	}
-
-	.entry.current .title {
-		color: var(--brass);
-	}
-
-	header {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: 12px;
-	}
-
-	header h3 {
-		flex: 1;
-		min-width: 0;
-	}
-
-	/* The whole header is the control: a click on the logo, the name or the empty space beside
-	   them opens or closes the card. It sits inside the `<h3>` — the usual shape for a
-	   disclosure — and **Activate** sits beside the heading rather than inside the button. */
-	.disclosure {
-		display: flex;
+	.named {
+		display: inline-flex;
 		align-items: center;
 		gap: 8px;
-		width: 100%;
-		padding: 2px 0;
-		border: 0;
-		text-align: left;
-		font: inherit;
-		color: inherit;
-		cursor: pointer;
-	}
-
-	.disclosure:hover .title {
-		color: var(--brass);
-	}
-
-	.chevron {
-		width: 12px;
-		flex: none;
-		font-size: 14px;
-		line-height: 1;
-		color: var(--text-faint);
-		transition: transform var(--fade) var(--ease);
-	}
-
-	.chevron.open {
-		transform: rotate(90deg);
-	}
-
-	.title {
-		transition: color var(--fade) var(--ease);
-	}
-
-	.body {
-		margin-top: 12px;
-	}
-
-	/* Spacing alone sets the model list apart from the fields above it: it is the same provider,
-	   and a rule and a heading made it read as a separate section. */
-	.models {
-		margin-top: 20px;
 	}
 
 	.logo {
-		width: 20px;
-		height: 20px;
-		flex: none;
-		border-radius: 5px;
-		object-fit: cover;
+		width: var(--icon-size);
+		height: var(--icon-size);
+		object-fit: contain;
 	}
 
-	h3 {
-		margin: 0;
-		font-size: 14px;
+	.body {
+		display: flex;
+		flex-direction: column;
+		gap: 14px;
+		max-width: 560px;
+		color: var(--text);
+	}
+
+	.label {
+		color: var(--text);
+		font-size: 12px;
 		font-weight: 500;
 	}
 
-	.badge {
-		font-size: 11px;
-		letter-spacing: 0.06em;
-		text-transform: uppercase;
-		color: var(--brass);
-	}
-
-	label {
-		display: block;
-		margin-bottom: 10px;
-	}
-
-	label > span {
-		display: block;
-		font-size: 12.5px;
-		color: var(--text-muted);
-		margin-bottom: 3px;
-	}
-
-	input {
-		width: 100%;
-		padding: 7px 10px;
-		background: var(--surface);
-		border: 1px solid var(--line);
-		border-radius: var(--radius);
-		font-family: var(--font-mono);
-		font-size: 13px;
-	}
-
-	small {
-		display: block;
-		margin-top: 3px;
-		font-size: 12px;
-		color: var(--text-faint);
+	.logo-field {
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
 	}
 
 	.logo-row {
@@ -528,147 +424,92 @@
 		gap: 8px;
 	}
 
-	.logo-row input[type='file'] {
-		flex: 1;
-		min-width: 0;
+	.logo-preview {
+		width: 28px;
+		height: 28px;
+		border-radius: var(--radius-sm);
+		object-fit: contain;
 	}
 
-	.logo-preview {
-		width: 32px;
-		height: 32px;
-		flex: none;
-		border-radius: 6px;
-		border: 1px solid var(--line);
-		object-fit: cover;
+	small {
+		color: var(--text-faint);
+		font-size: 11.5px;
 	}
 
 	.actions {
 		display: flex;
+		flex-wrap: wrap;
 		align-items: center;
 		gap: 8px;
-		margin-top: 12px;
-		flex-wrap: wrap;
 	}
 
-	button {
-		padding: 5px 12px;
-		border: 1px solid var(--line);
-		border-radius: var(--radius);
-		font-size: 13px;
-		color: var(--text-muted);
-		transition:
-			border-color var(--fade) var(--ease),
-			color var(--fade) var(--ease);
+	.space {
+		flex: 1;
 	}
 
-	button:not(:disabled):hover {
-		border-color: var(--text-faint);
-		color: var(--text);
-	}
-
-	button:disabled {
-		opacity: 0.4;
-		cursor: default;
-	}
-
-	.danger:not(:disabled):hover {
-		border-color: var(--danger);
-		color: var(--danger);
+	.models {
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
 	}
 
 	.registered {
-		list-style: none;
-		margin: 0 0 10px;
-		padding: 0;
 		display: flex;
 		flex-direction: column;
-		gap: 4px;
+		gap: 6px;
+		margin: 0;
+		padding: 0;
 	}
 
 	.add-model {
-		display: flex;
-		gap: 6px;
-	}
-
-	/* `:global` reaches past `Input.svelte`'s own scope — its root is the `<input>` itself, with
-	   no wrapper `div` this rule could otherwise land on (same reason `Slider.svelte` needs it). */
-	.add-model :global(.control) {
-		flex: 1;
-		min-width: 0;
-	}
-
-	code {
-		font-family: var(--font-mono);
-		font-size: 12.5px;
-	}
-
-	.ok {
-		font-size: 12.5px;
-		color: var(--laurel);
-	}
-
-	.error {
-		margin: 8px 0 0;
-		font-size: 12.5px;
-		color: var(--danger);
-	}
-
-	.search :global(.control) {
-		margin: 8px 0;
+		display: grid;
+		grid-template-columns: 1fr 1fr auto;
+		gap: 8px;
+		align-items: center;
 	}
 
 	.probed {
-		list-style: none;
+		display: flex;
+		flex-direction: column;
+		max-height: 260px;
 		margin: 0;
-		padding: 0;
-		max-height: 220px;
+		padding: 4px;
 		overflow-y: auto;
-		border: 1px solid var(--line);
-		border-radius: var(--radius);
+		border: var(--border-width) solid var(--line);
+		border-radius: var(--radius-sm);
+		list-style: none;
 	}
 
-	.probed li + li {
-		border-top: 1px solid var(--line);
-	}
-
-	.row {
+	.probed li {
 		display: flex;
 		align-items: center;
+		justify-content: space-between;
 		gap: 8px;
-		width: 100%;
-		padding: 6px 10px;
-		text-align: left;
-		border: 0;
-		border-radius: 0;
+		min-height: 32px;
+		padding: 0 4px 0 9px;
+		border-radius: max(calc(var(--radius) - 4px), 2px);
 	}
 
-	.row.on {
-		cursor: default;
+	.probed li:hover {
+		background: var(--hover);
 	}
 
-	.mark {
-		width: 13px;
-		flex: none;
-		color: var(--brass);
-		font-size: 11px;
-	}
-
-	.row .id {
-		flex: 1;
-		min-width: 0;
+	.id {
 		overflow: hidden;
+		font: 12.5px var(--font-mono);
 		text-overflow: ellipsis;
 		white-space: nowrap;
 	}
 
-	.add-hint {
-		flex: none;
-		font-size: 11.5px;
+	.empty {
+		margin: 0;
 		color: var(--text-faint);
+		font-size: 13px;
 	}
 
-	.probed .empty {
+	.error {
 		margin: 0;
-		padding: 10px;
+		color: var(--danger);
+		font-size: 12.5px;
 	}
 </style>

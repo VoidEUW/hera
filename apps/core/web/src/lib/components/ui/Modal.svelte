@@ -18,11 +18,10 @@
 	 *
 	 * What it does not own: the body. A sheet is its content; the shell only frames it.
 	 */
-	import { expoIn } from 'svelte/easing';
-	import { fade } from 'svelte/transition';
 	import { dialog, topmost } from '$lib/dialog';
 	import CloseButton from './CloseButton.svelte';
-	import { LEAVING, reveal, slot, still } from '$lib/motion';
+	import Scrim from './Scrim.svelte';
+	import { reveal } from '$lib/motion';
 
 	interface Props {
 		/** The accessible name of the dialog. Not drawn — the header carries a visible title. */
@@ -56,6 +55,8 @@
 		/** Class passed through to the sheet element, so a caller can size it from its own
 		 * scoped styles without :global(). */
 		sheetclass?: string;
+		/** Actions under the body, behind a hairline (the open dialog's footer): Cancel, Save. */
+		footer?: import('svelte').Snippet;
 		children?: import('svelte').Snippet;
 	}
 
@@ -69,6 +70,7 @@
 		dim = true,
 		width = 'min(520px, 92vw)',
 		sheetclass = '',
+		footer,
 		children
 	}: Props = $props();
 
@@ -97,16 +99,6 @@
 				? { y: 18, blur: 3, slot: 'drawer-open' }
 				: { y: 18, blur: 3, slot: 'modal-enter' }
 	);
-
-	/** The scrim is a `svelte/transition` fade rather than a `reveal`, so `reveal` does not reach
-	 *  it; it runs on the sheet's own slot so the two arrive and leave together. With motion off it
-	 *  gets no duration at all, for the reason `reveal` and `disclose` give. */
-	const motion = $derived(slot(gesture.slot));
-	const scrimIn = $derived({ duration: still() ? 0 : motion.duration, easing: motion.easing });
-	const scrimOut = $derived({
-		duration: still() ? 0 : motion.duration * LEAVING,
-		easing: expoIn
-	});
 
 	let sheet = $state<HTMLDivElement | null>(null);
 
@@ -153,7 +145,7 @@
 				path.some((node) => node instanceof HTMLElement && node.getAttribute('role') === 'dialog')
 			)
 				return;
-			if (sheet?.querySelector('[role="listbox"]')) return;
+			if (sheet?.querySelector('[role="menu"]')) return;
 			close();
 		};
 		window.addEventListener('click', away);
@@ -164,13 +156,7 @@
 	});
 </script>
 
-<div
-	class="scrim"
-	class:clear={!dim}
-	role="presentation"
-	in:fade={scrimIn}
-	out:fade={scrimOut}
-></div>
+<Scrim clear={!dim} motion={gesture.slot} />
 
 <div
 	bind:this={sheet}
@@ -200,30 +186,17 @@
 	{#if children}
 		{@render children()}
 	{/if}
+	{#if footer}<footer>{@render footer()}</footer>{/if}
 </div>
 
 <style>
-	/* The scrim. `role="presentation"` rather than the `role="button"` the four copies used:
-	 * a scrim is not a control, it is the absence of one, and the close button and Escape are
-	 * the two ways out that a keyboard user has. */
-	.scrim {
-		position: fixed;
-		inset: 0;
-		background: var(--scrim);
-		z-index: 10;
-	}
-
-	.scrim.clear {
-		background: none;
-	}
-
 	.sheet {
 		position: fixed;
 		display: flex;
 		flex-direction: column;
-		background: var(--surface-raised);
-		border: 1px solid var(--line);
-		border-radius: var(--radius-lg);
+		background: var(--surface);
+		border: var(--border-width) solid var(--line);
+		border-radius: var(--radius);
 		box-shadow: var(--shadow);
 		overflow: hidden;
 		z-index: 11;
@@ -264,23 +237,37 @@
 		display: flex;
 		align-items: flex-start;
 		justify-content: space-between;
-		gap: 16px;
-		padding: 16px 20px;
-		border-bottom: 1px solid var(--line);
+		gap: 12px;
+		padding: 20px 22px 4px;
 		flex: none;
+	}
+
+	/* The open dialog's footer: actions at the end, separated by a hairline. */
+	footer {
+		display: flex;
+		flex: none;
+		flex-wrap: wrap;
+		justify-content: flex-end;
+		gap: 8px;
+		margin: 0 22px;
+		padding: 14px 0 20px;
+		border-top: var(--border-width) solid var(--line);
 	}
 
 	/* The theme's open dialog: the title in the interface face, not the display one. */
 	h2 {
 		margin: 0;
 		font-family: var(--font-ui);
-		font-size: calc(var(--ui-size) + 3px);
+		font-size: 16px;
 		font-weight: 600;
+		line-height: 1.25;
 	}
 
 	header .caption {
-		margin: 2px 0 0;
+		margin: 3px 0 0;
 		max-width: 46ch;
+		color: var(--text-muted);
+		font-size: 13px;
 	}
 
 	/* A bare sheet's way out, pinned to its own top-right corner rather than sitting in a header
