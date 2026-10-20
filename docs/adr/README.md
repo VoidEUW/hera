@@ -27,3 +27,4 @@ later.
 | [18](0018-a-model-may-carry-request-options.md) | A model may carry request options, and Hera does not know what they mean | accepted |
 | [19](0019-preferred-models-widen-past-qwen.md) | Preferred models widen past Qwen, and a model may decline tool calling | accepted |
 | [20](0020-the-stable-part-of-the-prompt-goes-first.md) | The stable part of the prompt goes first, and what changes goes last | accepted |
+| [21](0021-a-theme-is-imported-data.md) | A theme is imported data, and it changes tokens rather than structure | accepted |

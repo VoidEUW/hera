@@ -97,6 +97,12 @@ it is and reads no meaning back out of it. See ADR 11.
 **The server render is authoritative.** The client replaces its optimistic view with the
 persisted event list at `done`.
 
+**A theme is imported, and a component reads tokens only** — [ADR 21](docs/adr/0021-a-theme-is-imported-data.md).
+`npm run theme:import docs/themes/<export>.md` (in `apps/core/web`) generates
+`src/lib/themes/`; those files are never edited by hand. A theme changes tokens — colour, faces,
+sizes, radii, motion slots — never structure. No literal colour, font, radius or duration in a
+component: a guard test fails on one, and on a token some registered theme does not define.
+
 **Skill selection is code.** Never build a feature that depends on the model noticing a skill is
 relevant; the target model does not. See ADR 5.
 
