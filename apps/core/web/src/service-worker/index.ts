@@ -8,12 +8,18 @@
  * shell and the static assets beside it, so installing Hera changes nothing about how a turn
  * behaves; it only makes the shell load once and start faster the next time.
  */
-import { build, files, version } from '$service-worker';
+import { assets, immutable } from '$app/manifest';
+import { version } from '$app/env';
 
 declare let self: ServiceWorkerGlobalScope;
 
 const CACHE = `hera-shell-${version}`;
-const ASSETS = new Set([...build, ...files]);
+// The manifest paths are relative to the base path (`_app/immutable/x.js`, no leading slash), while a
+// request is matched on `url.pathname`. Resolving against the worker scope makes them the same shape
+// and keeps that true under a base path.
+const ASSETS = new Set(
+	[...immutable, ...assets].map((entry) => new URL(entry.path, self.registration.scope).pathname)
+);
 
 self.addEventListener('install', (event) => {
 	async function precache() {
