@@ -6,6 +6,7 @@ the right frames, and what was persisted matches what was streamed.
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Any
@@ -21,7 +22,16 @@ from hera_core.wiring import Services
 from hera_home import artifacts_dir, scratch_dir
 from hera_mcp import BUILTIN_SERVER_NAME, TOOL_NAMES, build_builtin_server
 from hera_permissions import PermissionSet, Policy
-from hera_providers import FakeProvider, text_turn, thinking_turn, tool_call, tool_turn
+from hera_providers import (
+    FakeProvider,
+    ProviderUnavailable,
+    TextDelta,
+    TurnEnd,
+    text_turn,
+    thinking_turn,
+    tool_call,
+    tool_turn,
+)
 from hera_skillsets import SkillLibrary, SkillLibraryPort
 from hera_tools import ToolRegistry, ToolsSettings
 
@@ -100,13 +110,94 @@ class TestASimpleTurn:
         assert [m["role"] for m in detail["messages"]] == ["user", "assistant"]
         assert detail["messages"][0]["content"] == "Explain Kerberos"
 
-    async def test_the_first_message_names_the_chat(self, make_services: Any) -> None:
-        services = make_services(FakeProvider([text_turn("Hello.")]))
+    async def test_the_first_message_is_summarized_for_the_chat_title(
+        self, make_services: Any
+    ) -> None:
+        class ProviderWithTitle:
+            def __init__(self) -> None:
+                self.chat = FakeProvider([text_turn("Hello.")])
+
+            async def stream(self, request: Any) -> AsyncIterator[Any]:
+                if request.messages[0].role.value == "system" and "Summarize the user's" in str(
+                    request.messages[0].content
+                ):
+                    assert request.messages[1].content == "Incoming message:\nExplain Kerberos"
+                    yield TextDelta(text="Kerberos Authentication")
+                    yield TurnEnd()
+                    return
+                async for event in self.chat.stream(request):
+                    yield event
+
+            async def aclose(self) -> None:
+                await self.chat.aclose()
+
+        services = make_services(ProviderWithTitle())
         async with _client(services) as client:
             chat_id = await open_chat(client)
             await talk(client, chat_id, "Explain Kerberos")
             detail = (await client.get(f"{API}/chats/{chat_id}")).json()
 
+        assert detail["chat"]["title"] == "Kerberos Authentication"
+
+    async def test_a_failed_title_request_falls_back_to_the_raw_message(
+        self, make_services: Any
+    ) -> None:
+        """A chat that never gets a summarized title because the auxiliary call broke should
+        still get a name -- the raw-text title this feature replaces as the common case, not
+        nothing at all."""
+
+        class ProviderWhoseTitleCallBreaks:
+            def __init__(self) -> None:
+                self.chat = FakeProvider([text_turn("Hello.")])
+
+            async def stream(self, request: Any) -> AsyncIterator[Any]:
+                if request.messages[0].role.value == "system" and "Summarize the user's" in str(
+                    request.messages[0].content
+                ):
+                    raise ProviderUnavailable("the title endpoint is down")
+                async for event in self.chat.stream(request):
+                    yield event
+
+            async def aclose(self) -> None:
+                await self.chat.aclose()
+
+        services = make_services(ProviderWhoseTitleCallBreaks())
+        async with _client(services) as client:
+            chat_id = await open_chat(client)
+            await talk(client, chat_id, "Explain Kerberos")
+            detail = (await client.get(f"{API}/chats/{chat_id}")).json()
+
+        assert detail["chat"]["title"] == "Explain Kerberos"
+
+    async def test_a_title_request_that_hangs_does_not_hold_up_the_turn(
+        self, make_services: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The title is awaited before `done` and before the turn is persisted, so an endpoint
+        that never answers it must cost a short wait and a raw-text title, not the whole turn."""
+        monkeypatch.setattr("hera_core.api.chats._TITLE_TIMEOUT_SECONDS", 0.05)
+
+        class ProviderWhoseTitleCallHangs:
+            def __init__(self) -> None:
+                self.chat = FakeProvider([text_turn("Hello.")])
+
+            async def stream(self, request: Any) -> AsyncIterator[Any]:
+                if request.messages[0].role.value == "system" and "Summarize the user's" in str(
+                    request.messages[0].content
+                ):
+                    await asyncio.Event().wait()
+                async for event in self.chat.stream(request):
+                    yield event
+
+            async def aclose(self) -> None:
+                await self.chat.aclose()
+
+        services = make_services(ProviderWhoseTitleCallHangs())
+        async with _client(services) as client:
+            chat_id = await open_chat(client)
+            frames = await asyncio.wait_for(talk(client, chat_id, "Explain Kerberos"), timeout=5)
+            detail = (await client.get(f"{API}/chats/{chat_id}")).json()
+
+        assert payload(frames, "done")["content"] == "Hello."
         assert detail["chat"]["title"] == "Explain Kerberos"
 
     async def test_a_second_turn_sees_the_first(self, make_services: Any) -> None:
