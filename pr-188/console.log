@@ -1,0 +1,12 @@
+# browser console
+
+[desktop] warning: A preload for 'http://127.0.0.1:45257/_app/immutable/entry/start.gjsbG1-Y.js' is found, but is not used because it is a cross-world service worker resource mismatch.  (http://127.0.0.1:45257/chat/060cf966-7061-4522-9018-35019b9b1b6a:26)
+[desktop] warning: The resource http://127.0.0.1:45257/_app/immutable/entry/start.gjsbG1-Y.js was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.  (http://127.0.0.1:45257/chat/060cf966-7061-4522-9018-35019b9b1b6a:0)
+[desktop] warning: The resource http://127.0.0.1:45257/_app/immutable/entry/start.gjsbG1-Y.js was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.  (http://127.0.0.1:45257/chat/060cf966-7061-4522-9018-35019b9b1b6a:0)
+
+# uncaught page errors
+
+
+# failed requests (network failure or a 4xx/5xx)
+
+(none)
