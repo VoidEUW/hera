@@ -1,9 +1,5 @@
 # browser console
 
-[desktop] warning: A preload for 'http://127.0.0.1:41213/_app/immutable/entry/start.gjsbG1-Y.js' is found, but is not used because it is a cross-world service worker resource mismatch.  (http://127.0.0.1:41213/:26)
-[phone] warning: A preload for 'http://127.0.0.1:41213/_app/immutable/entry/start.gjsbG1-Y.js' is found, but is not used because it is a cross-world service worker resource mismatch.  (http://127.0.0.1:41213/chat/0faec678-0058-4912-9c77-a3ea2d818431:26)
-[phone] warning: A preload for 'http://127.0.0.1:41213/_app/immutable/entry/payload.DSmR2FwN.js' is found, but is not used because it is a cross-world service worker resource mismatch.  (http://127.0.0.1:41213/chat/0faec678-0058-4912-9c77-a3ea2d818431:27)
-[phone] warning: A preload for 'http://127.0.0.1:41213/_app/immutable/chunks/CRzLMJPS.js' is found, but is not used because it is a cross-world service worker resource mismatch.  (http://127.0.0.1:41213/chat/0faec678-0058-4912-9c77-a3ea2d818431:28)
 
 # uncaught page errors
 
