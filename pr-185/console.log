@@ -1,0 +1,11 @@
+# browser console
+
+[desktop] warning: A preload for 'http://127.0.0.1:58875/_app/immutable/entry/start.gjsbG1-Y.js' is found, but is not used because it is a cross-world service worker resource mismatch.  (http://127.0.0.1:58875/:26)
+[desktop] warning: A preload for 'http://127.0.0.1:58875/_app/immutable/entry/payload.DSmR2FwN.js' is found, but is not used because it is a cross-world service worker resource mismatch.  (http://127.0.0.1:58875/:27)
+
+# uncaught page errors
+
+
+# failed requests (network failure or a 4xx/5xx)
+
+(none)
