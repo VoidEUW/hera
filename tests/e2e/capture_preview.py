@@ -601,7 +601,7 @@ def act_profile(page: Page, base: str, shots: Path, report: Report) -> None:
         # indistinguishable from a screenshot of the dark one if the run happened to start light,
         # and that is precisely the run where the scene would be quietly worthless.
         assert page.evaluate("() => document.documentElement.dataset.theme") == "dark"
-        page.get_by_role("button", name="Light", exact=True).first.click(timeout=5_000)
+        page.get_by_role("radio", name="Light", exact=True).first.click(timeout=5_000)
         page.wait_for_timeout(700)
         assert page.evaluate("() => document.documentElement.dataset.theme") == "light"
         page.keyboard.press("Escape")
@@ -612,7 +612,7 @@ def act_profile(page: Page, base: str, shots: Path, report: Report) -> None:
         page.locator("nav.rail button.card").first.click(timeout=5_000)
         page.wait_for_selector("[role='dialog']", timeout=10_000)
         page.get_by_role("button", name="General", exact=True).click(timeout=5_000)
-        page.get_by_role("button", name="Dark", exact=True).first.click(timeout=5_000)
+        page.get_by_role("radio", name="Dark", exact=True).first.click(timeout=5_000)
         page.wait_for_timeout(500)
         page.keyboard.press("Escape")
         page.wait_for_timeout(400)
@@ -620,6 +620,35 @@ def act_profile(page: Page, base: str, shots: Path, report: Report) -> None:
         # screenshot that merely *looks* dark proves nothing about whether it stayed dark.
         assert page.evaluate("() => document.documentElement.dataset.theme") == "dark"
         shoot(page, shots, "42-back-to-dark")
+
+
+def act_design(page: Page, base: str, shots: Path, report: Report) -> None:
+    """Every primitive at once, in both modes (`/design`, #182).
+
+    The gallery is what a theme change is reviewed against: a token that moved shows on every
+    control here, rather than on whichever screen the other scenes happen to visit. Full-page,
+    because the point is the whole set.
+    """
+    viewport = page.viewport_size or {"width": 1920, "height": 1080}
+    with report.scene("design-dark", "design", page, shots):
+        page.goto(f"{base}/design", wait_until="networkidle")
+        page.get_by_role("radio", name="Dark", exact=True).click(timeout=5_000)
+        page.wait_for_timeout(500)
+        assert page.evaluate("() => document.documentElement.dataset.theme") == "dark"
+        # The gallery scrolls inside the shell, and an element screenshot is only its visible
+        # box -- so the window is made as tall as the gallery for the two frames.
+        tall = page.evaluate("() => document.querySelector('main.gallery').scrollHeight")
+        page.set_viewport_size({"width": viewport["width"], "height": int(tall) + 40})
+        page.wait_for_timeout(300)
+        page.locator("main.gallery").screenshot(path=shots / "60-design-dark.png")
+
+    with report.scene("design-light", "design", page, shots):
+        page.get_by_role("radio", name="Light", exact=True).click(timeout=5_000)
+        page.wait_for_timeout(500)
+        assert page.evaluate("() => document.documentElement.dataset.theme") == "light"
+        page.locator("main.gallery").screenshot(path=shots / "61-design-light.png")
+        page.get_by_role("radio", name="Dark", exact=True).click(timeout=5_000)
+        page.set_viewport_size(viewport)
 
 
 def act_reduced_motion(page: Page, base: str, shots: Path, report: Report) -> None:
@@ -750,7 +779,7 @@ def main() -> int:
             # tuple anyway because it needs the chat the first scene made.
             chat_url = act_conversation(page, base, shots, report)
             act_question(page, chat_url, shots, report)
-            for act in (act_rail, act_composer, act_settings, act_profile):
+            for act in (act_rail, act_composer, act_settings, act_profile, act_design):
                 act(page, base, shots, report)
             desktop.close()
             filmed |= name_recording(videos, filmed, "desktop")

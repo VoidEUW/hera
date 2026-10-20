@@ -7,8 +7,9 @@
 	 * by content: a section is shown when its heading, or the words that describe it, match.
 	 */
 	import { api, type Health, type Preferences } from '$lib/api/client';
-	import Checkbox from '$lib/components/Checkbox.svelte';
-	import Select from '$lib/components/Select.svelte';
+	import Checkbox from '$lib/components/ui/Checkbox.svelte';
+	import Select from '$lib/components/ui/Select.svelte';
+	import Segmented from '$lib/components/ui/Segmented.svelte';
 	import { t } from '$lib/i18n';
 	import { notifications } from '$lib/notifications.svelte';
 	import { theme, type Appearance } from '$lib/theme.svelte';
@@ -67,18 +68,12 @@
 {#if showAppearance}
 	<section>
 		<h3>{t.profileMenu.appearance}</h3>
-		<div class="segments">
-			{#each APPEARANCES as option (option.id)}
-				<button
-					class="segment"
-					class:active={theme.appearance === option.id}
-					type="button"
-					onclick={() => theme.set(option.id)}
-				>
-					{option.label}
-				</button>
-			{/each}
-		</div>
+		<Segmented
+			options={APPEARANCES.map((option) => ({ value: option.id, label: option.label }))}
+			value={theme.appearance}
+			label={t.profileMenu.appearance}
+			onchange={(next) => theme.set(next)}
+		/>
 	</section>
 {/if}
 
@@ -165,28 +160,6 @@
 
 	.control {
 		max-width: 320px;
-	}
-
-	.segments {
-		display: inline-flex;
-		gap: 2px;
-		padding: 3px;
-		background: var(--surface);
-		border: 1px solid var(--line);
-		border-radius: var(--radius);
-	}
-
-	.segment {
-		min-width: 84px;
-		padding: 5px 12px;
-		border-radius: 6px;
-		font-size: 13px;
-		color: var(--text-muted);
-	}
-
-	.segment.active {
-		background: var(--surface-raised);
-		color: var(--text);
 	}
 
 	dl {

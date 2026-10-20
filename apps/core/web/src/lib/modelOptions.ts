@@ -9,7 +9,7 @@
  * that could drift (ADR 18: the options themselves stay an opaque pass-through).
  */
 import type { ModelEntry } from '$lib/api/client';
-import type { Choice } from '$lib/components/Select.svelte';
+import type { Choice } from '$lib/components/ui/Select.svelte';
 import { t } from '$lib/i18n';
 
 /** The five sampling keys offered as sliders over `ModelEntry.options`. Bounds are soft: the

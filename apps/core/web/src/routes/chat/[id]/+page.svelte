@@ -15,8 +15,8 @@
 	import Backdrop from '$lib/components/Backdrop.svelte';
 	import Composer from '$lib/components/Composer.svelte';
 	import Message from '$lib/components/Message.svelte';
-	import Select from '$lib/components/Select.svelte';
-	import Skeleton from '$lib/components/Skeleton.svelte';
+	import Select from '$lib/components/ui/Select.svelte';
+	import Skeleton from '$lib/components/ui/Skeleton.svelte';
 	import { t } from '$lib/i18n';
 	import { Placeholder } from '$lib/loading.svelte';
 	import { artifacts } from '$lib/stores/artifacts.svelte';

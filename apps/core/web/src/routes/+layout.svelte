@@ -13,6 +13,7 @@
 	import Offline from '$lib/components/Offline.svelte';
 	import Rail from '$lib/components/Rail.svelte';
 	import Settings from '$lib/components/Settings.svelte';
+	import Toaster from '$lib/components/ui/Toaster.svelte';
 	import { t } from '$lib/i18n';
 	import { notifications } from '$lib/notifications.svelte';
 	import { workspace } from '$lib/stores/workspace.svelte';
@@ -173,6 +174,9 @@
 	{#if workspace.settingsOpen}
 		<Settings onclose={closeSettings} tab={workspace.settingsTab} />
 	{/if}
+
+	<!-- Outside the reachable branch, so a confirmation can still say something on the offline screen. -->
+	<Toaster />
 {/if}
 
 <style>

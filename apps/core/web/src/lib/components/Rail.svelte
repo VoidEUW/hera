@@ -26,9 +26,9 @@
 	import { disclose } from '$lib/motion';
 	import { colourOf } from '$lib/projects';
 	import type { Shape } from '$lib/stores/workspace.svelte';
-	import Input from './Input.svelte';
+	import Input from '$lib/components/ui/Input.svelte';
 	import Ocellus from './Ocellus.svelte';
-	import Skeleton from './Skeleton.svelte';
+	import Skeleton from '$lib/components/ui/Skeleton.svelte';
 
 	interface Props {
 		chats: Chat[];

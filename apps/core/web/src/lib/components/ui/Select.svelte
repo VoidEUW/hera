@@ -88,12 +88,10 @@
 	const current = $derived(choices.find((choice) => choice.value === value) ?? null);
 	const shown = $derived(current?.label || placeholder || t.select.none);
 
-	/** The list opens away from its own edge — downwards for `below`, upwards for `above` — so
-	 * it should arrive from that same edge rather than fading in place: a `below` list drops the
-	 * last few pixels into position, an `above` one rises into it. Uses the shared `reveal`
-	 * gesture (`$lib/motion`) — the same one `Modal.svelte`'s docked and anchored sheets use —
-	 * so a popup and a sheet read as the same kind of arrival at two different scales. */
-	const revealY = $derived(placement === 'above' ? 8 : -8);
+	/* The list grows out of the trigger's corner (the theme's `menu.enter`: from scale .95 on the
+	   spring slot) through the shared `reveal` gesture — the same one every sheet uses, so a popup
+	   and a sheet read as the same kind of arrival at two scales. The origin is set in CSS by
+	   placement. */
 
 	function choose(next: string) {
 		open = false;
@@ -198,7 +196,7 @@
 			/>
 		{/if}
 		<span class="shown">{shown}</span>
-		<span class="chevron" aria-hidden="true"></span>
+		<span class="chevron"><Icon name="chevD" /></span>
 	</button>
 
 	{#if open}
@@ -209,8 +207,8 @@
 			aria-label={label}
 			tabindex="-1"
 			onkeydown={walk}
-			in:reveal={{ y: revealY, blur: 2 }}
-			out:reveal={{ y: revealY, blur: 2 }}
+			in:reveal={{ scale: 0.95 }}
+			out:reveal={{ scale: 0.95 }}
 		>
 			{#each choices as choice (choice.value)}
 				{@const on = choice.value === value}
@@ -292,11 +290,12 @@
 	   `input` elements beside it wear, so a form reads as one set of fields rather than a mix
 	   of pills and boxes. Only the trigger changes — the popup is the same list everywhere. */
 	.select.field .pill {
-		padding: 7px 10px;
+		height: calc(var(--space) * 9);
+		padding: 0 calc(var(--space) * 3);
 		background: var(--surface);
-		border-radius: var(--radius);
-		font-family: var(--font-mono);
-		font-size: 13px;
+		border-radius: var(--radius-sm);
+		font-family: var(--font-ui);
+		font-size: var(--ui-size);
 	}
 
 	.select.field .pill:hover:not(:disabled),
@@ -320,22 +319,17 @@
 		object-fit: cover;
 	}
 
-	/* Two borders on a rotated square: one shape, no asset, and it takes the colour of the row
-	   like everything else here. `margin-left: auto` keeps it on the right of a pill that is
-	   wider than its text. */
+	/* `margin-left: auto` keeps it on the right of a pill that is wider than its text. */
 	.chevron {
-		width: 5px;
-		height: 5px;
+		display: flex;
 		flex: none;
 		margin-left: auto;
-		border-right: 1.5px solid currentcolor;
-		border-bottom: 1.5px solid currentcolor;
-		transform: translateY(-2px) rotate(45deg);
+		color: var(--text-faint);
 		transition: transform var(--fade) var(--ease);
 	}
 
 	.pill.open .chevron {
-		transform: translateY(1px) rotate(225deg);
+		transform: rotate(180deg);
 	}
 
 	.away {
@@ -357,17 +351,37 @@
 		overflow-y: auto;
 		padding: 5px;
 		background: var(--surface-raised);
-		border: 1px solid var(--line);
-		border-radius: var(--radius-lg);
+		border: var(--border-width) solid var(--line);
+		border-radius: var(--radius);
 		box-shadow: var(--shadow);
 	}
 
+	/* `menu.enter` grows the list out of the trigger's corner, so the origin is the edge it is
+	   attached by. */
 	.list.below {
 		top: calc(100% + 5px);
+		transform-origin: top;
 	}
 
 	.list.above {
 		bottom: calc(100% + 5px);
+		transform-origin: bottom;
+	}
+
+	.list.below.start {
+		transform-origin: top left;
+	}
+
+	.list.below.end {
+		transform-origin: top right;
+	}
+
+	.list.above.start {
+		transform-origin: bottom left;
+	}
+
+	.list.above.end {
+		transform-origin: bottom right;
 	}
 
 	.list.start {

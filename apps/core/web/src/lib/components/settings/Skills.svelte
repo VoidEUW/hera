@@ -18,7 +18,7 @@
 	 */
 	import Icon from '$lib/components/ui/Icon.svelte';
 	import { api, type BrokenSkill, type Skill } from '$lib/api/client';
-	import Checkbox from '$lib/components/Checkbox.svelte';
+	import Checkbox from '$lib/components/ui/Checkbox.svelte';
 	import SkillEditor from './SkillEditor.svelte';
 	import { t } from '$lib/i18n';
 	import { Placeholder } from '$lib/loading.svelte';

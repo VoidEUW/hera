@@ -36,7 +36,7 @@
 	import { isImage, read, size, type Attachment } from '$lib/attachments';
 	import { t } from '$lib/i18n';
 	import { providerFallbackIcon, providerIcon } from '$lib/providers';
-	import Select from './Select.svelte';
+	import Select from '$lib/components/ui/Select.svelte';
 	import ServerSheet from './ServerSheet.svelte';
 	import type { Tab as SettingsTab } from './Settings.svelte';
 	import SkillPicker from './SkillPicker.svelte';

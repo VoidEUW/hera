@@ -421,3 +421,26 @@ a {
 		transition-duration: 0.001ms !important;
 	}
 }
+
+/* The tooltip label from `$lib/tooltip`. Global because the action appends it to <body>, where no
+   component's scoped style can reach. Inverted text on ink, rounded (the theme's soft tooltip). */
+.hera-tooltip {
+	position: absolute;
+	z-index: 200;
+	max-width: 240px;
+	padding: calc(var(--space) * 1) calc(var(--space) * 2);
+	border-radius: var(--radius-sm);
+	background: var(--text);
+	color: var(--ground);
+	font-family: var(--font-ui);
+	font-size: calc(var(--ui-size) - 1.5px);
+	line-height: 1.35;
+	pointer-events: none;
+	animation: tooltip-in var(--motion-tooltip-enter) both;
+}
+
+@keyframes tooltip-in {
+	from {
+		opacity: 0;
+	}
+}

@@ -10,7 +10,7 @@
 	 */
 	import type { Server } from '$lib/api/client';
 	import { t } from '$lib/i18n';
-	import Modal from './Modal.svelte';
+	import Modal from '$lib/components/ui/Modal.svelte';
 
 	interface Props {
 		/** The servers reported connected, in the order the tool layer listed them. */

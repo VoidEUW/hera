@@ -621,6 +621,20 @@ export const t = {
 		command: 'uv run hera serve',
 		commandHint: 'The usual way to start Hera, from the project directory.',
 		detail: 'What the browser said'
+	},
+
+	/** The primitives in `lib/components/ui/`: words that belong to a control, not to a screen. */
+	ui: {
+		close: 'Close',
+		dismiss: 'Dismiss',
+		loading: 'Loading',
+		notResponding: 'Not responding',
+		wait: 'Wait',
+		retry: 'Try again',
+		characters: 'characters',
+		open: 'Open',
+		closeSection: 'Collapse',
+		openSection: 'Expand'
 	}
 } as const;
 

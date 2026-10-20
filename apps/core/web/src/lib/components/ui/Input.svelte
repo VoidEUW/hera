@@ -89,55 +89,62 @@
 <style>
 	/* Named `.control` rather than `.field` — a settings screen that reaches in with `:global()`
 	   (`Models.svelte`'s `.add-model`, `.search`) already has its own unrelated `.field` class on
-	   the `<label>` wrapper around a `Checkbox`, and the two must never collide. */
+	   the `<label>` wrapper around a `Checkbox`, and the two must never collide.
+
+	   The theme's open look: transparent, outlined, and on focus a laurel underline drawn inside
+	   the bottom edge (`field.focus`) — focus is her attention, so it is laurel, and drawn inside
+	   so it moves nothing. Nine density units tall. */
 	.control {
 		width: 100%;
-		padding: 7px 10px;
-		background: var(--surface);
-		border: 1px solid var(--line);
-		border-radius: var(--radius);
+		height: calc(var(--space) * 9);
+		padding: 0 calc(var(--space) * 3);
+		background: transparent;
+		border: var(--border-width) solid var(--line);
+		border-radius: var(--radius-sm);
 		font-family: var(--font-ui);
-		font-size: 13px;
+		font-size: var(--ui-size);
 		color: var(--text);
-		transition: border-color var(--fade) var(--ease);
+		box-shadow: inset 0 0 0 transparent;
+		transition:
+			box-shadow var(--motion-field-focus),
+			border-color var(--fade) var(--ease);
+	}
+
+	.control::placeholder {
+		color: var(--text-faint);
 	}
 
 	.control.mono {
 		font-family: var(--font-mono);
+		font-size: calc(var(--ui-size) - 0.5px);
 	}
 
 	.control:disabled {
 		cursor: default;
-		opacity: 0.5;
+		color: var(--text-faint);
 	}
 
 	.control:focus-visible {
 		outline: none;
-		border-color: var(--brass);
-		box-shadow: 0 0 0 2px var(--brass-soft);
+		box-shadow: inset 0 -2px 0 var(--laurel);
 	}
 
 	/* The rail's in-place rename: the brass border is the edit state itself, not a focus ring on
 	   top of one, so there is nothing extra to draw on focus. */
 	.control.inline {
-		padding: 6px 8px;
+		height: calc(var(--space) * 7.5);
+		padding: 0 calc(var(--space) * 2);
 		background: var(--ground);
 		border-color: var(--brass);
-		font-size: 13.5px;
 	}
 
 	.control.inline:focus-visible {
 		box-shadow: none;
 	}
 
-	/* The memory editor's paragraph field — matches `.editor textarea` beside it, which this
-	   component does not own, exactly: ground, brass only once focused, no ring. */
+	/* The memory editor's paragraph field — matches the editor textarea beside it: ground, the
+	   underline only once focused. */
 	.control.editor {
-		padding: 6px 8px;
 		background: var(--ground);
-	}
-
-	.control.editor:focus-visible {
-		box-shadow: none;
 	}
 </style>

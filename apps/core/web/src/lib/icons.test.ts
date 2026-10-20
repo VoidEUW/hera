@@ -46,6 +46,8 @@ describe('a component', () => {
 			'lib/components/ui/Icon.svelte',
 			// The signature, which is not an icon and may not become one (docs/frontend.md).
 			'lib/components/Ocellus.svelte',
+			// A progress arc, not an icon: its stroke is animated, which an icon's never is.
+			'lib/components/ui/Spinner.svelte',
 			// The gutter marks, retired by the trace rework later on this branch (ADR 21).
 			'lib/components/Brain.svelte',
 			'lib/components/Globe.svelte',

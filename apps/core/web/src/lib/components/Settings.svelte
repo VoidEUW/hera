@@ -18,8 +18,8 @@
 	 * conversation visible behind it.
 	 */
 	import { t } from '$lib/i18n';
-	import Input from './Input.svelte';
-	import Modal from './Modal.svelte';
+	import Input from '$lib/components/ui/Input.svelte';
+	import Modal from '$lib/components/ui/Modal.svelte';
 	import type { IconName } from '$lib/icons';
 	import Icon from '$lib/components/ui/Icon.svelte';
 	import Dreaming from './settings/Dreaming.svelte';

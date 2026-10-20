@@ -20,7 +20,7 @@
 	 */
 	import { expoIn } from 'svelte/easing';
 	import { fade } from 'svelte/transition';
-	import { t } from '$lib/i18n';
+	import CloseButton from './CloseButton.svelte';
 	import { LEAVING, reveal, slot, still } from '$lib/motion';
 
 	interface Props {
@@ -91,7 +91,7 @@
 	 * mispositioned invisible catcher for a few frames has nothing left to catch. */
 	const gesture = $derived(
 		placement === 'centre'
-			? { scale: 0.96, slot: 'modal-enter' }
+			? { scale: 0.85, slot: 'modal-enter' }
 			: placement === 'docked'
 				? { y: 18, blur: 3, slot: 'drawer-open' }
 				: { y: 18, blur: 3, slot: 'modal-enter' }
@@ -249,21 +249,15 @@
 	{#if title || caption}
 		<header>
 			<div>
-				{#if title}<h2 class="display">{title}</h2>{/if}
+				{#if title}<h2>{title}</h2>{/if}
 				{#if caption}<p class="caption">{caption}</p>{/if}
 			</div>
-			<button class="close" type="button" onclick={close}>
-				<span class="sr-only">{t.settings.close}</span>
-				<span class="glyph" aria-hidden="true"></span>
-			</button>
+			<CloseButton onclick={close} />
 		</header>
 	{:else if closeButton}
 		<!-- A sheet with no title still closes with a real control (#99): the profile menu
 	         hides its chrome but not its way out. -->
-		<button class="close floating" type="button" onclick={close}>
-			<span class="sr-only">{t.settings.close}</span>
-			<span class="glyph" aria-hidden="true"></span>
-		</button>
+		<span class="floating"><CloseButton size="sm" onclick={close} /></span>
 	{/if}
 	{#if children}
 		{@render children()}
@@ -338,9 +332,12 @@
 		flex: none;
 	}
 
+	/* The theme's open dialog: the title in the interface face, not the display one. */
 	h2 {
 		margin: 0;
-		font-size: 18px;
+		font-family: var(--font-ui);
+		font-size: calc(var(--ui-size) + 3px);
+		font-weight: 600;
 	}
 
 	header .caption {
@@ -348,88 +345,12 @@
 		max-width: 46ch;
 	}
 
-	/* The close button — the reason this component exists. A 32px hit area (the minimum for a
-	 * comfortable touch target), a hairline circle that colours on hover and focus, and the
-	 * glyph drawn as two crossing hairlines rather than a text \u2715, which is a font's own idea of
-	 * the shape and differs between the fonts. */
-	.close {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		flex: none;
-		width: 32px;
-		height: 32px;
-		padding: 0;
-		background: none;
-		border: 1px solid var(--line);
-		border-radius: 50%;
-		color: var(--text-muted);
-		transition:
-			border-color var(--fade) var(--ease),
-			color var(--fade) var(--ease);
-	}
-
-	.close:hover,
-	.close:focus-visible {
-		border-color: var(--brass);
-		color: var(--brass);
-	}
-
-	.close:active {
-		transform: scale(0.95);
-	}
-
-	/* A bare sheet's close control: same circle, smaller and pinned to the sheet's own
-	   top-right corner rather than sitting in a header bar that does not exist. */
-	.close.floating {
+	/* A bare sheet's way out, pinned to its own top-right corner rather than sitting in a header
+	   bar that does not exist. */
+	.floating {
 		position: absolute;
 		top: 6px;
 		right: 6px;
-		width: 26px;
-		height: 26px;
 		z-index: 1;
-		background: var(--surface-raised);
-	}
-
-	/* Two hairlines crossing at the centre: one shape, no font, and it takes the colour of the
-	 * button like everything else here. */
-	.glyph {
-		position: relative;
-		width: 10px;
-		height: 10px;
-	}
-
-	.glyph::before,
-	.glyph::after {
-		content: '';
-		position: absolute;
-		top: 50%;
-		left: 50%;
-		width: 12px;
-		height: 1.5px;
-		background: currentcolor;
-		border-radius: 1px;
-	}
-
-	.glyph::before {
-		transform: translate(-50%, -50%) rotate(45deg);
-	}
-
-	.glyph::after {
-		transform: translate(-50%, -50%) rotate(-45deg);
-	}
-
-	/* The sr-only utility, here rather than imported, because it is three lines and every
-	 * import chain should not be able to reach it. */
-	.sr-only {
-		position: absolute;
-		width: 1px;
-		height: 1px;
-		padding: 0;
-		margin: -1px;
-		overflow: hidden;
-		clip-path: inset(50%);
-		white-space: nowrap;
-		border: 0;
 	}
 </style>

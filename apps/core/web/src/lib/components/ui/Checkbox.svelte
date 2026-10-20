@@ -23,10 +23,21 @@
 		 * sentence elsewhere, say. */
 		ariaLabel?: string;
 		disabled?: boolean;
+		/** `switch` for a setting that takes effect the moment it is flipped — a track and a
+		 * thumb, brass when on (the theme's `hera/toggles`). `box` for a choice that is part of
+		 * something you will save or send. Both are the same native input underneath. */
+		variant?: 'box' | 'switch';
 		onchange?: (checked: boolean) => void;
 	}
 
-	let { checked, label = '', ariaLabel = '', disabled = false, onchange }: Props = $props();
+	let {
+		checked,
+		label = '',
+		ariaLabel = '',
+		disabled = false,
+		variant = 'box',
+		onchange
+	}: Props = $props();
 
 	function flip(event: Event) {
 		// Read from the native input rather than flipping a local flag: the input is the source
@@ -37,11 +48,24 @@
 	}
 </script>
 
-<label class="check" class:disabled>
-	<input type="checkbox" {checked} {disabled} aria-label={ariaLabel || undefined} onchange={flip} />
-	<span class="box" aria-hidden="true">
-		<span class="mark"></span>
-	</span>
+<!-- `class:switch` rather than the variant as a class name: `box` is already the drawn square's
+     class, and a label carrying it was squeezed to that square's 18px. -->
+<label class="check" class:switch={variant === 'switch'} class:disabled>
+	<input
+		type="checkbox"
+		role={variant === 'switch' ? 'switch' : undefined}
+		{checked}
+		{disabled}
+		aria-label={ariaLabel || undefined}
+		onchange={flip}
+	/>
+	{#if variant === 'switch'}
+		<span class="track" aria-hidden="true"><span class="thumb"></span></span>
+	{:else}
+		<span class="box" aria-hidden="true">
+			<span class="mark"></span>
+		</span>
+	{/if}
 	{#if label}<span class="word">{label}</span>{/if}
 </label>
 
@@ -150,5 +174,51 @@
 
 	.word {
 		min-width: 0;
+	}
+	/* The switch: a pill track that fills brass, and a thumb that slides across it on the
+	   toggle's slot. The input is stretched over the whole track so the hand finds it. */
+	.switch input {
+		width: 30px;
+	}
+
+	.track {
+		position: relative;
+		flex: none;
+		width: 30px;
+		height: 18px;
+		border: var(--border-width) solid var(--line);
+		border-radius: var(--chip-radius);
+		background: var(--surface-raised);
+		transition:
+			background var(--motion-switch-toggle),
+			border-color var(--motion-switch-toggle);
+	}
+
+	.thumb {
+		position: absolute;
+		top: 2px;
+		left: 2px;
+		width: 12px;
+		height: 12px;
+		border-radius: 50%;
+		background: var(--text-faint);
+		transition:
+			transform var(--motion-switch-toggle),
+			background var(--motion-switch-toggle);
+	}
+
+	input:checked + .track {
+		background: var(--brass);
+		border-color: var(--brass);
+	}
+
+	input:checked + .track .thumb {
+		transform: translateX(12px);
+		background: var(--on-brass);
+	}
+
+	input:focus-visible + .track {
+		outline: var(--focus-width) solid var(--laurel);
+		outline-offset: 2px;
 	}
 </style>

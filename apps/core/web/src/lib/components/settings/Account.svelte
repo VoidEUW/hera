@@ -12,9 +12,10 @@
 	 * looks like at that size. The server still holds the upload to the limits an image
 	 * attachment has (type, size, and bytes that match the type).
 	 */
+	import Button from '$lib/components/ui/Button.svelte';
 	import { api } from '$lib/api/client';
 	import { MAX_IMAGE_BYTES } from '$lib/attachments';
-	import Input from '$lib/components/Input.svelte';
+	import Input from '$lib/components/ui/Input.svelte';
 	import { t } from '$lib/i18n';
 	import { workspace } from '$lib/stores/workspace.svelte';
 
@@ -154,11 +155,11 @@
 				<span class="face initials" aria-hidden="true">{initials(account?.name ?? '') || '·'}</span>
 			{/if}
 			<div class="actions">
-				<button class="button" type="button" onclick={() => input?.click()}>
+				<Button variant="neutral" onclick={() => input?.click()}>
 					{account?.avatar_version ? t.account.replace : t.account.upload}
-				</button>
+				</Button>
 				{#if account?.avatar_version}
-					<button class="button quiet" type="button" onclick={clear}>{t.account.remove}</button>
+					<Button variant="ghost" onclick={clear}>{t.account.remove}</Button>
 				{/if}
 			</div>
 			<input
@@ -197,9 +198,9 @@
 			<p class="caption problem">{t.account.emailInvalid}</p>
 		{/if}
 		<div class="foot">
-			<button class="button" type="button" disabled={!dirty || emailBad} onclick={save}>
+			<Button variant="neutral" disabled={!dirty || emailBad} onclick={save}>
 				{t.settings.save}
-			</button>
+			</Button>
 			{#if saved}<span class="caption saved">{t.account.saved}</span>{/if}
 		</div>
 	</section>
@@ -273,28 +274,6 @@
 
 	.file {
 		display: none;
-	}
-
-	.button {
-		padding: 5px 12px;
-		border: 1px solid var(--line);
-		border-radius: var(--radius);
-		font-size: 13px;
-		color: var(--text-muted);
-	}
-
-	.button:not(:disabled):hover {
-		border-color: var(--brass);
-		color: var(--brass);
-	}
-
-	.button:disabled {
-		opacity: 0.4;
-		cursor: default;
-	}
-
-	.quiet {
-		border-color: transparent;
 	}
 
 	.field {

@@ -83,7 +83,7 @@
 		background: linear-gradient(
 			90deg,
 			transparent,
-			color-mix(in oklab, var(--skeleton-sheen, var(--line)) 70%, transparent),
+			color-mix(in oklab, var(--skeleton-sheen, var(--skeleton-highlight)) 70%, transparent),
 			transparent
 		);
 		transform: translateX(-100%);

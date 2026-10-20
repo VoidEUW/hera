@@ -19,10 +19,11 @@
 	 * Opened over Settings. `Modal` makes only the topmost sheet answer Escape and outside
 	 * clicks, so closing this does not also close the screen under it.
 	 */
+	import Button from '$lib/components/ui/Button.svelte';
 	import { untrack } from 'svelte';
 	import { api, type Skill } from '$lib/api/client';
-	import Input from '$lib/components/Input.svelte';
-	import Modal from '$lib/components/Modal.svelte';
+	import Input from '$lib/components/ui/Input.svelte';
+	import Modal from '$lib/components/ui/Modal.svelte';
 	import { t } from '$lib/i18n';
 
 	interface Props {
@@ -157,23 +158,23 @@
 	<footer>
 		{#if confirming}
 			<p class="sure caption">{t.settings.deleteSure(name)}</p>
-			<button class="ghost" type="button" onclick={() => (confirming = false)}>
+			<Button variant="ghost" onclick={() => (confirming = false)}>
 				{t.settings.deleteKeep}
-			</button>
-			<button class="danger solid" type="button" disabled={saving} onclick={remove}>
+			</Button>
+			<Button variant="danger" disabled={saving} onclick={remove}>
 				{t.settings.deleteYes}
-			</button>
+			</Button>
 		{:else}
 			{#if !isNew}
-				<button class="danger" type="button" onclick={() => (confirming = true)}>
+				<Button variant="danger-soft" onclick={() => (confirming = true)}>
 					{t.settings.deleteSkill}
-				</button>
+				</Button>
 			{/if}
 			<span class="spacer"></span>
-			<button class="ghost" type="button" onclick={onclose}>{t.settings.cancel}</button>
-			<button class="primary" type="button" disabled={!changed || saving} onclick={save}>
+			<Button variant="ghost" onclick={onclose}>{t.settings.cancel}</Button>
+			<Button variant="highlighted" disabled={!changed || saving} onclick={save}>
 				{isNew ? t.settings.create : t.settings.save}
-			</button>
+			</Button>
 		{/if}
 	</footer>
 </Modal>
@@ -228,38 +229,6 @@
 		flex: 1;
 		margin: 0;
 		color: var(--danger);
-	}
-
-	footer button {
-		padding: 6px 14px;
-		border-radius: var(--radius);
-		font-size: 13px;
-	}
-
-	.ghost {
-		border: 1px solid var(--line);
-		color: var(--text-muted);
-	}
-
-	.primary {
-		background: var(--pomegranate);
-		color: var(--ground);
-	}
-
-	.primary:disabled {
-		opacity: 0.45;
-	}
-
-	/* Red, and a different shape from Save, so the one irreversible button cannot be mistaken
-	   for the one beside it. */
-	.danger {
-		border: 1px solid var(--danger);
-		color: var(--danger);
-	}
-
-	.danger.solid {
-		background: var(--danger);
-		color: var(--ground);
 	}
 
 	.rule {
