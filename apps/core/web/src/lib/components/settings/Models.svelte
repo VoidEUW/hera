@@ -16,6 +16,7 @@
 	 * fields, its models, its probe — is `ProviderCard.svelte`, and one model's options are
 	 * `ModelOptions.svelte`.
 	 */
+	import Icon from '$lib/components/ui/Icon.svelte';
 	import { api, type ModelPreset, type Provider, type ProviderKind } from '$lib/api/client';
 	import Input from '$lib/components/Input.svelte';
 	import Select from '$lib/components/Select.svelte';
@@ -206,7 +207,7 @@
 		</section>
 	{:else}
 		<button class="ghost add" type="button" onclick={() => (adding = true)}>
-			<span aria-hidden="true">＋</span>
+			<Icon name="plus" />
 			{t.models.add}
 		</button>
 	{/if}

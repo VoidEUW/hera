@@ -14,6 +14,7 @@
 	 * sensible rule and a trap. A custom logo follows the same rule: left alone unless a new file
 	 * is chosen or explicitly cleared.
 	 */
+	import Icon from '$lib/components/ui/Icon.svelte';
 	import {
 		api,
 		type ModelPreset,
@@ -194,7 +195,7 @@
 				aria-controls={bodyId}
 				onclick={ontoggle}
 			>
-				<span class="chevron" class:open aria-hidden="true">▸</span>
+				<span class="chevron" class:open><Icon name="chevR" /></span>
 				<img
 					class="logo"
 					src={logoPreview(entry) || kindIcon(effectiveKind)}
@@ -382,7 +383,9 @@
 									disabled={already}
 									onclick={() => pickFromProbe(id)}
 								>
-									<span class="mark" aria-hidden="true">{already ? '✓' : ''}</span>
+									<span class="mark"
+										>{#if already}<Icon name="check" />{/if}</span
+									>
 									<code class="id">{id}</code>
 									{#if !already}<span class="add-hint">{t.models.pick}</span>{/if}
 									{#if already}<span class="caption">{t.models.alreadyAdded}</span>{/if}

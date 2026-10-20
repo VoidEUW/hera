@@ -17,6 +17,7 @@
 	 * are the same question, and answering it with two parallel sets of fields is how a project
 	 * ends up being renamed by the chat handler.
 	 */
+	import Icon from '$lib/components/ui/Icon.svelte';
 	import { untrack } from 'svelte';
 	import { resolve } from '$app/paths';
 	import { API, api, type Account, type Chat, type Project } from '$lib/api/client';
@@ -247,7 +248,7 @@
 					menuFor = is(menuFor, 'chat', chat.id) ? null : { kind: 'chat', id: chat.id };
 				}}
 			>
-				<span aria-hidden="true">⋯</span>
+				<Icon name="more" />
 			</button>
 		{/if}
 
@@ -372,7 +373,7 @@
 					aria-expanded={open}
 					onclick={() => (expanded = { ...expanded, [project.id]: !open })}
 				>
-					<span class="chevron" aria-hidden="true">{open ? '▾' : '▸'}</span>
+					<span class="chevron"><Icon name={open ? 'chevD' : 'chevR'} /></span>
 					<span class="dot" style:background={accent ?? 'var(--text-faint)'} aria-hidden="true"
 					></span>
 					<span class="label">{project.name}</span>
@@ -392,7 +393,7 @@
 							: { kind: 'project', id: project.id };
 					}}
 				>
-					<span aria-hidden="true">⋯</span>
+					<Icon name="more" />
 				</button>
 			{/if}
 
@@ -466,7 +467,7 @@
 				{/each}
 				<li>
 					<button class="entry add" type="button" onclick={() => onnew?.(project.id)}>
-						<span class="glyph" aria-hidden="true">＋</span>
+						<span class="glyph"><Icon name="plus" /></span>
 						{t.rail.newChat}
 					</button>
 				</li>
@@ -494,7 +495,7 @@
 	</a>
 
 	<button class="action" type="button" onclick={() => onnew?.()}>
-		<span class="glyph" aria-hidden="true">＋</span>
+		<span class="glyph"><Icon name="plus" /></span>
 		{t.rail.newChat}
 	</button>
 
@@ -504,7 +505,7 @@
 	<div class="heading-row">
 		<p class="heading">{t.rail.projects}</p>
 		<button class="new" type="button" aria-label={t.rail.newProject} onclick={startCreate}>
-			<span aria-hidden="true">＋</span>
+			<Icon name="plus" />
 		</button>
 	</div>
 

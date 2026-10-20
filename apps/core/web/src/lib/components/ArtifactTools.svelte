@@ -10,8 +10,7 @@
 	import { t } from '$lib/i18n';
 	import { saveDiagram } from '$lib/mermaid';
 	import { artifacts } from '$lib/stores/artifacts.svelte';
-	import Code from './Code.svelte';
-	import Tray from './Tray.svelte';
+	import Icon from './ui/Icon.svelte';
 
 	interface Props {
 		chatId: string;
@@ -29,7 +28,7 @@
 		aria-label={artifacts.source ? t.artifact.showDrawnOf(name) : t.artifact.showSourceOf(name)}
 		onclick={() => (artifacts.source = !artifacts.source)}
 	>
-		<Code size={14} />
+		<Icon name="code" />
 		{artifacts.source ? t.artifact.showDrawn : t.artifact.showSource}
 	</button>
 {/if}
@@ -45,7 +44,7 @@
 		title={t.artifact.downloadDrawn}
 		onclick={() => saveDiagram(chatId, name)}
 	>
-		<Tray size={14} />
+		<Icon name="download" />
 		{t.artifact.download}
 	</button>
 {:else}
@@ -59,7 +58,7 @@
 		rel="external"
 		aria-label={t.artifact.downloadOne(name)}
 	>
-		<Tray size={14} />
+		<Icon name="download" />
 		{t.artifact.download}
 	</a>
 {/if}

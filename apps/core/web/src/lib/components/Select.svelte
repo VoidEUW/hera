@@ -17,6 +17,7 @@
 	 * is a sheet because choosing skills is a task you go and do; picking one value from four is
 	 * not, and darkening the application to ask it would be shouting.
 	 */
+	import Icon from '$lib/components/ui/Icon.svelte';
 	import { t } from '$lib/i18n';
 	import { reveal } from '$lib/motion';
 
@@ -221,7 +222,9 @@
 					aria-selected={on}
 					onclick={() => choose(choice.value)}
 				>
-					<span class="mark" aria-hidden="true">{on ? '✓' : ''}</span>
+					<span class="mark"
+						>{#if on}<Icon name="check" />{/if}</span
+					>
 					{#if choice.icon}
 						<img
 							class="icon"

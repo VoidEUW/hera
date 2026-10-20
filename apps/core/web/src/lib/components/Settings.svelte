@@ -20,7 +20,8 @@
 	import { t } from '$lib/i18n';
 	import Input from './Input.svelte';
 	import Modal from './Modal.svelte';
-	import SettingsIcon, { type SettingsIconName } from './SettingsIcon.svelte';
+	import type { IconName } from '$lib/icons';
+	import Icon from '$lib/components/ui/Icon.svelte';
 	import Dreaming from './settings/Dreaming.svelte';
 	import Account from './settings/Account.svelte';
 	import General from './settings/General.svelte';
@@ -57,7 +58,7 @@
 		id: Tab;
 		label: string;
 		blurb: string;
-		icon: SettingsIconName;
+		icon: IconName;
 		soon?: boolean;
 	}
 
@@ -69,27 +70,27 @@
 					id: 'account',
 					label: t.settings.account,
 					blurb: t.settings.blurbAccount,
-					icon: 'account'
+					icon: 'user'
 				},
 				{
 					id: 'general',
 					label: t.settings.general,
 					blurb: t.settings.blurbGeneral,
-					icon: 'general'
+					icon: 'sliders'
 				}
 			]
 		},
 		{
 			label: t.settings.groupHera,
 			entries: [
-				{ id: 'mind', label: t.settings.mind, blurb: t.settings.blurbMind, icon: 'mind' },
-				{ id: 'memory', label: t.settings.memory, blurb: t.settings.blurbMemory, icon: 'memory' },
-				{ id: 'models', label: t.settings.models, blurb: t.settings.blurbModels, icon: 'models' },
+				{ id: 'mind', label: t.settings.mind, blurb: t.settings.blurbMind, icon: 'brain' },
+				{ id: 'memory', label: t.settings.memory, blurb: t.settings.blurbMemory, icon: 'clock' },
+				{ id: 'models', label: t.settings.models, blurb: t.settings.blurbModels, icon: 'cube' },
 				{
 					id: 'dreaming',
 					label: t.settings.dreaming,
 					blurb: t.settings.blurbDreaming,
-					icon: 'dreaming',
+					icon: 'moon',
 					soon: true
 				}
 			]
@@ -97,18 +98,18 @@
 		{
 			label: t.settings.groupAdjust,
 			entries: [
-				{ id: 'skills', label: t.settings.skills, blurb: t.settings.blurbSkills, icon: 'skills' },
+				{ id: 'skills', label: t.settings.skills, blurb: t.settings.blurbSkills, icon: 'spark' },
 				{
 					id: 'servers',
 					label: t.settings.servers,
 					blurb: t.settings.blurbServers,
-					icon: 'servers'
+					icon: 'plug'
 				},
 				{
 					id: 'permissions',
 					label: t.settings.permissions,
 					blurb: t.settings.blurbPermissions,
-					icon: 'permissions'
+					icon: 'shield'
 				}
 			]
 		}
@@ -153,7 +154,7 @@
 								type="button"
 								onclick={() => (tab = entry.id)}
 							>
-								<SettingsIcon name={entry.icon} />
+								<Icon name={entry.icon} />
 								{entry.label}
 								{#if entry.soon}<span class="soon">{t.settings.soon}</span>{/if}
 							</button>

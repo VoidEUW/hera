@@ -11,6 +11,7 @@
 	 * the most recent thing anybody said about this conversation. It is not a filter: retrieval
 	 * still runs and can still add more.
 	 */
+	import Icon from '$lib/components/ui/Icon.svelte';
 	import { untrack } from 'svelte';
 	import { api, type Skill } from '$lib/api/client';
 	import { t } from '$lib/i18n';
@@ -95,7 +96,9 @@
 					aria-pressed={on}
 					onclick={() => toggle(skill.id)}
 				>
-					<span class="mark" aria-hidden="true">{on ? '✓' : ''}</span>
+					<span class="mark"
+						>{#if on}<Icon name="check" />{/if}</span
+					>
 					<span class="what">
 						<span class="id">{skill.id}</span>
 						<span class="caption about">{skill.description || t.skills.nothing}</span>

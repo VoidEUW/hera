@@ -22,7 +22,7 @@
 	import { slot, still } from '$lib/motion';
 	import { artifacts } from '$lib/stores/artifacts.svelte';
 	import ArtifactView from './ArtifactView.svelte';
-	import Paper from './Paper.svelte';
+	import Icon from './ui/Icon.svelte';
 
 	interface Props {
 		chatId: string;
@@ -108,7 +108,7 @@
 
 <aside class="drawer" in:reveal={{ delay: AFTER }} out:reveal aria-label={t.artifact.panel}>
 	<header class="top">
-		<span class="mark" aria-hidden="true"><Paper size={14} /></span>
+		<span class="mark"><Icon name="file" /></span>
 		<h2 class="title">{chosen ? headingOf(chosen) : t.artifact.panel}</h2>
 		<button class="close" type="button" onclick={() => artifacts.close()}>
 			<span class="sr-only">{t.artifact.close}</span>
@@ -168,6 +168,7 @@
 
 	.mark {
 		display: flex;
+		color: var(--brass);
 	}
 
 	/* The gap belongs after the title, not before the first control. `:first-of-type` counts per

@@ -6,6 +6,7 @@
 	 * chats does not re-fetch the sidebar — and so a new chat appears in the list the moment it
 	 * is created rather than on the next load.
 	 */
+	import Icon from '$lib/components/ui/Icon.svelte';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
@@ -117,7 +118,7 @@
 			aria-label={t.rail.openMenu}
 			onclick={() => (workspace.railOpen = true)}
 		>
-			<span aria-hidden="true">☰</span>
+			<Icon name="menu" />
 		</button>
 
 		{#if workspace.railOpen}

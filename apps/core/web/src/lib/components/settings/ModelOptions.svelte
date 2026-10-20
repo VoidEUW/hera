@@ -13,6 +13,7 @@
 	 * model rather than defaulted to `true`, so saving an unrelated option never silently turns
 	 * tools back on for a model somebody already flagged off (ADR 19).
 	 */
+	import Icon from '$lib/components/ui/Icon.svelte';
 	import { untrack } from 'svelte';
 	import { api, type ModelEntry, type ModelPreset, type Provider } from '$lib/api/client';
 	import Checkbox from '$lib/components/Checkbox.svelte';
@@ -129,7 +130,7 @@
 							onclick={() => set(field.key, undefined)}
 						>
 							<span class="sr-only">{t.models.sampling.unset}</span>
-							<span aria-hidden="true">✕</span>
+							<Icon name="x" />
 						</button>
 					{/if}
 				</div>

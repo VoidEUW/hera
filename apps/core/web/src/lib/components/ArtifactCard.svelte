@@ -28,8 +28,7 @@
 	import { saveDiagram } from '$lib/mermaid';
 	import { artifacts } from '$lib/stores/artifacts.svelte';
 	import ArtifactView from './ArtifactView.svelte';
-	import Paper from './Paper.svelte';
-	import Tray from './Tray.svelte';
+	import Icon from './ui/Icon.svelte';
 
 	interface Props {
 		chatId: string | null;
@@ -58,7 +57,7 @@
 	{/if}
 
 	<figcaption class="bar">
-		<span class="mark" aria-hidden="true"><Paper size={14} muted={artifact.inline} /></span>
+		<span class="mark" class:muted={artifact.inline}><Icon name="file" /></span>
 		<span class="named">
 			<span class="title">{title}</span>
 			<span class="about">
@@ -93,7 +92,7 @@
 				aria-label={t.artifact.downloadDrawnOne(artifact.name)}
 				onclick={() => saveDiagram(chatId, artifact.name)}
 			>
-				<Tray size={14} />
+				<Icon name="download" />
 			</button>
 		{:else if chatId}
 			<!-- Saving it is the other thing anybody does with a published file, and until now it
@@ -114,7 +113,7 @@
 				title={t.artifact.download}
 				aria-label={t.artifact.downloadOne(artifact.name)}
 			>
-				<Tray size={14} />
+				<Icon name="download" />
 			</a>
 		{/if}
 		<button type="button" class="open" onclick={open} disabled={!chatId}>
@@ -155,6 +154,11 @@
 		display: flex;
 		flex: none;
 		align-items: center;
+		color: var(--brass);
+	}
+
+	.mark.muted {
+		color: var(--text-faint);
 	}
 
 	/* The gap between the name and the controls, rather than `margin-left: auto` on the last one

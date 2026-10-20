@@ -23,8 +23,8 @@
 	 * not editable at all — the filename is the identity, so renaming would be a different memory
 	 * with the same words in it.
 	 */
+	import Icon from '$lib/components/ui/Icon.svelte';
 	import { API, api, type MemoryBudget, type MemoryItem } from '$lib/api/client';
-	import Brain from '$lib/components/Brain.svelte';
 	import Checkbox from '$lib/components/Checkbox.svelte';
 	import Input from '$lib/components/Input.svelte';
 	import { t } from '$lib/i18n';
@@ -150,7 +150,7 @@
 		<!-- The same mark the gutter draws beside `remember`, so the row in a conversation and the
 		     page listing what she keeps are visibly one subject. -->
 		<p class="blurb">
-			<span class="mark" aria-hidden="true"><Brain size={15} /></span>
+			<span class="mark"><Icon name="brain" /></span>
 			{t.memory.blurb}
 		</p>
 

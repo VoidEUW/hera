@@ -10,6 +10,7 @@
 	 * Whether the editor is open is the parent's to say. A provider has one open model at a
 	 * time, so that is one value there rather than a flag in every row.
 	 */
+	import Icon from '$lib/components/ui/Icon.svelte';
 	import type { ModelEntry, ModelPreset, Provider } from '$lib/api/client';
 	import { t } from '$lib/i18n';
 	import ModelOptions from './ModelOptions.svelte';
@@ -38,7 +39,7 @@
 	<div class="row">
 		<button class="toggle" type="button" aria-expanded={open} onclick={ontoggle}>
 			<span class="start">
-				<span class="chevron" class:open aria-hidden="true">▸</span>
+				<span class="chevron" class:open><Icon name="chevR" /></span>
 				<span class="name">{model.name}</span>
 				{#if count}<span class="badge quiet">{t.models.optionsSet(count)}</span>{/if}
 			</span>

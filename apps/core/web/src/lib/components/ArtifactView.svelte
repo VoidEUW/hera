@@ -35,7 +35,7 @@
 	import { t } from '$lib/i18n';
 	import { draw } from '$lib/mermaid';
 	import { artifacts } from '$lib/stores/artifacts.svelte';
-	import Copy from './Copy.svelte';
+	import Icon from './ui/Icon.svelte';
 	import Prose from './Prose.svelte';
 
 	interface Props {
@@ -194,7 +194,7 @@
 			aria-label={t.artifact.copyCode}
 			onclick={copy}
 		>
-			<Copy size={14} done={copied} />
+			<Icon name={copied ? 'check' : 'copy'} />
 		</button>
 	</div>
 	<div class="lines">

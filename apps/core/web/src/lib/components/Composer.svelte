@@ -31,6 +31,7 @@
 	 * `/commands` are left in the text on purpose: the router strips them server-side, and a
 	 * browser that also stripped them would be a second implementation of the same rule.
 	 */
+	import Icon from '$lib/components/ui/Icon.svelte';
 	import type { Profile, Provider, Server } from '$lib/api/client';
 	import { isImage, read, size, type Attachment } from '$lib/attachments';
 	import { t } from '$lib/i18n';
@@ -305,7 +306,7 @@
 					<span class="size">{size(file.bytes)}</span>
 					<button type="button" onclick={() => drop(index)}>
 						<span class="sr-only">{t.attach.remove}</span>
-						<span aria-hidden="true">✕</span>
+						<Icon name="x" />
 					</button>
 				</li>
 			{/each}
@@ -363,7 +364,7 @@
 	<div class="bar">
 		<button class="attach" type="button" title={t.attach.add} onclick={() => picker?.click()}>
 			<span class="sr-only">{t.attach.add}</span>
-			<span aria-hidden="true">＋</span>
+			<Icon name="plus" />
 		</button>
 		<input bind:this={picker} class="sr-only" type="file" multiple tabindex="-1" onchange={pick} />
 
@@ -484,7 +485,7 @@
 		{:else}
 			<button class="send" type="button" disabled={!sendable || blocked} onclick={submit}>
 				<span class="sr-only">{t.composer.send}</span>
-				<span aria-hidden="true">↑</span>
+				<Icon name="arrowUp" />
 			</button>
 		{/if}
 	</div>
