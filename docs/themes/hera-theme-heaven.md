@@ -671,6 +671,9 @@ Not from the Theme Builder. These are the pieces Hera needed that the export doe
 
 - **Sidebar entry · `entry.active`** — the 2px bar on the active row is `--laurel`, not `--brass`. The chat you are in is where her attention is; a brass bar beside every active title read as a highlight. Brass stays on everything else the rules name.
 
+- **Sidebar · `sidebar.collapse`** — Hera does not fold the sidebar to an icon rail, so there is no fold button and the slot is unused. The sidebar is resizable by its edge and always shows its labels.
+- **Settings sidebar** — the settings dialog's sidebar is the chat sidebar's float panel (brand, search, fixed groups), on the dialog's `--ground`; there is no separate flat variant look.
+
 ### Added
 
 #### Context meter · `hera/context-meter`

@@ -1,36 +1,20 @@
-<script lang="ts" module>
-	import { getContext } from 'svelte';
-
-	const KEY = Symbol('sidebar');
-
-	export interface SidebarContext {
-		readonly collapsed: boolean;
-	}
-
-	/** For `SidebarEntry` and `SidebarGroup`: whether the sidebar they sit in is folded to an
-	 * icon rail, without every caller threading a prop through. */
-	export function sidebarContext(): SidebarContext {
-		return getContext<SidebarContext | undefined>(KEY) ?? { collapsed: false };
-	}
-</script>
-
 <script lang="ts">
 	/**
 	 * One sidebar, two variants (the theme's `hera/sidebar`): the shell is always a head, a body
 	 * that scrolls and an optional foot, and a variant only fills the slots.
 	 *
-	 * - **chat** — the brand and a fold button in the head, groups in the body, the account in
+	 * - **chat** — the brand in the head, groups in the body, the account in
 	 *   the foot. Resizable from its right edge (drag, or arrow keys in 16 px steps, Home / End to
-	 *   the ends, double-click to reset) and foldable to a rail exactly one icon column wide.
-	 * - **settings** — the left column of the settings dialog: a titled head, fixed groups,
-	 *   entries without actions, a narrower width, never folded or resized.
+	 *   the ends, double-click to reset).
+	 * - **settings** — the left column of the settings dialog: the same float panel with the title
+	 *   as its brand, fixed groups, entries without actions, a narrower width, never resized.
 	 *
 	 * The float look: an inset panel on the ground, rounded, `--surface`, a soft shadow and no
 	 * divider line. Every row hangs on the same two lines — the lead line (icons, the mark,
 	 * chevrons) and the label line — set by the `--sb-*` custom properties here, so nothing pads a
 	 * row by hand.
 	 */
-	import { setContext, type Snippet } from 'svelte';
+	import type { Snippet } from 'svelte';
 	import { MAX, MIN, sidebar } from '$lib/stores/sidebar.svelte';
 	import { t } from '$lib/i18n';
 
@@ -38,8 +22,6 @@
 		variant?: 'chat' | 'settings';
 		/** The landmark's accessible name. */
 		label: string;
-		/** Chat only: folded to an icon rail. */
-		collapsed?: boolean;
 		/** Chat only: whether the right edge can be dragged. Off for the phone sheet. */
 		resizable?: boolean;
 		head: Snippet;
@@ -47,21 +29,7 @@
 		children: Snippet;
 	}
 
-	let {
-		variant = 'chat',
-		label,
-		collapsed = false,
-		resizable = false,
-		head,
-		foot,
-		children
-	}: Props = $props();
-
-	setContext<SidebarContext>(KEY, {
-		get collapsed() {
-			return collapsed;
-		}
-	});
+	let { variant = 'chat', label, resizable = false, head, foot, children }: Props = $props();
 
 	let nav = $state<HTMLElement | null>(null);
 	let dragging = $state(false);
@@ -93,7 +61,6 @@
 <nav
 	bind:this={nav}
 	class="sidebar {variant}"
-	class:collapsed
 	class:dragging
 	aria-label={label}
 	style:--sb-width={variant === 'chat' && resizable ? `${sidebar.width}px` : undefined}
@@ -102,7 +69,7 @@
 	<div class="body">{@render children()}</div>
 	{#if foot}<div class="foot">{@render foot()}</div>{/if}
 
-	{#if resizable && !collapsed}
+	{#if resizable}
 		<!-- A focusable `role="separator"` with a value is the ARIA window-splitter pattern: an
 		     interactive widget, which Svelte's a11y lint does not know a separator can be. -->
 		<!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
@@ -146,20 +113,14 @@
 		transition: width var(--motion-sidebar-collapse);
 	}
 
-	.chat {
+	.chat,
+	.settings {
 		height: calc(100% - var(--sb-pad) * 2);
 		margin: var(--sb-pad);
 	}
 
 	.settings {
 		--sb-width: 228px;
-		border-radius: 0;
-		box-shadow: none;
-	}
-
-	/* Exactly one icon column wide: the padding and the row inset on both sides of the lead. */
-	.collapsed {
-		width: calc(2 * (var(--sb-pad) + var(--sb-ix)) + var(--sb-lead));
 	}
 
 	.dragging {
@@ -230,6 +191,7 @@
 	@media (max-width: 600px) {
 		.settings {
 			width: auto;
+			height: auto;
 		}
 
 		.settings .body {

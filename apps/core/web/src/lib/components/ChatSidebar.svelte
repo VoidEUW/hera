@@ -3,8 +3,8 @@
 	 * The chat sidebar: the mark, a new chat, projects that disclose their chats, the loose chats,
 	 * and the account — which is the door into Settings, labelled with who you are.
 	 *
-	 * Built from the sidebar primitives (`ui/sidebar/`), so its shell, its rows, its groups, its
-	 * fold to an icon rail and its resize handle are the same ones Settings uses. What is left here
+	 * Built from the sidebar primitives (`ui/sidebar/`), so its shell, its rows, its groups and
+	 * its resize handle are the same ones Settings uses. What is left here
 	 * is the part that is about chats and projects:
 	 *
 	 * - Projects disclose inline rather than navigating, because finding a chat under the thing it
@@ -22,7 +22,6 @@
 	import { Placeholder } from '$lib/loading.svelte';
 	import { disclose } from '$lib/motion';
 	import { colourOf } from '$lib/projects';
-	import { sidebar } from '$lib/stores/sidebar.svelte';
 	import type { Shape } from '$lib/stores/workspace.svelte';
 	import Avatar from './ui/Avatar.svelte';
 	import IconButton from './ui/IconButton.svelte';
@@ -45,7 +44,7 @@
 		activeProjectId?: string | null;
 		loading?: boolean;
 		shape?: Shape;
-		/** Shown as the phone's sheet: never folded, never resized. */
+		/** Shown as the phone's sheet: never resized. */
 		sheet?: boolean;
 		onnew?: (projectId?: string) => void;
 		onsettings?: () => void;
@@ -81,8 +80,6 @@
 	type Kind = 'chat' | 'project';
 	type Target = { kind: Kind; id: string };
 
-	const folded = $derived(sidebar.collapsed && !sheet);
-
 	let expanded = $state<Record<string, boolean>>({});
 	let projectsOpen = $state(true);
 	let chatsOpen = $state(true);
@@ -113,7 +110,7 @@
 
 	/** ⌘K / Ctrl+K focuses the search from anywhere — the shortcut its hint shows. */
 	function shortcut(event: KeyboardEvent) {
-		if (event.key.toLowerCase() !== 'k' || !(event.metaKey || event.ctrlKey) || folded) return;
+		if (event.key.toLowerCase() !== 'k' || !(event.metaKey || event.ctrlKey)) return;
 		event.preventDefault();
 		searchField?.focus();
 	}
@@ -361,7 +358,7 @@
 		</Menu>
 	</div>
 
-	{#if open && !folded}
+	{#if open}
 		<!-- A height, not a slide: the chats below make room rather than a panel arriving on top
 		     of them, so the row under the pointer stays under it. -->
 		<div
@@ -381,34 +378,24 @@
 
 <svelte:window onkeydown={shortcut} />
 
-<Sidebar variant="chat" label={t.appName} collapsed={folded} resizable={!sheet}>
+<Sidebar variant="chat" label={t.appName} resizable={!sheet}>
 	{#snippet head()}
 		<div class="brand-row">
 			<a class="brand" href={resolve('/')} aria-label={t.appName}>
 				<Ocellus size={22} />
 				<span class="display wordmark">{t.appName}</span>
 			</a>
-			{#if !sheet}
-				<IconButton
-					icon="panel"
-					label={folded ? t.rail.expand : t.rail.collapse}
-					aria-pressed={folded}
-					onclick={() => sidebar.toggle()}
-				/>
-			{/if}
 		</div>
 		<SidebarEntry icon="plus" label={t.rail.newChat} onclick={() => onnew?.()} />
-		{#if !folded}
-			<div class="search">
-				<SearchBar
-					bind:ref={searchField}
-					value={query}
-					placeholder={t.rail.search}
-					shortcut="⌘K"
-					onchange={(value) => (query = value)}
-				/>
-			</div>
-		{/if}
+		<div class="search">
+			<SearchBar
+				bind:ref={searchField}
+				value={query}
+				placeholder={t.rail.search}
+				shortcut="⌘K"
+				onchange={(value) => (query = value)}
+			/>
+		</div>
 	{/snippet}
 
 	{#if found}
@@ -460,7 +447,7 @@
 							}}
 						/>
 					</div>
-				{:else if !projects.length && !folded}
+				{:else if !projects.length}
 					<p class="hint">{t.rail.noProjects}</p>
 				{/if}
 			{/if}
@@ -485,7 +472,7 @@
 				{#each loose as chat (chat.id)}
 					{@render chatRow(chat, false)}
 				{:else}
-					{#if !folded}<p class="hint">{t.rail.noChats}</p>{/if}
+					<p class="hint">{t.rail.noChats}</p>
 				{/each}
 			{/if}
 		</SidebarGroup>
@@ -540,22 +527,6 @@
 	.wordmark {
 		font-size: 21px;
 		line-height: 1;
-		transition: opacity var(--motion-sidebar-collapse);
-	}
-
-	:global(.sidebar.collapsed) .wordmark {
-		opacity: 0;
-	}
-
-	/* Folded, the brand mark is the rail's top and the fold button sits under it, so the rail is
-	   still one icon column wide. */
-	:global(.sidebar.collapsed) .brand-row {
-		flex-direction: column;
-		gap: calc(var(--space) * 2);
-		height: auto;
-		padding: calc(var(--space) * 1) 0;
-		align-items: flex-start;
-		padding-left: calc(var(--sb-ix) - 3px);
 	}
 
 	.search {

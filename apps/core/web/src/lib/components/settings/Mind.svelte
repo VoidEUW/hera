@@ -84,7 +84,7 @@
 		<section class="region">
 			<div class="region-head">
 				<h3>{region.title}</h3>
-				<Pill tone={region.tier === 'owner_fixed' ? 'authority' : 'neutral'} dot={false}>
+				<Pill tone={region.tier === 'owner_fixed' ? 'neutral' : 'authority'} dot={false}>
 					{region.tier === 'owner_fixed' ? t.settings.ownerFixed : t.settings.evolvable}
 				</Pill>
 				<span class="caption generation">{t.settings.generation(region.generation)}</span>

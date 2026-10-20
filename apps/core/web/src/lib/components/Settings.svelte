@@ -20,6 +20,7 @@
 	import { t } from '$lib/i18n';
 	import SearchBar from '$lib/components/ui/SearchBar.svelte';
 	import Modal from '$lib/components/ui/Modal.svelte';
+	import Ocellus from '$lib/components/ui/Ocellus.svelte';
 	import type { IconName } from '$lib/icons';
 	import Sidebar from '$lib/components/ui/sidebar/Sidebar.svelte';
 	import SidebarEntry from '$lib/components/ui/sidebar/SidebarEntry.svelte';
@@ -136,11 +137,17 @@
 	<div class="body">
 		<Sidebar variant="settings" label={t.settings.title}>
 			{#snippet head()}
-				<SearchBar
-					value={query}
-					placeholder={t.settings.search}
-					onchange={(value) => (query = value)}
-				/>
+				<div class="brand">
+					<Ocellus size={22} />
+					<span class="display title">{t.settings.title}</span>
+				</div>
+				<div class="search">
+					<SearchBar
+						value={query}
+						placeholder={t.settings.search}
+						onchange={(value) => (query = value)}
+					/>
+				</div>
 			{/snippet}
 			{#each GROUPS as group (group.label)}
 				<SidebarGroup label={group.label} fixed>
@@ -207,10 +214,31 @@
 		height: min(92vh, 860px);
 	}
 
+	/* The ground the sidebar floats on, as in the chat screen. */
 	.body {
 		display: flex;
 		min-height: 0;
 		flex: 1;
+		border-radius: inherit;
+		background: var(--ground);
+	}
+
+	.brand {
+		display: flex;
+		align-items: center;
+		gap: calc(var(--sb-gap) - 2px);
+		height: calc(var(--space) * 10);
+		padding: 0 var(--sb-ir) 0 calc(var(--sb-ix) - 3px);
+		margin-bottom: calc(var(--space) * 1);
+	}
+
+	.title {
+		font-size: 21px;
+		line-height: 1;
+	}
+
+	.search {
+		margin: calc(var(--space) * 1.5) 0 calc(var(--space) * 1);
 	}
 
 	/* Right padding clears the floating close button, which sits over the panel's top corner. */

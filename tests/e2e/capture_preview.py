@@ -479,17 +479,6 @@ def act_rail(page: Page, base: str, shots: Path, report: Report) -> None:
         page.wait_for_timeout(400)
         shoot(page, shots, "17-new-chat-is-the-start-screen")
 
-    with report.scene("rail-folded", "rail", page, shots):
-        # Folded to one icon column, with the label of the row under the pointer as a tooltip --
-        # and unfolded again, so every later scene sees the rail it expects.
-        page.get_by_role("button", name="Collapse the sidebar").click(timeout=5_000)
-        page.wait_for_timeout(500)
-        page.locator('nav[aria-label="Hera"] a[href^="/chat/"]').first.hover()
-        page.wait_for_timeout(1500)
-        shoot(page, shots, "18-rail-folded")
-        page.get_by_role("button", name="Expand the sidebar").click(timeout=5_000)
-        page.wait_for_timeout(400)
-
     with report.scene("not-found", "rail", page, shots):
         # An address that leads nowhere: the router's error page, inside the shell.
         page.goto(f"{base}/no-such-screen", wait_until="networkidle")

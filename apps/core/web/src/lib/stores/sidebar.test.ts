@@ -1,4 +1,4 @@
-/** The chat sidebar's width and fold: clamped on every way in, and remembered. */
+/** The chat sidebar's width: clamped on every way in, and remembered. */
 
 import { describe, expect, it } from 'vitest';
 
@@ -25,22 +25,19 @@ describe('clamp', () => {
 });
 
 describe('Sidebar', () => {
-	it('starts at the default, unfolded, when nothing is stored', () => {
+	it('starts at the default when nothing is stored', () => {
 		const sidebar = new Sidebar();
 		sidebar.load(memory());
 		expect(sidebar.width).toBe(DEFAULT);
-		expect(sidebar.collapsed).toBe(false);
 	});
 
-	it('remembers a width and a fold across loads', () => {
+	it('remembers a width across loads', () => {
 		const storage = memory();
 		const first = new Sidebar();
 		first.resize(333, storage);
-		first.toggle(storage);
 		const second = new Sidebar();
 		second.load(storage);
 		expect(second.width).toBe(333);
-		expect(second.collapsed).toBe(true);
 	});
 
 	it('does not trust a stored width from outside the range', () => {

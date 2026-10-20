@@ -7,13 +7,10 @@
 	 * body stays in the document while shut (`inert`), so a rename in progress inside it is not
 	 * thrown away by closing the group. `fixed` groups — the settings sidebar's — do not close at
 	 * all, because a settings section you can hide is one you can lose.
-	 *
-	 * Folded to an icon rail, the label line is gone and the group is only its entries.
 	 */
 	import type { Snippet } from 'svelte';
 	import Icon from '../Icon.svelte';
 	import IconButton from '../IconButton.svelte';
-	import { sidebarContext } from './Sidebar.svelte';
 
 	interface Props {
 		label: string;
@@ -36,12 +33,11 @@
 		children
 	}: Props = $props();
 
-	const context = sidebarContext();
 	const id = $props.id();
-	const shut = $derived(!fixed && !open && !context.collapsed);
+	const shut = $derived(!fixed && !open);
 </script>
 
-<section class="group" class:shut class:collapsed={context.collapsed} aria-label={label}>
+<section class="group" class:shut aria-label={label}>
 	<div class="label-row">
 		{#if fixed}
 			<h3 class="label">{label}</h3>
@@ -80,13 +76,6 @@
 		gap: calc(var(--space) * 1.5);
 		height: calc(var(--space) * 7);
 		padding: 0 var(--sb-ir) 0 var(--sb-ix);
-		transition: opacity var(--motion-sidebar-collapse);
-	}
-
-	.collapsed .label-row {
-		opacity: 0;
-		height: calc(var(--space) * 2);
-		overflow: hidden;
 	}
 
 	.label {

@@ -45,8 +45,7 @@ The UI rework base. One branch, seven steps, each leaving the app working:
    Pill, Kbd, Avatar, Spinner, ProgressBar, Collapsible, Textarea, Toaster + `$lib/toasts`,
    Tooltip, Menu, ErrorPage, SendButton, Topbar — and Modal, Select, Checkbox (+ switch), Input,
    Slider, Skeleton re-skinned. `/design` shows every one in every state; the capture films it.
-4. **The shell**: one Sidebar family for chats and settings (fold to an icon rail, resize by drag
-   or keys), row menus that cannot be clipped, and one `dialog` action for focus and Escape —
+4. **The shell**: one Sidebar family for chats and settings (resize by drag or keys; no fold), row menus that cannot be clipped, and one `dialog` action for focus and Escape —
    which is what fixed the phone sheet's missing focus trap (#121).
 5. **The conversation**: the trace is a state dot on a dashed line with mono-capital verbs (the
    per-kind marks are gone); speaker labels, bubbles, always-visible actions, the streaming caret,

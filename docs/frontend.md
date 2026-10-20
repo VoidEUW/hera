@@ -374,7 +374,7 @@ a model picker. There is one model (ADR 2); there are many of her.
 └───────────────────────┴──────────────────────────────────────────────┘
 ```
 
-The rail collapses to icons. Projects disclose their chats inline, as in the reference — it is
+The rail is resized by its edge and does not fold. Projects disclose their chats inline, as in the reference — it is
 genuinely easier to find a chat under the thing it belongs to than in one flat list sorted by
 time. Settings sits directly above the profile card at the bottom, where the brief put it.
 
