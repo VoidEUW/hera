@@ -12,6 +12,9 @@
 	 * **Always allow** writes a rule and says so afterwards, because a person should never
 	 * wonder whether a decision stuck.
 	 */
+	import Button from './ui/Button.svelte';
+	import Icon from './ui/Icon.svelte';
+	import Kbd from './ui/Kbd.svelte';
 	import type { PermissionRequired } from '$lib/api/events';
 	import { t } from '$lib/i18n';
 	import { toolName } from '$lib/tools';
@@ -26,6 +29,33 @@
 	}
 
 	let { card, decided = null, busy = false, onanswer }: Props = $props();
+
+	/** The three answers, each with its key (the theme's boxed option keys). Allowing is her
+	 * authority being granted, so the first is brass; denying is the soft danger, because it is a
+	 * refusal rather than a destruction. */
+	const CHOICES = [
+		{
+			key: '1',
+			label: t.permission.allowOnce,
+			variant: 'highlighted',
+			allow: true,
+			remember: false
+		},
+		{ key: '2', label: t.permission.alwaysAllow, variant: 'neutral', allow: true, remember: true },
+		{ key: '3', label: t.permission.deny, variant: 'danger-soft', allow: false, remember: false }
+	] as const;
+
+	/** The keys answer the card that is waiting, unless a person is typing somewhere — a `1` in
+	 * the composer is a `1`, not a decision. */
+	function onkeydown(event: KeyboardEvent) {
+		if (decided || busy || event.metaKey || event.ctrlKey || event.altKey) return;
+		const target = event.target as HTMLElement | null;
+		if (target?.closest('input, textarea, select, [contenteditable="true"]')) return;
+		const choice = CHOICES.find((option) => option.key === event.key);
+		if (!choice) return;
+		event.preventDefault();
+		onanswer?.(choice.allow, choice.remember);
+	}
 
 	// "Run docker__mcp-find?" is a question about machinery. The decision being asked for is
 	// about an action and where it will happen, so that is what the sentence says -- with the
@@ -46,9 +76,11 @@
 	});
 </script>
 
+<svelte:window {onkeydown} />
+
 <aside class="card" class:settled={!!decided}>
 	<p class="title">
-		<span class="mark" aria-hidden="true">⬡</span>
+		<span class="mark"><Icon name="shield" /></span>
 		{named.server
 			? t.permission.titleFrom(named.action, named.server)
 			: t.permission.title(named.action)}
@@ -67,28 +99,30 @@
 		<p class="outcome">{outcome}</p>
 	{:else}
 		<div class="actions">
-			<button type="button" disabled={busy} onclick={() => onanswer?.(true, false)}>
-				{t.permission.allowOnce}
-			</button>
-			<button type="button" disabled={busy} onclick={() => onanswer?.(true, true)}>
-				{t.permission.alwaysAllow}
-			</button>
-			<button class="deny" type="button" disabled={busy} onclick={() => onanswer?.(false, false)}>
-				{t.permission.deny}
-			</button>
+			{#each CHOICES as choice (choice.key)}
+				<Button
+					variant={choice.variant}
+					size="sm"
+					disabled={busy}
+					aria-keyshortcuts={choice.key}
+					onclick={() => onanswer?.(choice.allow, choice.remember)}
+				>
+					<!-- Drawn, not read: `aria-keyshortcuts` already tells a screen reader the key. -->
+					<span aria-hidden="true"><Kbd>{choice.key}</Kbd></span>
+					{choice.label}
+				</Button>
+			{/each}
 		</div>
 	{/if}
 </aside>
 
 <style>
+	/* No frame (the theme's `qc.frame: none`): the card is the question in the flow of the
+	   answer, marked by its brass icon and its keys rather than boxed off from it. */
 	.card {
-		margin: 16px 0;
-		padding: 14px 16px;
+		margin: calc(var(--space) * 4) 0;
 		max-width: var(--measure);
-		background: var(--surface-raised);
-		border: 1px solid var(--line);
-		border-left: 3px solid var(--brass);
-		border-radius: var(--radius);
+		animation: card-in var(--motion-card-enter);
 		/* Answering is the card settling: the three buttons leave and the card takes on the quieter
 		   surface it keeps for the rest of the conversation's life. Both halves of that used to
 		   happen in one frame, so the decision read as the card being replaced rather than as the
@@ -98,8 +132,13 @@
 			opacity var(--fade) var(--ease);
 	}
 
+	@keyframes card-in {
+		from {
+			opacity: 0;
+		}
+	}
+
 	.settled {
-		background: var(--surface);
 		opacity: 0.85;
 	}
 
@@ -113,6 +152,8 @@
 	}
 
 	.mark {
+		display: flex;
+		align-self: center;
 		color: var(--brass);
 	}
 
@@ -156,31 +197,5 @@
 		justify-content: flex-end;
 		margin-top: 14px;
 		flex-wrap: wrap;
-	}
-
-	.actions button {
-		padding: 6px 12px;
-		border: 1px solid var(--line);
-		border-radius: var(--radius);
-		background: var(--surface);
-		font-size: 13px;
-		transition:
-			border-color var(--fade) var(--ease),
-			color var(--fade) var(--ease);
-	}
-
-	.actions button:not(:disabled):hover {
-		border-color: var(--brass);
-		color: var(--brass);
-	}
-
-	.actions button:disabled {
-		opacity: 0.5;
-		cursor: default;
-	}
-
-	.deny:not(:disabled):hover {
-		border-color: var(--danger);
-		color: var(--danger);
 	}
 </style>

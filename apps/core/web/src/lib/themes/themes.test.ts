@@ -164,10 +164,12 @@ describe('a component', () => {
 
 	it('names no colour of its own', () => {
 		const literal = /#[0-9a-fA-F]{3,8}\b|\brgba?\(|\bhsla?\(/;
+		// Comments are prose, and prose says "#158" about an issue rather than a colour.
 		const offenders = components.flatMap((path) =>
 			style(path)
+				.replace(/\/\*[\s\S]*?\*\//g, '')
 				.split('\n')
-				.filter((line) => literal.test(line) && !line.trim().startsWith('/*'))
+				.filter((line) => literal.test(line))
 				.map((line) => `${relative(src, path)}: ${line.trim()}`)
 		);
 		expect(offenders).toEqual([]);

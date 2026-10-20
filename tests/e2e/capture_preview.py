@@ -506,7 +506,7 @@ def act_composer(page: Page, base: str, shots: Path, report: Report) -> None:
         page.keyboard.press("Escape")
 
     with report.scene("composer-servers-sheet", "composer", page, shots):
-        page.locator("button.context.servers").first.click(timeout=5_000)
+        page.get_by_role("button", name=re.compile(r"^\d+ servers?$")).first.click(timeout=5_000)
         page.wait_for_selector("[role='dialog']", timeout=5_000)
         page.wait_for_timeout(500)
         shoot(page, shots, "21-servers-sheet")
@@ -514,7 +514,8 @@ def act_composer(page: Page, base: str, shots: Path, report: Report) -> None:
         page.wait_for_timeout(400)
 
     with report.scene("composer-skills-sheet", "composer", page, shots):
-        page.locator("button.context.skills").first.click(timeout=5_000)
+        skills = page.get_by_role("button", name=re.compile(r"^(Choose skills|\d+ skills?)$"))
+        skills.first.click(timeout=5_000)
         page.wait_for_selector("[role='dialog']", timeout=5_000)
         page.wait_for_timeout(500)
         shoot(page, shots, "22-skills-sheet")

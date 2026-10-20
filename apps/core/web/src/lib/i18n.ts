@@ -185,7 +185,10 @@ export const t = {
 		// Not "Send": the composer's button already says that, and this one does something
 		// else -- it replaces a question that was already asked.
 		saveAndSend: 'Ask again',
-		editNote: 'Her answer to the old wording goes.'
+		editNote: 'Her answer to the old wording goes.',
+		/** The speaker labels over a message: yours, and hers by name. */
+		you: 'You',
+		thinking: 'Thinking'
 	},
 
 	turn: {

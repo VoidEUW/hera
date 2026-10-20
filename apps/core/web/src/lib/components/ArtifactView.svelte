@@ -259,6 +259,16 @@
 		border-radius: var(--radius);
 	}
 
+	/* A published document is read, so it gets the room a page has: padding off the frame and
+	   the reading measure, instead of prose flush against the drawer's edge (#158). */
+	.document {
+		padding: calc(var(--space) * 5) calc(var(--space) * 6);
+	}
+
+	.document :global(.prose) {
+		max-width: var(--measure);
+	}
+
 	/* A drawing sits on white whatever the theme is. An SVG she wrote has its own idea about
 	   colour and very often assumes a light page; painting it onto a dark surface is how a
 	   perfectly good chart turns into black lines on black.
@@ -406,10 +416,22 @@
 		font-weight: 600;
 	}
 
+	/* Both columns — the numbers and the code — on one font and one line height, stated here
+	   rather than inherited. The `<code>` inside the right-hand `<pre>` is otherwise set in the
+	   browser's own `monospace` (the UA sheet gives `code` a family, and `.mono` sits on the
+	   `<pre>`, not on it), so the two columns were two fonts with two line heights and the
+	   numbers drifted away from their lines further down a file (#171). */
 	.source pre {
 		margin: 0;
 		padding: 10px 12px;
 		white-space: pre;
+		font-family: var(--font-mono);
+		font-size: calc(var(--ui-size) - 0.5px);
+		line-height: 1.55;
+	}
+
+	.source code {
+		font: inherit;
 	}
 
 	/* Stretched by the grid to the full height of the box. Sticky, so it stays put while a long

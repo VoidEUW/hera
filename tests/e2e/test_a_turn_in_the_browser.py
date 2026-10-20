@@ -244,7 +244,7 @@ def test_a_skill_is_switched_on_for_one_chat(page: Any) -> None:
     page.wait_for_url("**/chat/**", timeout=15_000)
     page.wait_for_selector("text=ticket-granting ticket", timeout=30_000)
 
-    page.locator("button.context.skills").click()
+    page.get_by_role("button", name=re.compile(r"^(Choose skills|\d+ skills?)$")).click()
     page.wait_for_selector("[role=dialog]", timeout=10_000)
 
     # Wait for the write itself, not for the pill. `ChatStore.pinSkills` is deliberately
@@ -259,11 +259,11 @@ def test_a_skill_is_switched_on_for_one_chat(page: Any) -> None:
     assert patched.value.ok
 
     page.keyboard.press("Escape")
-    page.wait_for_selector("button.context.skills:has-text('1 skill')", timeout=10_000)
+    page.get_by_role("button", name="1 skill", exact=True).wait_for(timeout=10_000)
 
     page.reload(wait_until="networkidle")
     # Stored on the chat, so it survives the reload that everything else here survives.
-    page.wait_for_selector("button.context.skills:has-text('1 skill')", timeout=15_000)
+    page.get_by_role("button", name="1 skill", exact=True).wait_for(timeout=15_000)
 
 
 def test_settings_holds_what_changes_her_behaviour(page: Any) -> None:
@@ -311,7 +311,7 @@ def test_manage_servers_lands_on_the_servers_tab(page: Any) -> None:
     """Issue #45: the composer's servers pill opens a read-only sheet, and its "Manage
     servers" button used to always reopen Settings on Models — the tab it defaults to,
     not the one the person was just looking at."""
-    page.locator("button.context.servers").click()
+    page.get_by_role("button", name=re.compile(r"^\d+ servers?$")).click()
     page.wait_for_selector("[role=dialog]", timeout=10_000)
 
     page.get_by_role("button", name="Manage servers").click()

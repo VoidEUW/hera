@@ -33,23 +33,16 @@
 		type ToolResultEvent
 	} from '$lib/api/events';
 	import { duration, t } from '$lib/i18n';
-	import { disclose, still } from '$lib/motion';
+	import { disclose } from '$lib/motion';
 	import { markOf, subject, toolName } from '$lib/tools';
 	import type { Activity } from '$lib/turn';
-	import { fade } from 'svelte/transition';
-	import Brain from './Brain.svelte';
-	import Globe from './Globe.svelte';
-	import Ocellus from './Ocellus.svelte';
 	import Prose from './Prose.svelte';
-	import Quill from './Quill.svelte';
-	import Scroll from './Scroll.svelte';
-	import Stele from './Stele.svelte';
-	import Wrench from './Wrench.svelte';
+	import Icon from './ui/Icon.svelte';
 
 	interface Props {
 		row: Activity;
-		/** Whether this turn is the one currently arriving. Only used to decide whether a block
-		 * of reasoning is still being written — see `tailing` below. */
+		/** Whether this turn is the one currently arriving. A call that settles while you watch
+		 * draws its check; one loaded from history just has it. */
 		streaming?: boolean;
 	}
 
@@ -107,11 +100,14 @@
 	const lines = $derived(result?.text ? result.text.split('\n').length : 0);
 
 	const words = $derived(thought.trim().split(/\s+/).filter(Boolean).length);
-	/** Whether to preview the last lines of this block. Both halves are needed: `row.live` says
-	 * the block was still open when the event list ran out, and `streaming` says the list is
-	 * still growing. A reloaded turn satisfies the first and not the second, which is right —
-	 * there is nothing to follow along with. */
-	const tailing = $derived(!!thought && !open && !!row.live && streaming);
+	/** What the dot says (ADR 21): a thought or a skill is quiet, a call is live while it runs
+	 * and settled in laurel once it answered, and a failure is danger. The kind of thing is the
+	 * verb's job, not the dot's. */
+	const standing = $derived.by((): 'quiet' | 'live' | 'done' | 'failed' => {
+		if (row.kind !== 'tool') return 'quiet';
+		if (!result) return 'live';
+		return result.ok ? 'done' : 'failed';
+	});
 	const expandable = $derived(!!thought || args.length > 0 || !!result?.text);
 
 	const trail = $derived.by(() => {
@@ -134,24 +130,16 @@
 	}
 </script>
 
-<div class="row" class:loud>
-	<span class="gutter">
-		{#if row.kind === 'thinking' || row.kind === 'unknown'}
-			<Ocellus size={9} alive={running} muted={!running} />
-		{:else if shape === 'skill'}
-			<Scroll size={13} alive={running} muted={!running && !loud} />
-		{:else if shape === 'search'}
-			<Globe size={13} alive={running} muted={!running && !loud} />
-		{:else if shape === 'note'}
-			<Quill size={13} alive={running} muted={!running && !loud} />
-		{:else if shape === 'memory'}
-			<Brain size={13} alive={running} muted={!running && !loud} />
-		{:else if shape === 'artifact'}
-			<Stele size={13} alive={running} muted={!running && !loud} />
-		{:else}
-			<Wrench size={13} alive={running} muted={!running && !loud} />
-		{/if}
+{#snippet settled()}
+	<span class="trail">
+		{trail}
+		{#if standing === 'done'}<span class="check" class:drawn={streaming}><Icon name="check" /></span
+			>{/if}
 	</span>
+{/snippet}
+
+<div class="row" class:loud>
+	<span class="gutter"><span class="dot {standing}" aria-hidden="true"></span></span>
 
 	<button
 		class="head"
@@ -180,48 +168,18 @@
 			     for a minute and then change its mind to *scratch write design-plan.md*: the
 			     wording settles once and only the target fills in. -->
 			<span class="verb">{named.action}</span>
-			<span class="target" title={named.qualified}>{did}</span>
-			<span class="trail">{trail}</span>
+			<span class="target" class:struck={standing === 'failed'} title={named.qualified}>{did}</span>
+			{@render settled()}
 		{:else}
-			<span class="verb">{result && !result.ok ? '' : t.activity.called}</span>
-			<span class="target" title={named.qualified}>
+			<span class="verb">{t.activity.called}</span>
+			<span class="target" class:struck={standing === 'failed'} title={named.qualified}>
 				{#if named.server && !mine}<strong>{named.server}</strong>{/if}
 				{named.action}
 			</span>
-			<span class="trail">{trail}</span>
+			{@render settled()}
 		{/if}
 	</button>
 </div>
-
-{#if tailing}
-	<!-- The tail of what she is thinking, while she is still thinking it.
-	     A collapsed row says "thought · 213 words · Show", which is a receipt: it tells you
-	     something happened and nothing about what. Following her reasoning meant opening a panel,
-	     and while a turn is still running that panel grows under your cursor. Three lines of the
-	     *most recent* words is enough to follow along and small enough to ignore.
-
-	     It closes to nothing the moment the block does. A finished thought is a record and reads
-	     as one row; only the one still being written earns three lines of the gutter, and a turn
-	     with six blocks in it would otherwise be a wall of half-sentences nobody is reading any
-	     more.
-
-	     Anchored to the bottom rather than truncated at the top: the box is three lines tall, the
-	     prose inside it is however long it is, and `justify-content: flex-end` pushes the end of
-	     it into view. Taking the last N characters in JavaScript would have to guess how many
-	     fit, and would guess wrong at every window width.
-
-	     **Enter only, deliberately.** It comes and goes on its own — the block it belongs to closed,
-	     the turn ended — and nothing a person pressed to dismiss it, so a fade on the way out would
-	     only delay a preview that has already stopped being about anything. It also has to be gone
-	     the instant the turn is: `tests/e2e/test_a_turn_in_the_browser.py` asserts the tail is not
-	     on screen once a turn has finished, and an `out:` would keep it in the document for the
-	     length of the animation. -->
-	<div class="body" in:fade={{ duration: still() ? 0 : 120 }}>
-		<span class="gutter hairline"></span>
-		<p class="tail" aria-hidden="true">{thought}</p>
-	</div>
-{/if}
-
 {#if open}
 	<!-- A disclosure, because a row's detail is something you open rather than something that
 	     arrives: the column of rows and the sentence below it rearrange themselves as the panel
@@ -271,6 +229,16 @@
 {/if}
 
 <style>
+	.row {
+		animation: row-in var(--motion-trace-row);
+	}
+
+	@keyframes row-in {
+		from {
+			opacity: 0;
+		}
+	}
+
 	.row,
 	.body {
 		display: grid;
@@ -294,28 +262,55 @@
 	}
 
 	/* The hairline that joins the eyes into one column. */
+	/* The gutter line: dashed (the theme's `trace.line` part), drawn down from the first row as
+	   the trace grows (`trace.line`). */
 	.gutter::before {
 		content: '';
 		position: absolute;
 		inset: 0 auto -6px 50%;
-		width: 1px;
-		background: var(--line);
+		width: 0;
+		border-left: 1px dashed var(--line);
 		transform: translateX(-50%);
+		transform-origin: top;
+		animation: grow var(--motion-trace-line);
 	}
 
-	/* Every mark sits on the ground colour and breaks the hairline, rather than having the
-	   line drawn across it. An eye with a wire through it is not an eye. */
-	.gutter :global(.ocellus),
-	.gutter :global(.wrench),
-	.gutter :global(.scroll),
-	.gutter :global(.globe),
-	.gutter :global(.quill),
-	.gutter :global(.knot),
-	.gutter :global(.stele) {
+	@keyframes grow {
+		from {
+			transform: translateX(-50%) scaleY(0);
+		}
+	}
+
+	/* The row's marker: a 7px dot in its state colour, on the ground so the dashed line breaks
+	   around it rather than running through it. */
+	.dot {
 		position: relative;
-		background: var(--ground);
-		padding: 3px 0;
-		box-sizing: content-box;
+		width: 7px;
+		height: 7px;
+		border-radius: 50%;
+		background: var(--text-faint);
+		box-shadow: 0 0 0 3px var(--ground);
+	}
+
+	.dot.live,
+	.dot.done {
+		background: var(--laurel);
+	}
+
+	/* `tool.running`: the dot pulses while the call is out. */
+	.dot.live {
+		animation: running var(--motion-tool-running) infinite alternate;
+	}
+
+	@keyframes running {
+		from {
+			transform: scale(0.55);
+			opacity: 0.35;
+		}
+	}
+
+	.dot.failed {
+		background: var(--danger);
 	}
 
 	.hairline {
@@ -357,14 +352,19 @@
 	   Widened from 5.2em when the scratchpad landed, which is the case the paragraph above
 	   predicted: `scratch write` and `scratch read` both clipped to `scratch w…` and `scratch
 	   r…`, so the two rows a person most needs to tell apart were the two the column made
-	   identical. 8em fits her longest name with room, and the target still has the reading
-	   column to itself. */
+	   identical. In the trace's small mono capitals (ADR 21) 9em fits her longest name with
+	   room, and the target still has the reading column to itself. */
 	.verb {
-		width: 8em;
+		width: 9em;
 		flex: none;
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
+		/* The theme's `trace.verb` part: small mono capitals. */
+		font-family: var(--font-mono);
+		font-size: 10.5px;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
 		color: var(--text-faint);
 	}
 
@@ -397,11 +397,42 @@
 	   can be reached by a truncated target. An ellipsis that stops one space short of a duration
 	   reads as a collision even when it is not one. */
 	.trail {
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
 		margin-left: auto;
 		flex: none;
 		padding-left: 14px;
 		color: var(--text-faint);
+		/* The theme's `trace.meta` part: the duration in mono, small. */
+		font-family: var(--font-mono);
+		font-size: 11px;
 		font-variant-numeric: tabular-nums;
+	}
+
+	/* `tool.done`: a laurel check after the duration. One that settles while you watch draws
+	   its own stroke; one loaded from history is simply there. */
+	.check {
+		display: flex;
+		color: var(--laurel);
+	}
+
+	.check.drawn :global(path) {
+		stroke-dasharray: 24;
+		animation: draw var(--motion-tool-done) both;
+	}
+
+	@keyframes draw {
+		from {
+			stroke-dashoffset: 24;
+		}
+	}
+
+	/* The theme's `tool.error` part: the target struck through in danger, at once. */
+	.struck {
+		color: var(--danger);
+		text-decoration: line-through;
+		text-decoration-color: var(--danger);
 	}
 
 	.loud .trail {
@@ -412,29 +443,6 @@
 		padding: 2px 0 10px;
 		font-size: 13.5px;
 		color: var(--text-muted);
-	}
-
-	/* Two lines of her reasoning, ending at the end of it. A fixed-height column that puts its
-	   content at the bottom, so the overflow happens off the *top* and what you are left looking
-	   at is the most recent thing she wrote. The mask fades that cut instead of leaving a hard
-	   edge halfway through a letter. */
-	.tail {
-		display: flex;
-		flex-direction: column;
-		justify-content: flex-end;
-		/* Three full lines and a sliver of the one above them. The sliver is what says *there is
-		   more of this* — without it, three clean lines read as the whole thought. */
-		max-height: 4.55em;
-		margin: 0;
-		padding-bottom: 7px;
-		overflow: hidden;
-		font-family: var(--font-body);
-		font-size: 13px;
-		line-height: 1.45;
-		color: var(--text-faint);
-		white-space: pre-wrap;
-		overflow-wrap: anywhere;
-		mask-image: linear-gradient(to bottom, transparent, black 0.9em);
 	}
 
 	.args {

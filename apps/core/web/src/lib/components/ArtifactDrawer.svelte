@@ -128,22 +128,28 @@
 </aside>
 
 <style>
+	/* The side view (the theme's `hera/side-view`): a filled `--surface` panel, floating on the
+	   ground like the sidebar on the other edge, so the two sides of the screen are one family. */
 	.drawer {
 		display: flex;
 		flex-direction: column;
 		width: min(46vw, 720px);
 		flex: none;
-		border-left: 1px solid var(--line);
-		background: var(--ground);
+		margin: calc(var(--space) * 2);
+		border-radius: var(--radius-lg);
+		background: var(--surface);
+		box-shadow: var(--shadow-sm);
+		overflow: hidden;
 	}
 
+	/* No rule under the header (the theme's `drw.header: none`): the title, the tools and the
+	   body read as one panel. */
 	.top {
 		display: flex;
 		align-items: center;
 		gap: 8px;
 		flex: none;
-		padding: 12px 14px;
-		border-bottom: 1px solid var(--line);
+		padding: calc(var(--space) * 3) calc(var(--space) * 3.5);
 	}
 
 	/* Beside the transcript at 46vw of a phone width is not a panel, it is the whole screen with
@@ -151,12 +157,14 @@
 	   goes full-bleed instead. Still no scrim: `artifacts.close()` above is already the way out,
 	   and a full-bleed sheet leaves nothing peeking out from behind it for a scrim to dim. */
 	@media (max-width: 780px) {
+		/* Full-bleed on a phone: no edge to float off. */
 		.drawer {
 			position: fixed;
 			inset: 0;
 			width: 100%;
+			margin: 0;
+			border-radius: 0;
 			z-index: 12;
-			border-left: 0;
 		}
 
 		.top {

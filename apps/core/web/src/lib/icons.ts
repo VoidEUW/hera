@@ -2,7 +2,8 @@
  * The icon set (ADR 21): one stroke family on a 24-unit grid, drawn at `--icon-size` with
  * `--icon-stroke`, round caps and joins, in `currentColor`. `Icon.svelte` is the only thing that
  * draws one; the names are the theme spec's (`docs/themes/hera-theme-heaven.md` § Icons), plus
- * `brain` (Settings → Mind) and `menu` (the phone's rail toggle) from the same family.
+ * `brain` (Settings → Mind), `menu` (the phone's rail toggle) and `help` (a question she asks)
+ * from the same family.
  *
  * The drawings are Lucide's (lucide-static v1.60.0), copied as data rather than installed: the
  * spec's stroke style is Lucide's, and a runtime icon library would be one more dependency for
@@ -342,6 +343,11 @@ export const ICONS = {
 		['path', { d: 'M4 5h16' }],
 		['path', { d: 'M4 12h16' }],
 		['path', { d: 'M4 19h16' }]
+	],
+	help: [
+		['circle', { cx: '12', cy: '12', r: '10' }],
+		['path', { d: 'M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3' }],
+		['path', { d: 'M12 17h.01' }]
 	]
 } satisfies Record<string, IconPart[]>;
 

@@ -15,6 +15,8 @@
 	 * edit itself: you can see the answer you are about to replace while you retype the
 	 * question.
 	 */
+	import Button from './ui/Button.svelte';
+	import { toasts } from '$lib/toasts.svelte';
 	import { untrack } from 'svelte';
 	import type { AnswerRequired, AnyEvent, Artifact, PermissionRequired } from '$lib/api/events';
 	import { size } from '$lib/attachments';
@@ -170,6 +172,7 @@
 		try {
 			await navigator.clipboard.writeText(copyable);
 			copied = true;
+			toasts.show(t.message.copied);
 			setTimeout(() => (copied = false), 1400);
 		} catch {
 			/* a browser that refuses the clipboard is not something to interrupt a person over */
@@ -207,6 +210,7 @@
 
 {#if role === 'user'}
 	<div class="mine">
+		<p class="speaker">{t.message.you}</p>
 		{#if editing}
 			<div class="editor">
 				<textarea
@@ -222,10 +226,11 @@
 					}}></textarea>
 				<div class="editing">
 					<span class="caption">{t.message.editNote}</span>
-					<button class="quiet" type="button" onclick={() => (editing = false)}>
+					<Button variant="ghost" size="sm" onclick={() => (editing = false)}>
 						{t.message.cancel}
-					</button>
-					<button class="primary" type="button" onclick={saveEdit}>{t.message.saveAndSend}</button>
+					</Button>
+					<Button variant="highlighted" size="sm" onclick={saveEdit}>{t.message.saveAndSend}</Button
+					>
 				</div>
 			</div>
 		{:else}
@@ -249,12 +254,22 @@
 			{#if canCopy || canRedo}
 				<div class="actions right">
 					{#if canCopy}
-						<button type="button" onclick={copy}>
-							{copied ? t.message.copied : t.message.copy}
-						</button>
+						<Button
+							variant="ghost"
+							size="sm"
+							icon={copied ? 'check' : 'copy'}
+							label={t.message.copy}
+							onclick={copy}
+						/>
 					{/if}
 					{#if canRedo}
-						<button type="button" onclick={startEdit}>{t.message.edit}</button>
+						<Button
+							variant="ghost"
+							size="sm"
+							icon="edit"
+							label={t.message.edit}
+							onclick={startEdit}
+						/>
 					{/if}
 				</div>
 			{/if}
@@ -262,12 +277,13 @@
 	</div>
 {:else}
 	<article class="hers">
+		<p class="speaker">{t.appName}</p>
 		<!-- One list, in the order things happened. It used to be every gutter row and then all
 		     the prose, which reads correctly only for a turn that does its thinking up front: the
 		     moment she speaks, thinks again and speaks again, the second thought was drawn above
 		     the sentence that prompted it. A run of consecutive rows is still one bordered block,
 		     so the gutter reads as a group where it is one. -->
-		{#each turn.blocks as item (item.key)}
+		{#each turn.blocks as item, index (item.key)}
 			{#if item.kind === 'gutter'}
 				<div class="gutter" class:long={item.rows.length > LONG_TRACE}>
 					{#if item.rows.length > 1}
@@ -301,7 +317,11 @@
 					</div>
 				</div>
 			{:else if item.kind === 'prose'}
-				<Prose text={item.text ?? ''} />
+				<!-- The caret (`stream.caret`) rides the end of the last thing she is still
+				     writing, and nowhere else. -->
+				<div class="said-hers" class:caret={streaming && index === turn.blocks.length - 1}>
+					<Prose text={item.text ?? ''} />
+				</div>
 			{:else if item.kind === 'artifact'}
 				<!-- What she published, drawn where she published it. `inline` decides whether that
 				     is the thing itself or a card to go and open it (ADR 13) — the model chose when
@@ -327,9 +347,9 @@
 		{/each}
 
 		{#if marked}
-			<p class="waiting">
+			<p class="waiting" role="status">
 				<Ocellus size={22} alive burst {folding} />
-				<span class="sr-only">Thinking</span>
+				<span class="thinking">{t.message.thinking}</span>
 			</p>
 		{/if}
 
@@ -343,10 +363,22 @@
 					<span class="tokens">{t.turn.tokens(generated)}</span>
 				{/if}
 				{#if canCopy}
-					<button type="button" onclick={copy}>{copied ? t.message.copied : t.message.copy}</button>
+					<Button
+						variant="ghost"
+						size="sm"
+						icon={copied ? 'check' : 'copy'}
+						label={t.message.copy}
+						onclick={copy}
+					/>
 				{/if}
 				{#if canRedo}
-					<button type="button" onclick={() => onredo?.()}>{t.message.retry}</button>
+					<Button
+						variant="ghost"
+						size="sm"
+						icon="refresh"
+						label={t.message.retry}
+						onclick={() => onredo?.()}
+					/>
 				{/if}
 			</div>
 		{/if}
@@ -374,34 +406,49 @@
 	/* Quiet until you go looking for them: a row of actions under every message would compete
 	   with the conversation, and one that only appears under a pointer cannot be reached from
 	   a keyboard. Hover, focus, or the moment something was copied. */
+	/* Always shown (the theme's `msg.actions` part): a copy that has to be found under a pointer
+	   is a copy a keyboard cannot reach, and three quiet icons do not compete with the prose. */
 	.actions {
 		display: flex;
-		gap: 4px;
-		margin-top: 4px;
-		opacity: 0;
-		transition: opacity var(--fade) var(--ease);
-	}
-
-	.mine:hover .actions,
-	.mine:focus-within .actions,
-	.hers:hover .actions,
-	.hers:focus-within .actions {
-		opacity: 1;
-	}
-
-	.actions button {
-		padding: 3px 7px;
-		border-radius: 6px;
-		font-size: 12px;
+		align-items: center;
+		gap: 2px;
+		margin-top: calc(var(--space) * 1);
 		color: var(--text-faint);
-		transition:
-			background var(--fade) var(--ease),
-			color var(--fade) var(--ease);
 	}
 
-	.actions button:hover {
-		background: var(--surface);
-		color: var(--text);
+	/* Who is speaking, in mono capitals (`msg.label`): yours on the right over the bubble, hers
+	   in her own colour, because her name is one of the two places pomegranate is for. */
+	.speaker {
+		margin: 0 0 calc(var(--space) * 1.5);
+		font-family: var(--font-mono);
+		font-size: 10.5px;
+		font-weight: 500;
+		letter-spacing: 0.1em;
+		text-transform: uppercase;
+		color: var(--text-faint);
+	}
+
+	.hers > .speaker {
+		color: var(--pomegranate);
+	}
+
+	/* The caret on the last line she is still writing. `:global` because the prose is rendered
+	   through {@html}. */
+	.caret :global(.prose > :last-child)::after {
+		content: '';
+		display: inline-block;
+		width: 2px;
+		height: 1.05em;
+		margin-left: 2px;
+		vertical-align: text-bottom;
+		background: var(--laurel);
+		animation: blink var(--motion-stream-caret) infinite;
+	}
+
+	@keyframes blink {
+		50% {
+			opacity: 0;
+		}
 	}
 
 	.tokens {
@@ -443,22 +490,6 @@
 		color: var(--text-faint);
 	}
 
-	.editing button {
-		padding: 4px 10px;
-		border-radius: var(--radius);
-		font-size: 12.5px;
-	}
-
-	.quiet {
-		color: var(--text-muted);
-		border: 1px solid var(--line);
-	}
-
-	.primary {
-		background: var(--pomegranate);
-		color: var(--ground);
-	}
-
 	.said {
 		margin: 0;
 		white-space: pre-wrap;
@@ -492,14 +523,15 @@
 		color: var(--text-faint);
 	}
 
+	/* Yours as a raised bubble on the right (`msg.user`), in her prose face so the two halves of
+	   the conversation read as one text. */
 	.bubble {
 		max-width: 46ch;
-		padding: 10px 14px;
+		padding: calc(var(--space) * 3) calc(var(--space) * 4);
 		background: var(--surface-raised);
 		border-radius: var(--radius-lg);
-		border-bottom-right-radius: 4px;
 		font-family: var(--font-body);
-		font-size: 16px;
+		font-size: calc(var(--prose-size) - 0.5px);
 		line-height: 1.55;
 		overflow-wrap: anywhere;
 	}
@@ -583,7 +615,24 @@
 	}
 
 	.waiting {
+		display: flex;
+		align-items: center;
+		gap: calc(var(--space) * 2.5);
 		margin: 0;
+	}
+
+	/* The label beside the eye breathes (`thinking.label`), so waiting reads as attention even
+	   where the mark is too small to watch. */
+	.thinking {
+		color: var(--text-muted);
+		font-size: var(--ui-size);
+		animation: breathe var(--motion-thinking-label) infinite alternate;
+	}
+
+	@keyframes breathe {
+		to {
+			opacity: 0.45;
+		}
 	}
 
 	/* The turn's own outcome, and the only sentence in a message that can be bad news. It arrives
