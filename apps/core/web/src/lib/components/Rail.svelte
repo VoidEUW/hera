@@ -454,7 +454,11 @@
 			     row that was under the pointer is no longer under it.
 
 			     Opens a little slower than it closes, for the reason `reveal` gives. -->
-			<ul class="list nested" in:disclose={{ duration: 180 }} out:disclose={{ duration: 120 }}>
+			<ul
+				class="list nested"
+				in:disclose={{ slot: 'group-disclose' }}
+				out:disclose={{ slot: 'group-disclose' }}
+			>
 				{#each inside(project.id) as chat (chat.id)}
 					{@render row(chat)}
 				{:else}
@@ -923,7 +927,7 @@
 	/* While the modal is open the card stays lit and the cog keeps turning once, so the
 	   gesture that opened Settings is still visibly the one in charge of it. */
 	.card.open .cog {
-		animation: cog-turn 700ms var(--ease) 1;
+		animation: cog-turn var(--motion-indicator-move) 1;
 	}
 
 	.card:hover .initials,

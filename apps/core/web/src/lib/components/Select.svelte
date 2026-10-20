@@ -208,8 +208,8 @@
 			aria-label={label}
 			tabindex="-1"
 			onkeydown={walk}
-			in:reveal={{ y: revealY, blur: 2, duration: 410 }}
-			out:reveal={{ y: revealY, blur: 2, duration: 290 }}
+			in:reveal={{ y: revealY, blur: 2 }}
+			out:reveal={{ y: revealY, blur: 2 }}
 		>
 			{#each choices as choice (choice.value)}
 				{@const on = choice.value === value}

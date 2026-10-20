@@ -231,7 +231,11 @@
 	     alone would leave the column snapping under a panel that had already finished arriving.
 
 	     Closes quicker than it opens, for the reason `reveal` gives. -->
-	<div class="body" in:disclose={{ duration: 180 }} out:disclose={{ duration: 120 }}>
+	<div
+		class="body"
+		in:disclose={{ slot: 'trace-disclose' }}
+		out:disclose={{ slot: 'trace-disclose' }}
+	>
 		<span class="gutter hairline"></span>
 		<div class="detail">
 			{#if thought}
@@ -430,7 +434,7 @@
 		color: var(--text-faint);
 		white-space: pre-wrap;
 		overflow-wrap: anywhere;
-		mask-image: linear-gradient(to bottom, transparent, #000 0.9em);
+		mask-image: linear-gradient(to bottom, transparent, black 0.9em);
 	}
 
 	.args {

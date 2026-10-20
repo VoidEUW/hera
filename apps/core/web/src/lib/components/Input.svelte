@@ -114,7 +114,7 @@
 	.control:focus-visible {
 		outline: none;
 		border-color: var(--brass);
-		box-shadow: 0 0 0 2px rgb(217 174 82 / 0.25);
+		box-shadow: 0 0 0 2px var(--brass-soft);
 	}
 
 	/* The rail's in-place rename: the brass border is the edit state itself, not a focus ring on

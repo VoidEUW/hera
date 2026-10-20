@@ -115,7 +115,7 @@
 	/* Focus lands on the input, but the ring is drawn on the box it covers. */
 	input:focus-visible + .box {
 		border-color: var(--brass);
-		box-shadow: 0 0 0 2px rgb(217 174 82 / 0.25);
+		box-shadow: 0 0 0 2px var(--brass-soft);
 	}
 
 	/* The check itself: a rotated L rather than a \u2713, the same hairline mark the Select's
@@ -127,12 +127,12 @@
 		border-bottom: 1.5px solid transparent;
 		opacity: 0;
 		transform: rotate(-45deg) translate(0, -1px) scale(0.6);
-		/* 330ms rather than `--fade`'s 120ms: that duration is tuned for a hover state changing
+		/* The toggle's own slot rather than `--fade`: that one is tuned for a hover state changing
 		   colour, and reads as a flicker rather than a pop for a mark arriving or leaving. */
 		transition:
-			border-color 330ms var(--ease),
-			opacity 330ms var(--ease),
-			transform 330ms var(--ease);
+			border-color var(--motion-switch-toggle),
+			opacity var(--motion-switch-toggle),
+			transform var(--motion-switch-toggle);
 	}
 
 	/* The mark itself pops in rather than just tinting in place — on and off both read as an

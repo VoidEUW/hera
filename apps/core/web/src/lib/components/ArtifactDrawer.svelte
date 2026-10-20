@@ -16,10 +16,10 @@
 	 * scrolled away. Without it, `artifact_edit` in turn nine leaves you scrolling back to turn
 	 * four to find the card that opens the file it just changed.
 	 */
-	import { cubicOut } from 'svelte/easing';
 	import { api } from '$lib/api/client';
 	import { headingOf, newest } from '$lib/artifacts';
 	import { t } from '$lib/i18n';
+	import { slot, still } from '$lib/motion';
 	import { artifacts } from '$lib/stores/artifacts.svelte';
 	import ArtifactView from './ArtifactView.svelte';
 	import Paper from './Paper.svelte';
@@ -29,10 +29,6 @@
 	}
 
 	let { chatId }: Props = $props();
-
-	/** How long the panel takes to make room for itself. Longer than `--fade`, because this is
-	 * a change to the shape of the screen rather than to the look of one thing on it. */
-	const REVEAL = 240;
 
 	/** How long it waits first, when it is opening. Just past `--fade`, so on a reload the
 	 * conversation has finished arriving before the panel starts taking width from it — two
@@ -55,16 +51,18 @@
 	 * the global `prefers-reduced-motion` rule in `app.css` cannot do for a transition that
 	 * lives in JavaScript. */
 	function reveal(node: HTMLElement, { delay = 0 } = {}) {
-		const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
-		if (still) return { duration: 0, css: () => '' };
+		if (still()) return { duration: 0, css: () => '' };
+		// The theme's `drawer.open` slot: longer than `--fade`, because this is a change to the
+		// shape of the screen rather than to the look of one thing on it.
+		const { duration, easing } = slot('drawer-open');
 		if (matchMedia('(max-width: 780px)').matches) {
-			return { delay, duration: REVEAL, easing: cubicOut, css: (t: number) => `opacity: ${t}` };
+			return { delay, duration, easing, css: (t: number) => `opacity: ${t}` };
 		}
 		const width = node.getBoundingClientRect().width;
 		return {
 			delay,
-			duration: REVEAL,
-			easing: cubicOut,
+			duration,
+			easing,
 			// `overflow: hidden` for the length of it: the body is laid out for the full width
 			// and reflowing it three times a frame on the way in is a different animation.
 			css: (t: number) => `width: ${t * width}px; opacity: ${t}; overflow: hidden`

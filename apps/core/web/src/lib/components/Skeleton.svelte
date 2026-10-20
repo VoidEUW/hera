@@ -87,7 +87,7 @@
 			transparent
 		);
 		transform: translateX(-100%);
-		animation: sweep 1.9s var(--ease) infinite;
+		animation: sweep var(--motion-skeleton-sweep) infinite;
 	}
 
 	@keyframes fade {

@@ -514,7 +514,7 @@
 		   Slower than `.mine` on purpose, and it is the one place in the interface where that is
 		   true. A person has just sent something and is waiting; the answer beginning is the
 		   event, and a turn's arriving fade that is over before it registers is a wasted gesture. */
-		animation: arrive 220ms var(--ease);
+		animation: arrive var(--motion-message-enter);
 	}
 
 	@keyframes arrive {

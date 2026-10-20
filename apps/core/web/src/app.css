@@ -1,115 +1,54 @@
 /**
- * The design language of docs/frontend.md, as tokens.
+ * The application's own styles, on top of the theme's tokens.
  *
- * **Parchment and laurel — gold leads.** She is a goddess and the interface should be able to
- * say so, so the ground itself is gold: aged vellum by day, a gold-brown black by night. The
- * green beside it keeps that from being gaudy — laurel is the thing that grows, and warm gold
- * against a living green is the oldest familiar pairing there is.
+ * **No palette, face, size, radius or duration is defined here.** They come from the active
+ * theme, which is generated from a Hera Theme Builder export by `npm run theme:import` (ADR 21) —
+ * see `src/lib/themes/`. What lives here is what is about this application rather than about a
+ * look: the reading column, the rail, the global rules every surface shares — and the two colour
+ * sets no theme export carries yet, the drawing canvas and the syntax hues, defined once here so
+ * no component names a colour of its own.
  *
- * The neutrals are the part of an interface people recognise from across a room, which is why
- * they are specified this precisely, and why the parchment is *saturated*. A pale gold at four
- * percent is not parchment, it is cream, and a cream ground under white cards is somebody
- * else's room however unfamiliar the accents on top of it are. Nothing here is pure white or
- * pure black — see docs/frontend.md, "What we take, and what has to be ours".
+ * The three accents are not interchangeable — each one means something, and using the wrong one
+ * is a bug:
  *
- * The three accents are not interchangeable — each one means something, and using the wrong
- * one is a bug:
- *
- *   brass        her authority  the leading colour: the mark's ring, skills, permission
- *                               cards, the active chat, emphasis
- *   laurel       her attention  thinking, a tool running, the ocellus iris, live state
+ *   brass        her authority  the active chat, emphasis, the action a screen leads with, a
+ *                               switch that is on, question and permission cards
+ *   laurel       her attention  thinking, a tool running, progress, live state, the focus ring
  *   pomegranate  her            the send action, her name — the two places that are her
  *
- * If a colour appears somewhere and you cannot say which of those three sentences it is
- * saying, it does not belong there.
+ * If a colour appears somewhere and you cannot say which of those three sentences it is saying,
+ * it does not belong there. `danger` is for failures and destructive actions, never a question.
  */
 
 @import 'katex/dist/katex.min.css';
-@import '@fontsource-variable/fraunces';
-@import '@fontsource-variable/source-serif-4';
-@import '@fontsource-variable/figtree';
-@import '@fontsource/ibm-plex-mono/400.css';
-@import '@fontsource/ibm-plex-mono/500.css';
+@import './lib/themes/index.css';
 
 :root {
-	--font-display: 'Fraunces Variable', Georgia, serif;
-	--font-body: 'Source Serif 4 Variable', Georgia, serif;
-	--font-ui: 'Figtree Variable', system-ui, sans-serif;
-	--font-mono: 'IBM Plex Mono', ui-monospace, monospace;
-
 	--measure: 68ch;
 	/* The reading column, and the axis everything in a conversation sits on: her prose, a user
 	   bubble, an activity row, a card, the composer. It is `--measure` resolved against the body
-	   face at 17px — measured, not guessed — because a column wider than the measure leaves the
-	   prose ending short of the right edge while everything around it does not, and the whole
-	   message reads as nudged off-centre. Measured in the browser, not guessed: 68ch of Source
-	   Serif 4 at 17px is 611.5px — Georgia, the fallback, is a sixth wider, so a number taken
-	   before the webfont loads is wrong by 100px. */
-	--column: 612px;
+	   face at the prose size — measured in the browser, not computed — because a column wider
+	   than the measure leaves the prose ending short of the right edge while everything around it
+	   does not, and the whole message reads as nudged off-centre. A number taken before the
+	   webfont loads is wrong: the fallback face is wider. Heaven's Newsreader at 17.5px measures
+	   674.1px in Chromium; re-measure when a theme changes the body face or the prose size. */
+	--column: 675px;
 	--rail: 264px;
-	--radius: 10px;
-	--radius-lg: 16px;
 
-	/* Motion. She is ox-eyed: wide, calm, unhurried. Nothing flickers, nothing bounces. */
-	--fade: 120ms;
-	--disclose: 160ms;
-	--ease: cubic-bezier(0.22, 0.61, 0.36, 1);
-}
+	/* A drawing (SVG, a diagram) sits on white whatever the theme is: it was made by a model that
+	   did not know which theme it would be shown in, and white is the one ground every drawing
+	   assumes. */
+	--canvas: #fff;
 
-/* Dark is the default, and the tokens live on :root so a system-dark visitor gets them before
-   any JavaScript has run — a light flash on load is the one thing a warm interface cannot
-   afford. */
-:root,
-[data-theme='dark'] {
-	--ground: #17130a;
-	--surface: #211b10;
-	--surface-raised: #2c2416;
-	--line: #3d3421;
-	--text: #f4eedf;
-	--text-muted: #b0a68d;
-	--text-faint: #7f7660;
-
-	/* Brass leads. It is the most used of the three and the one the interface is remembered by:
-	   the ring of the mark, the active chat, every emphasis, a permission card. */
-	--brass: #d9ae52;
-	/* Live state. Laurel rather than the teal it replaces — the wreath is hers by association,
-	   and a green that reads as *growing* is the right picture for a tool that is running. It
-	   has to look like motion, which is why it is a leaf green and not a sage one. */
-	--laurel: #7fb069;
-	/* Reserved for her: the send action and her name, and nothing else. Crimson, not coral — a
-	   pomegranate is a deep red, and the salmon it replaced sat in the same family as every
-	   other warm mid-red an assistant interface might be wearing. */
-	--pomegranate: #de4e64;
-	/* Kept apart from pomegranate by hue: hers is a rose-crimson, this is a salmon-orange, and
-	   the two never appear next to each other — one is the send button and the active chat, the
-	   other is inline text on a turn that went wrong. */
-	--danger: #e0685e;
-
-	--shadow: 0 12px 32px rgb(0 0 0 / 0.4);
-	color-scheme: dark;
-}
-
-[data-theme='light'] {
-	--ground: #f6eedb;
-	/* Off-white, deliberately. A pure-white card on a tinted ground is the single most copied
-	   arrangement in this category; a card that carries a little of the ground's own hue is
-	   invisible as a colour and unmistakable as a room. */
-	--surface: #fdfaf1;
-	--surface-raised: #efe4cc;
-	--line: #e0d2b4;
-	--text: #201b10;
-	--text-muted: #6b6250;
-	--text-faint: #9a8f79;
-
-	--brass: #8a6a1c;
-	--laurel: #3f6b32;
-	--pomegranate: #a82a45;
-	--danger: #b03a2e;
-
-	/* The shadow is the text colour at low opacity, so a card sits in the same light the type
-	   is drawn in rather than casting a neutral grey nobody else on the page is wearing. */
-	--shadow: 0 12px 32px rgb(32 27 16 / 0.14);
-	color-scheme: light;
+	/* Syntax hues for source views, each mixed with the theme's text colour so it keeps its
+	   contrast in either mode instead of needing a second palette. A theme export does not carry
+	   these yet; when one does, these move into it. */
+	--syntax-keyword: color-mix(in srgb, #c678dd 70%, var(--text));
+	--syntax-string: color-mix(in srgb, #7cb35b 70%, var(--text));
+	--syntax-number: color-mix(in srgb, #d19a66 70%, var(--text));
+	--syntax-title: color-mix(in srgb, #61afef 70%, var(--text));
+	--syntax-attribute: color-mix(in srgb, #e5c07b 65%, var(--text));
+	--syntax-deletion: color-mix(in srgb, #e06c75 70%, var(--text));
 }
 
 *,
@@ -128,7 +67,7 @@ body {
 	background: var(--ground);
 	color: var(--text);
 	font-family: var(--font-ui);
-	font-size: 14px;
+	font-size: var(--ui-size);
 	line-height: 1.45;
 	-webkit-font-smoothing: antialiased;
 }
@@ -150,7 +89,7 @@ button {
 
 /* Keyboard first: a visible focus ring everywhere, never removed. */
 :focus-visible {
-	outline: 2px solid var(--laurel);
+	outline: var(--focus-width) solid var(--laurel);
 	outline-offset: 2px;
 	border-radius: 4px;
 }
@@ -204,7 +143,7 @@ a {
 
 .prose {
 	font-family: var(--font-body);
-	font-size: 17px;
+	font-size: var(--prose-size);
 	line-height: 1.65;
 	max-width: var(--measure);
 	overflow-wrap: anywhere;
@@ -240,11 +179,8 @@ a {
 
 .prose h1 {
 	font-family: var(--font-display);
-	font-variation-settings:
-		'SOFT' 60,
-		'WONK' 0;
 	font-size: 22px;
-	font-weight: 500;
+	font-weight: var(--display-weight);
 }
 
 .prose h2 {
@@ -453,10 +389,7 @@ a {
 
 .display {
 	font-family: var(--font-display);
-	font-variation-settings:
-		'SOFT' 60,
-		'WONK' 0;
-	font-weight: 500;
+	font-weight: var(--display-weight);
 	letter-spacing: -0.01em;
 }
 

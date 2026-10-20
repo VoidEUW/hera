@@ -1,0 +1,12 @@
+[
+	{
+		"id": "heaven",
+		"name": "Heaven",
+		"description": "Light-first. Pale sky and white cloud, sun-gold for authority, a clear blue for anything alive, a dawn rose for her. Airy serif headings, soft blur entrances, a rounded floating composer.",
+		"ground": {
+			"dark": "#0f1824",
+			"light": "#e5edf6"
+		},
+		"default": true
+	}
+]

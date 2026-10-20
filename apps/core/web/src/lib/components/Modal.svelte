@@ -18,10 +18,10 @@
 	 *
 	 * What it does not own: the body. A sheet is its content; the shell only frames it.
 	 */
-	import { expoIn, expoOut } from 'svelte/easing';
+	import { expoIn } from 'svelte/easing';
 	import { fade } from 'svelte/transition';
 	import { t } from '$lib/i18n';
-	import { reveal, still } from '$lib/motion';
+	import { LEAVING, reveal, slot, still } from '$lib/motion';
 
 	interface Props {
 		/** The accessible name of the dialog. Not drawn — the header carries a visible title. */
@@ -89,27 +89,23 @@
 	 * to have a dropdown open across that window is to click the sheet's own close button while
 	 * one is still expanded — at which point the whole sheet is disappearing anyway, so a
 	 * mispositioned invisible catcher for a few frames has nothing left to catch. */
-	const sheetIn = $derived(
+	const gesture = $derived(
 		placement === 'centre'
-			? { scale: 0.96, duration: 490 }
+			? { scale: 0.96, slot: 'modal-enter' }
 			: placement === 'docked'
-				? { y: 18, blur: 3, duration: 280 }
-				: { y: 18, blur: 3, duration: 610 }
-	);
-	const sheetOut = $derived(
-		placement === 'centre'
-			? { scale: 0.96, duration: 290 }
-			: placement === 'docked'
-				? { y: 18, blur: 3, duration: 190 }
-				: { y: 18, blur: 3, duration: 450 }
+				? { y: 18, blur: 3, slot: 'drawer-open' }
+				: { y: 18, blur: 3, slot: 'modal-enter' }
 	);
 
-	/** The scrim is a `svelte/transition` fade rather than a `reveal`, so `motion.ts` does not
-	 *  reach it, and it is the longest motion on the screen: a centred sheet's scrim runs for
-	 *  `sheetIn.duration`, which is 490 ms. With motion off it gets no duration at all, for the
-	 *  reason `reveal` and `disclose` give. */
-	const scrimIn = $derived({ duration: still() ? 0 : sheetIn.duration, easing: expoOut });
-	const scrimOut = $derived({ duration: still() ? 0 : sheetOut.duration, easing: expoIn });
+	/** The scrim is a `svelte/transition` fade rather than a `reveal`, so `reveal` does not reach
+	 *  it; it runs on the sheet's own slot so the two arrive and leave together. With motion off it
+	 *  gets no duration at all, for the reason `reveal` and `disclose` give. */
+	const motion = $derived(slot(gesture.slot));
+	const scrimIn = $derived({ duration: still() ? 0 : motion.duration, easing: motion.easing });
+	const scrimOut = $derived({
+		duration: still() ? 0 : motion.duration * LEAVING,
+		easing: expoIn
+	});
 
 	/** Where focus was when the sheet opened — the trigger that opened it, usually. Returned
 	 * on close, because a control that takes focus away and keeps it is a control that has
@@ -247,8 +243,8 @@
 	aria-modal="true"
 	aria-label={label}
 	tabindex="-1"
-	in:reveal={sheetIn}
-	out:reveal={sheetOut}
+	in:reveal={gesture}
+	out:reveal={gesture}
 >
 	{#if title || caption}
 		<header>
@@ -281,7 +277,7 @@
 	.scrim {
 		position: fixed;
 		inset: 0;
-		background: rgb(0 0 0 / 0.45);
+		background: var(--scrim);
 		z-index: 10;
 	}
 

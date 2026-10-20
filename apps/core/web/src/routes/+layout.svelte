@@ -197,7 +197,7 @@
 	.scrim {
 		position: fixed;
 		inset: 0;
-		background: rgb(0 0 0 / 0.45);
+		background: var(--scrim);
 		border: 0;
 		animation: fade var(--fade) var(--ease);
 		z-index: 10;

@@ -57,7 +57,7 @@
 	}
 
 	.alive {
-		animation: breathe 4s var(--ease) infinite;
+		animation: breathe var(--motion-tool-running) infinite;
 	}
 
 	@keyframes breathe {

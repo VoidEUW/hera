@@ -81,11 +81,11 @@ function library(): Promise<typeof import('mermaid').default> {
 				// own error graphic into the page, which would put *mermaid's* idea of a failure on
 				// screen instead of the source view that lets a person see what went wrong.
 				suppressErrorRendering: true,
-				// The interface's own UI face (`--font-ui` in `app.css`), spelled out rather than
-				// read from the custom property: mermaid measures label widths against this font
-				// while laying the diagram out, and a `var()` that fails to resolve in the element
-				// it measures in comes out as text overflowing its boxes.
-				fontFamily: "'Figtree Variable', system-ui, sans-serif",
+				// The theme's interface face, resolved to its concrete stack here rather than
+				// passed as `var(--font-ui)`: mermaid measures label widths against this font while
+				// laying the diagram out, and a `var()` that fails to resolve in the element it
+				// measures in comes out as text overflowing its boxes.
+				fontFamily: interfaceFace(),
 				// A drawing sits on white whatever the theme is (`ArtifactView`), so the renderer is
 				// never told about dark mode and never has to be re-run when the theme changes.
 				theme: 'default',
@@ -104,6 +104,13 @@ function library(): Promise<typeof import('mermaid').default> {
 			throw cause;
 		});
 	return engine;
+}
+
+/** The active theme's interface face as a concrete font stack, read off the root element where
+ * the theme declares it (ADR 21). The fallback is only for a document with no theme loaded. */
+function interfaceFace(): string {
+	const face = getComputedStyle(document.documentElement).getPropertyValue('--font-ui').trim();
+	return face || 'system-ui, sans-serif';
 }
 
 /** Never repeats, so two diagrams on screen cannot collide.

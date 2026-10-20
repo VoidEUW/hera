@@ -102,7 +102,7 @@
 	.slider:focus-visible::-webkit-slider-thumb {
 		box-shadow:
 			0 0 0 1px var(--brass),
-			0 0 0 4px rgb(217 174 82 / 0.25);
+			0 0 0 4px var(--brass-soft);
 	}
 
 	/* Firefox: `-moz-range-progress` is a real pseudo-element here, so the fill needs no gradient
@@ -140,6 +140,6 @@
 	.slider:focus-visible::-moz-range-thumb {
 		box-shadow:
 			0 0 0 1px var(--brass),
-			0 0 0 4px rgb(217 174 82 / 0.25);
+			0 0 0 4px var(--brass-soft);
 	}
 </style>

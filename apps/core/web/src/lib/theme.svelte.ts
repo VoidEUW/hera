@@ -7,20 +7,21 @@
  * a light flash on load is the one thing a warm interface cannot afford.
  */
 
+import registry from '$lib/themes/registry.json';
+
 export type Appearance = 'system' | 'light' | 'dark';
 
 const KEY = 'hera:appearance';
 
-/** The ground colour of each resolved appearance, in one place with `app.css`'s `--ground`
- * rather than read back out of a stylesheet — a PWA's chrome (status bar, task switcher) wants
- * this before the page has necessarily painted anything to compute it from. */
-const GROUND: Record<'light' | 'dark', string> = {
-	light: '#F6EEDB',
-	dark: '#17130A'
-};
+/** Every imported theme (ADR 21), and the one a fresh browser gets. */
+export const THEMES = registry;
+const DEFAULT = THEMES.find((entry) => entry.default) ?? THEMES[0];
 
 class Theme {
 	appearance = $state<Appearance>('system');
+	/** Which imported theme is on screen. Only the default exists today, so nothing sets it yet;
+	 * it is written to `data-palette` all the same, so a second theme is a picker away. */
+	palette = $state(DEFAULT.id);
 
 	/** What is actually on screen, after `system` has been resolved. */
 	resolved = $derived(this.appearance === 'system' ? systemPreference() : this.appearance);
@@ -43,12 +44,17 @@ class Theme {
 	}
 
 	apply() {
-		document.documentElement.dataset.theme = this.resolved;
+		const root = document.documentElement;
+		root.dataset.theme = this.resolved;
+		root.dataset.palette = this.palette;
 		// The installed app's chrome follows the same resolution the page does, instead of
-		// staying pinned to the dark value `app.html` ships as its pre-hydration default.
+		// staying pinned to the dark value `app.html` ships as its pre-hydration default. The
+		// ground comes from the registry rather than a stylesheet because a PWA's chrome wants
+		// it before the page has necessarily painted anything to compute it from.
+		const ground = (THEMES.find((entry) => entry.id === this.palette) ?? DEFAULT).ground;
 		document
 			.querySelector('meta[name="theme-color"]')
-			?.setAttribute('content', GROUND[this.resolved]);
+			?.setAttribute('content', ground[this.resolved]);
 	}
 }
 

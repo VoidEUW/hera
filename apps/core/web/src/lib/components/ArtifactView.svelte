@@ -246,7 +246,7 @@
 	.frame {
 		display: block;
 		width: 100%;
-		background: #fff;
+		background: var(--canvas);
 		border: 1px solid var(--line);
 		border-radius: var(--radius);
 	}
@@ -284,7 +284,7 @@
 		   svg's default 300px and sat at the left of a box it did not fill. */
 		grid-template-columns: minmax(0, 1fr);
 		padding: 12px;
-		background: #fff;
+		background: var(--canvas);
 		border: 1px solid var(--line);
 	}
 
@@ -347,8 +347,8 @@
 		flex: 1 0 auto;
 	}
 
-	/* Token colours are mixed with the page's own text colour, so they keep their contrast on
-	   whichever theme is up instead of needing a second palette. Every source view shares them,
+	/* Token colours are the `--syntax-*` tokens in `app.css`, mixed with the page's own text
+	   colour so they keep their contrast on whichever theme is up. Every source view shares them,
 	   which is what `$lib/highlight` being reusable is for. */
 	.source :global(.hljs-comment),
 	.source :global(.hljs-quote) {
@@ -360,20 +360,20 @@
 	.source :global(.hljs-selector-tag),
 	.source :global(.hljs-literal),
 	.source :global(.hljs-doctag) {
-		color: color-mix(in srgb, #c678dd 70%, var(--text));
+		color: var(--syntax-keyword);
 	}
 
 	.source :global(.hljs-string),
 	.source :global(.hljs-regexp),
 	.source :global(.hljs-addition) {
-		color: color-mix(in srgb, #7cb35b 70%, var(--text));
+		color: var(--syntax-string);
 	}
 
 	.source :global(.hljs-number),
 	.source :global(.hljs-symbol),
 	.source :global(.hljs-bullet),
 	.source :global(.hljs-meta) {
-		color: color-mix(in srgb, #d19a66 70%, var(--text));
+		color: var(--syntax-number);
 	}
 
 	.source :global(.hljs-title),
@@ -382,7 +382,7 @@
 	.source :global(.hljs-name),
 	.source :global(.hljs-selector-class),
 	.source :global(.hljs-selector-id) {
-		color: color-mix(in srgb, #61afef 70%, var(--text));
+		color: var(--syntax-title);
 	}
 
 	.source :global(.hljs-attr),
@@ -391,11 +391,11 @@
 	.source :global(.hljs-built_in),
 	.source :global(.hljs-type),
 	.source :global(.hljs-property) {
-		color: color-mix(in srgb, #e5c07b 65%, var(--text));
+		color: var(--syntax-attribute);
 	}
 
 	.source :global(.hljs-deletion) {
-		color: color-mix(in srgb, #e06c75 70%, var(--text));
+		color: var(--syntax-deletion);
 	}
 
 	.source :global(.hljs-emphasis) {
