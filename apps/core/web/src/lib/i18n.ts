@@ -68,6 +68,7 @@ export const t = {
 		account: (name: string) => `${name} — Settings`,
 		accountLabel: 'Account',
 		collapse: 'Collapse the sidebar',
+		resize: 'Resize the sidebar',
 		expand: 'Expand the sidebar',
 		openMenu: 'Open menu',
 		closeMenu: 'Close menu',
@@ -184,7 +185,10 @@ export const t = {
 		// Not "Send": the composer's button already says that, and this one does something
 		// else -- it replaces a question that was already asked.
 		saveAndSend: 'Ask again',
-		editNote: 'Her answer to the old wording goes.'
+		editNote: 'Her answer to the old wording goes.',
+		/** The speaker labels over a message: yours, and hers by name. */
+		you: 'You',
+		thinking: 'Thinking'
 	},
 
 	turn: {
@@ -621,6 +625,35 @@ export const t = {
 		command: 'uv run hera serve',
 		commandHint: 'The usual way to start Hera, from the project directory.',
 		detail: 'What the browser said'
+	},
+
+	/** `+error.svelte`: an address that leads nowhere, and a screen that could not be drawn. */
+	notFound: {
+		title: 'Nothing here',
+		body: 'This address does not lead to a chat, a project or a screen in Hera. It may have been deleted, or the link was mistyped.',
+		home: 'Back to the start'
+	},
+
+	broken: {
+		title: 'Something went wrong',
+		body: 'Hera could not draw this screen. Reloading usually helps; if it does not, the detail below is what to report.',
+		reload: 'Reload',
+		home: 'Back to the start',
+		detail: 'What went wrong'
+	},
+
+	/** The primitives in `lib/components/ui/`: words that belong to a control, not to a screen. */
+	ui: {
+		close: 'Close',
+		dismiss: 'Dismiss',
+		loading: 'Loading',
+		notResponding: 'Not responding',
+		wait: 'Wait',
+		retry: 'Try again',
+		characters: 'characters',
+		open: 'Open',
+		closeSection: 'Collapse',
+		openSection: 'Expand'
 	}
 } as const;
 

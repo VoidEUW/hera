@@ -16,8 +16,9 @@
 	 * one that was never installed, and "why is my skill not being used" is what this screen is
 	 * for.
 	 */
+	import Icon from '$lib/components/ui/Icon.svelte';
 	import { api, type BrokenSkill, type Skill } from '$lib/api/client';
-	import Checkbox from '$lib/components/Checkbox.svelte';
+	import Checkbox from '$lib/components/ui/Checkbox.svelte';
 	import SkillEditor from './SkillEditor.svelte';
 	import { t } from '$lib/i18n';
 	import { Placeholder } from '$lib/loading.svelte';
@@ -129,7 +130,7 @@
 					<h3>{skill.id}</h3>
 					{#if skill.trust !== 'unknown'}
 						<span class="trust" data-trust={skill.trust} title={skill.digest}>
-							<span aria-hidden="true">{skill.trust === 'verified' ? '✓' : '⚠'}</span>
+							<Icon name={skill.trust === 'verified' ? 'check' : 'alert'} />
 							{skill.trust === 'verified' ? t.settings.verified : t.settings.modified}
 						</span>
 					{/if}
@@ -189,7 +190,7 @@
 	{/if}
 
 	<button class="add" type="button" onclick={() => (editing = null)}>
-		<span aria-hidden="true">＋</span>
+		<Icon name="plus" />
 		{t.settings.addSkill}
 	</button>
 

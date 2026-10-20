@@ -34,6 +34,7 @@ import argparse
 import asyncio
 import json
 import os
+import re
 import socket
 import tempfile
 import threading
@@ -464,9 +465,9 @@ def act_rail(page: Page, base: str, shots: Path, report: Report) -> None:
     """The rail's own states, which the conversation scenes never show."""
     with report.scene("rail-row-menu", "rail", page, shots):
         page.goto(base, wait_until="networkidle")
-        page.wait_for_selector("nav.rail li.item", timeout=15_000)
+        page.wait_for_selector('nav[aria-label="Hera"] a[href^="/chat/"]', timeout=15_000)
         shoot(page, shots, "15-rail")
-        page.locator("nav.rail button.more").first.click(timeout=5_000)
+        page.get_by_role("button", name="Chat options").first.click(timeout=5_000)
         page.wait_for_timeout(300)
         shoot(page, shots, "16-rail-menu")
         page.keyboard.press("Escape")
@@ -477,6 +478,25 @@ def act_rail(page: Page, base: str, shots: Path, report: Report) -> None:
         page.get_by_role("button", name="New chat", exact=True).first.click(timeout=5_000)
         page.wait_for_timeout(400)
         shoot(page, shots, "17-new-chat-is-the-start-screen")
+
+    with report.scene("rail-folded", "rail", page, shots):
+        # Folded to one icon column, with the label of the row under the pointer as a tooltip --
+        # and unfolded again, so every later scene sees the rail it expects.
+        page.get_by_role("button", name="Collapse the sidebar").click(timeout=5_000)
+        page.wait_for_timeout(500)
+        page.locator('nav[aria-label="Hera"] a[href^="/chat/"]').first.hover()
+        page.wait_for_timeout(1500)
+        shoot(page, shots, "18-rail-folded")
+        page.get_by_role("button", name="Expand the sidebar").click(timeout=5_000)
+        page.wait_for_timeout(400)
+
+    with report.scene("not-found", "rail", page, shots):
+        # An address that leads nowhere: the router's error page, inside the shell.
+        page.goto(f"{base}/no-such-screen", wait_until="networkidle")
+        page.get_by_role("heading", name="Nothing here").wait_for(timeout=10_000)
+        page.wait_for_timeout(500)
+        shoot(page, shots, "19-not-found")
+        page.goto(base, wait_until="networkidle")
 
 
 def act_composer(page: Page, base: str, shots: Path, report: Report) -> None:
@@ -494,7 +514,7 @@ def act_composer(page: Page, base: str, shots: Path, report: Report) -> None:
         page.keyboard.press("Escape")
 
     with report.scene("composer-servers-sheet", "composer", page, shots):
-        page.locator("button.context.servers").first.click(timeout=5_000)
+        page.get_by_role("button", name=re.compile(r"^\d+ servers?$")).first.click(timeout=5_000)
         page.wait_for_selector("[role='dialog']", timeout=5_000)
         page.wait_for_timeout(500)
         shoot(page, shots, "21-servers-sheet")
@@ -502,7 +522,8 @@ def act_composer(page: Page, base: str, shots: Path, report: Report) -> None:
         page.wait_for_timeout(400)
 
     with report.scene("composer-skills-sheet", "composer", page, shots):
-        page.locator("button.context.skills").first.click(timeout=5_000)
+        skills = page.get_by_role("button", name=re.compile(r"^(Choose skills|\d+ skills?)$"))
+        skills.first.click(timeout=5_000)
         page.wait_for_selector("[role='dialog']", timeout=5_000)
         page.wait_for_timeout(500)
         shoot(page, shots, "22-skills-sheet")
@@ -558,7 +579,7 @@ def act_settings(page: Page, base: str, shots: Path, report: Report) -> None:
         settled(page)
         shoot(page, shots, "30-settings-account")
 
-    nav = page.locator("[role='dialog'] nav.tabs")
+    nav = page.get_by_role("navigation", name="Settings")
     for index, tab in enumerate(SETTINGS_TABS[1:], start=1):
         with report.scene(f"settings-{tab.lower()}", "settings", page, shots):
             # Not `exact`: **Dreaming** is labelled with a `v0.3` badge beside it, so its accessible
@@ -590,7 +611,7 @@ def act_profile(page: Page, base: str, shots: Path, report: Report) -> None:
     """
     with report.scene("profile-menu", "theme", page, shots):
         page.goto(base, wait_until="networkidle")
-        page.locator("nav.rail button.card").first.click(timeout=5_000)
+        page.get_by_role("button", name=re.compile(r"— Settings$")).first.click(timeout=5_000)
         page.wait_for_selector("[role='dialog']", timeout=10_000)
         page.get_by_role("button", name="General", exact=True).click(timeout=5_000)
         page.wait_for_timeout(500)
@@ -601,7 +622,7 @@ def act_profile(page: Page, base: str, shots: Path, report: Report) -> None:
         # indistinguishable from a screenshot of the dark one if the run happened to start light,
         # and that is precisely the run where the scene would be quietly worthless.
         assert page.evaluate("() => document.documentElement.dataset.theme") == "dark"
-        page.get_by_role("button", name="Light", exact=True).first.click(timeout=5_000)
+        page.get_by_role("radio", name="Light", exact=True).first.click(timeout=5_000)
         page.wait_for_timeout(700)
         assert page.evaluate("() => document.documentElement.dataset.theme") == "light"
         page.keyboard.press("Escape")
@@ -609,10 +630,10 @@ def act_profile(page: Page, base: str, shots: Path, report: Report) -> None:
         shoot(page, shots, "41-light-start")
 
     with report.scene("back-to-dark", "theme", page, shots):
-        page.locator("nav.rail button.card").first.click(timeout=5_000)
+        page.get_by_role("button", name=re.compile(r"— Settings$")).first.click(timeout=5_000)
         page.wait_for_selector("[role='dialog']", timeout=10_000)
         page.get_by_role("button", name="General", exact=True).click(timeout=5_000)
-        page.get_by_role("button", name="Dark", exact=True).first.click(timeout=5_000)
+        page.get_by_role("radio", name="Dark", exact=True).first.click(timeout=5_000)
         page.wait_for_timeout(500)
         page.keyboard.press("Escape")
         page.wait_for_timeout(400)
@@ -620,6 +641,35 @@ def act_profile(page: Page, base: str, shots: Path, report: Report) -> None:
         # screenshot that merely *looks* dark proves nothing about whether it stayed dark.
         assert page.evaluate("() => document.documentElement.dataset.theme") == "dark"
         shoot(page, shots, "42-back-to-dark")
+
+
+def act_design(page: Page, base: str, shots: Path, report: Report) -> None:
+    """Every primitive at once, in both modes (`/design`, #182).
+
+    The gallery is what a theme change is reviewed against: a token that moved shows on every
+    control here, rather than on whichever screen the other scenes happen to visit. Full-page,
+    because the point is the whole set.
+    """
+    viewport = page.viewport_size or {"width": 1920, "height": 1080}
+    with report.scene("design-dark", "design", page, shots):
+        page.goto(f"{base}/design", wait_until="networkidle")
+        page.get_by_role("radio", name="Dark", exact=True).click(timeout=5_000)
+        page.wait_for_timeout(500)
+        assert page.evaluate("() => document.documentElement.dataset.theme") == "dark"
+        # The gallery scrolls inside the shell, and an element screenshot is only its visible
+        # box -- so the window is made as tall as the gallery for the two frames.
+        tall = page.evaluate("() => document.querySelector('main.gallery').scrollHeight")
+        page.set_viewport_size({"width": viewport["width"], "height": int(tall) + 40})
+        page.wait_for_timeout(300)
+        page.locator("main.gallery").screenshot(path=shots / "60-design-dark.png")
+
+    with report.scene("design-light", "design", page, shots):
+        page.get_by_role("radio", name="Light", exact=True).click(timeout=5_000)
+        page.wait_for_timeout(500)
+        assert page.evaluate("() => document.documentElement.dataset.theme") == "light"
+        page.locator("main.gallery").screenshot(path=shots / "61-design-light.png")
+        page.get_by_role("radio", name="Dark", exact=True).click(timeout=5_000)
+        page.set_viewport_size(viewport)
 
 
 def act_reduced_motion(page: Page, base: str, shots: Path, report: Report) -> None:
@@ -750,7 +800,7 @@ def main() -> int:
             # tuple anyway because it needs the chat the first scene made.
             chat_url = act_conversation(page, base, shots, report)
             act_question(page, chat_url, shots, report)
-            for act in (act_rail, act_composer, act_settings, act_profile):
+            for act in (act_rail, act_composer, act_settings, act_profile, act_design):
                 act(page, base, shots, report)
             desktop.close()
             filmed |= name_recording(videos, filmed, "desktop")

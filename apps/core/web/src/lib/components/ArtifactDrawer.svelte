@@ -16,23 +16,20 @@
 	 * scrolled away. Without it, `artifact_edit` in turn nine leaves you scrolling back to turn
 	 * four to find the card that opens the file it just changed.
 	 */
-	import { cubicOut } from 'svelte/easing';
 	import { api } from '$lib/api/client';
 	import { headingOf, newest } from '$lib/artifacts';
 	import { t } from '$lib/i18n';
+	import { slot, still } from '$lib/motion';
 	import { artifacts } from '$lib/stores/artifacts.svelte';
 	import ArtifactView from './ArtifactView.svelte';
-	import Paper from './Paper.svelte';
+	import CloseButton from './ui/CloseButton.svelte';
+	import Icon from './ui/Icon.svelte';
 
 	interface Props {
 		chatId: string;
 	}
 
 	let { chatId }: Props = $props();
-
-	/** How long the panel takes to make room for itself. Longer than `--fade`, because this is
-	 * a change to the shape of the screen rather than to the look of one thing on it. */
-	const REVEAL = 240;
 
 	/** How long it waits first, when it is opening. Just past `--fade`, so on a reload the
 	 * conversation has finished arriving before the panel starts taking width from it — two
@@ -55,16 +52,18 @@
 	 * the global `prefers-reduced-motion` rule in `app.css` cannot do for a transition that
 	 * lives in JavaScript. */
 	function reveal(node: HTMLElement, { delay = 0 } = {}) {
-		const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
-		if (still) return { duration: 0, css: () => '' };
+		if (still()) return { duration: 0, css: () => '' };
+		// The theme's `drawer.open` slot: longer than `--fade`, because this is a change to the
+		// shape of the screen rather than to the look of one thing on it.
+		const { duration, easing } = slot('drawer-open');
 		if (matchMedia('(max-width: 780px)').matches) {
-			return { delay, duration: REVEAL, easing: cubicOut, css: (t: number) => `opacity: ${t}` };
+			return { delay, duration, easing, css: (t: number) => `opacity: ${t}` };
 		}
 		const width = node.getBoundingClientRect().width;
 		return {
 			delay,
-			duration: REVEAL,
-			easing: cubicOut,
+			duration,
+			easing,
 			// `overflow: hidden` for the length of it: the body is laid out for the full width
 			// and reflowing it three times a frame on the way in is a different animation.
 			css: (t: number) => `width: ${t * width}px; opacity: ${t}; overflow: hidden`
@@ -110,12 +109,9 @@
 
 <aside class="drawer" in:reveal={{ delay: AFTER }} out:reveal aria-label={t.artifact.panel}>
 	<header class="top">
-		<span class="mark" aria-hidden="true"><Paper size={14} /></span>
+		<span class="mark"><Icon name="file" /></span>
 		<h2 class="title">{chosen ? headingOf(chosen) : t.artifact.panel}</h2>
-		<button class="close" type="button" onclick={() => artifacts.close()}>
-			<span class="sr-only">{t.artifact.close}</span>
-			<span class="glyph" aria-hidden="true"></span>
-		</button>
+		<CloseButton label={t.artifact.close} onclick={() => artifacts.close()} />
 	</header>
 
 	<div class="body">
@@ -132,22 +128,28 @@
 </aside>
 
 <style>
+	/* The side view (the theme's `hera/side-view`): a filled `--surface` panel, floating on the
+	   ground like the sidebar on the other edge, so the two sides of the screen are one family. */
 	.drawer {
 		display: flex;
 		flex-direction: column;
 		width: min(46vw, 720px);
 		flex: none;
-		border-left: 1px solid var(--line);
-		background: var(--ground);
+		margin: calc(var(--space) * 2);
+		border-radius: var(--radius-lg);
+		background: var(--surface);
+		box-shadow: var(--shadow-sm);
+		overflow: hidden;
 	}
 
+	/* No rule under the header (the theme's `drw.header: none`): the title, the tools and the
+	   body read as one panel. */
 	.top {
 		display: flex;
 		align-items: center;
 		gap: 8px;
 		flex: none;
-		padding: 12px 14px;
-		border-bottom: 1px solid var(--line);
+		padding: calc(var(--space) * 3) calc(var(--space) * 3.5);
 	}
 
 	/* Beside the transcript at 46vw of a phone width is not a panel, it is the whole screen with
@@ -155,12 +157,14 @@
 	   goes full-bleed instead. Still no scrim: `artifacts.close()` above is already the way out,
 	   and a full-bleed sheet leaves nothing peeking out from behind it for a scrim to dim. */
 	@media (max-width: 780px) {
+		/* Full-bleed on a phone: no edge to float off. */
 		.drawer {
 			position: fixed;
 			inset: 0;
 			width: 100%;
+			margin: 0;
+			border-radius: 0;
 			z-index: 12;
-			border-left: 0;
 		}
 
 		.top {
@@ -170,6 +174,7 @@
 
 	.mark {
 		display: flex;
+		color: var(--brass);
 	}
 
 	/* The gap belongs after the title, not before the first control. `:first-of-type` counts per
@@ -183,74 +188,6 @@
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
-	}
-
-	/* The same close control the modal shell carries (#99): a hairline circle with a 32px hit
-	   area, drawn here rather than imported because a drawer is not a modal and the shell's
-	   scrim and focus handling would be wrong in it. */
-	.close {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		flex: none;
-		width: 32px;
-		height: 32px;
-		padding: 0;
-		background: none;
-		border: 1px solid var(--line);
-		border-radius: 50%;
-		color: var(--text-muted);
-		transition:
-			border-color var(--fade) var(--ease),
-			color var(--fade) var(--ease);
-	}
-
-	.close:hover,
-	.close:focus-visible {
-		border-color: var(--brass);
-		color: var(--brass);
-	}
-
-	.close:active {
-		transform: scale(0.95);
-	}
-
-	.glyph {
-		position: relative;
-		width: 10px;
-		height: 10px;
-	}
-
-	.glyph::before,
-	.glyph::after {
-		content: '';
-		position: absolute;
-		top: 50%;
-		left: 50%;
-		width: 12px;
-		height: 1.5px;
-		background: currentcolor;
-		border-radius: 1px;
-	}
-
-	.glyph::before {
-		transform: translate(-50%, -50%) rotate(45deg);
-	}
-
-	.glyph::after {
-		transform: translate(-50%, -50%) rotate(-45deg);
-	}
-
-	.sr-only {
-		position: absolute;
-		width: 1px;
-		height: 1px;
-		padding: 0;
-		margin: -1px;
-		overflow: hidden;
-		clip-path: inset(50%);
-		white-space: nowrap;
-		border: 0;
 	}
 
 	/* The body owns the height it is given, so an HTML artifact's frame fills the panel rather

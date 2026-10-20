@@ -31,11 +31,14 @@
 	 * `/commands` are left in the text on purpose: the router strips them server-side, and a
 	 * browser that also stripped them would be a second implementation of the same rule.
 	 */
+	import Chip from './ui/Chip.svelte';
+	import SendButton from './ui/SendButton.svelte';
+	import Icon from '$lib/components/ui/Icon.svelte';
 	import type { Profile, Provider, Server } from '$lib/api/client';
 	import { isImage, read, size, type Attachment } from '$lib/attachments';
 	import { t } from '$lib/i18n';
 	import { providerFallbackIcon, providerIcon } from '$lib/providers';
-	import Select from './Select.svelte';
+	import Select from '$lib/components/ui/Select.svelte';
 	import ServerSheet from './ServerSheet.svelte';
 	import type { Tab as SettingsTab } from './Settings.svelte';
 	import SkillPicker from './SkillPicker.svelte';
@@ -305,7 +308,7 @@
 					<span class="size">{size(file.bytes)}</span>
 					<button type="button" onclick={() => drop(index)}>
 						<span class="sr-only">{t.attach.remove}</span>
-						<span aria-hidden="true">✕</span>
+						<Icon name="x" />
 					</button>
 				</li>
 			{/each}
@@ -363,7 +366,7 @@
 	<div class="bar">
 		<button class="attach" type="button" title={t.attach.add} onclick={() => picker?.click()}>
 			<span class="sr-only">{t.attach.add}</span>
-			<span aria-hidden="true">＋</span>
+			<Icon name="plus" />
 		</button>
 		<input bind:this={picker} class="sr-only" type="file" multiple tabindex="-1" onchange={pick} />
 
@@ -371,26 +374,18 @@
 		     opens the read-only sheet. They sit side by side because the two "switched on"
 		     facts they report are about the same next message, not about the same thing. -->
 		{#if onskills}
-			<button
-				class="context skills"
-				type="button"
+			<Chip
+				on={pinned.length > 0}
 				title={skillsDetail || t.skills.pick}
 				onclick={() => (picking = true)}
 			>
-				<span class="dot" class:idle={!pinned.length} aria-hidden="true"></span>
 				{skillsLabel}
-			</button>
+			</Chip>
 		{/if}
 
-		<button
-			class="context servers"
-			type="button"
-			title={t.servers.title}
-			onclick={() => (showingServers = true)}
-		>
-			<span class="dot" class:idle={!connected.length} aria-hidden="true"></span>
+		<Chip on={connected.length > 0} title={t.servers.title} onclick={() => (showingServers = true)}>
 			{serversLabel}
-		</button>
+		</Chip>
 
 		{#if profiles.length > 1}
 			<div class="profile">
@@ -431,17 +426,14 @@
 					/>
 				</div>
 			{:else if shape === 'toggle'}
-				<button
-					class="context thinking"
-					class:on={thinkingOn}
-					type="button"
-					aria-pressed={thinkingOn}
+				<Chip
+					on={thinkingOn}
+					pressed={thinkingOn}
 					title={thinkingOn ? t.composer.thinkingOn : t.composer.thinkingOff}
 					onclick={() => setThinking(!thinkingOn)}
 				>
-					<span class="dot" class:idle={!thinkingOn} aria-hidden="true"></span>
 					{thinkingOn ? t.composer.thinking : t.composer.thinkingOff}
-				</button>
+				</Chip>
 			{:else if shape === 'budget'}
 				<!-- A number, not a level. `inputmode=numeric` so a phone opens the keypad rather
 				     than the keyboard, and the value is only sent on change rather than on every
@@ -479,28 +471,28 @@
 			</button>
 		{/if}
 
-		{#if busy}
-			<button class="send stop" type="button" onclick={() => onstop?.()}>{t.composer.stop}</button>
-		{:else}
-			<button class="send" type="button" disabled={!sendable || blocked} onclick={submit}>
-				<span class="sr-only">{t.composer.send}</span>
-				<span aria-hidden="true">↑</span>
-			</button>
-		{/if}
+		<SendButton {busy} disabled={!sendable || blocked} onsend={submit} onstop={() => onstop?.()} />
 	</div>
 </div>
 
 <style>
+	/* The soft composer: a filled rounded box, and on focus a laurel border with a soft laurel
+	   ring around it (`composer.focus`) — typing to her is giving her your attention, and focus is
+	   laurel everywhere. */
 	.composer {
 		background: var(--surface);
-		border: 1px solid var(--line);
+		border: var(--border-width) solid var(--line);
 		border-radius: var(--radius-lg);
-		padding: 12px 14px 10px;
-		transition: border-color var(--fade) var(--ease);
+		padding: calc(var(--space) * 3) calc(var(--space) * 3.5) calc(var(--space) * 2.5);
+		box-shadow: 0 0 0 0 transparent;
+		transition:
+			border-color var(--motion-composer-focus),
+			box-shadow var(--motion-composer-focus);
 	}
 
 	.composer:focus-within {
-		border-color: var(--text-faint);
+		border-color: var(--laurel);
+		box-shadow: 0 0 0 3px var(--laurel-soft);
 	}
 
 	.attached {
@@ -701,10 +693,6 @@
 		background: var(--laurel);
 	}
 
-	.dot.idle {
-		background: var(--text-faint);
-	}
-
 	/* Both dropdowns are `Select`, which owns the pill and the popup. They used to be a native
 	   `<select>` with `appearance: none` and a chevron drawn on this element — which gave back
 	   the frame and left the *list* the platform's, so opening one dropped the operating
@@ -761,44 +749,9 @@
 		opacity: 0;
 	}
 
-	.send {
-		display: grid;
-		place-items: center;
-		width: 30px;
-		height: 30px;
-		border-radius: 50%;
-		background: var(--pomegranate);
-		color: var(--ground);
-		font-size: 15px;
-		transition: opacity var(--fade) var(--ease);
-	}
-
-	.send:disabled {
-		opacity: 0.35;
-		cursor: default;
-	}
-
-	.stop {
-		width: auto;
-		padding: 0 12px;
-		border-radius: var(--radius);
-		font-size: 13px;
-	}
-
 	@media (max-width: 640px) {
 		.hint {
 			display: none;
-		}
-
-		/* The thinking switch and the budget, wearing the same pill as the skills and servers dots
-	   beside it, because it is the same kind of fact: something switched on for the next thing
-	   you type. Laurel for on, faint for off, and no colour of its own — the dot already says it. */
-		.context.thinking {
-			flex: none;
-		}
-
-		.context.thinking.on {
-			color: var(--text-muted);
 		}
 
 		/* The budget is a number inside the pill, so the input has to give up the pill's own

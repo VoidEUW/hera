@@ -55,7 +55,7 @@ def test_an_unreachable_server_is_not_an_empty_account(server: str, page: Any) -
     # Not one word about there being nothing here, and no chrome to click that cannot work.
     assert page.get_by_text("No chats yet.").count() == 0
     assert page.get_by_text("No projects yet.").count() == 0
-    assert page.locator("nav.rail").count() == 0
+    assert page.get_by_role("navigation", name="Hera").count() == 0
 
     # What actually happened is on the screen, under the thing to do about it.
     assert page.get_by_role("button", name="Try again").count() == 1
@@ -71,5 +71,5 @@ def test_try_again_brings_the_application_back(server: str, page: Any) -> None:
     page.get_by_role("button", name="Try again").click()
 
     # The rail, which means the load answered -- and no reload was needed to get here.
-    page.wait_for_selector("nav.rail", timeout=15_000)
+    page.get_by_role("navigation", name="Hera").wait_for(timeout=15_000)
     assert page.get_by_text("Hera is not answering").count() == 0

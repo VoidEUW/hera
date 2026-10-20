@@ -138,122 +138,63 @@ It has to work at three sizes, and each has a job:
 | Size | Where | What it does |
 |---|---|---|
 | 20–28 px | The mark, next to the wordmark on the start screen | Identity |
-| 16 px | Her thinking indicator | Motion: she is looking |
-| 8 px | The gutter beside every tool call, skill and permission event | The hundred eyes |
+| 16–22 px | Her thinking indicator | Motion: she is looking |
 
-The third is the important one. A turn with six tool calls draws six eyes down its left gutter,
-joined by a hairline. Activity becomes a **column of eyes** that you read at a glance — how much
-she did, and where. Nothing else in the interface may use concentric circles.
+The activity gutter used to be the third size — an 8 px eye beside every event, the hundred eyes
+of Argus. Since [ADR 21](adr/0021-a-theme-is-imported-data.md) a gutter row is a small dot in the
+row's state colour beside a mono-capital verb: what a reader needs from the column is *what state
+each row is in*, and the verb already says what kind of thing happened. Nothing else in the
+interface may use concentric circles.
 
 ## Colour
 
-**Parchment and laurel — gold leads.** She is a goddess and the interface should be able to say
-so, so the ground itself is gold: aged vellum by day, a gold-brown black by night. The green
-beside it is what keeps that from being gaudy — laurel is the thing that grows, and warm gold
-against a living green is the oldest familiar pairing there is. Natural, domestic, and not
-borrowed from anybody.
-
-Nothing here is pure white or pure black, and the parchment is deliberately *saturated*: a pale
-gold at four percent is not parchment, it is cream.
+**The values are not here.** A theme is imported from a Hera Theme Builder export
+([ADR 21](adr/0021-a-theme-is-imported-data.md)); the exports live in [`themes/`](themes/), and
+the shipped one is [Heaven](themes/hera-theme-heaven.md) — pale sky and cloud, sun-gold, a clear
+blue for anything alive, a dawn rose for her. What stays here is what every theme has to honour.
 
 The three accents are not interchangeable — each one means something, and using the wrong one is
 a bug:
 
 | Token | Means | Used for |
 |---|---|---|
-| `brass` | **her authority** | The leading colour: the mark's ring, skills, permission cards, the active chat, emphasis |
-| `laurel` | **her attention** | Thinking, a tool running, the ocellus iris, live state |
+| `brass` | **her authority** | The leading colour: the mark's ring, skills, permission cards, the active chat, emphasis, a switch that is on |
+| `laurel` | **her attention** | Thinking, a tool running, the ocellus iris, live state, the focus ring |
 | `pomegranate` | **her** | The send action and her name — the two places that are *her*, and nothing else |
 
-Mapping meaning onto hue is what keeps the palette from being decoration. If a colour appears
-somewhere and you cannot say which of the three sentences above it is saying, it does not belong
-there.
+`danger` is for failures and destructive actions, and is never used for a question or a stance —
+a question she can ask is not an error.
 
-### Dark (default)
+The token names are roles, not hues: a theme can make laurel blue and it is still laurel, because
+it is still saying *live*. Mapping meaning onto hue is what keeps the palette from being
+decoration. If a colour appears somewhere and you cannot say which of the sentences above it is
+saying, it does not belong there.
 
-```
---ground            #17130A   the page — gold-brown black
---surface           #211B10   sidebar, composer, cards
---surface-raised    #2C2416   modal, hover, the settings sheet
---line              #3D3421   hairlines, dividers, the activity gutter
---text              #F4EEDF   prose
---text-muted        #B0A68D   labels, metadata, collapsed activity
---text-faint        #7F7660   placeholders, disabled
+The neutrals are what a person recognises from across a room before they have read a word, which
+is why a theme specifies them as precisely as its accents. The previous palette, Parchment &
+Laurel, learnt that the hard way — a cream ground under white cards is the most recognisable
+arrangement in this whole category — and the lesson outlives the palette.
 
---brass             #D9AE52   leads
---laurel            #7FB069
---pomegranate       #DE4E64   crimson, not coral
---danger            #E0685E   refusals, failed tools
-```
-
-### Light
-
-```
---ground            #F6EEDB   vellum — saturated, so it is parchment and not cream
---surface           #FDFAF1   off-white on purpose; see below
---surface-raised    #EFE4CC
---line              #E0D2B4
---text              #201B10
---text-muted        #6B6250
---text-faint        #9A8F79
-
---brass             #8A6A1C
---laurel            #3F6B32
---pomegranate       #A82A45
---danger            #B03A2E
-```
-
-**How this got here, in two moves.** The first pass said *warm charcoal, never blue-grey; warm
-paper, never white*, and produced `#FBF7F2` under `#FFFFFF` cards — a cream ground under white
-cards, which is the most recognisable arrangement in this whole category. The accents were never
-the problem; the **neutrals** were, because they are what a person recognises from across a room
-before they have read a word.
-
-The ground moved twice: first off cream and onto a rose plaster, then onto gold — which is where
-it belonged, because gold is the thing that is actually *about her*. The saturation is what makes
-that safe. A gold neutral pale enough to be tasteful is a cream, and this one is not pale.
-
-`peacock` became `laurel` in the same move. The teal was the eye of the peacock and the eye is
-still an ocellus — peacock plumage is green as well as blue — but a leaf green does the job the
-colour actually has, which is to look like motion when something is running.
-
-`danger` stays a salmon-orange and is deliberately *not* harmonised with the crimson. The two
-never appear near each other, and a failure that looked like her would be the wrong kind of
-quiet.
-
-Three appearance settings, matching the reference: **system**, **light**, **dark**. System is the
-default, because a person who has already told their machine wants the same answer here.
+Three appearance settings: **system**, **light**, **dark**. System is the default, because a
+person who has already told their machine wants the same answer here; dark tokens sit on `:root`
+so nothing flashes light before the scripts run.
 
 ## Typography
 
 Serif to read, sans for chrome. The chat is prose and deserves a book face; buttons and labels
 are not prose and should get out of the way.
 
-| Role | Face | Why this one |
-|---|---|---|
-| Display | **Fraunces** | Variable, with `SOFT` and `WONK` axes. Old-style warmth with a little strangeness in it — antique without being a costume. Set `SOFT` high and `WONK` low. Used sparingly: the greeting, the wordmark, modal titles, empty states. |
-| Body | **Source Serif 4** | The face the chat is set in. Warm, drawn for screens, variable, open licence. This is the role *Anthropic Serif* plays in the reference, and this is the honest answer to it. |
-| Chrome | **Figtree** | Humanist sans with a soft edge. Deliberately **not Inter** — Inter is the neutral default and neutral reads as cold, which is the one thing the brief rules out. |
-| Mono | **IBM Plex Mono** | Code blocks, tool arguments, model names. Warmer than JetBrains Mono and it has an actual voice. |
-
-Alternative worth a look if the classical reading should be stronger: **Cormorant Garamond** for
-display. More Greek, more delicate, harder to set well at interface sizes.
-
-```
-display-lg   40 / 1.15   Fraunces      the start-screen greeting
-display      28 / 1.20   Fraunces      modal titles, empty states
-h1           22 / 1.30   Fraunces
-h2           18 / 1.35   Source Serif 4
-body         17 / 1.65   Source Serif 4    chat prose — generous, unhurried
-ui           14 / 1.45   Figtree           sidebar, buttons, labels
-caption      12.5 / 1.40 Figtree           timestamps, provenance, metadata
-mono         13.5 / 1.55 IBM Plex Mono
-```
+A theme names four faces — **display** (the wordmark, dialog titles, the start screen), **body**
+(her prose, your messages, chat titles), **interface** (every control, label and menu) and
+**mono** (code, commands, keyboard hints) — and their sizes; Heaven's are in
+[its export](themes/hera-theme-heaven.md#typography). What every theme keeps: interface text is
+never the body face, and the body face is never a neutral grotesque, because neutral reads as
+cold and that is the one thing the brief rules out.
 
 Measure caps at **68ch**. Longer lines are the fastest way to make a reading interface tiring.
-The reading column **is** that measure — `--column`, 612px, which is 68ch of Source Serif 4 at
-17px with the webfont actually loaded — so her prose, a user bubble, the activity gutter, the
-cards and the composer all sit on one axis. A column wider than the measure is the version of
+The reading column **is** that measure — `--column`, 68ch of the body face at the prose size with
+the webfont actually loaded, measured in the browser rather than computed — so her prose, a user
+bubble, the activity gutter, the cards and the composer all sit on one axis. A column wider than the measure is the version of
 this that looks broken: only the prose gets capped, so her answer stops short of the edge
 everything around it reaches and the message reads as nudged off-centre.
 
@@ -314,16 +255,16 @@ animation snaps back to its resting value, so the tail would vanish before it co
 It only shrinks as far as half, too, because a feather at full stretch has its tip 20.5 units out
 and the eye covers 11.5 of them — everything past that is animating something already hidden.
 
-Only the waiting mark displays. The running eyes in the activity gutter keep the plain look, and
-only the waiting one is drawn in a box twice its layout size — a fanned feather reaches past
-where the eye sits, so it bleeds over its neighbours rather than pushing the line apart. Once the
-tail is in, the mark gives way to the activity gutter, where an 8 px eye stays as the first eye of
-that turn. The animation becomes the record.
+Only the waiting mark displays, and it is drawn in a box twice its layout size — a fanned feather
+reaches past where the eye sits, so it bleeds over its neighbours rather than pushing the line
+apart. Once the tail is in, the mark gives way to the activity gutter, whose first row is the
+thought she just had. The animation becomes the record.
 
-Everything else: 120 ms fades, 160 ms disclosure heights, `ease-out`. `prefers-reduced-motion`
-replaces the rotation with a static ocellus at full opacity, leaves the tail folded, and removes
-every transition; the interface must be completely usable and completely legible with all motion
-off.
+Everything else has exactly one **motion slot** — `--motion-<slot>`, a duration and a curve
+supplied by the theme ([Heaven's table](themes/hera-theme-heaven.md#motion)) — and a component
+reads its slot rather than naming a duration. `prefers-reduced-motion` replaces the rotation with
+a static ocellus at full opacity, leaves the tail folded, and removes every transition; the
+interface must be completely usable and completely legible with all motion off.
 
 ## Waiting
 
@@ -531,8 +472,10 @@ makes every animated state above safe to be wrong about for a second.
 
 ### The activity gutter
 
-Everything she did before speaking stacks above the prose as collapsed rows, each with its
-8 px ocellus on a hairline. Quiet, in `caption` on `--text-muted`, expandable. A row carries the
+Everything she did before speaking stacks above the prose as collapsed rows, each with a small
+dot in its state colour on a dashed hairline and its verb in mono capitals
+([ADR 21](adr/0021-a-theme-is-imported-data.md)). Quiet, in `caption` on `--text-muted`,
+expandable. A row carries the
 verb, the target, and how long it took:
 
 ```
@@ -704,8 +647,8 @@ Waiting on the maintainer, who has said more of the story is coming:
    later and in the mind regions, not here. It may still overturn the pomegranate / peacock /
    brass reading, which is the one part of this document that is about *her* rather than about
    the application.
-2. **Display face** — Fraunces (warm, slightly antique) or Cormorant Garamond (classical, Greek,
-   more delicate)?
+2. ~~**Display face**~~ — settled by the theme: Heaven sets Cormorant Garamond
+   ([ADR 21](adr/0021-a-theme-is-imported-data.md)).
 3. **The mark** — does the ocellus land, and should the wordmark be set in the display face or
    drawn?
 4. **Where thinking lives** — a gutter row that expands in place, as drawn, or its own column?

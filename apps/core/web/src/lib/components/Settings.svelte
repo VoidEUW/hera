@@ -18,9 +18,12 @@
 	 * conversation visible behind it.
 	 */
 	import { t } from '$lib/i18n';
-	import Input from './Input.svelte';
-	import Modal from './Modal.svelte';
-	import SettingsIcon, { type SettingsIconName } from './SettingsIcon.svelte';
+	import Input from '$lib/components/ui/Input.svelte';
+	import Modal from '$lib/components/ui/Modal.svelte';
+	import type { IconName } from '$lib/icons';
+	import Sidebar from '$lib/components/ui/sidebar/Sidebar.svelte';
+	import SidebarEntry from '$lib/components/ui/sidebar/SidebarEntry.svelte';
+	import SidebarGroup from '$lib/components/ui/sidebar/SidebarGroup.svelte';
 	import Dreaming from './settings/Dreaming.svelte';
 	import Account from './settings/Account.svelte';
 	import General from './settings/General.svelte';
@@ -57,7 +60,7 @@
 		id: Tab;
 		label: string;
 		blurb: string;
-		icon: SettingsIconName;
+		icon: IconName;
 		soon?: boolean;
 	}
 
@@ -69,27 +72,27 @@
 					id: 'account',
 					label: t.settings.account,
 					blurb: t.settings.blurbAccount,
-					icon: 'account'
+					icon: 'user'
 				},
 				{
 					id: 'general',
 					label: t.settings.general,
 					blurb: t.settings.blurbGeneral,
-					icon: 'general'
+					icon: 'sliders'
 				}
 			]
 		},
 		{
 			label: t.settings.groupHera,
 			entries: [
-				{ id: 'mind', label: t.settings.mind, blurb: t.settings.blurbMind, icon: 'mind' },
-				{ id: 'memory', label: t.settings.memory, blurb: t.settings.blurbMemory, icon: 'memory' },
-				{ id: 'models', label: t.settings.models, blurb: t.settings.blurbModels, icon: 'models' },
+				{ id: 'mind', label: t.settings.mind, blurb: t.settings.blurbMind, icon: 'brain' },
+				{ id: 'memory', label: t.settings.memory, blurb: t.settings.blurbMemory, icon: 'clock' },
+				{ id: 'models', label: t.settings.models, blurb: t.settings.blurbModels, icon: 'cube' },
 				{
 					id: 'dreaming',
 					label: t.settings.dreaming,
 					blurb: t.settings.blurbDreaming,
-					icon: 'dreaming',
+					icon: 'moon',
 					soon: true
 				}
 			]
@@ -97,18 +100,18 @@
 		{
 			label: t.settings.groupAdjust,
 			entries: [
-				{ id: 'skills', label: t.settings.skills, blurb: t.settings.blurbSkills, icon: 'skills' },
+				{ id: 'skills', label: t.settings.skills, blurb: t.settings.blurbSkills, icon: 'spark' },
 				{
 					id: 'servers',
 					label: t.settings.servers,
 					blurb: t.settings.blurbServers,
-					icon: 'servers'
+					icon: 'plug'
 				},
 				{
 					id: 'permissions',
 					label: t.settings.permissions,
 					blurb: t.settings.blurbPermissions,
-					icon: 'permissions'
+					icon: 'shield'
 				}
 			]
 		}
@@ -131,60 +134,61 @@
 	{onclose}
 >
 	<div class="body">
-		<aside class="side">
-			<label class="search">
-				<span class="sr-only">{t.settings.search}</span>
-				<Input
-					kind="search"
-					value={query}
-					placeholder={t.settings.search}
-					onchange={(value) => (query = value)}
-				/>
-			</label>
-
-			<nav class="tabs">
-				{#each GROUPS as group (group.label)}
-					<div class="group">
-						<p class="heading">{group.label}</p>
-						{#each group.entries as entry (entry.id)}
-							<button
-								class="tab"
-								class:active={tab === entry.id}
-								type="button"
-								onclick={() => (tab = entry.id)}
-							>
-								<SettingsIcon name={entry.icon} />
-								{entry.label}
-								{#if entry.soon}<span class="soon">{t.settings.soon}</span>{/if}
-							</button>
-						{/each}
-					</div>
-				{/each}
-			</nav>
-		</aside>
+		<Sidebar variant="settings" label={t.settings.title}>
+			{#snippet head()}
+				<label class="search">
+					<span class="sr-only">{t.settings.search}</span>
+					<Input
+						kind="search"
+						value={query}
+						placeholder={t.settings.search}
+						onchange={(value) => (query = value)}
+					/>
+				</label>
+			{/snippet}
+			{#each GROUPS as group (group.label)}
+				<SidebarGroup label={group.label} fixed>
+					{#each group.entries as entry (entry.id)}
+						<SidebarEntry
+							icon={entry.icon}
+							label={entry.label}
+							active={tab === entry.id}
+							meta={entry.soon ? t.settings.soon : undefined}
+							onclick={() => (tab = entry.id)}
+						/>
+					{/each}
+				</SidebarGroup>
+			{/each}
+		</Sidebar>
 
 		<div class="panel">
-			<Screen title={current.label} blurb={current.blurb}>
-				{#if tab === 'account'}
-					<Account {filter} />
-				{:else if tab === 'general'}
-					<General {filter} />
-				{:else if tab === 'models'}
-					<Models {filter} />
-				{:else if tab === 'memory'}
-					<Memory {filter} />
-				{:else if tab === 'dreaming'}
-					<Dreaming />
-				{:else if tab === 'mind'}
-					<Mind {filter} />
-				{:else if tab === 'skills'}
-					<Skills {filter} />
-				{:else if tab === 'servers'}
-					<Servers {filter} />
-				{:else}
-					<Permissions {filter} />
-				{/if}
-			</Screen>
+			<!-- Keyed by the tab, so a new pane arrives on the theme's `settings.switch` fade rather
+			     than replacing the old one in place. -->
+			{#key tab}
+				<div class="pane">
+					<Screen title={current.label} blurb={current.blurb}>
+						{#if tab === 'account'}
+							<Account {filter} />
+						{:else if tab === 'general'}
+							<General {filter} />
+						{:else if tab === 'models'}
+							<Models {filter} />
+						{:else if tab === 'memory'}
+							<Memory {filter} />
+						{:else if tab === 'dreaming'}
+							<Dreaming />
+						{:else if tab === 'mind'}
+							<Mind {filter} />
+						{:else if tab === 'skills'}
+							<Skills {filter} />
+						{:else if tab === 'servers'}
+							<Servers {filter} />
+						{:else}
+							<Permissions {filter} />
+						{/if}
+					</Screen>
+				</div>
+			{/key}
 		</div>
 	</div>
 </Modal>
@@ -193,6 +197,17 @@
 	/* The one sheet with a height of its own: every tab holds a different amount, and a sheet
 	   that resized itself around each one made switching between them the loudest thing on the
 	   screen. The panel scrolls inside it instead. */
+	.pane {
+		display: contents;
+		animation: pane-in var(--motion-settings-switch);
+	}
+
+	@keyframes pane-in {
+		from {
+			opacity: 0;
+		}
+	}
+
 	:global(.sheet.settings) {
 		height: min(92vh, 860px);
 	}
@@ -203,70 +218,9 @@
 		flex: 1;
 	}
 
-	.side {
-		display: flex;
-		flex-direction: column;
-		gap: 14px;
-		width: 224px;
-		flex: none;
-		min-height: 0;
-		padding: 14px 10px;
-		border-right: 1px solid var(--line);
-	}
-
 	/* Level with the close button on the far side of the sheet. */
 	.search {
 		display: block;
-	}
-
-	.tabs {
-		display: flex;
-		flex-direction: column;
-		gap: 16px;
-		min-height: 0;
-		overflow-y: auto;
-	}
-
-	.group {
-		display: flex;
-		flex-direction: column;
-		gap: 2px;
-	}
-
-	.heading {
-		margin: 0 0 4px;
-		padding: 0 10px;
-		font-size: 11.5px;
-		letter-spacing: 0.04em;
-		color: var(--text-faint);
-	}
-
-	.tab {
-		display: flex;
-		align-items: center;
-		gap: 10px;
-		padding: 7px 10px;
-		border-radius: var(--radius);
-		text-align: left;
-		font-size: 13.5px;
-		color: var(--text-muted);
-	}
-
-	.tab:hover {
-		background: var(--surface);
-		color: var(--text);
-	}
-
-	.tab.active {
-		background: var(--surface);
-		color: var(--text);
-	}
-
-	.soon {
-		margin-left: auto;
-		font-size: 10.5px;
-		letter-spacing: 0.05em;
-		color: var(--text-faint);
 	}
 
 	/* Right padding clears the floating close button, which sits over the panel's top corner. */
@@ -289,35 +243,9 @@
 		border: 0;
 	}
 
-	@media (max-width: 640px) {
+	@media (max-width: 600px) {
 		.body {
 			flex-direction: column;
-		}
-
-		.side {
-			width: auto;
-			border-right: 0;
-			border-bottom: 1px solid var(--line);
-			padding-right: 44px;
-		}
-
-		.tabs {
-			flex-direction: row;
-			gap: 4px;
-			overflow-x: auto;
-			overflow-y: hidden;
-		}
-
-		.group {
-			flex-direction: row;
-		}
-
-		.heading {
-			display: none;
-		}
-
-		.tab {
-			white-space: nowrap;
 		}
 
 		.panel {

@@ -13,12 +13,14 @@
 	 * model rather than defaulted to `true`, so saving an unrelated option never silently turns
 	 * tools back on for a model somebody already flagged off (ADR 19).
 	 */
+	import Button from '$lib/components/ui/Button.svelte';
+	import Icon from '$lib/components/ui/Icon.svelte';
 	import { untrack } from 'svelte';
 	import { api, type ModelEntry, type ModelPreset, type Provider } from '$lib/api/client';
-	import Checkbox from '$lib/components/Checkbox.svelte';
-	import Input from '$lib/components/Input.svelte';
-	import Select from '$lib/components/Select.svelte';
-	import Slider from '$lib/components/Slider.svelte';
+	import Checkbox from '$lib/components/ui/Checkbox.svelte';
+	import Input from '$lib/components/ui/Input.svelte';
+	import Select from '$lib/components/ui/Select.svelte';
+	import Slider from '$lib/components/ui/Slider.svelte';
 	import { t } from '$lib/i18n';
 	import {
 		SAMPLING_FIELDS,
@@ -129,7 +131,7 @@
 							onclick={() => set(field.key, undefined)}
 						>
 							<span class="sr-only">{t.models.sampling.unset}</span>
-							<span aria-hidden="true">✕</span>
+							<Icon name="x" />
 						</button>
 					{/if}
 				</div>
@@ -281,17 +283,12 @@
 		<p class="warn">{t.models.optionsInvalid}</p>
 	{/if}
 	<div class="options-actions">
-		<button
-			class="ghost tiny"
-			type="button"
-			disabled={!valid || !contextValid}
-			onclick={() => save()}
-		>
+		<Button variant="ghost" size="sm" disabled={!valid || !contextValid} onclick={() => save()}>
 			{t.models.optionsSave}
-		</button>
-		<button class="ghost tiny" type="button" onclick={() => (draft = '')}>
+		</Button>
+		<Button variant="ghost" size="sm" onclick={() => (draft = '')}>
 			{t.models.optionsClear}
-		</button>
+		</Button>
 	</div>
 </div>
 
@@ -353,11 +350,6 @@
 	button:disabled {
 		opacity: 0.4;
 		cursor: default;
-	}
-
-	.tiny {
-		padding: 1px 8px;
-		font-size: 12px;
 	}
 
 	/* The options editor, open only when somebody asked for it — a model that needs nothing

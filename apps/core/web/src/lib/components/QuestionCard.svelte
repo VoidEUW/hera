@@ -18,6 +18,8 @@
 	 * question is her turning towards you, and drawing it in the permission colour would make
 	 * being asked feel like being stopped.
 	 */
+	import Button from './ui/Button.svelte';
+	import Icon from './ui/Icon.svelte';
 	import type { AnswerRequired } from '$lib/api/events';
 	import { isAskKind } from '$lib/api/events';
 	import { t } from '$lib/i18n';
@@ -72,7 +74,7 @@
 
 <aside class="card" class:settled>
 	<p class="head">
-		<span class="mark" aria-hidden="true">?</span>
+		<span class="mark"><Icon name="help" /></span>
 		{#if label}
 			<span class="kind" data-kind={card.kind}>{label}</span>
 		{/if}
@@ -95,21 +97,21 @@
 				aria-label={card.question || t.question.asked}></textarea>
 			<div class="actions">
 				<span class="caption hint">{t.composer.hint}</span>
-				<button type="button" disabled={busy} onclick={send}>{t.question.send}</button>
+				<Button variant="highlighted" size="sm" disabled={busy} onclick={send}>
+					{t.question.send}
+				</Button>
 			</div>
 		</div>
 	{/if}
 </aside>
 
 <style>
+	/* No frame (the theme's `qc.frame: none`): the question sits in the flow of her answer,
+	   marked by its brass icon — a question card is her authority asking, like a permission. */
 	.card {
-		margin: 16px 0;
-		padding: 14px 16px;
+		margin: calc(var(--space) * 4) 0;
 		max-width: var(--measure);
-		background: var(--surface-raised);
-		border: 1px solid var(--line);
-		border-left: 3px solid var(--laurel);
-		border-radius: var(--radius);
+		animation: card-in var(--motion-card-enter);
 		/* Answering is the card settling: the field leaves and the card takes on the quieter
 		   surface it keeps for the rest of the conversation's life. Both halves of that used to
 		   happen in one frame, so the reply read as the card being replaced rather than as the
@@ -119,8 +121,13 @@
 			opacity var(--fade) var(--ease);
 	}
 
+	@keyframes card-in {
+		from {
+			opacity: 0;
+		}
+	}
+
 	.settled {
-		background: var(--surface);
 		opacity: 0.85;
 	}
 
@@ -132,8 +139,9 @@
 	}
 
 	.mark {
-		color: var(--laurel);
-		font-family: var(--font-display);
+		display: flex;
+		align-self: center;
+		color: var(--brass);
 	}
 
 	/* What sort of question it is. Nothing here may be the danger colour: no question she can
@@ -198,27 +206,6 @@
 	.hint {
 		margin: 0;
 		font-size: 11.5px;
-	}
-
-	.actions button {
-		padding: 6px 12px;
-		border: 1px solid var(--line);
-		border-radius: var(--radius);
-		background: var(--surface);
-		font-size: 13px;
-		transition:
-			border-color var(--fade) var(--ease),
-			color var(--fade) var(--ease);
-	}
-
-	.actions button:not(:disabled):hover {
-		border-color: var(--laurel);
-		color: var(--laurel);
-	}
-
-	.actions button:disabled {
-		opacity: 0.5;
-		cursor: default;
 	}
 
 	/* What they answered, once they have. Indented under the question the way a reply is, and

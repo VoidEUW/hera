@@ -6,13 +6,17 @@
 	 * chats does not re-fetch the sidebar — and so a new chat appears in the list the moment it
 	 * is created rather than on the next load.
 	 */
+	import Icon from '$lib/components/ui/Icon.svelte';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import Offline from '$lib/components/Offline.svelte';
-	import Rail from '$lib/components/Rail.svelte';
+	import ChatSidebar from '$lib/components/ChatSidebar.svelte';
 	import Settings from '$lib/components/Settings.svelte';
+	import Toaster from '$lib/components/ui/Toaster.svelte';
+	import { dialog } from '$lib/dialog';
 	import { t } from '$lib/i18n';
+	import { sidebar } from '$lib/stores/sidebar.svelte';
 	import { notifications } from '$lib/notifications.svelte';
 	import { workspace } from '$lib/stores/workspace.svelte';
 	import { theme } from '$lib/theme.svelte';
@@ -25,6 +29,7 @@
 	// is a dependency it also invalidates: Svelte answers that with effect_update_depth_exceeded
 	// and stops rendering the page entirely.
 	theme.load();
+	sidebar.load();
 	notifications.load();
 	void workspace.load();
 
@@ -94,7 +99,6 @@
 			workspace.openSettings();
 			return;
 		}
-		if (event.key === 'Escape' && workspace.railOpen) workspace.railOpen = false;
 	}
 </script>
 
@@ -117,7 +121,7 @@
 			aria-label={t.rail.openMenu}
 			onclick={() => (workspace.railOpen = true)}
 		>
-			<span aria-hidden="true">☰</span>
+			<Icon name="menu" />
 		</button>
 
 		{#if workspace.railOpen}
@@ -133,14 +137,19 @@
 			></div>
 		{/if}
 
+		<!-- On a phone the sidebar opens as a sheet, and then it *is* a dialog: focus moves in, Tab
+		     stays in, Escape closes it and focus goes back to the menu button (#121) — the same
+		     `dialog` action every Modal uses, switched on only while the sheet is open. -->
 		<div
 			class="rail-slot"
 			class:sheet={workspace.railOpen}
 			role={workspace.railOpen ? 'dialog' : undefined}
 			aria-modal={workspace.railOpen ? 'true' : undefined}
 			aria-label={workspace.railOpen ? t.rail.title : undefined}
+			use:dialog={{ active: workspace.railOpen, onclose: () => (workspace.railOpen = false) }}
 		>
-			<Rail
+			<ChatSidebar
+				sheet={workspace.railOpen}
 				chats={workspace.chats}
 				projects={workspace.projects}
 				account={workspace.account}
@@ -174,6 +183,10 @@
 	{/if}
 {/if}
 
+<!-- Outside the reachable branch, so a confirmation can still say something on the offline
+     screen. -->
+<Toaster />
+
 <style>
 	.shell {
 		display: flex;
@@ -197,7 +210,7 @@
 	.scrim {
 		position: fixed;
 		inset: 0;
-		background: rgb(0 0 0 / 0.45);
+		background: var(--scrim);
 		border: 0;
 		animation: fade var(--fade) var(--ease);
 		z-index: 10;
@@ -207,6 +220,11 @@
 		from {
 			opacity: 0;
 		}
+	}
+
+	/* The sidebar floats inside this slot; the slot only gives it the full height. */
+	.rail-slot {
+		display: flex;
 	}
 
 	@media (max-width: 780px) {

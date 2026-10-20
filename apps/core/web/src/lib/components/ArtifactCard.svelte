@@ -22,14 +22,14 @@
 	 * author chose those words, and a browser second-guessing them is how one screen disagrees
 	 * with the next.
 	 */
+	import Button from './ui/Button.svelte';
 	import type { Artifact } from '$lib/api/events';
 	import { downloadUrl, extensionOf, hasSource, kindOf, size, headingOf } from '$lib/artifacts';
 	import { t } from '$lib/i18n';
 	import { saveDiagram } from '$lib/mermaid';
 	import { artifacts } from '$lib/stores/artifacts.svelte';
 	import ArtifactView from './ArtifactView.svelte';
-	import Paper from './Paper.svelte';
-	import Tray from './Tray.svelte';
+	import Icon from './ui/Icon.svelte';
 
 	interface Props {
 		chatId: string | null;
@@ -58,20 +58,20 @@
 	{/if}
 
 	<figcaption class="bar">
-		<span class="mark" aria-hidden="true"><Paper size={14} muted={artifact.inline} /></span>
+		<span class="mark" class:muted={artifact.inline}><Icon name="file" /></span>
 		<span class="named">
 			<span class="title">{title}</span>
 			<span class="about">
-				{#if extension}<span class="kind">{extension}</span>{/if}
+				{#if extension}<span class="kind">{extension}</span><span aria-hidden="true">·</span>{/if}
 				<span class="bytes">{size(artifact.bytes)}</span>
 			</span>
 		</span>
 		{#if artifact.inline && chatId && hasSource(artifact.name)}
 			<!-- Only where the thing itself is drawn here: a card that is just a strip has no
 			     picture to swap for its code. -->
-			<button
-				type="button"
-				class="open"
+			<Button
+				variant="ghost"
+				size="sm"
 				aria-pressed={source}
 				aria-label={source
 					? t.artifact.showDrawnOf(artifact.name)
@@ -79,22 +79,20 @@
 				onclick={() => (source = !source)}
 			>
 				{source ? t.artifact.showDrawn : t.artifact.showSource}
-			</button>
+			</Button>
 		{/if}
 		{#if chatId && drawn}
 			<!-- A button rather than the link beside it, because what it saves is not what a link
 			     here would point at: a diagram is converted to the page that draws it on the way
 			     out, and the file at the download URL is its mermaid source. `$lib/mermaid` does
 			     the converting, and falls back to that URL when the source will not parse. -->
-			<button
-				type="button"
-				class="save"
-				title={t.artifact.downloadDrawn}
-				aria-label={t.artifact.downloadDrawnOne(artifact.name)}
+			<Button
+				variant="ghost"
+				size="sm"
+				icon="download"
+				label={t.artifact.downloadDrawnOne(artifact.name)}
 				onclick={() => saveDiagram(chatId, artifact.name)}
-			>
-				<Tray size={14} />
-			</button>
+			/>
 		{:else if chatId}
 			<!-- Saving it is the other thing anybody does with a published file, and until now it
 			     meant opening the drawer to find the link. A plain `<a download>` at the download
@@ -114,30 +112,41 @@
 				title={t.artifact.download}
 				aria-label={t.artifact.downloadOne(artifact.name)}
 			>
-				<Tray size={14} />
+				<Icon name="download" />
 			</a>
 		{/if}
-		<button type="button" class="open" onclick={open} disabled={!chatId}>
+		<Button
+			size="sm"
+			variant={artifact.inline ? 'ghost' : 'neutral'}
+			onclick={open}
+			disabled={!chatId}
+		>
 			{artifact.inline ? t.artifact.openFull : t.artifact.open}
-		</button>
+		</Button>
 	</figcaption>
 </figure>
 
 <style>
 	.artifact {
-		margin: 14px 0;
+		margin: calc(var(--space) * 3.5) 0;
 		padding: 0;
 		max-width: var(--measure);
+		animation: arrive var(--motion-artifact-enter);
 	}
 
-	/* The card shape: a bordered strip you click. An inline artifact does not get the border,
-	   because the thing above the caption is already the object and boxing it twice reads as a
-	   frame around a frame. */
+	@keyframes arrive {
+		from {
+			opacity: 0;
+		}
+	}
+
+	/* The card (the theme's `art.frame: card`, `art.rail: none`): a bordered surface you click.
+	   An inline artifact does not get the border, because the thing above the caption is already
+	   the object and boxing it twice reads as a frame around a frame. */
 	.artifact:not(.inline) .bar {
-		padding: 11px 12px;
+		padding: calc(var(--space) * 2.5) calc(var(--space) * 3);
 		background: var(--surface);
-		border: 1px solid var(--line);
-		border-left: 3px solid var(--brass);
+		border: var(--border-width) solid var(--line);
 		border-radius: var(--radius);
 	}
 
@@ -155,6 +164,11 @@
 		display: flex;
 		flex: none;
 		align-items: center;
+		color: var(--text-muted);
+	}
+
+	.mark.muted {
+		color: var(--text-faint);
 	}
 
 	/* The gap between the name and the controls, rather than `margin-left: auto` on the last one
@@ -169,7 +183,7 @@
 
 	.title {
 		font-family: var(--font-body);
-		font-size: 15px;
+		font-size: calc(var(--prose-size) - 1px);
 		color: var(--text);
 		overflow: hidden;
 		text-overflow: ellipsis;
@@ -183,14 +197,15 @@
 
 	.about {
 		display: flex;
-		gap: 8px;
+		gap: 5px;
 		flex: none;
-		font-size: 12px;
+		font-size: calc(var(--ui-size) - 2px);
 		color: var(--text-faint);
 	}
 
 	.kind {
 		letter-spacing: 0.04em;
+		text-transform: uppercase;
 	}
 
 	/* Square, so the glyph sits in the middle of a target the same height as the button beside
@@ -214,29 +229,6 @@
 	.save:hover {
 		color: var(--text);
 		border-color: var(--brass);
-	}
-
-	.open {
-		flex: none;
-		padding: 4px 10px;
-		border: 1px solid var(--line);
-		border-radius: var(--radius);
-		font-size: 12.5px;
-		color: var(--text-muted);
-		transition:
-			color var(--fade) var(--ease),
-			border-color var(--fade) var(--ease);
-	}
-
-	.open:hover:not(:disabled) {
-		color: var(--text);
-		border-color: var(--brass);
-	}
-
-	.artifact.inline .open {
-		border-color: transparent;
-		padding: 2px 6px;
-		font-size: 12px;
 	}
 
 	.artifact.inline .save {

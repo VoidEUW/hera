@@ -1,4 +1,4 @@
-import { cubicOut, expoIn, expoOut } from 'svelte/easing';
+import { cubicOut, expoIn } from 'svelte/easing';
 
 /** Whether the reader has asked for the interface not to move.
  *
@@ -10,6 +10,91 @@ import { cubicOut, expoIn, expoOut } from 'svelte/easing';
 export function still(): boolean {
 	return matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
+
+/** One motion slot, resolved: what `--motion-<name>` says, as numbers a transition can use. */
+export interface Slot {
+	duration: number;
+	easing: (t: number) => number;
+}
+
+const NAMED: Record<string, [number, number, number, number]> = {
+	ease: [0.25, 0.1, 0.25, 1],
+	'ease-in': [0.42, 0, 1, 1],
+	'ease-out': [0, 0, 0.58, 1],
+	'ease-in-out': [0.42, 0, 0.58, 1]
+};
+
+/**
+ * CSS's `cubic-bezier()` as a function of progress, so a Svelte transition can run on the curve
+ * a theme names. Solved for x with Newton's method and finished by bisection where the slope is
+ * too flat for Newton to converge; y is free to leave [0, 1], which is what a spring overshoot is.
+ */
+export function cubicBezier(x1: number, y1: number, x2: number, y2: number): (t: number) => number {
+	const cx = 3 * x1;
+	const bx = 3 * (x2 - x1) - cx;
+	const ax = 1 - cx - bx;
+	const cy = 3 * y1;
+	const by = 3 * (y2 - y1) - cy;
+	const ay = 1 - cy - by;
+	const x = (u: number) => ((ax * u + bx) * u + cx) * u;
+	const y = (u: number) => ((ay * u + by) * u + cy) * u;
+	const slope = (u: number) => (3 * ax * u + 2 * bx) * u + cx;
+
+	return (t: number) => {
+		if (t <= 0) return 0;
+		if (t >= 1) return 1;
+		let u = t;
+		for (let i = 0; i < 8; i++) {
+			const error = x(u) - t;
+			if (Math.abs(error) < 1e-6) return y(u);
+			const d = slope(u);
+			if (Math.abs(d) < 1e-6) break;
+			u -= error / d;
+		}
+		let lo = 0;
+		let hi = 1;
+		u = t;
+		for (let i = 0; i < 40 && hi - lo > 1e-7; i++) {
+			if (x(u) < t) lo = u;
+			else hi = u;
+			u = (lo + hi) / 2;
+		}
+		return y(u);
+	};
+}
+
+/** Parse the computed value of a motion slot — `330ms cubic-bezier(0.2, 0.7, 0.2, 1)`, `1.5s
+ *  linear` — or `null` if it is not one. */
+export function parseSlot(value: string): Slot | null {
+	const duration = /(-?[\d.]+)(ms|s)\b/.exec(value);
+	if (!duration) return null;
+	const ms = Number(duration[1]) * (duration[2] === 's' ? 1000 : 1);
+	const bezier = /cubic-bezier\(([^)]+)\)/.exec(value);
+	if (bezier) {
+		const [a, b, c, d] = bezier[1].split(',').map(Number);
+		return { duration: ms, easing: cubicBezier(a, b, c, d) };
+	}
+	const named = Object.keys(NAMED)
+		.sort((p, q) => q.length - p.length)
+		.find((name) => new RegExp(`(^|\\s)${name}(\\s|$)`).test(value));
+	if (named) return { duration: ms, easing: cubicBezier(...NAMED[named]) };
+	return { duration: ms, easing: (t: number) => t };
+}
+
+/**
+ * The theme's slot `--motion-<name>` (ADR 21), read off the root element where the theme
+ * declares it. A transition that runs in JavaScript cannot say `var(--motion-…)`, so this is how
+ * it asks the same question a stylesheet does. `fallback` is for a document with no theme loaded,
+ * which in practice means a unit test.
+ */
+export function slot(name: string, fallback: Slot = { duration: 200, easing: cubicOut }): Slot {
+	if (typeof document === 'undefined') return fallback;
+	const value = getComputedStyle(document.documentElement).getPropertyValue(`--motion-${name}`);
+	return parseSlot(value) ?? fallback;
+}
+
+/** How much quicker a close is than its open: a hand reaches further than it lets go. */
+export const LEAVING = 0.7;
 
 export interface RevealParams {
 	/** Vertical travel in pixels at the fully-hidden end — positive arrives from below,
@@ -23,8 +108,9 @@ export interface RevealParams {
 	/** Blur in pixels at the fully-hidden end, softening a short travel enough that it still
 	 * reads as a full arrival rather than a slide. `0` for none. */
 	blur?: number;
-	duration?: number;
-	easing?: (t: number) => number;
+	/** The motion slot the gesture runs on. `menu-enter` unless the caller is something else — a
+	 * dialog is `modal-enter`, a docked panel `drawer-open`. */
+	slot?: string;
 }
 
 /**
@@ -33,12 +119,12 @@ export interface RevealParams {
  * `Modal.svelte`'s sheet) uses this, so a person reads them as the same event happening at
  * different scales rather than as several unrelated animators. A dropdown or an edge-docked
  * sheet travels (`y`) and softens through a light blur; a centred dialog has no edge to travel
- * from and grows into place (`scale`) instead. Pass different `duration`s to `in:`/`out:` for a
- * gesture that opens a little slower than it closes, the way a hand reaches further than it
- * lets go.
+ * from and grows into place (`scale`) instead. The duration and the arriving curve are the
+ * theme's slot (`params.slot`); leaving takes `LEAVING` of the duration, so every gesture opens a
+ * little slower than it closes, the way a hand reaches further than it lets go.
  *
- * The easing defaults to `expoOut` arriving and `expoIn` leaving, picked from `options.direction`
- * rather than left for every call site to remember — and the two are *not* interchangeable.
+ * Leaving always runs on `expoIn`, picked from `options.direction` rather than left for every
+ * call site to remember — the arriving curve and the leaving one are *not* interchangeable.
  * Svelte's own outro math turns an arriving-style curve (fast start, long gentle settle) into,
  * once run in reverse, an element that sits fully visible for most of its `out:` duration and
  * only fades in the last sliver of it — a close that looks like it never started until it
@@ -59,26 +145,26 @@ export function reveal(
 	// against what `docs/frontend.md` says in as many words.
 	if (still()) return { duration: 0 };
 
-	const {
-		y = 0,
-		scale = 1,
-		blur = 0,
-		duration = 220,
-		easing = options.direction === 'out' ? expoIn : expoOut
-	} = params;
+	const { y = 0, scale = 1, blur = 0 } = params;
+	const motion = slot(params.slot ?? 'menu-enter');
+	const leaving = options.direction === 'out';
 	return {
-		duration,
-		easing,
+		duration: leaving ? motion.duration * LEAVING : motion.duration,
+		easing: leaving ? expoIn : motion.easing,
+		// A spring slot overshoots, so `t` passes 1 and `u` goes below 0 for a moment. That is the
+		// point for travel and scale; opacity and blur have no meaning past their ends — a negative
+		// blur is an invalid keyframe the browser warns about and drops — so they are clamped.
 		css: (t: number, u: number) =>
 			`transform: translateY(${u * y}px) scale(${1 - u * (1 - scale)});` +
-			`opacity: ${t};` +
-			(blur ? `filter: blur(${u * blur}px);` : '')
+			`opacity: ${Math.min(1, Math.max(0, t))};` +
+			(blur ? `filter: blur(${Math.max(0, u * blur)}px);` : '')
 	};
 }
 
 export interface DiscloseParams {
-	duration?: number;
-	easing?: (t: number) => number;
+	/** `collapse-disclose` unless the panel belongs to something with its own slot, like the
+	 * activity trace (`trace-disclose`). */
+	slot?: string;
 	delay?: number;
 }
 
@@ -102,12 +188,19 @@ export interface DiscloseParams {
  * same function both directions: on the way in the node has just been created, and on the way out
  * it has not been removed yet, so one `getBoundingClientRect()` answers both.
  */
-export function disclose(_node: Element, params: DiscloseParams = {}) {
+export function disclose(
+	_node: Element,
+	params: DiscloseParams = {},
+	options: { direction?: 'in' | 'out' | 'both' } = {}
+) {
 	// `0` rather than a short duration: with motion off this is not a faster animation, it is the
 	// state change happening, and the caller should not have to know that a transition existed.
 	if (still()) return { duration: 0 };
 
-	const { duration = 160, easing = cubicOut, delay = 0 } = params;
+	const { delay = 0 } = params;
+	const motion = slot(params.slot ?? 'collapse-disclose');
+	const duration = options.direction === 'out' ? motion.duration * LEAVING : motion.duration;
+	const easing = motion.easing;
 	// `floor`, because a fractional pixel target rounds up on the way in and leaves a sub-pixel gap
 	// under the content at the end of the animation.
 	const height = Math.floor(_node.getBoundingClientRect().height);

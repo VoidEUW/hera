@@ -14,6 +14,8 @@
 	 * sensible rule and a trap. A custom logo follows the same rule: left alone unless a new file
 	 * is chosen or explicitly cleared.
 	 */
+	import Button from '$lib/components/ui/Button.svelte';
+	import Icon from '$lib/components/ui/Icon.svelte';
 	import {
 		api,
 		type ModelPreset,
@@ -21,8 +23,8 @@
 		type Provider,
 		type ProviderKind
 	} from '$lib/api/client';
-	import Input from '$lib/components/Input.svelte';
-	import Select from '$lib/components/Select.svelte';
+	import Input from '$lib/components/ui/Input.svelte';
+	import Select from '$lib/components/ui/Select.svelte';
 	import { t } from '$lib/i18n';
 	import { kindFallbackIcon, kindIcon, PROVIDER_KINDS } from '$lib/providers';
 	import ModelRow from './ModelRow.svelte';
@@ -194,7 +196,7 @@
 				aria-controls={bodyId}
 				onclick={ontoggle}
 			>
-				<span class="chevron" class:open aria-hidden="true">▸</span>
+				<span class="chevron" class:open><Icon name="chevR" /></span>
 				<img
 					class="logo"
 					src={logoPreview(entry) || kindIcon(effectiveKind)}
@@ -207,7 +209,7 @@
 			</button>
 		</h3>
 		{#if !isActive}
-			<button class="ghost" type="button" onclick={activate}>{t.models.activate}</button>
+			<Button variant="ghost" onclick={activate}>{t.models.activate}</Button>
 		{/if}
 	</header>
 
@@ -237,9 +239,9 @@
 							onchange={(e) => readLogo(e)}
 						/>
 						{#if logoPreview(entry)}
-							<button class="ghost tiny" type="button" onclick={() => clearLogo()}>
+							<Button variant="ghost" size="sm" onclick={() => clearLogo()}>
 								{t.models.logoClear}
-							</button>
+							</Button>
 						{/if}
 					</div>
 					<small>{t.models.logoHint}</small>
@@ -294,17 +296,12 @@
 			</label>
 
 			<div class="actions">
-				<button
-					class="primary"
-					type="button"
-					disabled={Object.keys(draft).length === 0}
-					onclick={save}
-				>
+				<Button variant="highlighted" disabled={Object.keys(draft).length === 0} onclick={save}>
 					{t.settings.save}
-				</button>
-				<button class="ghost" type="button" onclick={runProbe}>
+				</Button>
+				<Button variant="ghost" onclick={runProbe}>
 					{result === 'running' ? t.models.testing : t.models.test}
-				</button>
+				</Button>
 				{#if saved}
 					<span class="ok">{t.models.saved}</span>
 				{/if}
@@ -347,14 +344,9 @@
 						value={newModel.name}
 						onchange={(value) => (newModel = { ...newModel, name: value })}
 					/>
-					<button
-						class="ghost tiny"
-						type="button"
-						disabled={!newModel.id.trim()}
-						onclick={addModel}
-					>
+					<Button variant="ghost" size="sm" disabled={!newModel.id.trim()} onclick={addModel}>
 						{t.models.addModel}
-					</button>
+					</Button>
 				</div>
 			</div>
 
@@ -382,7 +374,9 @@
 									disabled={already}
 									onclick={() => pickFromProbe(id)}
 								>
-									<span class="mark" aria-hidden="true">{already ? '✓' : ''}</span>
+									<span class="mark"
+										>{#if already}<Icon name="check" />{/if}</span
+									>
 									<code class="id">{id}</code>
 									{#if !already}<span class="add-hint">{t.models.pick}</span>{/if}
 									{#if already}<span class="caption">{t.models.alreadyAdded}</span>{/if}
@@ -577,19 +571,9 @@
 		cursor: default;
 	}
 
-	.primary {
-		border-color: var(--brass);
-		color: var(--brass);
-	}
-
 	.danger:not(:disabled):hover {
 		border-color: var(--danger);
 		color: var(--danger);
-	}
-
-	.tiny {
-		padding: 1px 8px;
-		font-size: 12px;
 	}
 
 	.registered {

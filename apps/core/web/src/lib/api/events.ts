@@ -173,7 +173,7 @@ export function isAskKind(kind: string): kind is AskKind {
 }
 
 /** The skill tool. Reaching for a skill mid-task and being handed one before the turn are the
- * same thing to a reader, so they are drawn the same way — see `Scroll.svelte`. */
+ * same thing to a reader, so they are drawn the same way — see `ActivityRow.svelte`. */
 export const SKILL_TOOL = 'hera__skill';
 
 /** The tool that publishes an artifact (ADR 13). Its *result* carries the card.

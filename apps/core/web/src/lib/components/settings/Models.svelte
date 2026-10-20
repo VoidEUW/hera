@@ -16,9 +16,11 @@
 	 * fields, its models, its probe — is `ProviderCard.svelte`, and one model's options are
 	 * `ModelOptions.svelte`.
 	 */
+	import Button from '$lib/components/ui/Button.svelte';
+	import Icon from '$lib/components/ui/Icon.svelte';
 	import { api, type ModelPreset, type Provider, type ProviderKind } from '$lib/api/client';
-	import Input from '$lib/components/Input.svelte';
-	import Select from '$lib/components/Select.svelte';
+	import Input from '$lib/components/ui/Input.svelte';
+	import Select from '$lib/components/ui/Select.svelte';
 	import { providers as disclosed } from '$lib/disclosure.svelte';
 	import { t } from '$lib/i18n';
 	import { Placeholder } from '$lib/loading.svelte';
@@ -193,20 +195,15 @@
 				<small>{t.models.keyBlank}</small>
 			</label>
 			<div class="actions">
-				<button
-					class="primary"
-					type="button"
-					disabled={!fresh.name || !fresh.model_id}
-					onclick={add}
-				>
+				<Button variant="highlighted" disabled={!fresh.name || !fresh.model_id} onclick={add}>
 					{t.models.add}
-				</button>
-				<button class="ghost" type="button" onclick={() => (adding = false)}>Cancel</button>
+				</Button>
+				<Button variant="ghost" onclick={() => (adding = false)}>Cancel</Button>
 			</div>
 		</section>
 	{:else}
 		<button class="ghost add" type="button" onclick={() => (adding = true)}>
-			<span aria-hidden="true">＋</span>
+			<Icon name="plus" />
 			{t.models.add}
 		</button>
 	{/if}
@@ -279,11 +276,6 @@
 	button:disabled {
 		opacity: 0.4;
 		cursor: default;
-	}
-
-	.primary {
-		border-color: var(--brass);
-		color: var(--brass);
 	}
 
 	.add {

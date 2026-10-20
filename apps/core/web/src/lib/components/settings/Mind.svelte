@@ -7,6 +7,7 @@
 	 * here the screen is mounted once per visit, so the count only matters if `load` is ever
 	 * called twice while mounted.
 	 */
+	import Button from '$lib/components/ui/Button.svelte';
 	import { api, type Region } from '$lib/api/client';
 	import { t } from '$lib/i18n';
 	import { Placeholder } from '$lib/loading.svelte';
@@ -89,14 +90,13 @@
 			<p class="caption purpose">{region.purpose}</p>
 			<textarea bind:value={drafts[region.id]} rows="4"></textarea>
 			<div class="region-foot">
-				<button
-					class="save"
-					type="button"
+				<Button
+					variant="highlighted"
 					disabled={drafts[region.id] === region.text}
 					onclick={() => saveRegion(region)}
 				>
 					{t.settings.save}
-				</button>
+				</Button>
 				{#if savedRegion === region.id}
 					<span class="caption saved">{t.settings.saved}</span>
 				{/if}
@@ -147,24 +147,6 @@
 		align-items: center;
 		gap: 10px;
 		margin-top: 8px;
-	}
-
-	.save {
-		padding: 5px 12px;
-		border: 1px solid var(--line);
-		border-radius: var(--radius);
-		font-size: 13px;
-		color: var(--text-muted);
-	}
-
-	.save:not(:disabled):hover {
-		border-color: var(--brass);
-		color: var(--brass);
-	}
-
-	.save:disabled {
-		opacity: 0.4;
-		cursor: default;
 	}
 
 	.saved {

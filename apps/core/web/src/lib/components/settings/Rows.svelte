@@ -9,7 +9,7 @@
 	 * a different shape for every tab is a panel that looks like it is loading six different
 	 * things. The point of this is that switching tabs is calm.
 	 */
-	import Skeleton from '../Skeleton.svelte';
+	import Skeleton from '$lib/components/ui/Skeleton.svelte';
 
 	interface Props {
 		/** How many rows. Four is about a screenful at the modal's height. */

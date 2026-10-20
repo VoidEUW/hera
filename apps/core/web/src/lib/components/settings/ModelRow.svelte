@@ -10,6 +10,8 @@
 	 * Whether the editor is open is the parent's to say. A provider has one open model at a
 	 * time, so that is one value there rather than a flag in every row.
 	 */
+	import Button from '$lib/components/ui/Button.svelte';
+	import Icon from '$lib/components/ui/Icon.svelte';
 	import type { ModelEntry, ModelPreset, Provider } from '$lib/api/client';
 	import { t } from '$lib/i18n';
 	import ModelOptions from './ModelOptions.svelte';
@@ -38,7 +40,7 @@
 	<div class="row">
 		<button class="toggle" type="button" aria-expanded={open} onclick={ontoggle}>
 			<span class="start">
-				<span class="chevron" class:open aria-hidden="true">▸</span>
+				<span class="chevron" class:open><Icon name="chevR" /></span>
 				<span class="name">{model.name}</span>
 				{#if count}<span class="badge quiet">{t.models.optionsSet(count)}</span>{/if}
 			</span>
@@ -47,7 +49,7 @@
 				>{#if current}<span class="badge">{t.models.active}</span>{/if}</span
 			>
 		</button>
-		<button class="small danger" type="button" onclick={onremove}>{t.models.removeModel}</button>
+		<Button variant="danger-soft" size="sm" onclick={onremove}>{t.models.removeModel}</Button>
 	</div>
 
 	{#if open}
@@ -153,26 +155,5 @@
 
 	.badge.quiet {
 		color: var(--text-faint);
-	}
-
-	.small {
-		padding: 1px 8px;
-		border: 1px solid var(--line);
-		border-radius: var(--radius);
-		font-size: 12px;
-		color: var(--text-muted);
-		transition:
-			border-color var(--fade) var(--ease),
-			color var(--fade) var(--ease);
-	}
-
-	.small:hover {
-		border-color: var(--text-faint);
-		color: var(--text);
-	}
-
-	.danger:hover {
-		border-color: var(--danger);
-		color: var(--danger);
 	}
 </style>

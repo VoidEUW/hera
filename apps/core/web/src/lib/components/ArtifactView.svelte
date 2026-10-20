@@ -35,7 +35,7 @@
 	import { t } from '$lib/i18n';
 	import { draw } from '$lib/mermaid';
 	import { artifacts } from '$lib/stores/artifacts.svelte';
-	import Copy from './Copy.svelte';
+	import Icon from './ui/Icon.svelte';
 	import Prose from './Prose.svelte';
 
 	interface Props {
@@ -194,7 +194,7 @@
 			aria-label={t.artifact.copyCode}
 			onclick={copy}
 		>
-			<Copy size={14} done={copied} />
+			<Icon name={copied ? 'check' : 'copy'} />
 		</button>
 	</div>
 	<div class="lines">
@@ -246,7 +246,7 @@
 	.frame {
 		display: block;
 		width: 100%;
-		background: #fff;
+		background: var(--canvas);
 		border: 1px solid var(--line);
 		border-radius: var(--radius);
 	}
@@ -257,6 +257,16 @@
 		overflow: auto;
 		overscroll-behavior: contain;
 		border-radius: var(--radius);
+	}
+
+	/* A published document is read, so it gets the room a page has: padding off the frame and
+	   the reading measure, instead of prose flush against the drawer's edge (#158). */
+	.document {
+		padding: calc(var(--space) * 5) calc(var(--space) * 6);
+	}
+
+	.document :global(.prose) {
+		max-width: var(--measure);
 	}
 
 	/* A drawing sits on white whatever the theme is. An SVG she wrote has its own idea about
@@ -284,7 +294,7 @@
 		   svg's default 300px and sat at the left of a box it did not fill. */
 		grid-template-columns: minmax(0, 1fr);
 		padding: 12px;
-		background: #fff;
+		background: var(--canvas);
 		border: 1px solid var(--line);
 	}
 
@@ -347,8 +357,8 @@
 		flex: 1 0 auto;
 	}
 
-	/* Token colours are mixed with the page's own text colour, so they keep their contrast on
-	   whichever theme is up instead of needing a second palette. Every source view shares them,
+	/* Token colours are the `--syntax-*` tokens in `app.css`, mixed with the page's own text
+	   colour so they keep their contrast on whichever theme is up. Every source view shares them,
 	   which is what `$lib/highlight` being reusable is for. */
 	.source :global(.hljs-comment),
 	.source :global(.hljs-quote) {
@@ -360,20 +370,20 @@
 	.source :global(.hljs-selector-tag),
 	.source :global(.hljs-literal),
 	.source :global(.hljs-doctag) {
-		color: color-mix(in srgb, #c678dd 70%, var(--text));
+		color: var(--syntax-keyword);
 	}
 
 	.source :global(.hljs-string),
 	.source :global(.hljs-regexp),
 	.source :global(.hljs-addition) {
-		color: color-mix(in srgb, #7cb35b 70%, var(--text));
+		color: var(--syntax-string);
 	}
 
 	.source :global(.hljs-number),
 	.source :global(.hljs-symbol),
 	.source :global(.hljs-bullet),
 	.source :global(.hljs-meta) {
-		color: color-mix(in srgb, #d19a66 70%, var(--text));
+		color: var(--syntax-number);
 	}
 
 	.source :global(.hljs-title),
@@ -382,7 +392,7 @@
 	.source :global(.hljs-name),
 	.source :global(.hljs-selector-class),
 	.source :global(.hljs-selector-id) {
-		color: color-mix(in srgb, #61afef 70%, var(--text));
+		color: var(--syntax-title);
 	}
 
 	.source :global(.hljs-attr),
@@ -391,11 +401,11 @@
 	.source :global(.hljs-built_in),
 	.source :global(.hljs-type),
 	.source :global(.hljs-property) {
-		color: color-mix(in srgb, #e5c07b 65%, var(--text));
+		color: var(--syntax-attribute);
 	}
 
 	.source :global(.hljs-deletion) {
-		color: color-mix(in srgb, #e06c75 70%, var(--text));
+		color: var(--syntax-deletion);
 	}
 
 	.source :global(.hljs-emphasis) {
@@ -406,10 +416,22 @@
 		font-weight: 600;
 	}
 
+	/* Both columns — the numbers and the code — on one font and one line height, stated here
+	   rather than inherited. The `<code>` inside the right-hand `<pre>` is otherwise set in the
+	   browser's own `monospace` (the UA sheet gives `code` a family, and `.mono` sits on the
+	   `<pre>`, not on it), so the two columns were two fonts with two line heights and the
+	   numbers drifted away from their lines further down a file (#171). */
 	.source pre {
 		margin: 0;
 		padding: 10px 12px;
 		white-space: pre;
+		font-family: var(--font-mono);
+		font-size: calc(var(--ui-size) - 0.5px);
+		line-height: 1.55;
+	}
+
+	.source code {
+		font: inherit;
 	}
 
 	/* Stretched by the grid to the full height of the box. Sticky, so it stays put while a long

@@ -23,10 +23,11 @@
 	 * not editable at all — the filename is the identity, so renaming would be a different memory
 	 * with the same words in it.
 	 */
+	import Button from '$lib/components/ui/Button.svelte';
+	import Icon from '$lib/components/ui/Icon.svelte';
 	import { API, api, type MemoryBudget, type MemoryItem } from '$lib/api/client';
-	import Brain from '$lib/components/Brain.svelte';
-	import Checkbox from '$lib/components/Checkbox.svelte';
-	import Input from '$lib/components/Input.svelte';
+	import Checkbox from '$lib/components/ui/Checkbox.svelte';
+	import Input from '$lib/components/ui/Input.svelte';
 	import { t } from '$lib/i18n';
 	import { Placeholder } from '$lib/loading.svelte';
 	import Rows from './Rows.svelte';
@@ -150,7 +151,7 @@
 		<!-- The same mark the gutter draws beside `remember`, so the row in a conversation and the
 		     page listing what she keeps are visibly one subject. -->
 		<p class="blurb">
-			<span class="mark" aria-hidden="true"><Brain size={15} /></span>
+			<span class="mark"><Icon name="brain" /></span>
 			{t.memory.blurb}
 		</p>
 
@@ -257,17 +258,17 @@
 							{/if}
 							{#if editing === memory.key}
 								<span class="confirm">
-									<button type="button" class="save" onclick={() => save(memory.key)}>
+									<Button variant="highlighted" onclick={() => save(memory.key)}>
 										{t.memory.save}
-									</button>
+									</Button>
 									<button type="button" onclick={() => (editing = '')}>{t.memory.cancel}</button>
 								</span>
 							{:else if confirming === memory.key}
 								<span class="confirm">
 									{t.memory.deleteAsk}
-									<button type="button" class="danger" onclick={() => remove(memory.key)}>
+									<Button variant="danger-soft" onclick={() => remove(memory.key)}>
 										{t.memory.delete}
-									</button>
+									</Button>
 									<button type="button" onclick={() => (confirming = '')}>{t.memory.cancel}</button>
 								</span>
 							{:else}
@@ -524,14 +525,6 @@
 
 	.confirm button:hover {
 		color: var(--text);
-	}
-
-	.confirm .danger:hover {
-		color: var(--danger);
-	}
-
-	.confirm .save {
-		color: var(--brass);
 	}
 
 	.problem {

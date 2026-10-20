@@ -25,6 +25,7 @@ words are gone still looks like a diagram from any distance.
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Any
 
@@ -194,7 +195,7 @@ class TestADiagramIsDrawn:
         page.locator("figure.artifact.inline .drawing svg").first.wait_for(timeout=30_000)
 
         with page.expect_download(timeout=15_000) as saving:
-            page.locator("figure.artifact .save").first.click()
+            page.get_by_role("button", name=re.compile(r"^Download .+ as a page$")).first.click()
         saved = saving.value
 
         # The name she gave it, with the kind changed to the one that opens.

@@ -11,13 +11,15 @@
 	 * Everything here saves one field at a time. A whole-project PUT would let this screen,
 	 * left open in a second tab, overwrite a pin somebody added in the first on its way past.
 	 */
+	import Button from '$lib/components/ui/Button.svelte';
+	import Textarea from '$lib/components/ui/Textarea.svelte';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { untrack } from 'svelte';
 	import type { Project } from '$lib/api/client';
-	import Select from '$lib/components/Select.svelte';
-	import Skeleton from '$lib/components/Skeleton.svelte';
+	import Select from '$lib/components/ui/Select.svelte';
+	import Skeleton from '$lib/components/ui/Skeleton.svelte';
 	import SkillPicker from '$lib/components/SkillPicker.svelte';
 	import { t } from '$lib/i18n';
 	import { Placeholder } from '$lib/loading.svelte';
@@ -101,16 +103,16 @@
 			<p class="caption">{t.project.instructionsHint}</p>
 			<!-- No placeholder. The hint above already says what belongs here, and repeating it
 			     inside the field means the empty state says the same sentence twice. -->
-			<textarea bind:value={draft} rows="8"></textarea>
+			<Textarea
+				value={draft}
+				rows={8}
+				ariaLabel={t.project.instructions}
+				onchange={(value) => (draft = value)}
+			/>
 			<div class="foot">
-				<button
-					class="save"
-					type="button"
-					disabled={!dirty}
-					onclick={() => saveInstructions(project)}
-				>
+				<Button variant="highlighted" disabled={!dirty} onclick={() => saveInstructions(project)}>
 					{t.project.save}
-				</button>
+				</Button>
 				{#if saved}<span class="caption saved">{t.project.saved}</span>{/if}
 			</div>
 		</section>
@@ -124,9 +126,9 @@
 				{:else}
 					<span class="caption">—</span>
 				{/each}
-				<button class="link" type="button" onclick={() => (picking = true)}>
+				<Button variant="ghost" size="sm" onclick={() => (picking = true)}>
 					{t.project.chooseSkills}
-				</button>
+				</Button>
 			</div>
 		</section>
 
@@ -187,14 +189,13 @@
 					<li class="caption">{t.project.noChats}</li>
 				{/each}
 			</ul>
-			<button class="link" type="button" onclick={() => goto(resolve('/'))}>{t.rail.newChat}</button
-			>
+			<Button variant="ghost" size="sm" onclick={() => goto(resolve('/'))}>{t.rail.newChat}</Button>
 		</section>
 	</div>
 {:else}
 	<div class="missing">
 		<p>{t.project.notFound}</p>
-		<button class="save" type="button" onclick={() => goto(resolve('/'))}>{t.rail.newChat}</button>
+		<Button variant="highlighted" onclick={() => goto(resolve('/'))}>{t.rail.newChat}</Button>
 	</div>
 {/if}
 
@@ -284,40 +285,11 @@
 		color: var(--text-faint);
 	}
 
-	textarea {
-		width: 100%;
-		padding: 10px 12px;
-		background: var(--surface);
-		border: 1px solid var(--line);
-		border-radius: var(--radius);
-		color: var(--text);
-		font: inherit;
-		resize: vertical;
-	}
-
-	textarea:focus {
-		outline: none;
-		border-color: var(--brass);
-	}
-
 	.foot {
 		display: flex;
 		align-items: center;
 		gap: 10px;
 		margin-top: 8px;
-	}
-
-	.save {
-		padding: 6px 14px;
-		background: var(--surface-raised);
-		border: 1px solid var(--line);
-		border-radius: var(--radius);
-		color: var(--text);
-		font-size: 13px;
-	}
-
-	.save:disabled {
-		color: var(--text-faint);
 	}
 
 	.saved {
@@ -344,15 +316,6 @@
 		border-radius: 999px;
 		font-size: 12.5px;
 		color: var(--text-muted);
-	}
-
-	.link {
-		color: var(--brass);
-		font-size: 13px;
-	}
-
-	.link:hover {
-		text-decoration: underline;
 	}
 
 	.colours {
