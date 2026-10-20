@@ -7,6 +7,7 @@ of those renders as a sentence to the model if it leaks through, and none of the
 
 from __future__ import annotations
 
+from typing import Any, cast
 from uuid import uuid4
 
 import pytest
@@ -31,7 +32,7 @@ from hera_profiles import (
 def profile(**fields: object) -> Profile:
     """A detached profile. Nothing here needs it to be persisted."""
     defaults: dict[str, object] = {"owner_id": uuid4(), "slug": "test", "name": "Test"}
-    return Profile(**{**defaults, **fields})
+    return Profile(**cast("dict[str, Any]", {**defaults, **fields}))
 
 
 def rendered(builder: PromptBuilder, **bindings: str) -> str:

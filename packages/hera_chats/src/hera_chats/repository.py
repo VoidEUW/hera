@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Sequence
-from typing import Any
+from typing import Any, cast
 from uuid import UUID
 
 from sqlalchemy.orm.attributes import flag_modified
@@ -86,7 +86,7 @@ class ProjectRepository(Repository[Project]):
             owner_id=owner_id,
             name=name,
             slug=self._free_slug(owner_id, slugify(name)),
-            **fields,
+            **cast("dict[str, Any]", fields),
         )
         return self.add(project)
 
@@ -156,7 +156,7 @@ class ChatRepository(Repository[Chat]):
         )
 
     def create(self, owner_id: UUID, **fields: object) -> Chat:
-        return self.add(Chat(owner_id=owner_id, **fields))
+        return self.add(Chat(owner_id=owner_id, **cast("dict[str, Any]", fields)))
 
     def save(self, obj: Chat) -> Chat:
         # A chat carries a JSON column now (`pinned_skills`), and an in-place edit followed by
