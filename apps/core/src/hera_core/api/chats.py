@@ -77,6 +77,11 @@ logger = logging.getLogger(__name__)
 
 EXPORT_TYPE = "text/markdown; charset=utf-8"
 
+# How long the title may take. It is awaited before `done` is sent and before the turn is
+# persisted, so a slow endpoint would otherwise hold both for as long as its own HTTP timeout
+# (minutes) -- over a name the chat can do without, because the raw-message title is the fallback.
+_TITLE_TIMEOUT_SECONDS = 15.0
+
 
 @router.get("/chats", response_model=list[ChatOut])
 def list_chats(owner: Owner, db: Db, project_id: UUID | None = None) -> list[ChatOut]:
@@ -542,14 +547,18 @@ async def _chat_title(container: Container, text: str) -> str | None:
     )
     try:
         parts: list[str] = []
-        async for event in provider.stream(request):
-            if isinstance(event, TextDelta):
-                parts.append(event.text)
+        async with asyncio.timeout(_TITLE_TIMEOUT_SECONDS):
+            async for event in provider.stream(request):
+                if isinstance(event, TextDelta):
+                    parts.append(event.text)
         generated = " ".join("".join(parts).strip().split()).strip(" \t\n\"'`#*-•")
         if not generated or generated.casefold() == title_from(text).casefold():
             return None
         return title_from(generated, limit=60)
     except asyncio.CancelledError:
+        return None
+    except TimeoutError:
+        logger.warning("Automatic chat title took longer than %ss", _TITLE_TIMEOUT_SECONDS)
         return None
     except Exception:
         logger.exception("Could not generate an automatic chat title")

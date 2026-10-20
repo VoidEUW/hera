@@ -6,6 +6,7 @@ the right frames, and what was persisted matches what was streamed.
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Any
@@ -166,6 +167,37 @@ class TestASimpleTurn:
             await talk(client, chat_id, "Explain Kerberos")
             detail = (await client.get(f"{API}/chats/{chat_id}")).json()
 
+        assert detail["chat"]["title"] == "Explain Kerberos"
+
+    async def test_a_title_request_that_hangs_does_not_hold_up_the_turn(
+        self, make_services: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The title is awaited before `done` and before the turn is persisted, so an endpoint
+        that never answers it must cost a short wait and a raw-text title, not the whole turn."""
+        monkeypatch.setattr("hera_core.api.chats._TITLE_TIMEOUT_SECONDS", 0.05)
+
+        class ProviderWhoseTitleCallHangs:
+            def __init__(self) -> None:
+                self.chat = FakeProvider([text_turn("Hello.")])
+
+            async def stream(self, request: Any) -> AsyncIterator[Any]:
+                if request.messages[0].role.value == "system" and "Summarize the user's" in str(
+                    request.messages[0].content
+                ):
+                    await asyncio.Event().wait()
+                async for event in self.chat.stream(request):
+                    yield event
+
+            async def aclose(self) -> None:
+                await self.chat.aclose()
+
+        services = make_services(ProviderWhoseTitleCallHangs())
+        async with _client(services) as client:
+            chat_id = await open_chat(client)
+            frames = await asyncio.wait_for(talk(client, chat_id, "Explain Kerberos"), timeout=5)
+            detail = (await client.get(f"{API}/chats/{chat_id}")).json()
+
+        assert payload(frames, "done")["content"] == "Hello."
         assert detail["chat"]["title"] == "Explain Kerberos"
 
     async def test_a_second_turn_sees_the_first(self, make_services: Any) -> None:
