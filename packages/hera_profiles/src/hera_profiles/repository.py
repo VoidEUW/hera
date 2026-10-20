@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Mapping, Sequence
+from typing import Any, cast
 from uuid import UUID
 
 from sqlalchemy.orm.attributes import flag_modified
@@ -71,7 +72,7 @@ class ProfileRepository(Repository[Profile]):
             owner_id=owner_id,
             name=name,
             slug=self._free_slug(owner_id, slug or slugify(name)),
-            **fields,  # forwarded straight into the model's own validation
+            **cast("dict[str, Any]", fields),  # forwarded straight into the model's own validation
         )
         return self.add(profile)
 
