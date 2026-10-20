@@ -3,10 +3,43 @@
 Current state of the rebuild, so a new session can start without re-reading history. A snapshot,
 not a changelog — historical detail and full rationale live in `versions/` and the ADRs.
 
-**Updated:** 2026-09-18 · **Version:** v0.2.0 tagged, v0.2.1 in progress · **Strategy:** thin spine
+**Updated:** 2026-10-20 · **Version:** v0.2.0 tagged, v0.2.1 in progress · **Strategy:** thin spine
 first, then deepen
 
 ## Now: v0.2.1
+
+### The interface is on a theme ([issue #182](https://github.com/VoidEUW/hera/issues/182), [ADR 21](adr/0021-a-theme-is-imported-data.md))
+
+The UI rework base. One branch, seven steps, each leaving the app working:
+
+1. **A theme is imported data.** `npm run theme:import <export.md>` turns a Hera Theme Builder
+   export into `apps/core/web/src/lib/themes/` (tokens re-scoped per palette, fonts, a registry).
+   Heaven is the one shipped and the default; the other family members arrive by importing their
+   exports. A theme changes tokens — colour, faces, sizes, radii, density, motion slots — never
+   structure.
+2. **One icon set**, drawn only by `ui/Icon.svelte` (Lucide's drawings as data, the spec's names).
+3. **The primitives**, once each, in `lib/components/ui/`: Button, CloseButton, Segmented, Chip,
+   Pill, Kbd, Avatar, Spinner, ProgressBar, Collapsible, Textarea, Toaster + `$lib/toasts`,
+   Tooltip, Menu, ErrorPage, SendButton, Topbar — and Modal, Select, Checkbox (+ switch), Input,
+   Slider, Skeleton re-skinned. `/design` shows every one in every state; the capture films it.
+4. **The shell**: one Sidebar family for chats and settings (fold to an icon rail, resize by drag
+   or keys), row menus that cannot be clipped, and one `dialog` action for focus and Escape —
+   which is what fixed the phone sheet's missing focus trap (#121).
+5. **The conversation**: the trace is a state dot on a dashed line with mono-capital verbs (the
+   per-kind marks are gone); speaker labels, bubbles, always-visible actions, the streaming caret,
+   the soft composer with chips and the morphing send button, the card and side view (#158,
+   #171), frameless question and permission cards with keys.
+6. **Error pages** on one primitive: offline, and the router's 404 and failures (#140, #141).
+
+**Guards that keep it** (`src/lib/themes/themes.test.ts`, `src/lib/icons.test.ts`): a generated
+theme carries every declaration of its export; every theme defines what the default defines;
+every token read is defined somewhere; no literal colour or duration in a component; no `<svg>`
+outside `Icon` (and the ocellus and the spinner); no icon spelled as a text glyph.
+
+**Left for the issues to pick up:** ProviderCard and ModelRow keep their own disclosure (they mount
+their body only when open); `$lib` is still a deprecated alias rather than `#lib` imports; the
+spec's word-by-word blur on her prose (`prose.stream`) is not done — the caret is; Chromium warns
+about unused preloads on a hard navigation while the service worker is in control.
 
 ### The turn was sending the wrong conversation ([issue #63](https://github.com/VoidEUW/hera/issues/63))
 
@@ -366,8 +399,9 @@ every enabled memory is always in the prompt, under a token ceiling.
 - A tool call reads as a sentence ("called **Docker** fetch content"), qualified name on hover /
   under the permission card — no table of known tools, so an unfamiliar server doesn't look broken
   next to a familiar one.
-- Gutter marks by what happened, not by which event carried it: a thought keeps the ocellus; a
-  skill (routed or self-selected mid-task) gets a scroll; everything else gets a wrench.
+- A gutter row says what happened with its verb (mono capitals) and what state it is in with a
+  dot — quiet for a thought or a skill, laurel for a call (pulsing while it is out), danger for a
+  failure — [ADR 21](adr/0021-a-theme-is-imported-data.md). A thought shows its word count only.
 - A question is drawn once out of three events (`hera__ask` call, `answer_required`,
   the synthesised `tool_result`) — `QuestionCard` is `PermissionCard` with a field instead of
   buttons, settled state read from the persisted `answer_given` event.
@@ -416,6 +450,8 @@ Rules that would otherwise rot are tests, not prose:
 | `test_layering.py` | a package imports sideways or upwards, or reaches into `apps/`. Each package has an explicit allow-list; `hera_storage` and `hera_prompts` have an empty one |
 | `test_workspace.py` | a member is missing from mypy's `files`, from coverage's `source`, or from the root `[tool.uv.sources]`; or two test modules would shadow each other |
 | `test_docs.py` | a decision record is unindexed, misnumbered, or has no status |
+| `web/src/lib/themes/themes.test.ts` | a generated theme drifts from its export, a theme lacks a token another defines, a component reads an undefined token or names a colour or a duration of its own |
+| `web/src/lib/icons.test.ts` | a component draws its own `<svg>` or spells an icon as a text glyph |
 
 ## CI
 
@@ -490,7 +526,8 @@ or pointed at directly by Claude Code. They live in the separate `hera-skills` r
 
 1. **React to the build.** `docs/frontend.md` says the design language gets adjusted once there is
    something to argue with — run `uv run hera serve` and argue with it. Open questions it can now
-   answer: the display face, whether the ocellus lands, where thinking lives, the exact palette.
+   answer: whether the ocellus lands and where thinking lives. The face and the palette are now a
+   theme's (ADR 21), and a theme is one import away.
 2. **Her identity.** The 13 mind regions ship with placeholder text saying what belongs in each.
    Writing them is what makes her Hera — a text editor in Settings → Mind, not code.
 3. **A real endpoint.** Everything so far runs against `FakeProvider`. Settings → Models now
