@@ -1,0 +1,26 @@
+# browser console
+
+[desktop] warning: A preload for 'http://127.0.0.1:53387/_app/immutable/entry/start.ChRbPsMW.js' is found, but is not used because it is a cross-world service worker resource mismatch.  (http://127.0.0.1:53387/chat/3cc61d85-9091-4965-9014-cefcd135716d:26)
+[desktop] warning: A preload for 'http://127.0.0.1:53387/_app/immutable/entry/payload.DSmR2FwN.js' is found, but is not used because it is a cross-world service worker resource mismatch.  (http://127.0.0.1:53387/chat/3cc61d85-9091-4965-9014-cefcd135716d:27)
+[desktop] warning: The resource http://127.0.0.1:53387/_app/immutable/entry/payload.DSmR2FwN.js was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.  (http://127.0.0.1:53387/chat/3cc61d85-9091-4965-9014-cefcd135716d:0)
+[desktop] warning: The resource http://127.0.0.1:53387/_app/immutable/entry/start.ChRbPsMW.js was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.  (http://127.0.0.1:53387/chat/3cc61d85-9091-4965-9014-cefcd135716d:0)
+[desktop] warning: The resource http://127.0.0.1:53387/_app/immutable/entry/payload.DSmR2FwN.js was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.  (http://127.0.0.1:53387/chat/3cc61d85-9091-4965-9014-cefcd135716d:0)
+[desktop] warning: The resource http://127.0.0.1:53387/_app/immutable/entry/start.ChRbPsMW.js was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.  (http://127.0.0.1:53387/chat/3cc61d85-9091-4965-9014-cefcd135716d:0)
+[desktop] warning: A preload for 'http://127.0.0.1:53387/_app/immutable/entry/start.ChRbPsMW.js' is found, but is not used because it is a cross-world service worker resource mismatch.  (http://127.0.0.1:53387/no-such-screen:26)
+[desktop] warning: A preload for 'http://127.0.0.1:53387/_app/immutable/entry/payload.DSmR2FwN.js' is found, but is not used because it is a cross-world service worker resource mismatch.  (http://127.0.0.1:53387/no-such-screen:27)
+[desktop] warning: A preload for 'http://127.0.0.1:53387/_app/immutable/chunks/C27VMQpq.js' is found, but is not used because it is a cross-world service worker resource mismatch.  (http://127.0.0.1:53387/no-such-screen:29)
+[desktop] warning: A preload for 'http://127.0.0.1:53387/_app/immutable/entry/start.ChRbPsMW.js' is found, but is not used because it is a cross-world service worker resource mismatch.  (http://127.0.0.1:53387/design:26)
+[desktop] warning: A preload for 'http://127.0.0.1:53387/_app/immutable/entry/payload.DSmR2FwN.js' is found, but is not used because it is a cross-world service worker resource mismatch.  (http://127.0.0.1:53387/design:27)
+[desktop] warning: A preload for 'http://127.0.0.1:53387/_app/immutable/chunks/CRzLMJPS.js' is found, but is not used because it is a cross-world service worker resource mismatch.  (http://127.0.0.1:53387/design:28)
+[desktop] warning: A preload for 'http://127.0.0.1:53387/_app/immutable/chunks/C27VMQpq.js' is found, but is not used because it is a cross-world service worker resource mismatch.  (http://127.0.0.1:53387/design:29)
+[desktop] warning: The resource http://127.0.0.1:53387/_app/immutable/chunks/C27VMQpq.js was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.  (http://127.0.0.1:53387/design:0)
+[desktop] warning: The resource http://127.0.0.1:53387/_app/immutable/entry/payload.DSmR2FwN.js was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.  (http://127.0.0.1:53387/design:0)
+[desktop] warning: The resource http://127.0.0.1:53387/_app/immutable/entry/start.ChRbPsMW.js was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.  (http://127.0.0.1:53387/design:0)
+[desktop] warning: The resource http://127.0.0.1:53387/_app/immutable/chunks/CRzLMJPS.js was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.  (http://127.0.0.1:53387/design:0)
+
+# uncaught page errors
+
+
+# failed requests (network failure or a 4xx/5xx)
+
+(none)
