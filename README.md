@@ -74,11 +74,12 @@ uv run hera serve                 # http://localhost:8756
 Or with Docker — the image is built for amd64 and arm64:
 
 ```bash
-docker run -p 8756:8756 -v hera_data:/data ghcr.io/voideuw/hera:latest
+docker run -p 8756:8756 -v hera_data:/data ghcr.io/voideuw/hera:rc
 # or, from a checkout: docker compose up
 ```
 
-`:latest` is always the newest release; `:rc` follows the newest release candidate. A container
+`:rc` follows the newest release candidate, and an exact version (`:0.2.1-rc5`) is always there.
+`:latest` is always the newest *release* and appears with v0.2.1 — until then use `:rc`. A container
 reaches a model on the host through `host.docker.internal` — see the comments in
 [docker-compose.yml](docker-compose.yml).
 
