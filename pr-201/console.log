@@ -1,0 +1,25 @@
+# browser console
+
+[desktop] warning: A preload for 'http://127.0.0.1:44041/_app/immutable/entry/start.ChRbPsMW.js' is found, but is not used because it is a cross-world service worker resource mismatch.  (http://127.0.0.1:44041/chat/b3d3ea4e-c687-44fe-83ee-5407dbc670c3:26)
+[desktop] warning: A preload for 'http://127.0.0.1:44041/_app/immutable/entry/payload.DSmR2FwN.js' is found, but is not used because it is a cross-world service worker resource mismatch.  (http://127.0.0.1:44041/chat/b3d3ea4e-c687-44fe-83ee-5407dbc670c3:27)
+[desktop] warning: A preload for 'http://127.0.0.1:44041/_app/immutable/chunks/C27VMQpq.js' is found, but is not used because it is a cross-world service worker resource mismatch.  (http://127.0.0.1:44041/chat/b3d3ea4e-c687-44fe-83ee-5407dbc670c3:29)
+[desktop] warning: A preload for 'http://127.0.0.1:44041/_app/immutable/entry/start.ChRbPsMW.js' is found, but is not used because it is a cross-world service worker resource mismatch.  (http://127.0.0.1:44041/chat/b3d3ea4e-c687-44fe-83ee-5407dbc670c3:26)
+[desktop] warning: A preload for 'http://127.0.0.1:44041/_app/immutable/entry/payload.DSmR2FwN.js' is found, but is not used because it is a cross-world service worker resource mismatch.  (http://127.0.0.1:44041/chat/b3d3ea4e-c687-44fe-83ee-5407dbc670c3:27)
+[desktop] warning: A preload for 'http://127.0.0.1:44041/_app/immutable/chunks/CRzLMJPS.js' is found, but is not used because it is a cross-world service worker resource mismatch.  (http://127.0.0.1:44041/chat/b3d3ea4e-c687-44fe-83ee-5407dbc670c3:28)
+[desktop] warning: A preload for 'http://127.0.0.1:44041/_app/immutable/chunks/C27VMQpq.js' is found, but is not used because it is a cross-world service worker resource mismatch.  (http://127.0.0.1:44041/chat/b3d3ea4e-c687-44fe-83ee-5407dbc670c3:29)
+[desktop] warning: The resource http://127.0.0.1:44041/_app/immutable/entry/start.ChRbPsMW.js was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.  (http://127.0.0.1:44041/chat/b3d3ea4e-c687-44fe-83ee-5407dbc670c3:0)
+[desktop] warning: The resource http://127.0.0.1:44041/_app/immutable/chunks/CRzLMJPS.js was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.  (http://127.0.0.1:44041/chat/b3d3ea4e-c687-44fe-83ee-5407dbc670c3:0)
+[desktop] warning: The resource http://127.0.0.1:44041/_app/immutable/chunks/C27VMQpq.js was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.  (http://127.0.0.1:44041/chat/b3d3ea4e-c687-44fe-83ee-5407dbc670c3:0)
+[desktop] warning: The resource http://127.0.0.1:44041/_app/immutable/entry/payload.DSmR2FwN.js was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.  (http://127.0.0.1:44041/chat/b3d3ea4e-c687-44fe-83ee-5407dbc670c3:0)
+[desktop] warning: The resource http://127.0.0.1:44041/_app/immutable/entry/start.ChRbPsMW.js was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.  (http://127.0.0.1:44041/chat/b3d3ea4e-c687-44fe-83ee-5407dbc670c3:0)
+[desktop] warning: The resource http://127.0.0.1:44041/_app/immutable/chunks/CRzLMJPS.js was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.  (http://127.0.0.1:44041/chat/b3d3ea4e-c687-44fe-83ee-5407dbc670c3:0)
+[desktop] warning: The resource http://127.0.0.1:44041/_app/immutable/chunks/C27VMQpq.js was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.  (http://127.0.0.1:44041/chat/b3d3ea4e-c687-44fe-83ee-5407dbc670c3:0)
+[desktop] warning: The resource http://127.0.0.1:44041/_app/immutable/entry/payload.DSmR2FwN.js was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.  (http://127.0.0.1:44041/chat/b3d3ea4e-c687-44fe-83ee-5407dbc670c3:0)
+[desktop] warning: A preload for 'http://127.0.0.1:44041/_app/immutable/entry/start.ChRbPsMW.js' is found, but is not used because it is a cross-world service worker resource mismatch.  (http://127.0.0.1:44041/:26)
+
+# uncaught page errors
+
+
+# failed requests (network failure or a 4xx/5xx)
+
+(none)
