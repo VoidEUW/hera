@@ -2,14 +2,21 @@
 
 ## Setup
 
+You need Python 3.12+, [uv](https://docs.astral.sh/uv/) and Node 24.
+
 ```bash
 git clone https://github.com/VoidEUW/hera.git
 cd hera
 uv sync --all-packages
-cd apps/core/web && npm ci
+cd apps/core/web && npm ci && cd ../..
+uv run playwright install chromium        # only for the browser tests
+pre-commit install                        # the fast half of the loop, before every commit
+uv run hera serve                         # http://localhost:8756
 ```
 
-One checkout, one sync. Every library is a workspace member under `packages/`, so an edit in one
+`hera serve` serves the interface from `apps/core/src/hera_core/static/`; after changing anything
+under `apps/core/web` run `npm run build` there (or use `npm run dev`, which proxies to a running
+server). One checkout, one sync. Every library is a workspace member under `packages/`, so an edit in one
 is visible to the others immediately with no reinstall.
 
 ## The loop
@@ -18,11 +25,15 @@ is visible to the others immediately with no reinstall.
 uv run ruff check . && uv run ruff format --check .
 uv run mypy
 uv run coverage run -m pytest && uv run coverage report   # gate: 90 %
-cd apps/core/web && npm run check && npm run test:unit
-uv run pytest -m e2e                                      # Playwright, no model needed
+cd apps/core/web && npm run check && npm run lint && npm run test:unit
+npm run build                                             # the browser tests drive this build
+cd ../.. && uv run pytest -m e2e                          # Playwright against a scripted model
 ```
 
-`pre-commit install` runs the fast half of this before every commit.
+`-m "not e2e and not live"` is the fast loop. `live` marks anything that needs a real model
+endpoint and never runs in CI. `uv run python tests/e2e/capture_preview.py <dir>` drives the
+interface and writes screenshots and a console log — what the CI **capture** job does for every
+pull request, and the way to look at a UI change before asking anybody else to.
 
 ## Branching — GitHub Flow
 
@@ -36,8 +47,10 @@ uv run pytest -m e2e                                      # Playwright, no model
 | `docs/` | documentation only |
 | `refactor/` | structure, no behaviour change |
 
-Open a pull request, let CI and CodeRabbit run, squash-merge, delete the branch. No long-running
-branches, no direct pushes to `main`, no merge commits — history stays linear.
+Open a pull request using the template, let CI and CodeRabbit run, squash-merge, delete the branch.
+No long-running branches, no direct pushes to `main`, no merge commits — history stays linear.
+Issues have forms for a feature and for a bug; say *what is wrong and why it matters* before how
+to fix it.
 
 ### Commit titles and release notes
 
@@ -70,6 +83,17 @@ The old hand-written changelog is kept, frozen, as
   importing from a package above it is a bug, and CodeRabbit is told to flag it.
 - **Typed, strictly.** `mypy --strict` passes with no `# type: ignore` that lacks a reason on the
   same line. `from __future__ import annotations` at the top of every module.
+- **A theme is imported, and a component reads tokens only** ([ADR 21](docs/adr/0021-a-theme-is-imported-data.md)).
+  Colour, type, shape and motion come from `src/lib/themes/`, which `npm run theme:import` writes and
+  nobody edits by hand. No literal colour, font, radius or duration in a component, and every
+  control is a primitive in `lib/components/ui/` — a feature component may not open a `<button>`,
+  `<input>`, `<textarea>` or `<select>`, nor read `--brass` where the theme does not name it.
+  Guard tests fail on each. A new component is added to `/design` and to the theme's *Hera
+  amendments*.
+- **A shortcut is a control that also exists on screen** (#112). Chords live in
+  `apps/core/web/src/lib/keys.ts` as data that names the control each mirrors; the screen that owns
+  the control registers the handler and shows the key. A chord-only feature is the interface's
+  version of what [ADR 5](docs/adr/0005-deterministic-skill-routing.md) refuses for skills.
 - **Everything is English** — code, comments, docstrings, commit messages, UI strings, prompts
   and stored content. User-visible text goes through the i18n layer so a German locale can be
   added without touching components.
