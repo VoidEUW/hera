@@ -3,14 +3,14 @@
 One file per version, written **before** the work rather than after it: what that version is for,
 what lands in it, in what order, and what is deliberately left out.
 
-This is not `docs/status.md` and not `CHANGELOG.md`, and the three are easy to collapse into each
-other by accident:
+This is not `docs/status.md` and not the release notes, and the three are easy to collapse into
+each other by accident:
 
 | | Answers | Tense |
 |---|---|---|
 | `docs/versions/vX.Y.Z.md` | *What are we building, and why in this order* | Future. Frozen once the version ships |
 | [`docs/status.md`](../status.md) | *Where does the build stand right now* | Present. A snapshot, rewritten as milestones land |
-| [`CHANGELOG.md`](../../CHANGELOG.md) | *What changed, for somebody who was not here* | Past. Append-only |
+| [GitHub releases](https://github.com/VoidEUW/hera/releases) | *What changed, for somebody who was not here* | Past. Written from the commits when a tag is pushed (see [`CHANGELOG.md`](../../CHANGELOG.md)) |
 
 A version document stops being edited when its tag is cut. If the plan turned out wrong, that is
 worth reading later — the reasoning is the point, and a document quietly corrected after the fact
@@ -31,4 +31,4 @@ not to* into *we forgot*.
 | [v0.3.0](v0.3.0.md) | The widening pass: dreaming, moved out of v0.2 · a sandbox · `hera-code` |
 
 v0.1.0 has no document here — it was planned in `docs/status.md` and in the eleven decision records
-before this convention existed. [`CHANGELOG.md`](../../CHANGELOG.md) is its record.
+before this convention existed. [`docs/changelog-history.md`](../changelog-history.md) is its record.

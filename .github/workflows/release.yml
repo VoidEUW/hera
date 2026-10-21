@@ -4,23 +4,70 @@ name: Release
 #   v1.2.3                  the application
 #   hera-prompts-v0.1.3     a single package, so a consumer can pin one library without
 #                           pinning Hera (see CONTRIBUTING.md, "Using one package somewhere else")
+#
+# Releases are published from the tag and nothing else. The notes are the changelog: they are
+# built from Conventional Commit titles by .github/scripts/release_notes.py, so there is no file
+# to keep up. A version with a suffix (v0.2.1-rc4) is a pre-release -- marked as one, never the
+# repository's "latest", and listing what changed since the previous tag; a plain version is a
+# release listing everything since the previous plain one, so it covers all of its candidates.
+#
+# Run by hand with a tag name, it publishes nothing and prints the notes that tag would get.
 on:
   push:
     tags:
       - "v*"
       - "hera-*-v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "The tag to write notes for, e.g. v0.2.1-rc4 -- or one not made yet, e.g. v0.2.1"
+        required: true
+      rev:
+        description: "The commit the notes run up to (default: the tag; use HEAD for a tag not made yet)"
+        required: false
 
 permissions:
   contents: write
 
 jobs:
+  # The dry run: notes into the job summary, nothing published, nothing tagged.
+  preview:
+    name: preview notes
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Write the notes
+        env:
+          TAG: ${{ inputs.tag }}
+          REV: ${{ inputs.rev }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          package=""
+          if [[ "$TAG" =~ ^(hera-[a-z0-9-]+)-v[0-9] ]]; then
+            package="${BASH_REMATCH[1]}"
+          fi
+          args=(--tag "$TAG" --repo "$REPOSITORY" --rev "${REV:-$TAG}")
+          if [ -n "$package" ]; then
+            args+=(--path "packages/${package//-/_}")
+          fi
+          {
+            echo "## Notes for \`$TAG\`"
+            echo
+            python3 .github/scripts/release_notes.py "${args[@]}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
   release:
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     # Read by the docker-image job below, so it can tell an application tag from a package
     # tag without re-deriving the regex a second place could disagree with.
     outputs:
       package: ${{ steps.target.outputs.package }}
       version: ${{ steps.target.outputs.version }}
+      prerelease: ${{ steps.target.outputs.prerelease }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -41,6 +88,12 @@ jobs:
             # is the file the tag has to agree with for the About box to be telling the truth.
             echo "directory=apps/core" >> "$GITHUB_OUTPUT"
             echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+          fi
+          # A suffix after the three numbers -- -rc1, -beta2 -- is what makes it a pre-release.
+          if [[ "$GITHUB_REF_NAME" =~ ^(hera-[a-z0-9-]+-)?v[0-9]+\.[0-9]+\.[0-9]+- ]]; then
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
           fi
 
       # Every tag, the application's included. The version is declared in exactly one file per
@@ -64,31 +117,31 @@ jobs:
         if: steps.target.outputs.package != ''
         run: uv build --package '${{ steps.target.outputs.package }}' --out-dir dist
 
-      - name: Collect the changes since the previous tag
-        id: notes
+      # Grouped by Conventional Commit type. The application's notes are every commit in the range;
+      # a package's are the ones touching its directory, because the rest is not in its wheel.
+      - name: Write the release notes
+        env:
+          PACKAGE: ${{ steps.target.outputs.package }}
+          DIRECTORY: ${{ steps.target.outputs.directory }}
         run: |
-          pattern='v[0-9]*'
-          if [ -n '${{ steps.target.outputs.package }}' ]; then
-            pattern='${{ steps.target.outputs.package }}-v[0-9]*'
+          args=(--tag "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY")
+          if [ -n "$PACKAGE" ]; then
+            args+=(--path "$DIRECTORY")
           fi
-          previous=$(git describe --tags --abbrev=0 --match "$pattern" "${GITHUB_REF_NAME}^" 2>/dev/null || true)
-          if [ -n "$previous" ]; then
-            range="$previous..${GITHUB_REF_NAME}"
-          else
-            range="${GITHUB_REF_NAME}"
-          fi
-          {
-            echo "body<<HERA_EOF"
-            git log --no-merges --pretty='- %s (%h)' "$range" -- '${{ steps.target.outputs.directory }}'
-            echo "HERA_EOF"
-          } >> "$GITHUB_OUTPUT"
+          python3 .github/scripts/release_notes.py "${args[@]}" > release-notes.md
+          cat release-notes.md >> "$GITHUB_STEP_SUMMARY"
 
       - uses: softprops/action-gh-release@v3
         with:
           name: ${{ github.ref_name }}
-          body: ${{ steps.notes.outputs.body }}
+          body_path: release-notes.md
           files: ${{ steps.target.outputs.package != '' && 'dist/*' || '' }}
           generate_release_notes: false
+          # A release candidate is a pre-release and never "latest". Of the rest only the
+          # application's tag is: a package's tag must not become what the repository calls its
+          # latest release.
+          prerelease: ${{ steps.target.outputs.prerelease }}
+          make_latest: ${{ steps.target.outputs.prerelease == 'false' && steps.target.outputs.package == '' }}
 
   # Only for the application tag (v1.2.3) -- a package tag (hera-prompts-v0.1.3) releases a
   # wheel, not something Dockerfile knows how to build. Depends on `release` rather than
@@ -96,7 +149,7 @@ jobs:
   docker-image:
     name: docker image
     needs: release
-    if: needs.release.outputs.package == ''
+    if: github.event_name == 'push' && needs.release.outputs.package == ''
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -124,10 +177,12 @@ jobs:
           repository=$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')
           version='${{ needs.release.outputs.version }}'
           tags="ghcr.io/$repository:$version"
-          # A pre-release version (anything with a -rc1-shaped suffix) never becomes `latest`,
-          # so pulling that tag can't hand somebody a release candidate by surprise.
+          # `latest` is always the newest *release*, so pulling it can never hand somebody a
+          # release candidate by surprise; `rc` is the newest candidate, for whoever wants one.
           if [[ "$version" != *-* ]]; then
             tags="$tags,ghcr.io/$repository:latest"
+          else
+            tags="$tags,ghcr.io/$repository:rc"
           fi
           echo "tags=$tags" >> "$GITHUB_OUTPUT"
 

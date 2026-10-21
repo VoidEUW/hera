@@ -39,9 +39,30 @@ uv run pytest -m e2e                                      # Playwright, no model
 Open a pull request, let CI and CodeRabbit run, squash-merge, delete the branch. No long-running
 branches, no direct pushes to `main`, no merge commits — history stays linear.
 
-Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/):
-`feat(chats): stream tool results as events`. The type drives the changelog — see
-[CHANGELOG.md](CHANGELOG.md), which is written per release rather than generated per commit.
+### Commit titles and release notes
+
+Commit messages — and so **pull request titles**, because a squash-merge takes the title — follow
+[Conventional Commits](https://www.conventionalcommits.org/): `feat(chats): stream tool results as
+events`. There is no changelog file to update. The release notes *are* the changelog, and they are
+written from these titles when a tag is pushed ([ADR 22](docs/adr/0022-the-changelog-is-the-release-notes.md)):
+
+| Type | Appears as |
+|---|---|
+| `feat` | Features |
+| `fix` | Fixes |
+| `perf` | Performance |
+| `refactor` | Refactoring |
+| `docs` | Documentation |
+| `chore`, `ci`, `build`, `test`, `style`, `revert` | Maintenance |
+| `feat!:` or a `BREAKING CHANGE:` footer | Breaking changes, first |
+
+Write the title for a reader of the release page: what changed, in the present tense, with the
+scope in brackets (`web`, `chats`, `ci`…). Dependency bumps are folded into one line. A title that
+is not conventional lands under *Other*, and CI says so on the pull request. The reasoning that
+does not fit a title goes in the pull request description or an ADR, not in a file nobody opens.
+
+The old hand-written changelog is kept, frozen, as
+[docs/changelog-history.md](docs/changelog-history.md).
 
 ## Writing code here
 
@@ -122,7 +143,25 @@ installed distribution rather than repeating the number, `/api/v1/health` report
 interface shows it from `workspace.version`. To display it somewhere new, read that field —
 do not add a constant.
 
-To cut an application release, bump `version` in `apps/core/pyproject.toml` and tag `v1.2.3`.
+### Cutting an application release
+
+1. Open a `chore(release): bump hera-core to 1.2.3` pull request that changes `version` in
+   `apps/core/pyproject.toml` (and the matching line in `uv.lock`, which `uv lock` rewrites) and
+   merge it once green — `main` is protected, so the bump goes through a pull request like
+   everything else.
+2. Tag the merge commit and push the tag: `git tag -a v1.2.3 -m v1.2.3 && git push origin v1.2.3`.
+
+`release.yml` does the rest. It publishes a **GitHub release** whose notes are written from the
+commit titles, and builds the Docker image.
+
+| Tag | Published as | Notes cover | Image tags |
+|---|---|---|---|
+| `v1.2.3-rc1` | pre-release, never "latest" | since the previous tag, rc or not | `1.2.3-rc1` and `rc` (moves to the newest) |
+| `v1.2.3` | release, the repository's "latest" | everything since the previous *release*, so all of its candidates | `1.2.3` and `latest` |
+
+To see the notes before tagging, run the **Release** workflow by hand from the Actions tab with the
+tag name (`v1.2.3`, and `HEAD` as the commit if the tag does not exist yet): it prints them into the
+job summary and publishes nothing.
 
 While developing both sides at once, point at the checkout instead:
 
