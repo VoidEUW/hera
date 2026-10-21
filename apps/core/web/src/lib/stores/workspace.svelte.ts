@@ -16,7 +16,7 @@ import {
 	type Server
 } from '$lib/api/client';
 import type { Attachment } from '$lib/attachments';
-import type { Tab as SettingsTab } from '$lib/components/Settings.svelte';
+import type { Tab as SettingsTab } from '$lib/settingsTabs';
 
 /** How many rows the rail held, the last time anybody looked at it. */
 export interface Shape {
@@ -424,6 +424,14 @@ export class Workspace {
 
 	/** Fold a chat's new title and activity back into the rail without a round trip. */
 	touch(updated: Chat) {
+		// Opening a chat is not activity: with nothing said since the rail was read it stays where
+		// it is, so the list is a stable thing to walk with ⌥↑ / ⌥↓ rather than one that jumps to
+		// put whatever you just opened on top (#112).
+		const before = this.chats.find((chat) => chat.id === updated.id);
+		if (before && before.last_message_at === updated.last_message_at) {
+			this.chats = this.chats.map((chat) => (chat.id === updated.id ? updated : chat));
+			return;
+		}
 		const rest = this.chats.filter((chat) => chat.id !== updated.id);
 		this.chats = [updated, ...rest];
 	}

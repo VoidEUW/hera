@@ -7,6 +7,7 @@
 	 * control that is on screen.
 	 */
 	import { API } from '$lib/api/client';
+	import { keys } from '$lib/keys';
 	import { t } from '$lib/i18n';
 	import IconButton from './ui/IconButton.svelte';
 	import Menu from './ui/Menu.svelte';
@@ -26,6 +27,25 @@
 	let open = $state(false);
 	let confirming = $state(false);
 	let anchor = $state<HTMLElement | null>(null);
+
+	// The chords for what is in this menu: the menu is the control they mirror (#112).
+	$effect(() => {
+		const off = [
+			keys.on('chat.export', () => {
+				// A download is a link being followed; the menu's own row is that link.
+				const link = document.createElement('a');
+				link.href = `${API}/chats/${chatId}/export.md`;
+				link.download = '';
+				link.click();
+			}),
+			keys.on('chat.delete', () => {
+				// Deleting is always asked first, so the chord opens the question, not the deed.
+				confirming = true;
+				open = true;
+			})
+		];
+		return () => off.forEach((undo) => undo());
+	});
 
 	function close() {
 		open = false;
@@ -61,10 +81,15 @@
 			href={`${API}/chats/${chatId}/export.md`}
 			download
 			external
+			keyId="chat.export"
 			onclick={close}>{t.rail.export}</MenuItem
 		>
-		<MenuItem icon="share" disabled description={t.chatMenu.shareSoon}>{t.chatMenu.share}</MenuItem>
+		<MenuItem icon="share" disabled keyId="chat.share" description={t.chatMenu.shareSoon}>
+			{t.chatMenu.share}
+		</MenuItem>
 		<MenuSeparator />
-		<MenuItem icon="trash" danger onclick={() => (confirming = true)}>{t.rail.delete}</MenuItem>
+		<MenuItem icon="trash" danger keyId="chat.delete" onclick={() => (confirming = true)}>
+			{t.rail.delete}
+		</MenuItem>
 	{/if}
 </Menu>

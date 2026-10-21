@@ -17,6 +17,7 @@
 	 * four to find the card that opens the file it just changed.
 	 */
 	import { api } from '$lib/api/client';
+	import { keys } from '$lib/keys';
 	import { downloadUrl, hasSource, kindOf, newest } from '$lib/artifacts';
 	import { t } from '$lib/i18n';
 	import { saveDiagram } from '$lib/mermaid';
@@ -121,6 +122,15 @@
 		setTimeout(() => (copied = false), 1400);
 	}
 
+	// ⌘S is the Save button, so it only answers while there is something to save; otherwise the
+	// browser's own Save keeps the chord (#112).
+	$effect(() =>
+		keys.on('chat.save', () => {
+			if (!artifacts.dirty) return false;
+			void save();
+		})
+	);
+
 	$effect(() => {
 		// The listing is re-read when something published changes, so a file created in the turn
 		// you are watching appears in the bar without a reload.
@@ -212,6 +222,7 @@
 				variant="highlighted"
 				size="sm"
 				busy={artifacts.saving}
+				keyId="chat.save"
 				disabled={!artifacts.dirty}
 				onclick={save}
 			>

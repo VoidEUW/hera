@@ -13,10 +13,12 @@
 	import { page } from '$app/state';
 	import Offline from '$lib/components/Offline.svelte';
 	import ChatSidebar from '$lib/components/ChatSidebar.svelte';
+	import CommandPalette from '$lib/components/CommandPalette.svelte';
 	import Settings from '$lib/components/Settings.svelte';
 	import Toaster from '$lib/components/ui/Toaster.svelte';
 	import { dialog } from '$lib/dialog';
 	import { t } from '$lib/i18n';
+	import { keys } from '$lib/keys';
 	import { sidebar } from '$lib/stores/sidebar.svelte';
 	import { notifications } from '$lib/notifications.svelte';
 	import { workspace } from '$lib/stores/workspace.svelte';
@@ -93,17 +95,54 @@
 		await Promise.all([workspace.loadProviders(), workspace.loadServers()]);
 	}
 
-	function onkeydown(event: KeyboardEvent) {
-		// ⌘K opens settings for now; search lands with the command palette.
-		if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
-			event.preventDefault();
-			workspace.openSettings();
-			return;
-		}
+	/** The command palette, and which question it was opened with. */
+	let palette = $state<'all' | 'chats' | null>(null);
+
+	/** Walk the chats in the order the rail lists them: ⌥↑ is the one above, ⌥↓ the one below. A
+	 * chord with nowhere to go declines, so the browser keeps it. */
+	function step(by: 1 | -1): boolean {
+		const list = workspace.chats;
+		const here = list.findIndex((chat) => chat.id === activeId);
+		const next = list[here === -1 ? (by === 1 ? 0 : list.length - 1) : here + by];
+		if (!next) return false;
+		void goto(resolve('/chat/[id]', { id: next.id }));
+		return true;
 	}
+
+	// The chords that exist on every screen (#112). Screens add their own while they are mounted.
+	$effect(() => {
+		const off = [
+			keys.on('palette', () => {
+				if (workspace.unreachable) return false;
+				palette = palette ? null : 'all';
+			}),
+			keys.on('palette.chats', () => {
+				if (workspace.unreachable) return false;
+				palette = 'chats';
+			}),
+			keys.on('settings', () => {
+				if (workspace.unreachable) return false;
+				palette = null;
+				workspace.openSettings();
+			}),
+			keys.on('hotkeys', () => {
+				if (workspace.unreachable) return false;
+				palette = null;
+				workspace.openSettings('hotkeys');
+			}),
+			keys.on('newChat', () => {
+				if (workspace.unreachable) return false;
+				palette = null;
+				void newChat();
+			}),
+			keys.on('chat.previous', () => step(-1)),
+			keys.on('chat.next', () => step(1))
+		];
+		return () => off.forEach((undo) => undo());
+	});
 </script>
 
-<svelte:window {onkeydown} />
+<svelte:window onkeydown={(event) => keys.dispatch(event)} />
 
 {#if workspace.unreachable}
 	<!-- Instead of the shell, not over it. Nothing below works without that first answer: no
@@ -153,6 +192,7 @@
 				{activeProjectId}
 				onnew={newChat}
 				onsettings={() => workspace.openSettings()}
+				onsearch={() => (palette = 'all')}
 				settingsOpen={workspace.settingsOpen}
 				onrename={(id, title) => workspace.renameChat(id, title)}
 				ondelete={removeChat}
@@ -173,7 +213,19 @@
 	     over the screen explaining that nothing is answering — and every control in it needs the
 	     server that is not. -->
 	{#if workspace.settingsOpen}
-		<Settings onclose={closeSettings} tab={workspace.settingsTab} />
+		<Settings
+			onclose={closeSettings}
+			tab={workspace.settingsTab}
+			ontab={(next) => (workspace.settingsTab = next)}
+		/>
+	{/if}
+
+	{#if palette}
+		<CommandPalette
+			scope={palette}
+			onnewchat={() => void newChat()}
+			onclose={() => (palette = null)}
+		/>
 	{/if}
 {/if}
 

@@ -20,6 +20,7 @@
 	 * clicks, so closing this does not also close the screen under it.
 	 */
 	import Button from '$lib/components/ui/Button.svelte';
+	import Confirm from '$lib/components/ui/Confirm.svelte';
 	import { untrack } from 'svelte';
 	import { api, type Skill } from '$lib/api/client';
 	import FileEditor from '$lib/components/ui/FileEditor.svelte';
@@ -56,12 +57,20 @@
 	let error = $state<string | null>(null);
 	let saving = $state(false);
 	let confirming = $state(false);
+	/** Asked on the way out with unsaved changes (Escape, the scrim, Cancel — every way out). */
+	let leaving = $state(false);
 	/** The Edit switch: a skill opens read-only and is changed on purpose; a new one is nothing
 	 * but an edit, so it opens with the switch on. */
 	let writing = $state(untrack(() => skill === null));
 
 	const isNew = $derived(current === null);
 	const changed = $derived(isNew ? id.trim() !== '' : original !== null && draft !== original);
+
+	/** Every way out goes through here, so a change is never thrown away without asking. */
+	function leave() {
+		if (changed && !saving) leaving = true;
+		else onclose();
+	}
 	const name = $derived(current?.id ?? id);
 
 	$effect(() => {
@@ -131,7 +140,7 @@
 	width="min(900px, 94vw)"
 	sheetclass="skill-editor"
 	closeButton={false}
-	{onclose}
+	onclose={leave}
 >
 	<div class="body">
 		{#if isNew}
@@ -155,7 +164,7 @@
 				text={draft}
 				bind:editing={writing}
 				onchange={(value) => (draft = value)}
-				{onclose}
+				onclose={leave}
 			>
 				{#snippet footer()}
 					<span>
@@ -195,13 +204,24 @@
 				</Button>
 			{/if}
 			<span class="spacer"></span>
-			<Button variant="ghost" onclick={onclose}>{t.settings.cancel}</Button>
+			<Button variant="ghost" onclick={leave}>{t.settings.cancel}</Button>
 			<Button variant="highlighted" busy={saving} disabled={!changed} onclick={save}>
 				{isNew ? t.settings.create : t.settings.save}
 			</Button>
 		{/if}
 	{/snippet}
 </Modal>
+
+{#if leaving}
+	<Confirm
+		title={t.artifact.discardTitle}
+		body={t.artifact.discardBody(isNew ? t.settings.newSkill : `${name}/SKILL.md`)}
+		confirm={t.artifact.discardYes}
+		cancel={t.artifact.discardKeep}
+		onconfirm={onclose}
+		oncancel={() => (leaving = false)}
+	/>
+{/if}
 
 <style>
 	:global(.sheet.skill-editor) {

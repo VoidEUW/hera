@@ -98,6 +98,7 @@ export const ICONS = {
 		['circle', { cx: '5', cy: '12', r: '1' }]
 	],
 	chevD: [['path', { d: 'm6 9 6 6 6-6' }]],
+	chevU: [['path', { d: 'm18 15-6-6-6 6' }]],
 	chevR: [['path', { d: 'm9 18 6-6-6-6' }]],
 	check: [['path', { d: 'M20 6 9 17l-5-5' }]],
 	clip: [
@@ -189,6 +190,17 @@ export const ICONS = {
 			}
 		],
 		['circle', { cx: '16.5', cy: '7.5', r: '.5', fill: 'currentColor' }]
+	],
+	keyboard: [
+		['path', { d: 'M10 8h.01' }],
+		['path', { d: 'M12 12h.01' }],
+		['path', { d: 'M14 8h.01' }],
+		['path', { d: 'M16 12h.01' }],
+		['path', { d: 'M18 8h.01' }],
+		['path', { d: 'M6 8h.01' }],
+		['path', { d: 'M7 16h10' }],
+		['path', { d: 'M8 12h.01' }],
+		['rect', { x: '2', y: '4', width: '20', height: '16', rx: '2' }]
 	],
 	mail: [
 		['path', { d: 'm22 7-8.991 5.727a2 2 0 0 1-2.009 0L2 7' }],

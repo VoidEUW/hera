@@ -63,7 +63,6 @@ export const t = {
 
 	rail: {
 		search: 'Search chats',
-		results: 'Results',
 		newChat: 'New chat',
 		projects: 'Projects',
 		newProject: 'New project',
@@ -281,6 +280,37 @@ export const t = {
 		notConnected: 'not connected'
 	},
 
+	/** The keymap (#112). The action and control names themselves live in `$lib/keys`, next to
+	 * the chord they describe, so a binding and its words cannot drift apart. */
+	hotkeys: {
+		global: 'Everywhere',
+		chat: 'In a chat',
+		intro: 'They cannot be changed yet.',
+		mirrors: (control: string) => `Same as: ${control}`,
+		planned: 'Coming later'
+	},
+	/** The command palette, opened with the search chord. */
+	palette: {
+		label: 'Search and jump',
+		placeholder: 'Search chats, projects and settings…',
+		chatsPlaceholder: 'Search chats…',
+		empty: 'Nothing matches that.',
+		actions: 'Actions',
+		chats: 'Chats',
+		projects: 'Projects',
+		settings: 'Settings',
+		inProject: (name: string) => name
+	},
+	/** Hera's own find, in the top bar of a chat. */
+	find: {
+		label: 'Find in this chat',
+		placeholder: 'Find in this chat',
+		none: 'No matches',
+		count: (at: number, of: number) => `${at} of ${of}`,
+		next: 'Next match',
+		previous: 'Previous match',
+		close: 'Close find'
+	},
 	settings: {
 		title: 'Settings',
 		subtitle: 'How she works: what she runs on, what she knows, what she may do.',
@@ -295,6 +325,7 @@ export const t = {
 		loadingMemory: 'Loading memories…',
 		account: 'Account',
 		general: 'General',
+		hotkeys: 'Hotkeys',
 		models: 'Models',
 		mind: 'Mind',
 		memory: 'Memory',
@@ -308,6 +339,7 @@ export const t = {
 		// One line under each screen's heading: what it is for, not how to use it.
 		blurbAccount: 'Who you are to Hera: a name, an email and a picture.',
 		blurbGeneral: 'This browser and this machine: appearance, language, time zone, notifications.',
+		blurbHotkeys: 'The keys that do what a button on screen already does.',
 		blurbMind: 'The text that shapes how she thinks and speaks, one region at a time.',
 		blurbMemory: 'What she knows about you, and how much room it takes.',
 		blurbModels: 'Where she runs. Any OpenAI-compatible endpoint.',

@@ -44,7 +44,7 @@
 		 * (ServerSheet, SkillPicker), which hang 96px from the bottom so the composer stays
 		 * visible under them; `anchored` is the profile menu, which pins to the bottom-left
 		 * above the profile card. */
-		placement?: 'centre' | 'docked' | 'anchored';
+		placement?: 'centre' | 'docked' | 'anchored' | 'top';
 		/** The scrim's own dimming. `true` (default) is the ordinary darkened scrim; `false` is
 		 * the profile menu's transparent catcher, which closes on click without claiming the
 		 * conversation behind it is unavailable. */
@@ -97,7 +97,9 @@
 			? { scale: 0.85, slot: 'modal-enter' }
 			: placement === 'docked'
 				? { y: 18, blur: 3, slot: 'drawer-open' }
-				: { y: 18, blur: 3, slot: 'modal-enter' }
+				: placement === 'top'
+					? { y: -10, blur: 3, slot: 'modal-enter' }
+					: { y: 18, blur: 3, slot: 'modal-enter' }
 	);
 
 	let sheet = $state<HTMLDivElement | null>(null);
@@ -224,6 +226,15 @@
 		bottom: 96px;
 		margin-inline: auto;
 		max-height: 60vh;
+	}
+
+	/* The command palette: near the top, where the eye already is, growing downwards. */
+	.sheet.top {
+		top: 14vh;
+		left: 0;
+		right: 0;
+		margin-inline: auto;
+		max-height: 72vh;
 	}
 
 	.sheet.anchored {

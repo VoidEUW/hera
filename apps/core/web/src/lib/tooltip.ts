@@ -12,14 +12,25 @@
  * leaves, fading in on `tooltip.enter`. Keyboard focus shows it at once — a person tabbing is
  * already asking what the control is. It is a visual aid, not the accessible name: the control
  * still needs its own `aria-label`.
+ *
+ * A control that has a chord (#112) gives `{ label, keys }` and the chord is drawn after the
+ * label, quieter — the place a key is shown when beside the control would crowd it.
  */
 import { still } from './motion';
 
 /** The spec's tooltip delay (`tooltip.enter`, its `w`). */
 export const SHOW_AFTER = 1200;
 
-export function tooltip(node: HTMLElement, label: string | undefined) {
-	let text = label;
+export type Tip = string | undefined | { label: string; keys?: string };
+
+function parts(tip: Tip): { text: string | undefined; keys: string | undefined } {
+	return typeof tip === 'object'
+		? { text: tip.label, keys: tip.keys }
+		: { text: tip, keys: undefined };
+}
+
+export function tooltip(node: HTMLElement, label: Tip) {
+	let { text, keys } = parts(label);
 	let tip: HTMLDivElement | null = null;
 	let timer: ReturnType<typeof setTimeout> | undefined;
 
@@ -38,12 +49,21 @@ export function tooltip(node: HTMLElement, label: string | undefined) {
 		tip.style.left = `${left + window.scrollX}px`;
 	}
 
+	function fill(into: HTMLElement) {
+		into.textContent = text ?? '';
+		if (!keys) return;
+		const chord = document.createElement('span');
+		chord.className = 'keys';
+		chord.textContent = keys;
+		into.append(chord);
+	}
+
 	function show() {
-		if (!text || tip) return;
+		if ((!text && !keys) || tip) return;
 		tip = document.createElement('div');
 		tip.className = 'hera-tooltip';
 		tip.setAttribute('role', 'tooltip');
-		tip.textContent = text;
+		fill(tip);
 		if (still()) tip.style.animation = 'none';
 		document.body.append(tip);
 		place();
@@ -72,10 +92,10 @@ export function tooltip(node: HTMLElement, label: string | undefined) {
 	window.addEventListener('scroll', hide, true);
 
 	return {
-		update(next: string | undefined) {
-			text = next;
-			if (tip && text) tip.textContent = text;
-			if (!text) hide();
+		update(next: Tip) {
+			({ text, keys } = parts(next));
+			if (tip && (text || keys)) fill(tip);
+			if (!text && !keys) hide();
 		},
 		destroy() {
 			hide();

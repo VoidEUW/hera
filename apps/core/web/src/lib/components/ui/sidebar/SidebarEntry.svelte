@@ -16,6 +16,8 @@
 	import type { Snippet } from 'svelte';
 	import type { IconName } from '$lib/icons';
 	import Icon from '../Icon.svelte';
+	import Kbd from '../Kbd.svelte';
+	import { keys, type KeyId } from '$lib/keys';
 
 	interface Props {
 		label: string;
@@ -29,6 +31,8 @@
 		active?: boolean;
 		disabled?: boolean;
 		meta?: string;
+		/** The chord this row mirrors (#112), drawn at its end. */
+		keyId?: KeyId;
 		/** For a row that discloses something (a project's chats). */
 		expanded?: boolean;
 		/** Keep the trailing action visible — its menu is open. */
@@ -49,6 +53,7 @@
 		active = false,
 		disabled = false,
 		meta,
+		keyId,
 		expanded,
 		pinned = false,
 		nested = false,
@@ -63,6 +68,7 @@
 	</span>
 	<span class="label">{label}</span>
 	{#if meta}<span class="meta">{meta}</span>{/if}
+	{#if keyId}<Kbd decorative>{keys.label(keyId)}</Kbd>{/if}
 {/snippet}
 
 <div class="row" class:active class:pinned class:nested class:has-action={Boolean(action)}>
@@ -83,6 +89,7 @@
 			type="button"
 			{disabled}
 			aria-expanded={expanded}
+			aria-keyshortcuts={keyId ? keys.aria(keyId) : undefined}
 			aria-current={active ? 'true' : undefined}
 			aria-label={ariaLabel}
 			{onclick}

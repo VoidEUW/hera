@@ -280,6 +280,7 @@ def test_settings_holds_what_changes_her_behaviour(page: Any) -> None:
     assert names == [
         "Account",
         "General",
+        "Hotkeys",
         "Mind",
         "Memory",
         "Models",

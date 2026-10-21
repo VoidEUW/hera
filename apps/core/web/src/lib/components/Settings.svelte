@@ -21,13 +21,14 @@
 	import SearchBar from '$lib/components/ui/SearchBar.svelte';
 	import Modal from '$lib/components/ui/Modal.svelte';
 	import Ocellus from '$lib/components/ui/Ocellus.svelte';
-	import type { IconName } from '$lib/icons';
+	import { ENTRIES, GROUPS, type Tab } from '$lib/settingsTabs';
 	import Sidebar from '$lib/components/ui/sidebar/Sidebar.svelte';
 	import SidebarEntry from '$lib/components/ui/sidebar/SidebarEntry.svelte';
 	import SidebarGroup from '$lib/components/ui/sidebar/SidebarGroup.svelte';
 	import Dreaming from './settings/Dreaming.svelte';
 	import Account from './settings/Account.svelte';
 	import General from './settings/General.svelte';
+	import Hotkeys from './settings/Hotkeys.svelte';
 	import Memory from './settings/Memory.svelte';
 	import Mind from './settings/Mind.svelte';
 	import Models from './settings/Models.svelte';
@@ -36,91 +37,19 @@
 	import Servers from './settings/Servers.svelte';
 	import Skills from './settings/Skills.svelte';
 
-	export type Tab =
-		| 'account'
-		| 'general'
-		| 'models'
-		| 'skills'
-		| 'servers'
-		| 'permissions'
-		| 'memory'
-		| 'mind'
-		| 'dreaming';
-
 	interface Props {
 		onclose?: () => void;
 		/** Which tab to land on. Defaults to the account — who this is for — but
 		 * a caller opening this from, say, the composer's server sheet wants to land on the
 		 * tab it was already talking about, not send a person back to the start. */
 		tab?: Tab;
+		/** The person chose another screen. The caller owns which one is showing, so a chord that
+		 * asks for a screen — ⌘/ for the Hotkeys — moves a Settings that is already open. */
+		ontab?: (tab: Tab) => void;
 	}
 
-	let { onclose, tab: initialTab = 'account' }: Props = $props();
+	let { onclose, tab = 'account', ontab }: Props = $props();
 
-	interface Entry {
-		id: Tab;
-		label: string;
-		blurb: string;
-		icon: IconName;
-		soon?: boolean;
-	}
-
-	const GROUPS: Array<{ label: string; entries: Entry[] }> = [
-		{
-			label: t.settings.groupApp,
-			entries: [
-				{
-					id: 'account',
-					label: t.settings.account,
-					blurb: t.settings.blurbAccount,
-					icon: 'user'
-				},
-				{
-					id: 'general',
-					label: t.settings.general,
-					blurb: t.settings.blurbGeneral,
-					icon: 'sliders'
-				}
-			]
-		},
-		{
-			label: t.settings.groupHera,
-			entries: [
-				{ id: 'mind', label: t.settings.mind, blurb: t.settings.blurbMind, icon: 'brain' },
-				{ id: 'memory', label: t.settings.memory, blurb: t.settings.blurbMemory, icon: 'clock' },
-				{ id: 'models', label: t.settings.models, blurb: t.settings.blurbModels, icon: 'cube' },
-				{
-					id: 'dreaming',
-					label: t.settings.dreaming,
-					blurb: t.settings.blurbDreaming,
-					icon: 'moon',
-					soon: true
-				}
-			]
-		},
-		{
-			label: t.settings.groupAdjust,
-			entries: [
-				{ id: 'skills', label: t.settings.skills, blurb: t.settings.blurbSkills, icon: 'spark' },
-				{
-					id: 'servers',
-					label: t.settings.servers,
-					blurb: t.settings.blurbServers,
-					icon: 'plug'
-				},
-				{
-					id: 'permissions',
-					label: t.settings.permissions,
-					blurb: t.settings.blurbPermissions,
-					icon: 'shield'
-				}
-			]
-		}
-	];
-
-	const ENTRIES = GROUPS.flatMap((group) => group.entries);
-
-	let tab = $state<Tab>(initialTab);
 	let query = $state('');
 
 	const filter = $derived(query.trim().toLowerCase());
@@ -157,7 +86,7 @@
 							label={entry.label}
 							active={tab === entry.id}
 							meta={entry.soon ? t.settings.soon : undefined}
-							onclick={() => (tab = entry.id)}
+							onclick={() => ontab?.(entry.id)}
 						/>
 					{/each}
 				</SidebarGroup>
@@ -174,6 +103,8 @@
 							<Account {filter} />
 						{:else if tab === 'general'}
 							<General {filter} />
+						{:else if tab === 'hotkeys'}
+							<Hotkeys {filter} />
 						{:else if tab === 'models'}
 							<Models {filter} />
 						{:else if tab === 'memory'}
