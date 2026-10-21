@@ -28,7 +28,7 @@ from fastapi.responses import Response
 from hera_core.chat_files import ChatFileRefused, FileArtifacts
 from hera_core.deps import Db, Owner, not_found, require_chat
 from hera_core.problems import problems
-from hera_core.schemas import ArtifactContent, ArtifactOut, ArtifactProblem
+from hera_core.schemas import ArtifactContent, ArtifactOut, ArtifactProblem, ArtifactWrite
 
 router = APIRouter(tags=["artifacts"])
 
@@ -60,6 +60,24 @@ async def read_artifact(chat_id: UUID, name: str, owner: Owner, db: Db) -> Artif
     chat = require_chat(db, chat_id, owner)
     text = await _content(chat_id=str(chat.id), name=name)
     return ArtifactContent(name=name, bytes=len(text.encode("utf-8")), text=text)
+
+
+@router.put("/chats/{chat_id}/artifacts/{name}", response_model=ArtifactContent)
+async def write_artifact(
+    chat_id: UUID, name: str, payload: ArtifactWrite, owner: Owner, db: Db
+) -> ArtifactContent:
+    """A person's edit to something she published.
+
+    It **replaces** a file that is already there and never makes one: a person who has spotted a
+    typo has a pen, and a new file is something she publishes (ADR 13). So an unknown name is a
+    404 and a file that is not text is the same 400 as reading it, rather than being overwritten
+    by something that cannot have been what they were looking at. The write goes through the
+    adapter the tools use, so the name guard and the size ceiling are the same ones.
+    """
+    chat = require_chat(db, chat_id, owner)
+    await _content(chat_id=str(chat.id), name=name)
+    size = await _guarded(FileArtifacts().create(str(chat.id), name, payload.text))
+    return ArtifactContent(name=name, bytes=size, text=payload.text)
 
 
 @router.put("/chats/{chat_id}/artifacts/{name}/problem", status_code=status.HTTP_204_NO_CONTENT)

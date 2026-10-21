@@ -15,6 +15,7 @@
 	import Avatar from '$lib/components/ui/Avatar.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
 	import Checkbox from '$lib/components/ui/Checkbox.svelte';
+	import Confirm from '$lib/components/ui/Confirm.svelte';
 	import Chip from '$lib/components/ui/Chip.svelte';
 	import CloseButton from '$lib/components/ui/CloseButton.svelte';
 	import CodeView from '$lib/components/ui/CodeView.svelte';
@@ -96,6 +97,8 @@ Pick a direction before writing a line of CSS.
 	let muted = $state(false);
 	let traceOpen = $state(false);
 	let skillSource = $state(SKILL);
+
+	let asking = $state(false);
 </script>
 
 <svelte:head><title>Design — Hera</title></svelte:head>
@@ -227,6 +230,7 @@ Pick a direction before writing a line of CSS.
 			<Button variant="danger-soft" onclick={() => toasts.fail('Could not save — no answer')}>
 				Show a failure
 			</Button>
+			<Button onclick={() => (asking = true)}>Ask before discarding</Button>
 		</div>
 	</section>
 
@@ -428,6 +432,17 @@ Pick a direction before writing a line of CSS.
 		</ul>
 	</section>
 </main>
+
+{#if asking}
+	<Confirm
+		title="Discard your changes?"
+		body="notes.md has edits that have not been saved."
+		confirm="Discard"
+		cancel="Keep editing"
+		onconfirm={() => (asking = false)}
+		oncancel={() => (asking = false)}
+	/>
+{/if}
 
 <style>
 	.gallery {

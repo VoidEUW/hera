@@ -394,6 +394,13 @@ export const api = {
 	 * earlier card draws, which ADR 13 makes deliberate. */
 	artifact: (chatId: string, name: string) =>
 		request<ArtifactContent>(`/chats/${chatId}/artifacts/${encodeURIComponent(name)}`),
+	/** Replace a published file's text with a person's edit. It never makes one: an unknown name
+	 * is a 404, so a typo in a document is fixable and a new file is still hers to publish. */
+	writeArtifact: (chatId: string, name: string, text: string) =>
+		request<ArtifactContent>(`/chats/${chatId}/artifacts/${encodeURIComponent(name)}`, {
+			method: 'PUT',
+			body: JSON.stringify({ text })
+		}),
 	/** Tell the server this artifact would not draw, so she hears about it on her next turn.
 	 * Only a browser can know: mermaid lays a diagram out by measuring text. */
 	reportArtifactProblem: (chatId: string, name: string, message: string) =>

@@ -47,7 +47,10 @@
 	let source = $state(false);
 
 	function open() {
-		if (chatId) artifacts.show(chatId, artifact.name);
+		if (!chatId) return;
+		// The same file again is not a way to lose an edit to it.
+		if (artifacts.open && artifacts.name === artifact.name) artifacts.show(chatId, artifact.name);
+		else artifacts.ask(() => artifacts.show(chatId, artifact.name));
 	}
 </script>
 

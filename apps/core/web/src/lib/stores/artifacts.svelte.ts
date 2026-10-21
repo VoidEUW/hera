@@ -33,6 +33,43 @@ class Artifacts {
 	source = $state(false);
 	/** Bumped whenever something published may have changed. Read by anything that fetched. */
 	version = $state(0);
+	/** The Edit switch of the open file: a text box over the source instead of the drawn thing. */
+	editing = $state(false);
+	/** What has been typed and not saved, or `null` when the file on screen is the file on disk.
+	 * Kept here and not in the view so it survives the view being rebuilt — switching Preview and
+	 * Source, or the file being re-read after a save — and so the header's Save can see it. */
+	draft = $state<string | null>(null);
+	/** The save in flight. */
+	saving = $state(false);
+	/** A leave that was held back because the draft would be lost; the drawer asks, and runs
+	 * this on a yes. */
+	asking = $state<(() => void) | null>(null);
+
+	get dirty(): boolean {
+		return this.draft !== null;
+	}
+
+	/** Record an edit. `base` is the text on disk: typing it back to what it was is not a change,
+	 * and a Save that lit up for nothing would be a button that lies. */
+	edit(text: string, base: string) {
+		this.draft = text === base ? null : text;
+	}
+
+	/** Run `leave` now, or — if it would throw an unsaved edit away — after the person says so.
+	 * What every control that closes the drawer or changes the file goes through. */
+	ask(leave: () => void) {
+		if (this.dirty) this.asking = leave;
+		else leave();
+	}
+
+	/** The person said to throw the edit away. */
+	discard() {
+		const leave = this.asking;
+		this.asking = null;
+		this.draft = null;
+		this.editing = false;
+		leave?.();
+	}
 
 	get open(): boolean {
 		return this.chatId !== null;
@@ -40,7 +77,10 @@ class Artifacts {
 
 	show(chatId: string, name: string | null = null) {
 		this.chatId = chatId;
-		if (name !== this.name) this.source = false;
+		if (name !== this.name) {
+			this.source = false;
+			this.#drop();
+		}
 		this.name = name;
 	}
 
@@ -48,6 +88,14 @@ class Artifacts {
 		this.chatId = null;
 		this.name = null;
 		this.source = false;
+		this.#drop();
+	}
+
+	/** A draft belongs to the file it was typed in. */
+	#drop() {
+		this.draft = null;
+		this.editing = false;
+		this.asking = null;
 	}
 
 	/** Forget an open drawer that belongs to a conversation nobody is looking at any more.

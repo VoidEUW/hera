@@ -50,9 +50,19 @@
 		/** Inside the side view, whose header already carries the name, copy and download: the
 		 * code view drops its own bar. */
 		bare?: boolean;
+		/** Let the source be changed here. Only the side view does: a card in the transcript is
+		 * for reading. */
+		editable?: boolean;
 	}
 
-	let { chatId, name, height = '420px', source = false, bare = false }: Props = $props();
+	let {
+		chatId,
+		name,
+		height = '420px',
+		source = false,
+		bare = false,
+		editable = false
+	}: Props = $props();
 
 	/** The height a drawing is shrunk to fit, when the box has a fixed one — a card in the
 	 * transcript. The drawer's `100%` is not a height to fit to: it scrolls what it cannot show. */
@@ -73,6 +83,18 @@
 
 	let content = $state<ArtifactContent | null>(null);
 	let failure = $state('');
+	/** Which file `content` is. Fetching again for a save or for another turn's edit keeps what is
+	 * on screen until the new text lands; only a *different* file blanks it, so a person typing
+	 * in the source box is not thrown out of it by their own save. */
+	let held = '';
+
+	/** What is drawn: the unsaved edit when this is the file being edited, otherwise the file. An
+	 * edit shows in Preview as well as in the box, so the page you are fixing is the one you see. */
+	const text = $derived(
+		editable && artifacts.name === wanted && artifacts.draft !== null
+			? artifacts.draft
+			: (content?.text ?? '')
+	);
 
 	/** The drawn diagram, sanitised — `''` while the renderer is still being fetched. */
 	let diagram = $state('');
@@ -81,6 +103,9 @@
 
 	const kind = $derived(kindOf(wanted));
 	const asCode = $derived(source && hasSource(wanted));
+	/** Text she wrote and a person can fix: everything with a source, and the files that are only
+	 * source. A `file` of a kind this build cannot draw is not offered for editing. */
+	const editableKind = $derived(kind !== 'file');
 
 	$effect(() => {
 		// Re-runs when the file changes and when something published changed. `wanted` and `chat`
@@ -89,12 +114,14 @@
 		// `status.md` records — nothing here assigns to `artifacts.version`.
 		void artifacts.version;
 		let current = true;
-		content = null;
+		if (held !== `${chat}/${wanted}`) content = null;
 		failure = '';
 		api
 			.artifact(chat, wanted)
 			.then((body) => {
-				if (current) content = body;
+				if (!current) return;
+				content = body;
+				held = `${chat}/${wanted}`;
 			})
 			.catch((cause) => {
 				if (current) failure = cause instanceof Error ? cause.message : String(cause);
@@ -123,7 +150,7 @@
 	// person is meant to read. It reads `content` and `kind` and writes neither, which is what
 	// keeps it clear of the `effect_update_depth_exceeded` shape `status.md` records three times.
 	$effect(() => {
-		const source = kind === 'mermaid' ? (content?.text ?? null) : null;
+		const source = kind === 'mermaid' && content ? text : null;
 		diagram = '';
 		undrawable = '';
 		if (source === null) return;
@@ -149,11 +176,14 @@
 {#snippet lines()}
 	<div class="code" class:bare style:max-height={height}>
 		<CodeView
-			text={content?.text ?? ''}
+			{text}
 			extension={extensionOf(wanted)}
 			name={bare ? undefined : wanted}
 			notice={undrawable ? t.artifact.notDrawn(undrawable) : undefined}
 			{bare}
+			editable={editable && editableKind}
+			bind:editing={artifacts.editing}
+			onchange={(next) => artifacts.edit(next, content?.text ?? '')}
 		/>
 	</div>
 {/snippet}
@@ -165,15 +195,14 @@
 {:else if asCode}
 	{@render lines()}
 {:else if kind === 'html'}
-	<iframe title={wanted} class="frame" style:height sandbox="allow-scripts" srcdoc={content.text}
-	></iframe>
+	<iframe title={wanted} class="frame" style:height sandbox="allow-scripts" srcdoc={text}></iframe>
 {:else if kind === 'svg'}
 	<div class="drawing" style:max-height={height} style:--fit={fit}>
 		<!-- eslint-disable-next-line svelte/no-at-html-tags -- sanitised in $lib/artifacts -->
-		{@html sanitiseSvg(content.text)}
+		{@html sanitiseSvg(text)}
 	</div>
 {:else if kind === 'markdown'}
-	<div class="document" style:max-height={height}><Prose text={content.text} /></div>
+	<div class="document" style:max-height={height}><Prose {text} /></div>
 {:else if kind === 'mermaid' && !undrawable && !diagram}
 	<!-- Outside the box rather than inside it. The drawing's box is white whatever the theme is,
 	     and a faint caption written for the page surface is not written for that — so while the

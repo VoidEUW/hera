@@ -24,7 +24,9 @@
 	import { artifacts } from '$lib/stores/artifacts.svelte';
 	import { toasts } from '$lib/toasts.svelte';
 	import ArtifactView from './ArtifactView.svelte';
+	import Button from './ui/Button.svelte';
 	import CloseButton from './ui/CloseButton.svelte';
+	import Confirm from './ui/Confirm.svelte';
 	import Icon from './ui/Icon.svelte';
 	import IconButton from './ui/IconButton.svelte';
 	import Segmented from './ui/Segmented.svelte';
@@ -79,6 +81,30 @@
 	const chosen = $derived(artifacts.name);
 
 	let copied = $state(false);
+
+	/** Switch the pen on or off. Writing is done on the source, so on a file that has a drawn
+	 * form it also moves to Source — the box cannot be over a picture. */
+	function toggleEdit() {
+		const on = !artifacts.editing;
+		artifacts.editing = on;
+		if (on && chosen && hasSource(chosen)) artifacts.source = true;
+	}
+
+	/** Save what was typed. The server replaces the file; every view of it then looks again. */
+	async function save() {
+		if (!chosen || artifacts.draft === null || artifacts.saving) return;
+		artifacts.saving = true;
+		try {
+			await api.writeArtifact(chatId, chosen, artifacts.draft);
+			artifacts.draft = null;
+			artifacts.version += 1;
+			toasts.show(t.artifact.saved);
+		} catch (cause) {
+			toasts.show(t.artifact.saveFailed(cause instanceof Error ? cause.message : String(cause)));
+		} finally {
+			artifacts.saving = false;
+		}
+	}
 
 	/** Copy the file as it is now. Fetched rather than taken from the view: the view may be
 	 * showing a drawing, and what a person copies from a side view is the file. */
@@ -146,7 +172,20 @@
 						{ value: 'preview', label: t.ui.preview },
 						{ value: 'source', label: t.ui.source }
 					]}
-					onchange={(next) => (artifacts.source = next === 'source')}
+					onchange={(next) => {
+						artifacts.source = next === 'source';
+						// The pen is over the source; leaving it for the drawn thing puts it down.
+						if (next === 'preview') artifacts.editing = false;
+					}}
+				/>
+			{/if}
+			{#if kindOf(chosen) !== 'file'}
+				<IconButton
+					icon="edit"
+					on={artifacts.editing}
+					aria-pressed={artifacts.editing}
+					label={t.artifact.edit}
+					onclick={toggleEdit}
 				/>
 			{/if}
 			<IconButton icon={copied ? 'check' : 'copy'} on={copied} label={t.ui.copy} onclick={copy} />
@@ -168,13 +207,31 @@
 				/>
 			{/if}
 		{/if}
-		<CloseButton label={t.artifact.close} onclick={() => artifacts.close()} />
+		{#if artifacts.editing || artifacts.dirty}
+			<Button
+				variant="highlighted"
+				size="sm"
+				busy={artifacts.saving}
+				disabled={!artifacts.dirty}
+				onclick={save}
+			>
+				{t.artifact.save}
+			</Button>
+		{/if}
+		<CloseButton label={t.artifact.close} onclick={() => artifacts.ask(() => artifacts.close())} />
 	</header>
 
 	<div class="body">
 		{#if chosen}
 			{#key chosen}
-				<ArtifactView {chatId} name={chosen} height="100%" source={artifacts.source} bare />
+				<ArtifactView
+					{chatId}
+					name={chosen}
+					height="100%"
+					source={artifacts.source}
+					bare
+					editable
+				/>
 			{/key}
 		{:else if failure}
 			<p class="failed">{failure}</p>
@@ -183,6 +240,17 @@
 		{/if}
 	</div>
 </aside>
+
+{#if artifacts.asking && chosen}
+	<Confirm
+		title={t.artifact.discardTitle}
+		body={t.artifact.discardBody(chosen)}
+		confirm={t.artifact.discardYes}
+		cancel={t.artifact.discardKeep}
+		onconfirm={() => artifacts.discard()}
+		oncancel={() => (artifacts.asking = null)}
+	/>
+{/if}
 
 <style>
 	/* The side view (the theme's `hera/side-view`, soft look): a filled `--surface` panel against

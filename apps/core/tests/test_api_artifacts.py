@@ -134,6 +134,86 @@ class TestReading:
         assert (await client.get(f"{API}/chats/{mine}/artifacts/page.html")).status_code == 404
 
 
+class TestWriting:
+    async def test_it_replaces_the_text_and_reads_back_as_written(
+        self, client: AsyncClient, published: FileArtifacts
+    ) -> None:
+        chat_id = await a_chat(client)
+        await published.create(chat_id, "notes.md", "# Draft")
+
+        response = await client.put(
+            f"{API}/chats/{chat_id}/artifacts/notes.md", json={"text": "# Final\n"}
+        )
+
+        assert response.status_code == 200
+        assert response.json() == {"name": "notes.md", "bytes": 8, "text": "# Final\n"}
+        read = (await client.get(f"{API}/chats/{chat_id}/artifacts/notes.md")).json()
+        assert read["text"] == "# Final\n"
+
+    async def test_it_never_makes_a_file(self, client: AsyncClient) -> None:
+        """A person edits what she published; a new file is hers to publish (ADR 13)."""
+        chat_id = await a_chat(client)
+
+        response = await client.put(
+            f"{API}/chats/{chat_id}/artifacts/new.md", json={"text": "hello"}
+        )
+
+        assert response.status_code == 404
+        assert (await client.get(f"{API}/chats/{chat_id}/artifacts")).json() == []
+
+    async def test_a_name_that_is_not_a_filename_is_refused(self, client: AsyncClient) -> None:
+        chat_id = await a_chat(client)
+
+        response = await client.put(
+            f"{API}/chats/{chat_id}/artifacts/sub%5Cplan.md", json={"text": "x"}
+        )
+
+        assert response.status_code == 400
+
+    async def test_a_file_that_is_not_text_is_not_overwritten(
+        self, client: AsyncClient, published: FileArtifacts
+    ) -> None:
+        chat_id = await a_chat(client)
+        await published.create(chat_id, "logo.png", "placeholder")
+        (artifacts_dir(chat_id) / "logo.png").write_bytes(b"\xff\xfe\x00")
+
+        response = await client.put(
+            f"{API}/chats/{chat_id}/artifacts/logo.png", json={"text": "text"}
+        )
+
+        assert response.status_code == 400
+        assert (artifacts_dir(chat_id) / "logo.png").read_bytes() == b"\xff\xfe\x00"
+
+    async def test_over_the_ceiling_is_refused_and_the_file_survives(
+        self, client: AsyncClient, published: FileArtifacts
+    ) -> None:
+        chat_id = await a_chat(client)
+        await published.create(chat_id, "notes.md", "kept")
+
+        response = await client.put(
+            f"{API}/chats/{chat_id}/artifacts/notes.md", json={"text": "x" * 1_000_001}
+        )
+
+        assert response.status_code == 400
+        assert (await client.get(f"{API}/chats/{chat_id}/artifacts/notes.md")).json()["text"] == (
+            "kept"
+        )
+
+    async def test_it_cannot_write_into_another_conversation(
+        self, client: AsyncClient, published: FileArtifacts
+    ) -> None:
+        mine = await a_chat(client)
+        theirs = await a_chat(client)
+        await published.create(theirs, "notes.md", "theirs")
+
+        response = await client.put(f"{API}/chats/{mine}/artifacts/notes.md", json={"text": "mine"})
+
+        assert response.status_code == 404
+        assert (await client.get(f"{API}/chats/{theirs}/artifacts/notes.md")).json()["text"] == (
+            "theirs"
+        )
+
+
 class TestDownloading:
     async def test_it_comes_back_as_an_attachment_and_not_as_a_page(
         self, client: AsyncClient, published: FileArtifacts

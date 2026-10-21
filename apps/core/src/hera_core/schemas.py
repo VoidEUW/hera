@@ -271,6 +271,17 @@ class ArtifactProblem(BaseModel):
     message: str = Field(min_length=1, max_length=2000)
 
 
+class ArtifactWrite(BaseModel):
+    """A person's edit to a file she published: the whole new text.
+
+    The whole text rather than a patch, because the edit is made in a text box over the file and
+    what is saved is what is shown — and because the find-and-replace she uses
+    (``artifact_edit``) is built for a writer who cannot see the file.
+    """
+
+    text: str
+
+
 class ArtifactContent(BaseModel):
     """One artifact's current content, for the panel that draws it.
 
