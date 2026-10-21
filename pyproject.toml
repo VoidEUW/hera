@@ -43,7 +43,7 @@ dev = [
     "ruff>=0.17.1",
     "httpx>=0.27",
     # Needed at the workspace root for the pydantic mypy plugin to load.
-    "pydantic>=2.13.5",
+    "pydantic>=2.14.1",
     "pre-commit>=4.7.0",
     # hera_skillsets parses SKILL.md frontmatter; mypy --strict needs the stubs.
     "types-PyYAML>=6.0",
