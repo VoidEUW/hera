@@ -20,7 +20,7 @@ classifiers = [
 dependencies = [
     "httpx>=0.27",
     "pydantic>=2.13.5",
-    "pydantic-settings>=2.4.0",
+    "pydantic-settings>=2.16.0",
 ]
 
 [tool.hatch.build.targets.wheel]
