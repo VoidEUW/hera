@@ -6,6 +6,7 @@
 | [adr/](adr/) | Architecture decision records — why the system has the shape it has. |
 | [frontend.md](frontend.md) | The design language of the interface: the story, the palette, the type, and how a turn is rendered. Provisional until there is a build to argue with. |
 | [tooling.md](tooling.md) | What she should be able to reach for and cannot: search, a scratchpad, artifacts, a question she can put to you. **Notes, not decisions** — argued from using the build, and none of it has an ADR yet. |
+| [changelog-history.md](changelog-history.md) | The hand-written changelog, **frozen** at the point it was retired (v0.1.0, v0.2.0, and the early v0.2.1 prose). Since then the changelog is the notes of each GitHub release, written from commit titles. |
 | [hera-storage.md](hera-storage.md) | The specification `hera_storage` was built against. A contract, kept as written. |
 | [hera-prompts.md](hera-prompts.md) | The specification the `hera_prompts` compiler was built against. A contract, kept as written. |
 | [prototype.md](prototype.md) | The guidance file of the previous version of Hera. **Historical.** Written for that version's German interface, so this one is not translated. |

@@ -3,7 +3,7 @@
 Current state of the rebuild, so a new session can start without re-reading history. A snapshot,
 not a changelog — historical detail and full rationale live in `versions/` and the ADRs.
 
-**Updated:** 2026-10-20 · **Version:** v0.2.0 tagged, v0.2.1 in progress · **Strategy:** thin spine
+**Updated:** 2026-10-21 · **Version:** v0.2.0 tagged, v0.2.1 in release candidates (rc4) · **Strategy:** thin spine
 first, then deepen
 
 ## Now: v0.2.1
@@ -28,6 +28,8 @@ and resolved through the export's looks and parts:
   Field, FileButton, Toggle, Scrim, TraceRow, Thinking, StallBox, ContextMeter, AttachmentChip,
   CodeView (VS Code colours), FileEditor (the skill editor), Swatches — and VoiceCall, ImageGen and
   Auth, on `/design` only until they have a backend.
+- **Guard** (`primitives.test.ts`): no `<button>`, `<input>`, `<textarea>` or `<select>` outside
+  `ui/`, and `--brass` read only where the theme names it.
 
 ### What the hotkeys need first (#112, part 1)
 
@@ -48,8 +50,16 @@ the transcript with the CSS Custom Highlight API. One Escape: menus, then dialog
 and the side view; unsaved edits ask first. ⌥↑/↓ walk the rail, and opening a chat no longer moves
 it. Guards: `keys.test.ts` (unique chords, none on a browser-reserved one, every entry names its
 control) and `tests/e2e/test_hotkeys.py`. ⌘⇧B (fold the rail) was dropped with the fold button.
-- **Guard** (`primitives.test.ts`): no `<button>`, `<input>`, `<textarea>` or `<select>` outside
-  `ui/`, and `--brass` read only where the theme names it.
+
+### Release notes are generated ([#200](https://github.com/VoidEUW/hera/issues/200))
+
+There is no hand-written changelog any more: pushing a tag publishes a GitHub release whose notes are
+written from the Conventional Commit titles (`.github/scripts/release_notes.py`, tested in
+`tests/test_release_notes.py`). A `-rc` tag is a pre-release, never "latest", and lists what changed
+since the previous tag; a plain tag lists everything since the previous plain one. Docker: the exact
+version always, `:latest` only for a release, `:rc` for the newest candidate. The old file is kept as
+[changelog-history.md](changelog-history.md). A PR-title check keeps the notes honest; the Release
+workflow run by hand with a tag name previews the notes without publishing.
 
 ### The interface is on a theme ([issue #182](https://github.com/VoidEUW/hera/issues/182), [ADR 21](adr/0021-a-theme-is-imported-data.md))
 
