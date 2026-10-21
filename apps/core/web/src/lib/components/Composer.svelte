@@ -25,9 +25,10 @@
 	import type { Profile, Provider, Server } from '$lib/api/client';
 	import { isImage, read, size, type Attachment } from '$lib/attachments';
 	import { t } from '$lib/i18n';
+	import { keys } from '$lib/keys';
 	import ModelSelector from './ModelSelector.svelte';
 	import SkillMenu from './SkillMenu.svelte';
-	import type { Tab as SettingsTab } from './Settings.svelte';
+	import type { Tab as SettingsTab } from '$lib/settingsTabs';
 	import AttachmentChip from './ui/AttachmentChip.svelte';
 	import Chip from './ui/Chip.svelte';
 	import FileButton from './ui/FileButton.svelte';
@@ -99,6 +100,14 @@
 	let serversChip = $state<HTMLButtonElement | null>(null);
 	let budgetOpen = $state(false);
 	let budgetChip = $state<HTMLButtonElement | null>(null);
+
+	// Shift+Escape puts the cursor back in the message field from anywhere (#112).
+	$effect(() =>
+		keys.on('composer', () => {
+			if (!field) return false;
+			field.focus();
+		})
+	);
 
 	$effect(() => {
 		if (autofocus) field?.focus();

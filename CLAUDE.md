@@ -107,6 +107,11 @@ a feature component composes them and may not open a `<button>`, `<input>`, `<te
 `<select>` itself, nor read `--brass` where the theme does not name it (`primitives.test.ts`).
 What Hera adds to a theme goes in the export's *Hera amendments* section.
 
+**A shortcut is a control that also exists on screen** (#112). Every chord lives in
+`apps/core/web/src/lib/keys.ts` as data that names the control it mirrors; a screen registers the
+handler and the control shows the key (beside it, or in its tooltip). A chord-only feature is the
+interface's version of what ADR 5 refuses for skills. `docs/frontend.md` § Keyboard has the rules.
+
 **Skill selection is code.** Never build a feature that depends on the model noticing a skill is
 relevant; the target model does not. See ADR 5.
 

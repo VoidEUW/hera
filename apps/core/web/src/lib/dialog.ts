@@ -44,7 +44,9 @@ export function dialog(node: HTMLElement, params: DialogParams = {}) {
 		if (event.key === 'Escape') {
 			// An open dropdown or menu inside the dialog is what this Escape is for; it closes
 			// itself, and closing the dialog as well would be the double close they used to race.
-			if (node.querySelector('[role="listbox"], [role="menu"]')) return;
+			// An inline list — the command palette's results — is not a dropdown; it sits in the
+			// dialog and Escape closes the dialog around it.
+			if (node.querySelector('[role="listbox"]:not([data-inline]), [role="menu"]')) return;
 			onclose?.();
 			return;
 		}

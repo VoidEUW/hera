@@ -744,6 +744,25 @@ The side view's pen: an icon button in the header (`on` while editing) puts the 
 - Tokens: as the code view; Save is the one highlighted button in the header, so brass
 - Parts and states: reading; editing clean; editing dirty; saving
 
+#### Command palette · `hera/palette`
+
+One field and one list, opened over the screen from a chord: chats by name, projects, Settings screens and actions, each with the chord that does the same thing at the end of its row. Focus stays in the field; ↑ / ↓ move a soft highlight, Enter runs the row, Escape clears and then closes.
+
+- Tokens: `--surface`, `--line`, `--hover`, `--text-faint`
+- Parts and states: field; group headings; rows (icon, label, description, key); empty
+- Motion: `modal.enter`
+
+#### Find bar · `hera/find-bar`
+
+Hera's own find in a chat's top bar: a search field, "3 of 12", previous and next, close. Matches are painted over the transcript with the CSS Custom Highlight API — `--laurel-soft` for every match and `--laurel` for the current one; never brass.
+
+- Tokens: `--laurel`, `--laurel-soft`, `--on-laurel`, `--text-faint`
+- Parts and states: empty; matches; none; closed on Escape
+
+#### Keys beside controls (extends `hera/chips`, `hera/tooltip`)
+
+A chord is drawn with the `kbd` part at the end of a text row (sidebar entry, menu item, palette row), and after the label in the tooltip of an icon button or a button — quieter, mono. It is the same chord the Hotkeys screen lists.
+
 ## Source of truth
 
 ```json

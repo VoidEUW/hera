@@ -11,7 +11,7 @@ Everything structural in this document exists in `apps/core/web`: the rail with 
 disclosing their chats, the start screen, settings as a modal with its own left nav, the ocellus
 at all three sizes, the activity gutter with a reason on every skill, the question and permission
 cards inline, dark and light, and the mobile sheet. What is *not* built is listed under **Open**
-at the bottom, plus the command palette behind ⌘K (it opens Settings for now).
+at the bottom.
 
 **Last updated:** 2026-08-27 · **Built:** yes — `uv run hera serve`
 
@@ -647,7 +647,49 @@ direct and never coy. She is the goddess of the household, not a mascot.
   control. The activity gutter collapses each block to one summary row that expands on tap —
   nothing is removed, only the resting state is quieter. Installable: a manifest and a service
   worker that never touches `/api/*`, so it cannot sit between a phone and a streaming turn.
-- **Keyboard first.** Visible focus, `⌘K` for search, the composer focused on load.
+- **Keyboard first.** Visible focus, the composer focused on load, and every chord in
+  `lib/keys.ts` — see *Keyboard* below.
+
+## Keyboard
+
+**One rule: a shortcut is a control that also exists on screen.** A feature only a chord reaches is
+one nobody discovers — the interface's version of what ADR 5 refuses for skills. So every entry in
+the keymap (`lib/keys.ts`) names the `control` it mirrors; the Hotkeys screen (Settings → App) prints
+it beside the chord, and a unit test fails on an entry that names none.
+
+- **One place.** The map is data — `{ id, label, group, control, default }` — so rebinding later is a
+  screen over it rather than a rewrite. `Mod` is ⌘ on macOS and Ctrl elsewhere. Matching is on
+  `event.key`, and Shift counts only for letters, arrows and named keys, so `⌘/` works on a layout
+  that reaches `/` with Shift. A guard keeps the map off what the browser owns (⌘N, ⌘T, ⌘W, ⌘C…).
+- **Components register, the keymap dispatches.** `keys.on(id, fn)` returns its own undo, so a chat
+  chord exists only while the chat screen is mounted. A handler returns `false` to decline, and the
+  browser keeps the chord (⌘S answers only when there is something to save).
+- **Typing is not stolen.** Chords that a text field edits with (⌘⌫, ⌥↑/↓) do not fire inside one;
+  the rest do.
+- **One Escape.** A menu closes first, then a dialog (both answer for themselves), then what is
+  registered with `keys.onEscape` — the find bar, then the side view. A text field keeps its own
+  Escape (clear a search, cancel a rename) and never closes a drawer behind a person's back; an edit
+  with unsaved text asks first (`Confirm`).
+- **Where the key shows.** Beside the control when it carries a word and has room — a `Kbd` at the end
+  of a sidebar row or a menu row. In the tooltip when it is an icon or a button where a key would
+  crowd the row: `IconButton` and `Button` take a `keyId`.
+
+| Chord | Does |
+|---|---|
+| ⌘K | command palette: chats by name, projects, Settings screens, actions |
+| ⌘⇧F | the same palette, chats only |
+| ⌘, / ⌘/ | Settings / the Hotkeys screen |
+| ⌘⇧O | new chat |
+| ⌥↑ / ⌥↓ | the chat above / below in the rail |
+| ⇧Esc | back to the message field |
+| ⌘F | Hera's find, in the chat's top bar |
+| ⌘. | the side view |
+| ⌘S | save the open file |
+| ⌘E / ⌘⌫ | export / delete (asked once) from the chat menu |
+| ⌘⇧E | share — listed, not bound: Share is greyed |
+
+The rail does not fold, so there is no chord for it. Opening a chat does not move it in the rail
+(only something said does), which is what makes ⌥↑/↓ a walk instead of a bounce.
 
 ## Open
 

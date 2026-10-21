@@ -2,10 +2,17 @@
 	/** A key, as in ⌘K or Esc (the theme's `hera/chips`, the `kbd` part). */
 	import type { Snippet } from 'svelte';
 
-	let { children }: { children: Snippet } = $props();
+	interface Props {
+		/** Drawn only: the control already announces its chord through `aria-keyshortcuts`, and
+		 * reading it again inside the control's name — "New chat ⌘⇧O" — is noise. */
+		decorative?: boolean;
+		children: Snippet;
+	}
+
+	let { decorative = false, children }: Props = $props();
 </script>
 
-<kbd class="key">{@render children()}</kbd>
+<kbd class="key" aria-hidden={decorative || undefined}>{@render children()}</kbd>
 
 <style>
 	.key {

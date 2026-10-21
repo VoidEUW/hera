@@ -22,6 +22,8 @@
 	import type { IconName } from '$lib/icons';
 	import Icon from './Icon.svelte';
 	import Spinner from './Spinner.svelte';
+	import { keys, type KeyId } from '$lib/keys';
+	import { tooltip } from '$lib/tooltip';
 
 	interface Props extends Omit<HTMLButtonAttributes, 'children'> {
 		variant?: Variant;
@@ -36,6 +38,9 @@
 		download?: string | boolean;
 		/** A link that leaves the client router — a file, not a page. */
 		external?: boolean;
+		/** The chord this mirrors (#112), shown as a tooltip: a button with a word on it has no
+		 * room for a key beside it without crowding the row it sits in. */
+		keyId?: KeyId;
 		children: Snippet;
 	}
 
@@ -50,6 +55,7 @@
 		external = false,
 		type = 'button',
 		disabled,
+		keyId,
 		children,
 		...rest
 	}: Props = $props();
@@ -83,6 +89,8 @@
 		{type}
 		disabled={disabled || busy}
 		aria-busy={busy || undefined}
+		aria-keyshortcuts={keyId ? keys.aria(keyId) : undefined}
+		use:tooltip={keyId ? { label: '', keys: keys.label(keyId) } : undefined}
 		{...rest}
 	>
 		{@render content()}

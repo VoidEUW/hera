@@ -16,6 +16,8 @@
 	import Button from '$lib/components/ui/Button.svelte';
 	import Checkbox from '$lib/components/ui/Checkbox.svelte';
 	import Confirm from '$lib/components/ui/Confirm.svelte';
+	import Palette, { type PaletteItem } from '$lib/components/ui/Palette.svelte';
+	import { keys } from '$lib/keys';
 	import Chip from '$lib/components/ui/Chip.svelte';
 	import CloseButton from '$lib/components/ui/CloseButton.svelte';
 	import CodeView from '$lib/components/ui/CodeView.svelte';
@@ -99,6 +101,35 @@ Pick a direction before writing a line of CSS.
 	let skillSource = $state(SKILL);
 
 	let asking = $state(false);
+	let searching = $state(false);
+	let palette = $state('');
+	const paletteItems: PaletteItem[] = [
+		{
+			id: 'new',
+			label: 'New chat',
+			icon: 'plus',
+			group: 'Actions',
+			keyId: 'newChat',
+			run: () => {}
+		},
+		{
+			id: 'set',
+			label: 'Settings',
+			icon: 'sliders',
+			group: 'Actions',
+			keyId: 'settings',
+			run: () => {}
+		},
+		{ id: 'a', label: 'Explain Kerberos', icon: 'chat', group: 'Chats', run: () => {} },
+		{
+			id: 'b',
+			label: 'Garden plans',
+			description: 'Home',
+			icon: 'chat',
+			group: 'Chats',
+			run: () => {}
+		}
+	];
 </script>
 
 <svelte:head><title>Design — Hera</title></svelte:head>
@@ -231,6 +262,7 @@ Pick a direction before writing a line of CSS.
 				Show a failure
 			</Button>
 			<Button onclick={() => (asking = true)}>Ask before discarding</Button>
+			<Button onclick={() => (searching = true)}>Command palette</Button>
 		</div>
 	</section>
 
@@ -309,7 +341,9 @@ Pick a direction before writing a line of CSS.
 			<Pill tone="danger">failed</Pill>
 			<Chip on={skills} pressed={skills} onclick={() => (skills = !skills)}>1 skill</Chip>
 			<Chip>0 servers</Chip>
-			<Kbd>⌘K</Kbd>
+			<Kbd>{keys.label('palette')}</Kbd>
+			<Kbd>{keys.label('newChat')}</Kbd>
+			<Kbd>{keys.label('composer')}</Kbd>
 			<Avatar name="Void" />
 			<Avatar />
 			<AttachmentChip name="brief.pdf" size="184 KB" />
@@ -432,6 +466,17 @@ Pick a direction before writing a line of CSS.
 		</ul>
 	</section>
 </main>
+
+{#if searching}
+	<Palette
+		label="Search and jump"
+		placeholder="Search chats, projects and settings…"
+		empty="Nothing matches that."
+		items={paletteItems}
+		bind:query={palette}
+		onclose={() => (searching = false)}
+	/>
+{/if}
 
 {#if asking}
 	<Confirm

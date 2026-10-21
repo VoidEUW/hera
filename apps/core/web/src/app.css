@@ -541,6 +541,13 @@ a {
 
 /* The tooltip label from `$lib/tooltip`. Global because the action appends it to <body>, where no
    component's scoped style can reach. Inverted text on ink, rounded (the theme's soft tooltip). */
+.hera-tooltip .keys {
+	margin-left: calc(var(--space) * 2);
+	opacity: 0.65;
+	font-family: var(--font-mono);
+	font-size: 0.92em;
+}
+
 .hera-tooltip {
 	position: absolute;
 	z-index: 200;
@@ -560,4 +567,16 @@ a {
 	from {
 		opacity: 0;
 	}
+}
+
+/* Hera's own find in a chat (`FindBar`): every match, and the one the bar is on. Drawn with the
+   CSS Custom Highlight API, so the transcript's markup is not touched. Laurel, because finding is
+   live state; brass is for what she was granted. */
+::highlight(find) {
+	background-color: var(--laurel-soft);
+}
+
+::highlight(find-current) {
+	background-color: var(--laurel);
+	color: var(--on-laurel);
 }

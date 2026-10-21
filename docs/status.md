@@ -35,7 +35,19 @@ A shortcut mirrors a control on screen, and two the issue lists had none: **Save
 So the side view now has a **pen** (text artifacts, edited on their source, with Save and a
 discard confirmation — `PUT /chats/{id}/artifacts/{name}`, which replaces a file she published and
 never makes one), and the chat's top bar has a **chat menu** (Export, Share greyed, Delete).
-`Confirm` is the new primitive. The keymap, palette, find bar and Hotkeys screen follow in part 2.
+`Confirm` is the new primitive.
+
+### Hotkeys (#112, part 2)
+
+`lib/keys.ts` is the one keymap (data, platform-aware, handlers registered by the screen that owns
+the control). ⌘K opens the **command palette** (`ui/Palette` + `CommandPalette`): chats by title in
+the browser, projects, Settings screens, actions — and it replaces both of the old ⌘K meanings
+(Settings, and focusing the rail's filter; the rail's search is now a row that opens the palette).
+**Settings → Hotkeys** lists every chord beside the control it mirrors. **`FindBar`** (⌘F) searches
+the transcript with the CSS Custom Highlight API. One Escape: menus, then dialogs, then the find bar
+and the side view; unsaved edits ask first. ⌥↑/↓ walk the rail, and opening a chat no longer moves
+it. Guards: `keys.test.ts` (unique chords, none on a browser-reserved one, every entry names its
+control) and `tests/e2e/test_hotkeys.py`. ⌘⇧B (fold the rail) was dropped with the fold button.
 - **Guard** (`primitives.test.ts`): no `<button>`, `<input>`, `<textarea>` or `<select>` outside
   `ui/`, and `--brass` read only where the theme names it.
 
@@ -563,7 +575,7 @@ or pointed at directly by Claude Code. They live in the separate `hera-skills` r
 3. **A real endpoint.** Everything so far runs against `FakeProvider`. Settings → Models now
    registers one, tests it, and lists what it reports — so this is a matter of finding out what
    Qwen3.6-35B actually does with the `xml` prompt layout and the tool catalogue.
-4. **Deliberate gaps.** The `⌘K` palette (opens Settings for now), the mobile sheet, the embedder
+4. **Deliberate gaps.** The mobile sheet, the embedder
    seam.
 5. **Remaining tool surface.** `fetch` is still missing (she can find a page and not read it);
    PDFs are scoped for v0.1.0 but where extraction happens is open (see

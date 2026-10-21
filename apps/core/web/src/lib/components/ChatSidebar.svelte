@@ -30,7 +30,6 @@
 	import MenuItem from './ui/MenuItem.svelte';
 	import MenuNote from './ui/MenuNote.svelte';
 	import Ocellus from './ui/Ocellus.svelte';
-	import SearchBar from './ui/SearchBar.svelte';
 	import Skeleton from './ui/Skeleton.svelte';
 	import Sidebar from './ui/sidebar/Sidebar.svelte';
 	import SidebarEntry from './ui/sidebar/SidebarEntry.svelte';
@@ -48,6 +47,8 @@
 		sheet?: boolean;
 		onnew?: (projectId?: string) => void;
 		onsettings?: () => void;
+		/** Open the command palette. */
+		onsearch?: () => void;
 		settingsOpen?: boolean;
 		onrename?: (id: string, title: string) => void;
 		ondelete?: (id: string) => void;
@@ -68,6 +69,7 @@
 		sheet = false,
 		onnew,
 		onsettings,
+		onsearch,
 		settingsOpen = false,
 		onrename,
 		ondelete,
@@ -99,21 +101,6 @@
 	let anchors = $state<Record<string, HTMLElement | null>>({});
 
 	const loose = $derived(chats.filter((chat) => !chat.project_id));
-
-	/** The search bar's filter: titles containing it, across every project, in one list. */
-	let query = $state('');
-	let searchField = $state<HTMLInputElement | null>(null);
-	const found = $derived.by(() => {
-		const needle = query.trim().toLowerCase();
-		return needle ? chats.filter((chat) => chat.title.toLowerCase().includes(needle)) : null;
-	});
-
-	/** ⌘K / Ctrl+K focuses the search from anywhere — the shortcut its hint shows. */
-	function shortcut(event: KeyboardEvent) {
-		if (event.key.toLowerCase() !== 'k' || !(event.metaKey || event.ctrlKey)) return;
-		event.preventDefault();
-		searchField?.focus();
-	}
 
 	/* The shape of the rows that are coming, held long enough that a list arrives rather than
 	   appearing (`$lib/loading`). */
@@ -376,8 +363,6 @@
 	{/if}
 {/snippet}
 
-<svelte:window onkeydown={shortcut} />
-
 <Sidebar variant="chat" label={t.appName} resizable={!sheet}>
 	{#snippet head()}
 		<div class="brand-row">
@@ -386,97 +371,86 @@
 				<span class="display wordmark">{t.appName}</span>
 			</a>
 		</div>
-		<SidebarEntry icon="plus" label={t.rail.newChat} onclick={() => onnew?.()} />
-		<div class="search">
-			<SearchBar
-				bind:ref={searchField}
-				value={query}
-				placeholder={t.rail.search}
-				shortcut="⌘K"
-				onchange={(value) => (query = value)}
-			/>
-		</div>
+		<SidebarEntry icon="plus" label={t.rail.newChat} keyId="newChat" onclick={() => onnew?.()} />
+		<!-- Search is the command palette (#112): one place to find a chat, a project or a screen,
+		     opened by this row or by its chord, rather than a field that filters only the rail. -->
+		<SidebarEntry
+			icon="search"
+			label={t.rail.search}
+			keyId="palette"
+			onclick={() => onsearch?.()}
+		/>
 	{/snippet}
 
-	{#if found}
-		<SidebarGroup label={t.rail.results} count={found.length} fixed>
-			{#each found as chat (chat.id)}
+	<!-- Always shown, even with no projects: a heading with an add button under it is how you
+	     find out projects are a thing. -->
+	<SidebarGroup
+		label={t.rail.projects}
+		count={waiting ? undefined : projects.length}
+		addLabel={t.rail.newProject}
+		onadd={startCreate}
+		bind:open={projectsOpen}
+	>
+		{#if waiting}
+			<div class="waiting">
+				<Skeleton
+					rows={shape.projects}
+					height={15}
+					gap={ROW_GAP}
+					widths={[70, 52, 63]}
+					label={t.rail.loadingProjects}
+				/>
+			</div>
+		{:else}
+			{#each projects as project (project.id)}
+				{@render projectRow(project)}
+			{/each}
+			{#if creating}
+				<div class="item">
+					<Input
+						variant="inline"
+						class="rename"
+						autofocus
+						value={draft}
+						ariaLabel={t.rail.newProject}
+						placeholder={t.rail.projectNamePlaceholder}
+						onchange={(value) => (draft = value)}
+						onblur={commitCreate}
+						onkeydown={(event) => {
+							if (event.key === 'Enter') commitCreate();
+							if (event.key === 'Escape') creating = false;
+						}}
+					/>
+				</div>
+			{:else if !projects.length}
+				<p class="hint">{t.rail.noProjects}</p>
+			{/if}
+		{/if}
+	</SidebarGroup>
+
+	<SidebarGroup
+		label={t.rail.chats}
+		count={waiting ? undefined : loose.length}
+		bind:open={chatsOpen}
+	>
+		{#if waiting}
+			<div class="waiting">
+				<Skeleton
+					rows={shape.chats}
+					height={15}
+					gap={ROW_GAP}
+					widths={[82, 64, 74]}
+					label={t.rail.loadingChats}
+				/>
+			</div>
+		{:else}
+			{#each loose as chat (chat.id)}
 				{@render chatRow(chat, false)}
 			{:else}
-				<p class="hint">{t.settings.noMatch}</p>
+				<p class="hint">{t.rail.noChats}</p>
 			{/each}
-		</SidebarGroup>
-	{:else}
-		<!-- Always shown, even with no projects: a heading with an add button under it is how you
-	     find out projects are a thing. -->
-		<SidebarGroup
-			label={t.rail.projects}
-			count={waiting ? undefined : projects.length}
-			addLabel={t.rail.newProject}
-			onadd={startCreate}
-			bind:open={projectsOpen}
-		>
-			{#if waiting}
-				<div class="waiting">
-					<Skeleton
-						rows={shape.projects}
-						height={15}
-						gap={ROW_GAP}
-						widths={[70, 52, 63]}
-						label={t.rail.loadingProjects}
-					/>
-				</div>
-			{:else}
-				{#each projects as project (project.id)}
-					{@render projectRow(project)}
-				{/each}
-				{#if creating}
-					<div class="item">
-						<Input
-							variant="inline"
-							class="rename"
-							autofocus
-							value={draft}
-							ariaLabel={t.rail.newProject}
-							placeholder={t.rail.projectNamePlaceholder}
-							onchange={(value) => (draft = value)}
-							onblur={commitCreate}
-							onkeydown={(event) => {
-								if (event.key === 'Enter') commitCreate();
-								if (event.key === 'Escape') creating = false;
-							}}
-						/>
-					</div>
-				{:else if !projects.length}
-					<p class="hint">{t.rail.noProjects}</p>
-				{/if}
-			{/if}
-		</SidebarGroup>
-
-		<SidebarGroup
-			label={t.rail.chats}
-			count={waiting ? undefined : loose.length}
-			bind:open={chatsOpen}
-		>
-			{#if waiting}
-				<div class="waiting">
-					<Skeleton
-						rows={shape.chats}
-						height={15}
-						gap={ROW_GAP}
-						widths={[82, 64, 74]}
-						label={t.rail.loadingChats}
-					/>
-				</div>
-			{:else}
-				{#each loose as chat (chat.id)}
-					{@render chatRow(chat, false)}
-				{:else}
-					<p class="hint">{t.rail.noChats}</p>
-				{/each}
-			{/if}
-		</SidebarGroup>
-	{/if}
+		{/if}
+	</SidebarGroup>
 
 	{#snippet foot()}
 		{#if waiting}
@@ -491,6 +465,7 @@
 				label={shown}
 				ariaLabel={t.rail.account(shown)}
 				active={settingsOpen}
+				keyId="settings"
 				onclick={() => onsettings?.()}
 			>
 				{#snippet lead()}
@@ -527,10 +502,6 @@
 	.wordmark {
 		font-size: 21px;
 		line-height: 1;
-	}
-
-	.search {
-		margin: calc(var(--space) * 1.5) 0 calc(var(--space) * 1);
 	}
 
 	.item {

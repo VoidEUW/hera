@@ -12,6 +12,7 @@
 	import type { HTMLButtonAttributes } from 'svelte/elements';
 	import type { IconName } from '$lib/icons';
 	import Icon from './Icon.svelte';
+	import { keys, type KeyId } from '$lib/keys';
 	import { tooltip } from '$lib/tooltip';
 
 	interface Props extends Omit<HTMLButtonAttributes, 'children'> {
@@ -25,6 +26,8 @@
 		download?: string | boolean;
 		external?: boolean;
 		ref?: HTMLElement | null;
+		/** The chord this mirrors (#112): drawn after the label in the tooltip, and announced. */
+		keyId?: KeyId;
 	}
 
 	let {
@@ -38,8 +41,11 @@
 		external = false,
 		type = 'button',
 		ref = $bindable(),
+		keyId,
 		...rest
 	}: Props = $props();
+
+	const tip = $derived({ label, keys: keyId ? keys.label(keyId) : undefined });
 </script>
 
 {#if href}
@@ -53,7 +59,8 @@
 		download={download === true ? '' : download || undefined}
 		rel={external ? 'external' : undefined}
 		aria-label={label}
-		use:tooltip={label}
+		aria-keyshortcuts={keyId ? keys.aria(keyId) : undefined}
+		use:tooltip={tip}
 	>
 		<Icon name={icon} />
 	</a>
@@ -66,7 +73,8 @@
 		class:bordered
 		{type}
 		aria-label={label}
-		use:tooltip={label}
+		aria-keyshortcuts={keyId ? keys.aria(keyId) : undefined}
+		use:tooltip={tip}
 		{...rest}
 	>
 		<Icon name={icon} />

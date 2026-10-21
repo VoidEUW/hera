@@ -501,6 +501,46 @@ def act_artifact_editing(page: Page, chat_url: str, shots: Path, report: Report)
     (folder / "notes.md").unlink()
 
 
+def act_hotkeys(page: Page, chat_url: str, shots: Path, report: Report) -> None:
+    """The keyboard (#112): the palette, the Hotkeys screen, the find bar, a chord in a tooltip."""
+    with report.scene("palette", "hotkeys", page, shots):
+        page.goto(chat_url, wait_until="networkidle")
+        page.locator("body").click(position={"x": 700, "y": 300})
+        page.keyboard.press("ControlOrMeta+K")
+        page.get_by_role("dialog", name="Search and jump").wait_for(timeout=5_000)
+        page.wait_for_timeout(500)
+        shoot(page, shots, "22-palette")
+        page.keyboard.type("kerb")
+        page.wait_for_timeout(300)
+        shoot(page, shots, "23-palette-filtered")
+        page.keyboard.press("Escape")
+        page.keyboard.press("Escape")
+        page.wait_for_timeout(400)
+
+    with report.scene("hotkeys-screen", "hotkeys", page, shots):
+        page.keyboard.press("ControlOrMeta+/")
+        page.get_by_role("dialog", name="Settings").wait_for(timeout=5_000)
+        page.wait_for_timeout(600)
+        shoot(page, shots, "24-hotkeys-screen")
+        page.keyboard.press("Escape")
+        page.wait_for_timeout(400)
+
+    with report.scene("find-bar", "hotkeys", page, shots):
+        page.keyboard.press("ControlOrMeta+F")
+        page.get_by_role("search", name="Find in this chat").wait_for(timeout=5_000)
+        page.keyboard.type("the")
+        page.wait_for_timeout(500)
+        shoot(page, shots, "25-find-bar")
+        page.keyboard.press("Escape")
+        page.keyboard.press("Escape")
+        page.wait_for_timeout(300)
+
+    with report.scene("tooltip-with-a-chord", "hotkeys", page, shots):
+        page.get_by_role("button", name="Find in this chat").hover()
+        page.wait_for_timeout(1700)
+        shoot(page, shots, "26-tooltip-chord")
+
+
 def act_rail(page: Page, base: str, shots: Path, report: Report) -> None:
     """The rail's own states, which the conversation scenes never show."""
     with report.scene("rail-row-menu", "rail", page, shots):
@@ -830,6 +870,7 @@ def main() -> int:
             chat_url = act_conversation(page, base, shots, report)
             act_question(page, chat_url, shots, report)
             act_artifact_editing(page, chat_url, shots, report)
+            act_hotkeys(page, chat_url, shots, report)
             for act in (act_rail, act_composer, act_settings, act_profile, act_design):
                 act(page, base, shots, report)
             desktop.close()

@@ -17,12 +17,14 @@
 	import ChatMenu from '$lib/components/ChatMenu.svelte';
 	import Composer from '$lib/components/Composer.svelte';
 	import Message from '$lib/components/Message.svelte';
+	import FindBar from '$lib/components/FindBar.svelte';
 	import ContextMeter from '$lib/components/ui/ContextMeter.svelte';
 	import IconButton from '$lib/components/ui/IconButton.svelte';
 	import Selector from '$lib/components/ui/Selector.svelte';
 	import Skeleton from '$lib/components/ui/Skeleton.svelte';
 	import Topbar from '$lib/components/ui/Topbar.svelte';
 	import { t } from '$lib/i18n';
+	import { keys } from '$lib/keys';
 	import { Placeholder } from '$lib/loading.svelte';
 	import { artifacts } from '$lib/stores/artifacts.svelte';
 	import { ChatSession } from '$lib/stores/chat.svelte';
@@ -31,6 +33,8 @@
 	const session = new ChatSession();
 
 	let scroller = $state<HTMLElement | null>(null);
+	/** The find bar (⌘F) is open. */
+	let finding = $state(false);
 	let listing = $state<ArtifactSummary[]>([]);
 	const published = $derived(listing.length);
 
@@ -227,6 +231,37 @@
 		pinned = distance < 80;
 	}
 
+	/** The side view's toggle, and the chord that mirrors it. With nothing published there is no
+	 * toggle on screen, so the chord declines too. */
+	function toggleSideView(): boolean {
+		const chat = session.chat;
+		if (!chat || !published) return false;
+		if (artifacts.open) artifacts.ask(() => artifacts.close());
+		else artifacts.show(chat.id, artifacts.name);
+		return true;
+	}
+
+	// The chords of this screen, held only while it is on screen (#112). Escape closes the find
+	// bar first and the side view after it — what is nearest the hand goes first.
+	$effect(() => {
+		const off = [
+			keys.on('chat.find', () => {
+				if (!session.chat) return false;
+				finding = true;
+			}),
+			keys.on('chat.sideView', toggleSideView),
+			keys.onEscape(() => {
+				if (!finding) return false;
+				finding = false;
+			}, 20),
+			keys.onEscape(() => {
+				if (!artifacts.open) return false;
+				artifacts.ask(() => artifacts.close());
+			}, 10)
+		];
+		return () => off.forEach((undo) => undo());
+	});
+
 	/** Delete the conversation on screen and go to the start screen, as the rail does when the
 	 * chat it is deleting is the one you are in. */
 	async function removeChat() {
@@ -280,18 +315,30 @@
 		<IconButton
 			icon="panelR"
 			label={t.artifact.toggle}
+			keyId="chat.sideView"
 			on={artifacts.open}
 			aria-pressed={artifacts.open}
-			onclick={() =>
-				artifacts.open
-					? artifacts.ask(() => artifacts.close())
-					: session.chat && artifacts.show(session.chat.id, artifacts.name)}
+			onclick={toggleSideView}
+		/>
+	{/if}
+	{#if session.chat}
+		<IconButton
+			icon="search"
+			label={t.find.label}
+			keyId="chat.find"
+			on={finding}
+			aria-pressed={finding}
+			onclick={() => (finding = !finding)}
 		/>
 	{/if}
 	{#if session.chat}
 		<ChatMenu chatId={session.chat.id} {published} ondelete={removeChat} />
 	{/if}
 </Topbar>
+
+{#if finding}
+	<FindBar root={scroller} onclose={() => (finding = false)} />
+{/if}
 
 <!-- The conversation and the drawer are side by side rather than stacked, which is the whole
      point of a drawer: you keep working with it open — reading the page, asking for a change,

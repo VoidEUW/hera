@@ -14,7 +14,9 @@
 	import type { Snippet } from 'svelte';
 	import type { IconName } from '$lib/icons';
 	import Icon from './Icon.svelte';
+	import Kbd from './Kbd.svelte';
 	import Toggle from './Toggle.svelte';
+	import { keys, type KeyId } from '$lib/keys';
 
 	interface Props {
 		icon?: IconName;
@@ -33,6 +35,8 @@
 		/** A link that leaves the client router — a file download, not a page. */
 		external?: boolean;
 		onclick?: (event: MouseEvent) => void;
+		/** The chord this row mirrors (#112), drawn at the end of the row. */
+		keyId?: KeyId;
 		children: Snippet;
 	}
 
@@ -49,6 +53,7 @@
 		download = false,
 		external = false,
 		onclick,
+		keyId,
 		children
 	}: Props = $props();
 
@@ -71,6 +76,7 @@
 		{@render children()}
 		{#if description}<small>{description}</small>{/if}
 	</span>
+	{#if keyId}<Kbd decorative>{keys.label(keyId)}</Kbd>{/if}
 	{#if end === 'check'}
 		<span class="check" class:on><Icon name="check" /></span>
 	{:else if end === 'switch'}
@@ -87,6 +93,7 @@
 		class="item"
 		class:danger
 		role="menuitem"
+		aria-keyshortcuts={keyId ? keys.aria(keyId) : undefined}
 		{href}
 		download={download || undefined}
 		rel={external ? 'external' : undefined}
@@ -102,6 +109,7 @@
 		type="button"
 		role={resolvedRole}
 		aria-checked={resolvedRole === 'menuitem' ? undefined : on}
+		aria-keyshortcuts={keyId ? keys.aria(keyId) : undefined}
 		{disabled}
 		{onclick}
 	>
