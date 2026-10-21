@@ -28,6 +28,14 @@ and resolved through the export's looks and parts:
   Field, FileButton, Toggle, Scrim, TraceRow, Thinking, StallBox, ContextMeter, AttachmentChip,
   CodeView (VS Code colours), FileEditor (the skill editor), Swatches — and VoiceCall, ImageGen and
   Auth, on `/design` only until they have a backend.
+
+### What the hotkeys need first (#112, part 1)
+
+A shortcut mirrors a control on screen, and two the issue lists had none: **Save** and **Share**.
+So the side view now has a **pen** (text artifacts, edited on their source, with Save and a
+discard confirmation — `PUT /chats/{id}/artifacts/{name}`, which replaces a file she published and
+never makes one), and the chat's top bar has a **chat menu** (Export, Share greyed, Delete).
+`Confirm` is the new primitive. The keymap, palette, find bar and Hotkeys screen follow in part 2.
 - **Guard** (`primitives.test.ts`): no `<button>`, `<input>`, `<textarea>` or `<select>` outside
   `ui/`, and `--brass` read only where the theme names it.
 

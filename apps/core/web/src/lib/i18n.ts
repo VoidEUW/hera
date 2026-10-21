@@ -608,7 +608,23 @@ export const t = {
 		 * the part a person can act on, and the source is shown under it — a `.mmd` file is
 		 * still a file she made, and showing nothing at all is what makes one bad line look
 		 * like an artifact that came out broken. */
-		notDrawn: (why: string) => `That diagram did not come out: ${why}. The source is below.`
+		notDrawn: (why: string) => `That diagram did not come out: ${why}. The source is below.`,
+		/** The pen: an edit switch that puts a text box over the file's source. */
+		edit: 'Edit this file',
+		save: 'Save',
+		saved: 'Saved',
+		saveFailed: (why: string) => `Could not save: ${why}`,
+		discardTitle: 'Discard your changes?',
+		discardBody: (name: string) => `${name} has edits that have not been saved.`,
+		discardYes: 'Discard',
+		discardKeep: 'Keep editing'
+	},
+	/** The chat's own menu in the top bar: what you can do with the conversation as a whole. */
+	chatMenu: {
+		label: 'Options for this chat',
+		share: 'Share',
+		/** Under Share, because a feature you can see coming is a promise (#101). */
+		shareSoon: 'Coming later'
 	},
 
 	chat: {

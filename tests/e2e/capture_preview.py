@@ -461,6 +461,46 @@ def act_question(page: Page, chat_url: str, shots: Path, report: Report) -> None
         shoot(page, shots, "14-the-reply-resumed")
 
 
+def act_artifact_editing(page: Page, chat_url: str, shots: Path, report: Report) -> None:
+    """The side view with the pen on, and the chat's own menu.
+
+    The scripted model never publishes anything, so a file is put where she would have put it and
+    the conversation reopens on it, the way a reload does.
+    """
+    chat_id = chat_url.rstrip("/").rsplit("/", 1)[-1]
+    folder = Path(os.environ["HERA_HOME"]) / "chats" / chat_id / "artifacts"
+    folder.mkdir(parents=True, exist_ok=True)
+    (folder / "notes.md").write_text(
+        "# Ticket lifetime\n\nA ticket is valid for ten hours.\n", encoding="utf-8"
+    )
+    with report.scene("artifact-editing", "artifacts", page, shots):
+        page.goto(chat_url, wait_until="networkidle")
+        page.get_by_role("button", name="Edit this file").click(timeout=10_000)
+        page.locator(".cv textarea.input").fill(
+            "# Ticket lifetime\n\nA ticket is valid for ten hours, and renewable.\n"
+        )
+        page.wait_for_timeout(400)
+        shoot(page, shots, "19-artifact-editing")
+        page.locator("aside.drawer").get_by_role("button", name="Close").click()
+        page.wait_for_selector("[role='dialog']", timeout=5_000)
+        page.wait_for_timeout(400)
+        shoot(page, shots, "20-artifact-discard-asks")
+        page.get_by_role("button", name="Keep editing").click()
+        page.get_by_role("button", name="Save", exact=True).click()
+        page.wait_for_timeout(600)
+
+    with report.scene("chat-menu", "artifacts", page, shots):
+        page.get_by_role("button", name="Options for this chat").click(timeout=5_000)
+        page.wait_for_timeout(400)
+        shoot(page, shots, "21-chat-menu")
+        page.keyboard.press("Escape")
+        page.wait_for_timeout(300)
+
+    # Put back what the scripted model published (nothing), so the phone scenes after this open on
+    # a conversation without a full-bleed side view over its menu button.
+    (folder / "notes.md").unlink()
+
+
 def act_rail(page: Page, base: str, shots: Path, report: Report) -> None:
     """The rail's own states, which the conversation scenes never show."""
     with report.scene("rail-row-menu", "rail", page, shots):
@@ -789,6 +829,7 @@ def main() -> int:
             # tuple anyway because it needs the chat the first scene made.
             chat_url = act_conversation(page, base, shots, report)
             act_question(page, chat_url, shots, report)
+            act_artifact_editing(page, chat_url, shots, report)
             for act in (act_rail, act_composer, act_settings, act_profile, act_design):
                 act(page, base, shots, report)
             desktop.close()

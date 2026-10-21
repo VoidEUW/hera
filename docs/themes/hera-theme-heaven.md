@@ -721,6 +721,29 @@ A choice of colour: round swatches in a row, the chosen one ringed in `--text` �
 - Tokens: `--text`, `--ground`
 - Motion: `button.hover`
 
+#### Confirm · `hera/confirm`
+
+The open dialog, small: a title, one sentence saying what goes, **Cancel** (ghost) and the destructive action (`danger`) at the end. Escape answers no. Used before an unsaved edit is thrown away.
+
+- Tokens: `--surface`, `--line`, `--danger`
+- Parts and states: title; body; actions
+- Motion: `modal.enter`
+
+#### Chat menu · `hera/chat-menu`
+
+The conversation's own menu in the top bar, the on-screen control for the chat-wide chords: an icon button (`more`) opening the shared menu with **Export**, **Share** (disabled, with "Coming later" under it) and, after a separator, **Delete** (danger, asked once in the menu itself).
+
+- Tokens: as the shared menu
+- Parts and states: closed; open; confirming delete; Share disabled
+- Motion: `menu.enter`
+
+#### Side view · edit (extends `hera/side-view`)
+
+The side view's pen: an icon button in the header (`on` while editing) puts the code view's text box over the file's source, and a **Save** button (highlighted, small) appears beside it, disabled until the text differs from the file. Preview shows the unsaved text. Closing, or opening another file, with unsaved text asks first (Confirm).
+
+- Tokens: as the code view; Save is the one highlighted button in the header, so brass
+- Parts and states: reading; editing clean; editing dirty; saving
+
 ## Source of truth
 
 ```json

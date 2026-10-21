@@ -5,6 +5,8 @@
 	 * Everything on screen comes from the event list — the live one while a turn is streaming,
 	 * and the persisted one the instant it finishes. Nothing here parses text.
 	 */
+	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { untrack } from 'svelte';
 	import { api, type ArtifactSummary } from '$lib/api/client';
@@ -12,6 +14,7 @@
 	import { headingOf } from '$lib/artifacts';
 	import ArtifactDrawer from '$lib/components/ArtifactDrawer.svelte';
 	import Backdrop from '$lib/components/Backdrop.svelte';
+	import ChatMenu from '$lib/components/ChatMenu.svelte';
 	import Composer from '$lib/components/Composer.svelte';
 	import Message from '$lib/components/Message.svelte';
 	import ContextMeter from '$lib/components/ui/ContextMeter.svelte';
@@ -224,6 +227,14 @@
 		pinned = distance < 80;
 	}
 
+	/** Delete the conversation on screen and go to the start screen, as the rail does when the
+	 * chat it is deleting is the one you are in. */
+	async function removeChat() {
+		const chat = session.chat;
+		if (!chat) return;
+		if (await workspace.deleteChat(chat.id)) await goto(resolve('/'));
+	}
+
 	function answer(callId: string, allow: boolean, remember: boolean) {
 		void session.answer([callId], allow, remember);
 	}
@@ -259,7 +270,12 @@
 			label={t.artifact.panel}
 			placeholder={t.artifact.count(published)}
 			align="end"
-			onchange={(name) => session.chat && artifacts.show(session.chat.id, name)}
+			onchange={(name) => {
+				const chat = session.chat;
+				if (!chat) return;
+				if (artifacts.open && artifacts.name === name) artifacts.show(chat.id, name);
+				else artifacts.ask(() => artifacts.show(chat.id, name));
+			}}
 		/>
 		<IconButton
 			icon="panelR"
@@ -268,9 +284,12 @@
 			aria-pressed={artifacts.open}
 			onclick={() =>
 				artifacts.open
-					? artifacts.close()
+					? artifacts.ask(() => artifacts.close())
 					: session.chat && artifacts.show(session.chat.id, artifacts.name)}
 		/>
+	{/if}
+	{#if session.chat}
+		<ChatMenu chatId={session.chat.id} {published} ondelete={removeChat} />
 	{/if}
 </Topbar>
 
