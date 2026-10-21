@@ -37,7 +37,7 @@ dependencies = [
     # tomllib reads TOML; nothing in the standard library writes it, and hand-rolling the
     # serialisation is exactly what breaks on a quote in an API key.
     "tomli-w>=1.0",
-    "uvicorn[standard]>=0.52.4",
+    "uvicorn[standard]>=0.54.0",
 ]
 
 [project.scripts]
