@@ -3,7 +3,7 @@
   "scenes": 43,
   "ran": 43,
   "did_not_run": 0,
-  "console_messages": 7,
+  "console_messages": 4,
   "page_errors": 0,
   "failed_requests": 0,
   "screenshots": [
@@ -65,301 +65,301 @@
       "name": "01-start",
       "group": "conversation",
       "ok": true,
-      "seconds": 1.53,
+      "seconds": 1.24,
       "problem": ""
     },
     {
       "name": "02-waiting-mark",
       "group": "conversation",
       "ok": true,
-      "seconds": 3.97,
+      "seconds": 3.89,
       "problem": ""
     },
     {
       "name": "03-first-answer",
       "group": "conversation",
       "ok": true,
-      "seconds": 1.27,
+      "seconds": 1.28,
       "problem": ""
     },
     {
       "name": "04-long-trace",
       "group": "conversation",
       "ok": true,
-      "seconds": 12.74,
+      "seconds": 12.05,
       "problem": ""
     },
     {
       "name": "05-a-turn-that-cannot-start",
       "group": "conversation",
       "ok": true,
-      "seconds": 0.48,
+      "seconds": 1.04,
       "problem": ""
     },
     {
       "name": "06-a-turn-cut-off-mid-answer",
       "group": "conversation",
       "ok": true,
-      "seconds": 5.46,
+      "seconds": 5.41,
       "problem": ""
     },
     {
       "name": "07-the-answer-after-both",
       "group": "conversation",
       "ok": true,
-      "seconds": 4.7,
+      "seconds": 4.61,
       "problem": ""
     },
     {
       "name": "10-the-question-card",
       "group": "cards",
       "ok": true,
-      "seconds": 6.07,
+      "seconds": 5.89,
       "problem": ""
     },
     {
       "name": "11-the-reply-resumes-the-turn",
       "group": "cards",
       "ok": true,
-      "seconds": 4.62,
+      "seconds": 4.59,
       "problem": ""
     },
     {
       "name": "artifact-editing",
       "group": "artifacts",
       "ok": true,
-      "seconds": 3.41,
+      "seconds": 3.25,
       "problem": ""
     },
     {
       "name": "chat-menu",
       "group": "artifacts",
       "ok": true,
-      "seconds": 0.99,
+      "seconds": 0.93,
       "problem": ""
     },
     {
       "name": "palette",
       "group": "hotkeys",
       "ok": true,
-      "seconds": 2.72,
+      "seconds": 2.54,
       "problem": ""
     },
     {
       "name": "hotkeys-screen",
       "group": "hotkeys",
       "ok": true,
-      "seconds": 1.33,
+      "seconds": 1.26,
       "problem": ""
     },
     {
       "name": "find-bar",
       "group": "hotkeys",
       "ok": true,
-      "seconds": 1.09,
+      "seconds": 1.02,
       "problem": ""
     },
     {
       "name": "tooltip-with-a-chord",
       "group": "hotkeys",
       "ok": true,
-      "seconds": 2.0,
+      "seconds": 1.98,
       "problem": ""
     },
     {
       "name": "rail-row-menu",
       "group": "rail",
       "ok": true,
-      "seconds": 1.65,
+      "seconds": 1.4,
       "problem": ""
     },
     {
       "name": "rail-new-chat-and-projects",
       "group": "rail",
       "ok": true,
-      "seconds": 0.81,
+      "seconds": 0.82,
       "problem": ""
     },
     {
       "name": "not-found",
       "group": "rail",
       "ok": true,
-      "seconds": 2.11,
+      "seconds": 1.95,
       "problem": ""
     },
     {
       "name": "composer-model-dropdown",
       "group": "composer",
       "ok": true,
-      "seconds": 1.36,
+      "seconds": 1.25,
       "problem": ""
     },
     {
       "name": "composer-servers-sheet",
       "group": "composer",
       "ok": true,
-      "seconds": 1.35,
+      "seconds": 1.37,
       "problem": ""
     },
     {
       "name": "composer-skills-sheet",
       "group": "composer",
       "ok": true,
-      "seconds": 1.21,
+      "seconds": 1.14,
       "problem": ""
     },
     {
       "name": "composer-typed-and-growing",
       "group": "composer",
       "ok": true,
-      "seconds": 0.65,
+      "seconds": 0.6,
       "problem": ""
     },
     {
       "name": "settings-open",
       "group": "settings",
       "ok": true,
-      "seconds": 1.55,
+      "seconds": 1.33,
       "problem": ""
     },
     {
       "name": "settings-models",
       "group": "settings",
       "ok": true,
-      "seconds": 1.97,
+      "seconds": 1.78,
       "problem": ""
     },
     {
       "name": "settings-general",
       "group": "settings",
       "ok": true,
-      "seconds": 1.06,
+      "seconds": 0.98,
       "problem": ""
     },
     {
       "name": "settings-skills",
       "group": "settings",
       "ok": true,
-      "seconds": 1.82,
+      "seconds": 1.74,
       "problem": ""
     },
     {
       "name": "settings-servers",
       "group": "settings",
       "ok": true,
-      "seconds": 1.81,
+      "seconds": 1.71,
       "problem": ""
     },
     {
       "name": "settings-permissions",
       "group": "settings",
       "ok": true,
-      "seconds": 1.81,
+      "seconds": 1.75,
       "problem": ""
     },
     {
       "name": "settings-memory",
       "group": "settings",
       "ok": true,
-      "seconds": 1.83,
+      "seconds": 1.73,
       "problem": ""
     },
     {
       "name": "settings-mind",
       "group": "settings",
       "ok": true,
-      "seconds": 1.87,
+      "seconds": 1.78,
       "problem": ""
     },
     {
       "name": "settings-dreaming",
       "group": "settings",
       "ok": true,
-      "seconds": 1.04,
+      "seconds": 0.93,
       "problem": ""
     },
     {
       "name": "settings-search",
       "group": "settings",
       "ok": true,
-      "seconds": 1.23,
+      "seconds": 1.16,
       "problem": ""
     },
     {
       "name": "profile-menu",
       "group": "theme",
       "ok": true,
-      "seconds": 1.92,
+      "seconds": 2.03,
       "problem": ""
     },
     {
       "name": "light-theme",
       "group": "theme",
       "ok": true,
-      "seconds": 1.52,
+      "seconds": 1.45,
       "problem": ""
     },
     {
       "name": "back-to-dark",
       "group": "theme",
       "ok": true,
-      "seconds": 1.74,
+      "seconds": 1.57,
       "problem": ""
     },
     {
       "name": "design-dark",
       "group": "design",
       "ok": true,
-      "seconds": 3.38,
+      "seconds": 3.01,
       "problem": ""
     },
     {
       "name": "design-light",
       "group": "design",
       "ok": true,
-      "seconds": 2.25,
+      "seconds": 1.78,
       "problem": ""
     },
     {
       "name": "reduced-motion",
       "group": "accessibility",
       "ok": true,
-      "seconds": 1.62,
+      "seconds": 1.53,
       "problem": ""
     },
     {
       "name": "reduced-motion-drawer",
       "group": "accessibility",
       "ok": true,
-      "seconds": 0.54,
+      "seconds": 0.47,
       "problem": ""
     },
     {
       "name": "phone-start",
       "group": "phone",
       "ok": true,
-      "seconds": 1.5,
+      "seconds": 1.33,
       "problem": ""
     },
     {
       "name": "phone-rail",
       "group": "phone",
       "ok": true,
-      "seconds": 0.7,
+      "seconds": 0.66,
       "problem": ""
     },
     {
       "name": "phone-answer",
       "group": "phone",
       "ok": true,
-      "seconds": 1.83,
+      "seconds": 1.78,
       "problem": ""
     },
     {
       "name": "phone-settings",
       "group": "phone",
       "ok": true,
-      "seconds": 1.21,
+      "seconds": 1.13,
       "problem": ""
     }
   ]
