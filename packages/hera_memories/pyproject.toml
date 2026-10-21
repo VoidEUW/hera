@@ -16,7 +16,7 @@ classifiers = [
     "Programming Language :: Python :: 3.13",
     "Typing :: Typed",
 ]
-dependencies = ["hera-home", "pydantic-settings>=2.5", "pyyaml>=6.0"]
+dependencies = ["hera-home", "pydantic-settings>=2.16.0", "pyyaml>=6.0"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/hera_memories"]
