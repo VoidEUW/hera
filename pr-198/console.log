@@ -1,0 +1,11 @@
+# browser console
+
+[desktop] warning: A preload for 'http://127.0.0.1:36403/_app/immutable/entry/start.ChRbPsMW.js' is found, but is not used because it is a cross-world service worker resource mismatch.  (http://127.0.0.1:36403/:26)
+[desktop] warning: A preload for 'http://127.0.0.1:36403/_app/immutable/entry/start.ChRbPsMW.js' is found, but is not used because it is a cross-world service worker resource mismatch.  (http://127.0.0.1:36403/:26)
+
+# uncaught page errors
+
+
+# failed requests (network failure or a 4xx/5xx)
+
+(none)
