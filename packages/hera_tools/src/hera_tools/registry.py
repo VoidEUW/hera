@@ -43,13 +43,22 @@ class ServerStatus(BaseModel):
     connected: bool
     tools: int
     failure: str | None = None
+    builtin: bool = False
+    """Mounted by the application rather than declared in ``mcp.json`` -- not the file's to edit."""
 
 
 class ToolRegistry:
     """The tool layer, assembled."""
 
-    def __init__(self, servers: Sequence[ManagedServer], *, policy: Policy | None = None) -> None:
+    def __init__(
+        self,
+        servers: Sequence[ManagedServer],
+        *,
+        policy: Policy | None = None,
+        settings: ToolsSettings | None = None,
+    ) -> None:
         self._servers = tuple(servers)
+        self._settings = settings or ToolsSettings()
         self._policy = policy or Policy()
         """No policy means the default: every tool asks. A registry built without one is not
         an open door."""
@@ -79,7 +88,7 @@ class ToolRegistry:
         ]
         if builtin is not None:
             servers.insert(0, ManagedServer.in_process(builtin.name, builtin, settings))
-        return cls(servers, policy=policy)
+        return cls(servers, policy=policy, settings=settings)
 
     @classmethod
     def open(
@@ -107,6 +116,15 @@ class ToolRegistry:
     def policy(self) -> Policy:
         return self._policy
 
+    @property
+    def settings(self) -> ToolsSettings:
+        return self._settings
+
+    @property
+    def builtin_names(self) -> frozenset[str]:
+        """The servers the application mounted, which ``mcp.json`` neither declares nor owns."""
+        return frozenset(server.name for server in self._servers if server.builtin)
+
     def with_policy(self, policy: Policy) -> ToolRegistry:
         """The same servers, a different policy.
 
@@ -114,7 +132,37 @@ class ToolRegistry:
         "always allow" produces a new policy, and paying for four subprocess restarts to
         honour it would be absurd.
         """
-        return ToolRegistry(self._servers, policy=policy)
+        return ToolRegistry(self._servers, policy=policy, settings=self._settings)
+
+    def with_config(self, config: McpConfig) -> tuple[ToolRegistry, tuple[ManagedServer, ...]]:
+        """The same registry over a changed ``mcp.json``, and the servers it no longer has.
+
+        A server whose declaration is unchanged is kept as it is -- connected, listing cached --
+        so editing one entry does not restart the others. One that is new or changed is built
+        fresh, and one that is gone or switched off is handed back in the second half of the
+        result for the caller to close once nothing is using it. Not closed here: a turn that
+        started before the change holds the old registry and its servers, and finishes on them.
+
+        The application's own servers, the ones with no declaration, always stay.
+        """
+        wanted = config.enabled()
+        kept: list[ManagedServer] = []
+        retired: list[ManagedServer] = []
+        have: set[str] = set()
+        for server in self._servers:
+            if server.builtin:
+                kept.append(server)
+            elif server.name in wanted and server.config == wanted[server.name]:
+                kept.append(server)
+                have.add(server.name)
+            else:
+                retired.append(server)
+        kept.extend(
+            ManagedServer.from_config(name, declared, self._settings)
+            for name, declared in wanted.items()
+            if name not in have
+        )
+        return ToolRegistry(kept, policy=self._policy, settings=self._settings), tuple(retired)
 
     # -- what exists -------------------------------------------------------------------
 
@@ -147,6 +195,7 @@ class ToolRegistry:
                 connected=server.connected,
                 tools=len(catalogue.for_server(server.name)),
                 failure=server.failure,
+                builtin=server.builtin,
             )
             for server in self._servers
         )

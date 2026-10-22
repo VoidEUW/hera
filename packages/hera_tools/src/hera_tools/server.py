@@ -81,6 +81,11 @@ class ManagedServer:
         retry_after_s: float = 30.0,
     ) -> None:
         self.name = validate_server_name(name)
+        self.config: ServerConfig | None = None
+        """The ``mcp.json`` entry this was built from; ``None`` for a server running in-process.
+
+        Kept so a registry can tell, when the file changes, which servers did not and need not be
+        reconnected."""
         self._opener = opener
         self._call_timeout_s = call_timeout_s
         self._startup_timeout_s = startup_timeout_s
@@ -103,13 +108,15 @@ class ManagedServer:
     ) -> ManagedServer:
         """Build from one ``mcp.json`` entry."""
         settings = settings or ToolsSettings()
-        return cls(
+        server = cls(
             name,
             _opener_for(config, settings),
             call_timeout_s=config.timeout_s or settings.call_timeout_s,
             startup_timeout_s=config.startup_timeout_s or settings.startup_timeout_s,
             retry_after_s=settings.retry_after_s,
         )
+        server.config = config
+        return server
 
     @classmethod
     def in_process(
@@ -132,6 +139,11 @@ class ManagedServer:
         )
 
     # -- state -------------------------------------------------------------------------
+
+    @property
+    def builtin(self) -> bool:
+        """Whether this is a server the application mounted rather than one the file declares."""
+        return self.config is None
 
     @property
     def connected(self) -> bool:

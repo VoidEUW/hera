@@ -68,6 +68,13 @@ is an error rather than an empty string: a blank credential fails minutes later 
 unrelated. `enabled`, `timeout_s` and `startup_timeout_s` are ours and optional; everything
 else is the protocol's.
 
+**Writing it.** `put_server`, `remove_server`, `mask` and `merge` (in `hera_tools.config`) edit the
+file as JSON rather than saving the parsed `McpConfig` back, which would drop keys this client does
+not read and write `${VAR}` references out as their secrets. An entry is validated, variables
+included, before anything is written; the file is replaced atomically. `ToolRegistry.with_config`
+then swaps the servers over a changed file, keeping every connection whose declaration is unchanged
+and returning the retired ones for the caller to close.
+
 A missing file is not an error. Hera with no external servers is a working installation — her
 own tools are in-process and do not come from here.
 

@@ -19,7 +19,13 @@ from hera_tools.config import (
     ServerConfig,
     StdioServer,
     expand_variables,
+    mask,
+    merge,
     parse_server,
+    put_server,
+    raw_servers,
+    read_raw,
+    remove_server,
 )
 from hera_tools.errors import (
     InvalidToolConfig,
@@ -55,8 +61,14 @@ __all__ = [
     "ToolsError",
     "ToolsSettings",
     "expand_variables",
+    "mask",
+    "merge",
     "parse_server",
+    "put_server",
     "qualify",
+    "raw_servers",
+    "read_raw",
+    "remove_server",
     "split",
     "validate_server_name",
 ]

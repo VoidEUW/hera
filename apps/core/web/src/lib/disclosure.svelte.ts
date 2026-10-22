@@ -28,3 +28,6 @@ export class Disclosure {
 
 /** The Models screen's providers, by name. */
 export const providers = new Disclosure();
+
+/** The Servers screen's boxes, by server name. */
+export const servers = new Disclosure();

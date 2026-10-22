@@ -104,5 +104,7 @@ streamable HTTP.
 
 `${VAR}` and `${VAR:-fallback}` are expanded from the environment; a variable that isn't set
 is an error rather than a blank credential. `enabled`, `timeout_s` and `startup_timeout_s` are
-optional. A missing file is not an error — Hera with no external servers is a working
+optional. You can also add, edit and remove servers from **Settings → Servers**, which writes this
+same file — your other keys and `${VAR}` references are left as they are, and a secret you pasted is
+shown as *saved* and never sent back to the browser. A missing file is not an error — Hera with no external servers is a working
 installation; her own tools are built in and don't come from here.
