@@ -24,6 +24,10 @@ import { t } from '$lib/i18n';
 import { notifications } from '$lib/notifications.svelte';
 import { reduce, type Turn } from '$lib/turn';
 
+/** How long, and how often, `cancel` waits for the server to write down a stopped turn. */
+const SETTLE_WAIT_MS = 100;
+const SETTLE_ATTEMPTS = 10;
+
 export class ChatSession {
 	chat = $state<Chat | null>(null);
 	messages = $state<Message[]>([]);
@@ -31,6 +35,9 @@ export class ChatSession {
 	/** Events of the turn in flight. Empty when nothing is streaming. */
 	draft = $state<AnyEvent[]>([]);
 	streaming = $state(false);
+	/** Stop was pressed and the server has not yet said what it kept. The beat the send button
+	 * draws as `cancelling`: nothing is running and nothing is offered. */
+	cancelling = $state(false);
 	error = $state<string | null>(null);
 	/** Whether the message list has been fetched. A conversation that has not answered yet and
 	 * one with nothing in it are both an empty `messages`, and only one of them is an invitation
@@ -140,6 +147,52 @@ export class ChatSession {
 		this.#abort?.abort();
 		this.#abort = null;
 		this.streaming = false;
+	}
+
+	/** The person pressed **Stop**. Abort, then take the server's record in place of the draft.
+	 *
+	 * `stop()` alone is not that. It drops the stream, and the stream is what clears `pending`
+	 * and swaps the draft for the persisted message at `done` -- which a cancelled turn never
+	 * sends, because the client that would receive it has gone. So the question stayed pending,
+	 * the composer stayed `busy`, and the button stayed a Stop button (#216).
+	 *
+	 * The server closes the turn as `cancelled` and writes it when it sees the disconnect, which
+	 * is after this returns, so one read straight away can find the row as it was. It is read
+	 * until the last message has changed and carries its `turn_closed`, a few times and no more:
+	 * a request that never reached the server leaves nothing to wait for. */
+	async cancel() {
+		const chat = this.chat;
+		if (!chat || !this.streaming || this.cancelling) return;
+		const token = this.#load;
+		const last = this.messages.at(-1);
+		const seen = `${last?.id}:${last?.events.length}`;
+		this.cancelling = true;
+		this.stop();
+		try {
+			let detail = null;
+			for (let attempt = 0; attempt < SETTLE_ATTEMPTS; attempt++) {
+				await new Promise((resolve) => setTimeout(resolve, SETTLE_WAIT_MS));
+				detail = await api.chat(chat.id);
+				if (token !== this.#load) return;
+				const end = detail.messages.at(-1);
+				const changed = `${end?.id}:${end?.events.length}` !== seen;
+				if (changed && end?.role === 'assistant' && reduce(end.events).closed) break;
+			}
+			if (detail) {
+				this.chat = detail.chat;
+				this.messages = detail.messages;
+			}
+			this.draft = [];
+			this.pending = null;
+			this.pendingFiles = [];
+		} catch (cause) {
+			if (token !== this.#load) return;
+			// Whatever arrived stays on screen; the person is handed the composer back either way.
+			this.pending = null;
+			this.error = message(cause);
+		} finally {
+			this.cancelling = false;
+		}
 	}
 
 	async send(text: string, attachments: Attachment[] = []) {
