@@ -30,3 +30,4 @@ later.
 | [21](0021-a-theme-is-imported-data.md) | A theme is imported data, and it changes tokens rather than structure | accepted |
 | [22](0022-the-changelog-is-the-release-notes.md) | The changelog is the release notes, written from the commits | accepted |
 | [23](0023-permission-rules-are-kept-over-the-shipped-policy.md) | Permission rules are kept in a file, laid over the policy Hera ships with | accepted |
+| [24](0024-the-servers-screen-writes-mcp-json.md) | The Servers screen writes `mcp.json`, and a tool that is switched off is not offered | accepted |

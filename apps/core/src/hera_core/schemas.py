@@ -23,7 +23,7 @@ import binascii
 import json
 import re
 from datetime import date, datetime
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID
 
 from hera_skillsets.models import ID_PATTERN
@@ -569,6 +569,56 @@ class ServerOut(BaseModel):
     connected: bool
     tools: int
     failure: str | None = None
+    builtin: bool = False
+    """Hera's own server. Listed so it can be shown like any other, and not counted as one the
+    person added (the composer's "n servers" leaves it out); not the file's to edit."""
+
+    enabled: bool = True
+    """False for a block in ``mcp.json`` that is switched off: kept, not started."""
+
+    kind: Literal["builtin", "stdio", "http"] = "stdio"
+
+
+class ServerEntry(BaseModel):
+    """What the add-a-server form edits, and what it is shown when editing.
+
+    ``env`` and ``headers`` values come back as ``None`` where the file holds a literal -- a
+    secret somebody pasted never leaves the server -- and a ``None`` sent back means *keep it*.
+    A ``${VAR}`` is shown as written, because it is the name of a secret and not one.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    kind: Literal["stdio", "http"]
+    command: str = ""
+    args: list[str] = Field(default_factory=list)
+    env: dict[str, str | None] = Field(default_factory=dict)
+    cwd: str = ""
+    url: str = ""
+    headers: dict[str, str | None] = Field(default_factory=dict)
+    enabled: bool = True
+
+
+class ServerToolOut(BaseModel):
+    """One tool of one server, and whether she has it."""
+
+    model_config = ConfigDict(frozen=True)
+
+    name: str
+    """The qualified ``server__tool`` name -- what a rule is written against."""
+
+    local_name: str
+    description: str = ""
+    allowed: bool
+    rule: str | None = None
+    """The pattern that turned it off, when something did."""
+
+    exact: bool = False
+    """Whether that rule is on this tool alone, as opposed to a wider pattern such as ``fs__*``."""
+
+
+class ToolAllowedIn(BaseModel):
+    allowed: bool
 
 
 class RuleOut(BaseModel):

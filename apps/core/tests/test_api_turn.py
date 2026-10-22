@@ -542,17 +542,20 @@ class TestARealMcpServer:
         # test that costs maintenance and catches nothing.
         assert offered == {f"{BUILTIN_SERVER_NAME}__{name}" for name in TOOL_NAMES}
 
-    async def test_her_own_server_is_not_listed_as_a_server(
+    async def test_her_own_server_is_listed_but_flagged_as_hers(
         self, make_services: Any, mcp_registry: ToolRegistry
     ) -> None:
-        """The builtin is her, not an MCP server a person configured. "Servers" in the
-        settings screen and the composer means the ``mcp.json`` entries, and counting the
-        builtin made the composer say "1 server" on a machine with none."""
+        """She is shown on the Servers screen like any other server -- she is one (ADR 4) --
+        but "servers" to the composer and the health card means the ``mcp.json`` entries, so the
+        flag is what lets them leave her out. Counting her made the composer say "1 server" on a
+        machine with none."""
         services = make_services(FakeProvider([text_turn("ok")]), mcp_registry)
         async with _client(services) as client:
             servers = (await client.get(f"{API}/servers")).json()
+            health = (await client.get(f"{API}/health")).json()
 
-        assert servers == []
+        assert [(s["name"], s["builtin"]) for s in servers] == [(BUILTIN_SERVER_NAME, True)]
+        assert health["servers"] == []
 
 
 @pytest.fixture

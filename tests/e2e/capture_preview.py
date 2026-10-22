@@ -36,6 +36,7 @@ import json
 import os
 import re
 import socket
+import sys
 import tempfile
 import threading
 import time
@@ -705,6 +706,73 @@ def act_permissions(page: Page, base: str, shots: Path, report: Report) -> None:
         page.wait_for_timeout(300)
 
 
+SPIKE_SERVER = """
+from mcp.server.mcpserver import MCPServer
+
+server = MCPServer("spike", version="0.1.0")
+
+
+@server.tool(description="Repeat the text back.")
+def echo(text: str) -> str:
+    return text
+
+
+@server.tool(description="Say hello to somebody by name.")
+def greet(name: str) -> str:
+    return "hello " + name
+
+
+@server.tool(description="Add two numbers.")
+def add(a: int, b: int) -> int:
+    return a + b
+
+
+server.run(transport="stdio")
+"""
+
+
+def act_servers(page: Page, base: str, shots: Path, report: Report) -> None:
+    """Settings → Servers: her own box, a server added, its tools, one off, the form (#108)."""
+    with report.scene("servers-boxes", "settings", page, shots):
+        script = Path(tempfile.mkdtemp(prefix="hera-spike-")) / "spike.py"
+        script.write_text(SPIKE_SERVER, encoding="utf-8")
+        page.request.put(
+            f"{base}/api/v1/servers/spike",
+            data={"kind": "stdio", "command": sys.executable, "args": [str(script)]},
+        )
+        page.request.put(f"{base}/api/v1/servers/spike/tools/greet", data={"allowed": False})
+        page.goto(base, wait_until="networkidle")
+        page.get_by_role("button", name="Settings").first.click(timeout=5_000)
+        page.wait_for_selector("[role='dialog']", timeout=10_000)
+        page.get_by_role("navigation", name="Settings").get_by_role(
+            "button", name="Servers"
+        ).click()
+        settled(page)
+        page.wait_for_timeout(700)
+        shoot(page, shots, "47-servers-boxes")
+        page.locator("section.box").filter(
+            has=page.locator("b", has_text=re.compile(r"spike\s*$"))
+        ).locator("button.toggle").click()
+        page.get_by_role("checkbox", name="greet").wait_for(timeout=10_000)
+        page.wait_for_timeout(900)
+        shoot(page, shots, "48-servers-tools", full=True)
+        page.get_by_role("button", name="New server").click()
+        page.get_by_label("Name", exact=True).fill("filesystem")
+        page.get_by_label("Command", exact=True).fill("npx")
+        page.get_by_label("Arguments").fill(
+            "-y\n@modelcontextprotocol/server-filesystem\n/Users/me/notes"
+        )
+        page.get_by_role("button", name="Add", exact=True).first.click()
+        page.get_by_label("Environment: Name").fill("LOG_LEVEL")
+        page.get_by_label("Environment: Value").fill("debug")
+        page.wait_for_timeout(500)
+        shoot(page, shots, "49-servers-new")
+        page.keyboard.press("Escape")
+        page.wait_for_timeout(300)
+        page.keyboard.press("Escape")
+        page.wait_for_timeout(300)
+
+
 def act_profile(page: Page, base: str, shots: Path, report: Report) -> None:
     """Settings → General, and the light theme it carries.
 
@@ -909,6 +977,7 @@ def main() -> int:
                 act_composer,
                 act_settings,
                 act_permissions,
+                act_servers,
                 act_profile,
                 act_design,
             ):

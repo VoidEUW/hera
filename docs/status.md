@@ -58,7 +58,18 @@ restart: `~/.hera/permissions.json` is laid over the built-in policy at boot. A 
 `name` (card answers are named automatically and marked *From a card*); the screen shows each rule in
 words with the tools it covers, a three-way switch, an edit form with a live preview of what a pattern
 would match, and a confirmation before deleting. Rules that ship with Hera can be changed, not
-deleted. One mechanism (`hera_core.rulebook`) serves the screen and the card. #108 builds on it.
+deleted. One mechanism (`hera_core.rulebook`) serves the screen and the card.
+
+### Servers are boxes, and a person can add one ([#108](https://github.com/VoidEUW/hera/issues/108))
+
+Settings → Servers shows every server as a box — hers first, marked with the ocellus — with its state
+and a wrench with the tool count; opening one lists its tools, each with a checkbox. Unchecked is a
+`deny` rule on `server__tool` (so it is on the Permissions screen too), and a tool the policy denies is
+no longer offered to the model at all. **New server** takes a name, a command or a web address, its
+arguments, environment or headers, and an enabled switch; saving writes `mcp.json` — editing the JSON,
+not re-saving the parsed model, so other clients' keys and `${VAR}` references survive and a pasted
+secret is never sent back to the browser — and reconnects only that server. Edit and remove are on each
+box. See [ADR 24](adr/0024-the-servers-screen-writes-mcp-json.md).
 
 ### Release notes are generated ([#200](https://github.com/VoidEUW/hera/issues/200))
 

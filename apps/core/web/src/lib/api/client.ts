@@ -181,6 +181,36 @@ export interface Server {
 	connected: boolean;
 	tools: number;
 	failure: string | null;
+	/** Hera's own server. Shown like the others, not counted as one the person added. */
+	builtin: boolean;
+	/** False for a block in mcp.json that is switched off: kept, never started. */
+	enabled: boolean;
+	kind: 'builtin' | 'stdio' | 'http';
+}
+
+/** What the add-a-server form edits. A `null` in `env` or `headers` is a secret the server holds
+ * and did not send; sending `null` back keeps it. */
+export interface ServerEntry {
+	kind: 'stdio' | 'http';
+	command: string;
+	args: string[];
+	env: Record<string, string | null>;
+	cwd: string;
+	url: string;
+	headers: Record<string, string | null>;
+	enabled: boolean;
+}
+
+export interface ServerTool {
+	/** `server__tool` — what a permission rule is written against. */
+	name: string;
+	local_name: string;
+	description: string;
+	allowed: boolean;
+	/** The pattern that turned it off, when something did. */
+	rule: string | null;
+	/** Whether that rule is on this tool alone, rather than a wider one such as `fs__*`. */
+	exact: boolean;
 }
 
 export type Decision = 'allow' | 'deny' | 'ask';
@@ -550,6 +580,23 @@ export const api = {
 		}),
 
 	servers: () => request<Server[]>('/servers'),
+	serverTools: (name: string) =>
+		request<ServerTool[]>(`/servers/${encodeURIComponent(name)}/tools`),
+	/** Turn one tool on or off. Off is a `deny` rule, so it also shows under Permissions. */
+	setToolAllowed: (server: string, tool: string, allowed: boolean) =>
+		request<ServerTool>(
+			`/servers/${encodeURIComponent(server)}/tools/${encodeURIComponent(tool)}`,
+			{ method: 'PUT', body: JSON.stringify({ allowed }) }
+		),
+	serverConfig: (name: string) =>
+		request<ServerEntry>(`/servers/${encodeURIComponent(name)}/config`),
+	saveServer: (name: string, entry: ServerEntry) =>
+		request<Server>(`/servers/${encodeURIComponent(name)}`, {
+			method: 'PUT',
+			body: JSON.stringify(entry)
+		}),
+	deleteServer: (name: string) =>
+		request<void>(`/servers/${encodeURIComponent(name)}`, { method: 'DELETE' }),
 	permissions: () => request<{ fallback: Decision; rules: Rule[] }>('/permissions'),
 	createRule: (rule: NewRule) =>
 		request<Rule>('/permissions/rules', { method: 'POST', body: JSON.stringify(rule) }),

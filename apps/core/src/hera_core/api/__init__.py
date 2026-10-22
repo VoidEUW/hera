@@ -18,6 +18,7 @@ from hera_core.api import (
     profiles,
     projects,
     providers,
+    servers,
     system,
 )
 
@@ -29,6 +30,7 @@ router.include_router(memories.router)
 router.include_router(permissions.router)
 router.include_router(projects.router)
 router.include_router(providers.router)
+router.include_router(servers.router)
 router.include_router(profiles.router)
 router.include_router(system.router)
 

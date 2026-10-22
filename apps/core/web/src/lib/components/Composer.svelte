@@ -123,7 +123,10 @@
 	const profilePins = $derived(
 		profiles.find((entry) => entry.id === profileId)?.pinned_skills ?? []
 	);
-	const connected = $derived(servers.filter((server) => server.connected));
+	/** The servers a person added. Her own is in the list so the Servers screen can show it, and it
+	 * is not one of these: counting it made the chip say "1 server" on a machine with none. */
+	const added = $derived(servers.filter((server) => !server.builtin));
+	const connected = $derived(added.filter((server) => server.connected));
 
 	const activeEntry = $derived(providers.find((entry) => entry.name === activeProvider) ?? null);
 	const activeModel = $derived(
@@ -249,7 +252,7 @@
 			onclose={() => (serversOpen = false)}
 		>
 			<MenuHeading>{t.servers.heading}</MenuHeading>
-			{#each servers as server (server.name)}
+			{#each added as server (server.name)}
 				<MenuItem
 					icon="plug"
 					disabled
