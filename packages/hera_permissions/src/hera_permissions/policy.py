@@ -42,6 +42,11 @@ class Rule(BaseModel):
     reason: str = ""
     """Shown with the confirmation, or with the refusal. Worth filling in: "why can I not do
     this" is otherwise a question only the configuration file can answer."""
+    name: str = ""
+    """What a person calls this rule. **Display only and never matched on**: the pattern is the
+    rule's identity, and a name that could change what a rule covers would be a second pattern
+    nobody is reading. Given when a rule is made, changeable afterwards, and empty for a rule
+    nobody named -- the caller decides what to show instead."""
 
     @model_validator(mode="after")
     def _validate_pattern(self) -> Rule:
@@ -95,6 +100,11 @@ class PermissionSet(BaseModel):
     def without(self, pattern: str) -> PermissionSet:
         """A new set with every rule on ``pattern`` removed."""
         return PermissionSet(rules=[rule for rule in self.rules if rule.pattern != pattern])
+
+    def get(self, pattern: str) -> Rule | None:
+        """The rule on exactly ``pattern``, or ``None``. Not a match: ``fs__*`` is not found by
+        asking for ``fs__read``, because this is about *which rule*, not *which decision*."""
+        return next((rule for rule in self.rules if rule.pattern == pattern), None)
 
 
 class Outcome(BaseModel):
@@ -167,6 +177,24 @@ class Policy(BaseModel):
         return self.model_copy(
             update={"profiles": {**self.profiles, profile: existing.with_rule(rule)}}
         )
+
+    def without_rule(self, pattern: str, *, profile: str | None = None) -> Policy:
+        """A new policy with the rule on ``pattern`` removed from the base, or from one profile.
+
+        Removing a rule hands its tools back to whatever is less specific -- ultimately the
+        fallback -- which is the whole effect of deleting one, so nothing else is touched.
+        """
+        if profile is None:
+            return self.model_copy(update={"base": self.base.without(pattern)})
+        if profile not in self.profiles:
+            return self
+        return self.model_copy(
+            update={"profiles": {**self.profiles, profile: self.profiles[profile].without(pattern)}}
+        )
+
+    def with_fallback(self, decision: Decision) -> Policy:
+        """A new policy that treats a tool no rule covers as ``decision``."""
+        return self.model_copy(update={"fallback": decision})
 
 
 def _rank(candidate: tuple[Rule, str | None]) -> tuple[int, int, int, int]:

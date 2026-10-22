@@ -22,10 +22,8 @@ from hera_core.deps import Container, Db, Owner
 from hera_core.schemas import (
     BrokenSkillOut,
     HealthOut,
-    PermissionsOut,
     PreferencesOut,
     PreferencesPatch,
-    RuleOut,
     ServerOut,
     SkillIn,
     SkillOut,
@@ -35,7 +33,6 @@ from hera_core.schemas import (
 )
 from hera_home import home
 from hera_mcp import BUILTIN_SERVER_NAME
-from hera_permissions import Rule
 from hera_skillsets import SKILL_FILENAME, SkillUsageRepository
 
 router = APIRouter(tags=["system"])
@@ -214,26 +211,6 @@ async def list_servers(container: Container) -> list[ServerOut]:
     ]
 
 
-@router.get("/permissions", response_model=PermissionsOut)
-def read_permissions(container: Container) -> PermissionsOut:
-    """Allow, deny and ask, with the rules that came from a confirmation card marked as such.
-
-    Sorted by pattern rather than left in the order they were added: the set is unordered by
-    design — rules resolve by specificity, not position — and showing them in insertion order
-    would suggest an authority the pattern does not have.
-    """
-    if container.registry is None:
-        return PermissionsOut(fallback="ask", rules=[])
-    policy = container.registry.policy
-    rules = [_rule(rule) for rule in policy.base.rules]
-    for name, permission_set in policy.profiles.items():
-        rules.extend(_rule(rule, profile=name) for rule in permission_set.rules)
-    return PermissionsOut(
-        fallback=policy.fallback.value,
-        rules=sorted(rules, key=lambda item: (item.pattern, item.profile or "")),
-    )
-
-
 @router.get("/preferences", response_model=PreferencesOut)
 def read_preferences() -> PreferencesOut:
     return _preferences()
@@ -279,13 +256,4 @@ async def health(container: Container) -> HealthOut:
         model=container.model,
         skills=len(container.router.library.catalogue()),
         servers=servers,
-    )
-
-
-def _rule(rule: Rule, *, profile: str | None = None) -> RuleOut:
-    return RuleOut(
-        pattern=rule.pattern,
-        decision=rule.decision.value,
-        reason=rule.reason,
-        profile=profile,
     )

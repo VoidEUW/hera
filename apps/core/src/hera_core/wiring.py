@@ -23,10 +23,11 @@ the seam it lands on.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 from hera_chats import ChatsSettings, TurnOrchestrator
+from hera_core import permission_rules
 from hera_core.chat_files import FileArtifacts, FileScratchpad
 from hera_core.config import load as load_config
 from hera_core.enabled_skills import EnabledSkillPort, EnabledSkills
@@ -92,6 +93,11 @@ class Services:
     registry: ToolRegistry | None
     provider: Provider
     orchestrator: TurnOrchestrator
+
+    default_policy: Policy = field(default_factory=Policy)
+    """The rules this deployment ships with, before a person's own are laid over them. Kept so the
+    Permissions screen can say which rule is built in, and so deleting an override puts the
+    built-in one back (``hera_core.rulebook``)."""
 
     owns_provider: bool = False
     """Whether closing this container should close the provider.
@@ -203,9 +209,13 @@ def build_services(
     # screen, which lists what is there and shows what it costs.
     memories = MemoryStore(memories_dir(), MemoriesSettings())
 
+    # What this deployment ships with, and then what a person has decided over it: the rules in
+    # `permissions.json` (made on the Permissions screen or answered "always" on a card) are laid
+    # over the built-in policy, so they survive a restart (#109).
+    shipped = policy if policy is not None else DEFAULT_POLICY
     if registry is None:
         registry = ToolRegistry.open(
-            policy=policy if policy is not None else DEFAULT_POLICY,
+            policy=permission_rules.apply(shipped, permission_rules.load()),
             settings=ToolsSettings(),
             # hera_mcp imports no hera_* package at all, so the library arrives as a port, and
             # so does the search engine -- which one a person's questions are sent to is a
@@ -243,6 +253,7 @@ def build_services(
         router=router,
         memories=memories,
         registry=registry,
+        default_policy=shipped,
         provider=provider,
         owns_provider=not injected,
         orchestrator=TurnOrchestrator(

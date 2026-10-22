@@ -49,6 +49,7 @@ from hera_chats import (
     slugify,
     title_from,
 )
+from hera_core import rulebook
 from hera_core.chat_files import FileArtifacts, forget_chat
 from hera_core.clock import render as render_now
 from hera_core.config import ConfigError
@@ -67,7 +68,6 @@ from hera_core.schemas import (
     RedoIn,
 )
 from hera_core.sse import HEADERS, MEDIA_TYPE, event_frame, frame
-from hera_permissions import Decision, Rule
 from hera_profiles import Profile, ProfileRepository
 from hera_providers import ChatMessage, ChatRequest, FakeProvider, Role, TextDelta, ToolCallReady
 from hera_skillsets import SkillUsageRepository
@@ -645,15 +645,7 @@ def _profile_of(session: Session, chat: Chat) -> Profile | None:
 def _remember(
     container: Container, recorded: Sequence[ChatEvent], answered: set[str], *, allow: bool
 ) -> None:
-    """Turn "always allow" into a rule.
-
-    Written against the **exact tool name**, not a pattern derived from it. A card about
-    ``fs__write_file`` answered with "always" must not quietly permit ``fs__delete_file``; if
-    somebody wants the broader rule they can widen it on the Permissions screen, where they can
-    see what they are doing.
-    """
-    if container.registry is None:
-        return
+    """Turn "always" into a rule that survives a restart (:mod:`hera_core.rulebook`)."""
     tools = {
         event.name
         for event in recorded
@@ -663,17 +655,7 @@ def _remember(
         for event in recorded
         if isinstance(event, PermissionRequired) and event.call_id in answered
     }
-    policy = container.registry.policy
-    for tool in sorted(tools):
-        policy = policy.with_rule(
-            Rule(
-                pattern=tool,
-                decision=Decision.ALLOW if allow else Decision.DENY,
-                reason="answered on a confirmation card",
-            )
-        )
-    container.registry = container.registry.with_policy(policy)
-    container.orchestrator.registry = container.registry
+    rulebook.remember(container, sorted(tools), allow=allow)
 
 
 def _require_project(session: Session, project_id: UUID, owner: UUID) -> Project:

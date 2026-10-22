@@ -280,6 +280,60 @@ export const t = {
 		notConnected: 'not connected'
 	},
 
+	/** Settings → Permissions: rules a person can make, change and remove (#109). */
+	permissions: {
+		rulesHeading: 'Rules',
+		newRule: 'New rule',
+		editRule: 'Edit rule',
+		everything: 'Every tool',
+		fromServer: (server: string) => `Every tool from ${server}`,
+		oneTool: (server: string, tool: string) => `${tool} from ${server}`,
+		matching: (pattern: string) => `Tools matching ${pattern}`,
+		unnamed: 'Unnamed rule',
+		decisions: {
+			allow: { label: 'Allow', help: 'Runs without asking.' },
+			ask: { label: 'Ask', help: 'Shows a card first, and you answer.' },
+			deny: { label: 'Deny', help: 'Never runs, and she is told so.' }
+		},
+		decisionLabel: 'What happens',
+		fallbackTitle: 'Everything else',
+		fallbackHelp: 'What happens to a tool no rule covers — a new server, say.',
+		sources: {
+			default: 'Built in',
+			card: 'From a card',
+			profile: (name: string) => `Profile ${name}`
+		},
+		builtInNote: 'Built in rules can be changed but not deleted.',
+		covers: (n: number) => (n === 1 ? 'Covers 1 tool' : `Covers ${n} tools`),
+		coversNone: 'Covers none of her tools right now',
+		name: 'Name',
+		namePlaceholder: 'Reading files',
+		nameHelp: 'Only for you. It does not change what the rule covers.',
+		pattern: 'Applies to',
+		patternPlaceholder: 'fs__read_file',
+		patternHelp:
+			'A tool is server__name. A * stands for anything: fs__* is every tool from fs, and * alone is every tool.',
+		patternLocked:
+			'The pattern is what makes it this rule. To cover something else, make a new rule.',
+		previewSearching: 'Checking which tools that covers…',
+		previewMatches: (n: number) =>
+			n === 1 ? 'Covers 1 of her tools now:' : `Covers ${n} of her tools now:`,
+		previewNone: 'None of her tools right now. It will apply when one that matches appears.',
+		reason: 'Why',
+		reasonHelp: 'Shown on the card, or with the refusal.',
+		reasonPlaceholder: 'It only reads.',
+		patternRequired: 'Say which tools it applies to.',
+		save: 'Save rule',
+		create: 'Add rule',
+		cancel: 'Cancel',
+		edit: 'Edit this rule',
+		delete: 'Delete this rule',
+		deleteTitle: 'Delete this rule?',
+		deleteBody: (what: string) =>
+			`${what} goes back to the next most specific rule, or to “everything else”.`,
+		deleteYes: 'Delete',
+		deleteKeep: 'Keep it'
+	},
 	/** The keymap (#112). The action and control names themselves live in `$lib/keys`, next to
 	 * the chord they describe, so a binding and its words cannot drift apart. */
 	hotkeys: {
@@ -366,7 +420,7 @@ export const t = {
 			'A skill is a folder with a SKILL.md in it — a name, a description of when to use it, and instructions. Put one in your skills directory and it appears here.',
 		noServers:
 			'Tools come from MCP servers listed in mcp.json. Add one and it appears here with its tools.',
-		noPermissions: 'Nothing has been decided yet. Rules appear here as you answer cards.',
+		noPermissions: 'No rules yet. Make one, or answer “always” on a card.',
 		broken: 'Could not be read',
 		by: (author: string) => `by ${author}`,
 		verified: 'Verified',

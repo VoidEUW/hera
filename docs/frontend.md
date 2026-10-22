@@ -424,8 +424,15 @@ reports both — `ToolRegistry.status()` returns exactly `name`, `connected`, `t
 per server, so this screen is a direct rendering of that.
 
 **Permissions** is the third list, and it has no equivalent in the reference: allow, deny and ask
-rules over `server__tool` patterns, editable, with the rules that came from answering a
-confirmation card marked as such.
+rules over `server__tool` patterns ([ADR 23](adr/0023-permission-rules-are-kept-over-the-shipped-policy.md)).
+One row per rule, in words first — the name a person gave it, or for an unnamed one what its pattern
+says (*Every tool from fs*) — with the pattern in mono, the tools it covers today, and where it came
+from: **Built in**, **From a card**, or made here. What happens is a three-way switch on the row; a
+pen opens the form (name, decision, reason; the pattern is read-only after it is made) and a bin asks
+before deleting. **New rule** takes a name, a pattern with a live list of the tools it would cover,
+what happens, and why. A rule that ships with Hera can be changed and not deleted; the fallback —
+*everything else* — is its own switch at the top. The pattern is described in words by
+`$lib/permissions.ts`, which never decides what a pattern covers: the server's matcher answers that.
 
 ## Projects
 

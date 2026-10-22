@@ -672,6 +672,39 @@ def act_settings(page: Page, base: str, shots: Path, report: Report) -> None:
         shoot(page, shots, "39-settings-search")
 
 
+def act_permissions(page: Page, base: str, shots: Path, report: Report) -> None:
+    """Settings → Permissions with rules of every kind, and the form that makes one (#109)."""
+    with report.scene("permissions-rules", "settings", page, shots):
+        for rule in (
+            {
+                "name": "Her notes and memory",
+                "pattern": "hera__note",
+                "decision": "allow",
+                "reason": "It only writes inside Hera.",
+            },
+            {"pattern": "fs__*", "decision": "ask", "reason": "Reads and writes files."},
+            {"name": "No shell", "pattern": "shell__*", "decision": "deny"},
+        ):
+            page.request.post(f"{base}/api/v1/permissions/rules", data=rule)
+        page.goto(base, wait_until="networkidle")
+        page.get_by_role("button", name="Settings").first.click(timeout=5_000)
+        page.wait_for_selector("[role='dialog']", timeout=10_000)
+        page.get_by_role("navigation", name="Settings").get_by_role(
+            "button", name="Permissions"
+        ).click()
+        settled(page)
+        page.wait_for_timeout(700)
+        shoot(page, shots, "45-permissions-rules")
+        page.get_by_role("button", name="New rule").click()
+        page.get_by_label("Applies to").fill("hera__*")
+        page.wait_for_timeout(900)
+        shoot(page, shots, "46-permissions-new-rule")
+        page.keyboard.press("Escape")
+        page.wait_for_timeout(300)
+        page.keyboard.press("Escape")
+        page.wait_for_timeout(300)
+
+
 def act_profile(page: Page, base: str, shots: Path, report: Report) -> None:
     """Settings → General, and the light theme it carries.
 
@@ -871,7 +904,14 @@ def main() -> int:
             act_question(page, chat_url, shots, report)
             act_artifact_editing(page, chat_url, shots, report)
             act_hotkeys(page, chat_url, shots, report)
-            for act in (act_rail, act_composer, act_settings, act_profile, act_design):
+            for act in (
+                act_rail,
+                act_composer,
+                act_settings,
+                act_permissions,
+                act_profile,
+                act_design,
+            ):
                 act(page, base, shots, report)
             desktop.close()
             filmed |= name_recording(videos, filmed, "desktop")

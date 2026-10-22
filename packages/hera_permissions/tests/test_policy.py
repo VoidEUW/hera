@@ -221,3 +221,74 @@ def test_a_policy_is_frozen() -> None:
 
     with pytest.raises(ValidationError):
         policy.fallback = Decision.ALLOW  # type: ignore[misc]  # the assignment failing is the test
+
+
+# -- names, removal and the fallback ------------------------------------------------------
+
+
+def test_a_rule_can_carry_a_name_and_it_is_never_matched_on() -> None:
+    """The pattern is the rule's identity; a name that changed what it covers would be a second
+    pattern."""
+    named = Rule(pattern="fs__read", decision=Decision.ALLOW, name="Reading files")
+    renamed = named.model_copy(update={"name": "something else entirely"})
+
+    policy = Policy(base=PermissionSet(rules=[renamed]))
+
+    assert policy.check("fs__read").decision is Decision.ALLOW
+    assert policy.check("something else entirely").rule is None
+
+
+def test_a_name_is_optional() -> None:
+    assert rule("fs__read", Decision.ALLOW).name == ""
+
+
+def test_a_rule_is_found_by_its_exact_pattern_only() -> None:
+    rules = PermissionSet(rules=[rule("fs__*", Decision.ASK)])
+
+    assert rules.get("fs__*") is not None
+    assert rules.get("fs__read") is None
+
+
+def test_removing_a_rule_hands_its_tools_to_the_next_most_specific() -> None:
+    policy = Policy(
+        base=PermissionSet(rules=[rule("fs__*", Decision.ASK), rule("fs__read", Decision.ALLOW)])
+    )
+
+    removed = policy.without_rule("fs__read")
+
+    assert policy.check("fs__read").decision is Decision.ALLOW
+    assert removed.check("fs__read").decision is Decision.ASK
+
+
+def test_removing_the_last_rule_falls_back() -> None:
+    policy = Policy(base=PermissionSet(rules=[rule("fs__read", Decision.ALLOW)]))
+
+    assert policy.without_rule("fs__read").check("fs__read").rule is None
+
+
+def test_removing_from_a_profile_leaves_the_base_alone() -> None:
+    policy = Policy(
+        base=PermissionSet(rules=[rule("fs__read", Decision.DENY)]),
+        profiles={"work": PermissionSet(rules=[rule("fs__read", Decision.ALLOW)])},
+    )
+
+    removed = policy.without_rule("fs__read", profile="work")
+
+    assert removed.check("fs__read", profile="work").decision is Decision.DENY
+    assert removed.base == policy.base
+
+
+def test_removing_from_a_profile_that_does_not_exist_changes_nothing() -> None:
+    policy = Policy(base=PermissionSet(rules=[rule("fs__read", Decision.ALLOW)]))
+
+    assert policy.without_rule("fs__read", profile="nobody") == policy
+
+
+def test_the_fallback_is_changed_without_touching_the_rules() -> None:
+    policy = Policy(base=PermissionSet(rules=[rule("fs__read", Decision.ALLOW)]))
+
+    changed = policy.with_fallback(Decision.DENY)
+
+    assert changed.check("other__tool").decision is Decision.DENY
+    assert changed.base == policy.base
+    assert policy.fallback is Decision.ASK

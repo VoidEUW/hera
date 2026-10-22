@@ -98,6 +98,7 @@ Everything Hera owns lives under `~/.hera/` (`HERA_HOME` overrides it):
 | `skills/<name>/SKILL.md` | skill packages |
 | `chats/<id>/` | one conversation's `scratch/` and `artifacts/` |
 | `mcp.json` · `config.toml` | MCP servers, and the model endpoints the interface writes |
+| `permissions.json` | the permission rules you made, or answered "always" on a card |
 
 ## Architecture
 
