@@ -30,6 +30,7 @@ ACCOUNT_DIRNAME = "account"
 DATABASE_FILENAME = "hera.sqlite3"
 MCP_FILENAME = "mcp.json"
 CONFIG_FILENAME = "config.toml"
+PERMISSIONS_FILENAME = "permissions.json"
 
 __all__ = [
     "ACCOUNT_DIRNAME",
@@ -43,6 +44,7 @@ __all__ = [
     "MCP_FILENAME",
     "MEMORIES_DIRNAME",
     "MIND_DIRNAME",
+    "PERMISSIONS_FILENAME",
     "SCRATCH_DIRNAME",
     "SKILLS_DIRNAME",
     "account_dir",
@@ -58,6 +60,7 @@ __all__ = [
     "mcp_path",
     "memories_dir",
     "mind_dir",
+    "permissions_path",
     "scratch_dir",
     "skills_dir",
 ]
@@ -164,6 +167,11 @@ def database_path() -> Path:
 def mcp_path() -> Path:
     """The MCP server configuration, in the Claude-Desktop ``mcpServers`` shape."""
     return home() / MCP_FILENAME
+
+
+def permissions_path() -> Path:
+    """The rules a person has made or answered, over the ones Hera ships with."""
+    return home() / PERMISSIONS_FILENAME
 
 
 def config_path() -> Path:

@@ -34,6 +34,7 @@ from hera_core.account import Account
 from hera_core.config import ProviderKind, validate_provider_name
 from hera_core.model_presets import PRESETS, ModelPreset
 from hera_memories import MAX_DESCRIPTION, MAX_TEXT
+from hera_permissions import Decision
 from hera_profiles import MindRegion, Profile
 from hera_skillsets import BrokenSkill, Skill, SkillUsage
 
@@ -577,6 +578,45 @@ class RuleOut(BaseModel):
     decision: str
     reason: str = ""
     profile: str | None = None
+    name: str = ""
+    """What a person calls it. Display only; the pattern is the identity."""
+    source: str = "you"
+    """``default`` (ships with Hera), ``you`` (made on the screen), ``card`` (answered "always"
+    on a confirmation card) or ``profile`` (from a profile, read-only here)."""
+    covers: list[str] = Field(default_factory=list)
+    """The tools she has right now that this pattern covers — what makes a glob legible."""
+
+
+class RuleIn(BaseModel):
+    """A new rule."""
+
+    pattern: str = Field(min_length=1, max_length=200)
+    decision: Decision
+    name: str = Field(default="", max_length=120)
+    reason: str = Field(default="", max_length=500)
+
+
+class RulePatch(BaseModel):
+    """What may change about a rule. Not its pattern: that is its identity."""
+
+    name: str | None = Field(default=None, max_length=120)
+    decision: Decision | None = None
+    reason: str | None = Field(default=None, max_length=500)
+
+
+class FallbackPatch(BaseModel):
+    """What a tool no rule covers gets."""
+
+    fallback: Decision
+
+
+class MatchesOut(BaseModel):
+    """Which tools a pattern would cover, for the live preview in the new-rule form."""
+
+    model_config = ConfigDict(frozen=True)
+
+    pattern: str
+    tools: list[str]
 
 
 class PermissionsOut(BaseModel):

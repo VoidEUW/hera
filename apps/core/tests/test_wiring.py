@@ -161,3 +161,29 @@ async def test_forgetting_keeps_the_file(services: Services) -> None:
 
     assert (memories_dir() / "a-fact.md").is_file()
     assert services.memories.recall() == ""
+
+
+async def test_the_rules_a_person_made_are_laid_over_the_shipped_policy_at_boot() -> None:
+    """#109: what was decided on the Permissions screen, or answered "always" on a card, is what
+    the next start runs -- and the shipped rule is still there for everything they did not touch."""
+    from hera_core import permission_rules
+    from hera_permissions import Decision
+
+    permission_rules.save(
+        permission_rules.StoredPermissions(
+            fallback=Decision.DENY,
+            rules=[permission_rules.StoredRule(pattern="fs__*", decision=Decision.ALLOW)],
+        )
+    )
+
+    built = build_services(provider=FakeProvider([]))
+    try:
+        assert built.registry is not None
+        policy = built.registry.policy
+        assert policy.check("fs__read_file").decision is Decision.ALLOW
+        assert policy.check(f"{BUILTIN_SERVER_NAME}__note").decision is Decision.ALLOW
+        assert policy.check("unknown__tool").decision is Decision.DENY
+        # The shipped policy is kept apart from the person's, so the screen can tell them apart.
+        assert built.default_policy.check("fs__read_file").rule is None
+    finally:
+        await built.aclose()

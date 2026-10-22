@@ -183,11 +183,33 @@ export interface Server {
 	failure: string | null;
 }
 
+export type Decision = 'allow' | 'deny' | 'ask';
+
 export interface Rule {
 	pattern: string;
-	decision: 'allow' | 'deny' | 'ask';
+	decision: Decision;
 	reason: string;
 	profile: string | null;
+	/** What a person calls it. Display only: the pattern is the identity. */
+	name: string;
+	/** `default` ships with Hera, `you` was made on the screen, `card` came from answering
+	 * "always" on a confirmation card, `profile` belongs to a profile and is read-only here. */
+	source: 'default' | 'you' | 'card' | 'profile';
+	/** The tools she has right now that the pattern covers. */
+	covers: string[];
+}
+
+export interface NewRule {
+	pattern: string;
+	decision: Decision;
+	name?: string;
+	reason?: string;
+}
+
+export interface RulePatch {
+	name?: string;
+	decision?: Decision;
+	reason?: string;
 }
 
 export interface ModelEntry {
@@ -528,7 +550,28 @@ export const api = {
 		}),
 
 	servers: () => request<Server[]>('/servers'),
-	permissions: () => request<{ fallback: string; rules: Rule[] }>('/permissions')
+	permissions: () => request<{ fallback: Decision; rules: Rule[] }>('/permissions'),
+	createRule: (rule: NewRule) =>
+		request<Rule>('/permissions/rules', { method: 'POST', body: JSON.stringify(rule) }),
+	/** The pattern is the rule's identity, so it is the path and never part of the patch. */
+	updateRule: (pattern: string, patch: RulePatch) =>
+		request<Rule>(`/permissions/rules/${encodeURIComponent(pattern)}`, {
+			method: 'PATCH',
+			body: JSON.stringify(patch)
+		}),
+	deleteRule: (pattern: string) =>
+		request<void>(`/permissions/rules/${encodeURIComponent(pattern)}`, { method: 'DELETE' }),
+	setFallback: (fallback: Decision) =>
+		request<{ fallback: Decision; rules: Rule[] }>('/permissions', {
+			method: 'PATCH',
+			body: JSON.stringify({ fallback })
+		}),
+	/** Which of her tools a pattern would cover. Asked as it is typed, so the matcher is the
+	 * server's own and the browser holds no second copy of it. */
+	ruleMatches: (pattern: string) =>
+		request<{ pattern: string; tools: string[] }>(
+			`/permissions/matches?pattern=${encodeURIComponent(pattern)}`
+		)
 };
 
 /** POST a message and get the raw streaming response back. The caller reads it with `frames`. */

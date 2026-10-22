@@ -51,6 +51,15 @@ and the side view; unsaved edits ask first. ⌥↑/↓ walk the rail, and openin
 it. Guards: `keys.test.ts` (unique chords, none on a browser-reserved one, every entry names its
 control) and `tests/e2e/test_hotkeys.py`. ⌘⇧B (fold the rail) was dropped with the fold button.
 
+### Permissions are editable and kept ([#109](https://github.com/VoidEUW/hera/issues/109), [ADR 23](adr/0023-permission-rules-are-kept-over-the-shipped-policy.md))
+
+Settings → Permissions makes, changes and removes rules, and "always" on a card now survives a
+restart: `~/.hera/permissions.json` is laid over the built-in policy at boot. A rule has a display-only
+`name` (card answers are named automatically and marked *From a card*); the screen shows each rule in
+words with the tools it covers, a three-way switch, an edit form with a live preview of what a pattern
+would match, and a confirmation before deleting. Rules that ship with Hera can be changed, not
+deleted. One mechanism (`hera_core.rulebook`) serves the screen and the card. #108 builds on it.
+
 ### Release notes are generated ([#200](https://github.com/VoidEUW/hera/issues/200))
 
 There is no hand-written changelog any more: pushing a tag publishes a GitHub release whose notes are

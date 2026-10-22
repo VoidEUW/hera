@@ -114,6 +114,7 @@ code, in `hera_skillsets`.
   chats/<id>/scratch/    her working files for one conversation; gone when the chat is
   chats/<id>/artifacts/  what she published there — named, rendered, downloadable; gone too
   mcp.json               Claude-Desktop-compatible `mcpServers` shape
+  permissions.json       the rules a person made, over the policy Hera ships with (ADR 23)
   config.toml            registered endpoints, written by the interface
   trusted.json           skill ids and the SHA-256 you accepted; optional
 ```
