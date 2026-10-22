@@ -46,6 +46,8 @@
 		placeholder?: string;
 		/** A turn is streaming. Swaps send for **Stop**. */
 		busy?: boolean;
+		/** Stop was pressed and the turn has not closed yet. */
+		cancelling?: boolean;
 		/** The composer may not take a new message: a turn is running, or a card is open waiting on
 		 * you. Kept apart from `busy` because a suspended turn is not a running one, and offering
 		 * **Stop** for something that already stopped is a lie about what is happening. */
@@ -72,6 +74,7 @@
 	let {
 		placeholder = t.composer.placeholder,
 		busy = false,
+		cancelling = false,
 		blocked = false,
 		autofocus = false,
 		profiles = [],
@@ -363,7 +366,13 @@
 			onsettings={() => onsettings?.('models')}
 		/>
 
-		<SendButton {busy} disabled={!sendable || blocked} onsend={submit} onstop={() => onstop?.()} />
+		<SendButton
+			{busy}
+			{cancelling}
+			disabled={!sendable || blocked}
+			onsend={submit}
+			onstop={() => onstop?.()}
+		/>
 	</div>
 </div>
 

@@ -405,6 +405,7 @@
 					autofocus
 					placeholder={t.composer.reply}
 					busy={session.busy}
+					cancelling={session.cancelling}
 					blocked={session.blocked}
 					profiles={workspace.profiles}
 					profileId={session.chat?.profile_id ?? null}
@@ -413,7 +414,7 @@
 					servers={workspace.servers}
 					chatSkills={session.chat?.pinned_skills ?? []}
 					onsend={(text, files) => session.send(text, files)}
-					onstop={() => session.stop()}
+					onstop={() => void session.cancel()}
 					onmodel={(name, modelId) => workspace.useProvider(name, modelId)}
 					onreasoning={(name, modelId, value) => workspace.setReasoningEffort(name, modelId, value)}
 					onthinking={(name, modelId, on) => void workspace.setThinking(name, modelId, on)}

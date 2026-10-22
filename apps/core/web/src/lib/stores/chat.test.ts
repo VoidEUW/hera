@@ -175,3 +175,105 @@ describe('open', () => {
 		expect(await second).toBe(true);
 	});
 });
+
+describe('cancel', () => {
+	afterEach(() => {
+		vi.useRealTimers();
+		vi.unstubAllGlobals();
+	});
+
+	/** A session mid-turn: the question is pending, a fragment has arrived, the stream is open. */
+	function streaming(): ChatSession {
+		const session = new ChatSession();
+		session.chat = chatDetail('a').chat;
+		session.pending = 'Talk for a long time';
+		session.draft = [{ type: 'text_delta', text: 'word0 ' }];
+		session.streaming = true;
+		return session;
+	}
+
+	const interrupted = (): ChatDetail => ({
+		...chatDetail('a'),
+		messages: [
+			message({ id: 'u', role: 'user', content: 'Talk for a long time', sequence: 1 }),
+			message({
+				id: 'h',
+				sequence: 2,
+				events: [
+					{ type: 'text_delta', text: 'word0 ' },
+					{
+						type: 'turn_closed',
+						reason: 'cancelled',
+						usage: null,
+						iterations: 1,
+						error: ''
+					} as AnyEvent
+				]
+			})
+		]
+	});
+
+	it('hands the composer back and shows what the server kept', async () => {
+		vi.useFakeTimers();
+		vi.stubGlobal('fetch', async () => new Response(JSON.stringify(interrupted())));
+
+		const session = streaming();
+		const done = session.cancel();
+		expect(session.cancelling).toBe(true);
+		expect(session.streaming).toBe(false);
+
+		await vi.runAllTimersAsync();
+		await done;
+
+		expect(session.busy).toBe(false);
+		expect(session.cancelling).toBe(false);
+		expect(session.draft).toEqual([]);
+		expect(session.messages.at(-1)?.id).toBe('h');
+	});
+
+	it('reads again while the server has not written the stopped turn down yet', async () => {
+		vi.useFakeTimers();
+		let reads = 0;
+		vi.stubGlobal('fetch', async () => {
+			reads += 1;
+			// The row as it was before the disconnect was seen: the empty answer, no outcome.
+			const early: ChatDetail = {
+				...chatDetail('a'),
+				messages: [message({ id: 'h', sequence: 2, events: [] })]
+			};
+			return new Response(JSON.stringify(reads < 3 ? early : interrupted()));
+		});
+
+		const session = streaming();
+		const done = session.cancel();
+		await vi.runAllTimersAsync();
+		await done;
+
+		expect(reads).toBe(3);
+		expect(session.messages.at(-1)?.events.length).toBe(2);
+		expect(session.busy).toBe(false);
+	});
+
+	it('gives the composer back even when the server cannot be reached', async () => {
+		vi.useFakeTimers();
+		vi.stubGlobal('fetch', async () => {
+			throw new Error('offline');
+		});
+
+		const session = streaming();
+		const done = session.cancel();
+		await vi.runAllTimersAsync();
+		await done;
+
+		expect(session.busy).toBe(false);
+		expect(session.cancelling).toBe(false);
+		expect(session.error).toBe('offline');
+	});
+
+	it('does nothing when no turn is running', async () => {
+		const session = new ChatSession();
+		session.chat = chatDetail('a').chat;
+		await session.cancel();
+		expect(session.cancelling).toBe(false);
+	});
+});
