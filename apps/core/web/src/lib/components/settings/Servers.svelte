@@ -124,7 +124,8 @@
 	.bar {
 		display: flex;
 		justify-content: flex-end;
-		margin-bottom: 12px;
+		padding-top: 14px;
+		margin-bottom: 20px;
 	}
 
 	.empty {

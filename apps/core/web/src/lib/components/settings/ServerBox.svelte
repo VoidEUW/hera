@@ -82,7 +82,7 @@
 
 <style>
 	.server {
-		margin-bottom: 10px;
+		margin-bottom: 12px;
 	}
 
 	.named {
