@@ -295,6 +295,26 @@ class TestTheToolLoop:
         assert [spec.name for spec in provider.requests[0].tools] == ["fs__read_file"]
         assert "fs__read_file" in provider.requests[0].messages[0].content
 
+    async def test_a_denied_tool_is_not_offered_but_is_still_refused_by_name(
+        self, make_orchestrator: Make
+    ) -> None:
+        """Unchecking a tool on the Servers screen (#108) means she does not have it."""
+        policy = Policy(
+            base=PermissionSet(rules=[Rule(pattern="fs__read_file", decision=Decision.DENY)]),
+            fallback=Decision.ALLOW,
+        )
+        tools = StubTools(policy=policy)
+        provider = FakeProvider([tool_turn(tool_call("fs__read_file")), text_turn("ok")])
+
+        events = await drain(
+            make_orchestrator(provider, tools).begin(TurnContext(text="go")).stream()
+        )
+
+        assert provider.requests[0].tools == []
+        assert "fs__read_file" not in provider.requests[0].messages[0].content
+        result = next(e for e in events if isinstance(e, ToolResultEvent))
+        assert result.failure == "denied"
+
     async def test_no_registry_means_the_prompt_says_nothing_about_tools(
         self, make_orchestrator: Make
     ) -> None:

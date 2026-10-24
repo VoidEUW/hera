@@ -16,6 +16,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import tempfile
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
@@ -195,3 +196,134 @@ def _entry(name: str, entry: Any) -> Mapping[str, Any]:
             f"MCP server {name!r} must be an object, got {type(entry).__name__}"
         )
     return entry
+
+
+# -- writing ----------------------------------------------------------------------------
+#
+# The file is edited as the JSON it is, never saved back from an `McpConfig`. The model is the
+# wrong thing to round-trip: it drops the keys this client does not implement (`alwaysAllow`,
+# an editor's own notes -- the Claude-Desktop compatibility the reader goes out of its way to
+# keep) and it holds `${VAR}` already *expanded*, so saving it would write a person's real token
+# into a file that was written so as not to contain one.
+
+_KNOWN_KEYS = frozenset({"command", "args", "env", "cwd", "url", "headers", "enabled"})
+"""What a form edits. Everything else in an entry is the file's and survives a save -- the
+unknown keys of another client, and the two timeouts, which are ours but have no field."""
+
+_SECRET_KEYS = ("env", "headers")
+
+
+def read_raw(path: Path) -> dict[str, Any]:
+    """The whole document as written, or an empty one if there is no file.
+
+    A file that is not valid JSON raises rather than reading as empty: the next thing a caller
+    does is write, and writing over a document nobody could parse would destroy it.
+    """
+    try:
+        text = path.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        return {}
+    except OSError as exc:
+        raise InvalidToolConfig(f"cannot read {path}: {exc}") from exc
+    try:
+        payload = json.loads(text)
+    except json.JSONDecodeError as exc:
+        raise InvalidToolConfig(f"{path} is not valid JSON: {exc}") from exc
+    if not isinstance(payload, dict):
+        raise InvalidToolConfig(f"{path} must contain a JSON object")
+    return payload
+
+
+def raw_servers(path: Path) -> dict[str, dict[str, Any]]:
+    """The ``mcpServers`` entries as written, unexpanded; a non-object entry is left out."""
+    declared = read_raw(path).get("mcpServers", {})
+    if not isinstance(declared, dict):
+        raise InvalidToolConfig("'mcpServers' must be an object mapping name to server")
+    return {name: entry for name, entry in declared.items() if isinstance(entry, dict)}
+
+
+def put_server(path: Path, name: str, entry: Mapping[str, Any]) -> bool:
+    """Add or replace one server, leaving the rest of the file as it was.
+
+    The entry is checked the way the reader will check it -- including that every ``${VAR}``
+    it names is set -- *before* anything is written, so a bad one is refused rather than
+    breaking the next start. Returns whether the server already existed.
+    """
+    parse_server(name, entry)
+    document = read_raw(path)
+    servers = document.get("mcpServers", {})
+    if not isinstance(servers, dict):
+        raise InvalidToolConfig("'mcpServers' must be an object mapping name to server")
+    existed = name in servers
+    servers[name] = dict(entry)
+    document["mcpServers"] = servers
+    _write(path, document)
+    return existed
+
+
+def remove_server(path: Path, name: str) -> bool:
+    """Delete one server's block. Returns whether there was one."""
+    document = read_raw(path)
+    servers = document.get("mcpServers", {})
+    if not isinstance(servers, dict) or name not in servers:
+        return False
+    del servers[name]
+    _write(path, document)
+    return True
+
+
+def mask(entry: Mapping[str, Any]) -> dict[str, Any]:
+    """An entry as it may be shown: a literal secret becomes ``None``, a ``${VAR}`` stays.
+
+    A reference is not a secret, it is the name of one, and the form is clearer for showing it.
+    Anything else in ``env`` or ``headers`` is what somebody pasted, so it never leaves the
+    server -- the editor shows that a value is set, and a new one replaces it.
+    """
+    shown = dict(entry)
+    for key in _SECRET_KEYS:
+        values = entry.get(key)
+        if isinstance(values, dict):
+            shown[key] = {
+                name: value if isinstance(value, str) and _VARIABLE.search(value) else None
+                for name, value in values.items()
+            }
+    return shown
+
+
+def merge(stored: Mapping[str, Any] | None, submitted: Mapping[str, Any]) -> dict[str, Any]:
+    """What to write when an entry is saved from a form.
+
+    The keys this client does not read are carried over from what is stored, so a block copied
+    from Claude Desktop survives being edited here. A secret submitted as ``None`` is the one
+    that was masked: it keeps its stored value, and a key the form dropped is gone.
+    """
+    kept = {key: value for key, value in (stored or {}).items() if key not in _KNOWN_KEYS}
+    merged: dict[str, Any] = {**kept, **submitted}
+    for key in _SECRET_KEYS:
+        values = submitted.get(key)
+        if not isinstance(values, dict):
+            continue
+        before = (stored or {}).get(key)
+        before = before if isinstance(before, dict) else {}
+        merged[key] = {
+            name: before[name] if value is None and name in before else value
+            for name, value in values.items()
+            if value is not None or name in before
+        }
+    return merged
+
+
+def _write(path: Path, document: Mapping[str, Any]) -> None:
+    """Replace the file whole or not at all: a crash halfway must not leave half a config."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    text = json.dumps(document, indent=2, ensure_ascii=False) + "\n"
+    handle, temporary = tempfile.mkstemp(
+        dir=path.parent, prefix=f".{path.name}.", suffix=".writing"
+    )
+    try:
+        with os.fdopen(handle, "w", encoding="utf-8") as out:
+            out.write(text)
+        os.replace(temporary, path)
+    except BaseException:
+        Path(temporary).unlink(missing_ok=True)
+        raise

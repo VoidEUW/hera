@@ -14,6 +14,7 @@ import shutil
 from fastapi import APIRouter, HTTPException, status
 
 from hera_core import __version__, trust
+from hera_core.api.servers import list_servers
 from hera_core.clock import is_known
 from hera_core.clock import render as render_now
 from hera_core.config import load as load_config
@@ -24,7 +25,6 @@ from hera_core.schemas import (
     HealthOut,
     PreferencesOut,
     PreferencesPatch,
-    ServerOut,
     SkillIn,
     SkillOut,
     SkillPatch,
@@ -32,7 +32,6 @@ from hera_core.schemas import (
     SkillsOut,
 )
 from hera_home import home
-from hera_mcp import BUILTIN_SERVER_NAME
 from hera_skillsets import SKILL_FILENAME, SkillUsageRepository
 
 router = APIRouter(tags=["system"])
@@ -188,29 +187,6 @@ def create_skill(payload: SkillIn, container: Container) -> SkillOut:
     return SkillOut.of(written)
 
 
-@router.get("/servers", response_model=list[ServerOut])
-async def list_servers(container: Container) -> list[ServerOut]:
-    """One row per MCP server, with its failure reason when it has one.
-
-    Her own in-process server is not one of these: "servers" to a person means the
-    ``mcp.json`` entries they added, and counting the builtin makes the composer say
-    "1 server" on a machine with none. The row disappears here rather than in the
-    interface because the health card reads the same list.
-    """
-    if container.registry is None:
-        return []
-    return [
-        ServerOut(
-            name=status.name,
-            connected=status.connected,
-            tools=status.tools,
-            failure=status.failure,
-        )
-        for status in await container.registry.status()
-        if status.name != BUILTIN_SERVER_NAME
-    ]
-
-
 @router.get("/preferences", response_model=PreferencesOut)
 def read_preferences() -> PreferencesOut:
     return _preferences()
@@ -248,7 +224,7 @@ async def health(container: Container) -> HealthOut:
     skills found, no servers connected, the wrong model name — are wrong together and are much
     easier to see side by side.
     """
-    servers = await list_servers(container)
+    servers = [row for row in await list_servers(container) if not row.builtin]
     return HealthOut(
         ok=True,
         version=__version__,

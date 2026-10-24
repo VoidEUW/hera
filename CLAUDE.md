@@ -131,7 +131,7 @@ columns, never `ForeignKey`; migrations live in `apps/core`.
 | `skills/<name>/SKILL.md` | skill packages |
 | `chats/<id>/scratch/` | her working files for one conversation. A cache, not something you keep — deleting the chat deletes it |
 | `chats/<id>/artifacts/` | what she publishes there: the filename is the identity, the extension is the kind. Goes with the chat too ([ADR 13](docs/adr/0013-an-artifact-is-a-file-she-publishes.md)) |
-| `mcp.json` | MCP servers, in the Claude-Desktop `mcpServers` shape |
+| `mcp.json` | MCP servers, in the Claude-Desktop `mcpServers` shape. Written by Settings → Servers as well as by hand — the JSON is edited, never re-saved from the parsed model ([ADR 24](docs/adr/0024-the-servers-screen-writes-mcp-json.md)) |
 | `permissions.json` | the permission rules a person made or answered "always" on a card, laid over the built-in policy at boot ([ADR 23](docs/adr/0023-permission-rules-are-kept-over-the-shipped-policy.md)) |
 | `config.toml` | registered model endpoints, written by the interface. A model in here may carry **`options`** — request-body fields merged in last and never read ([ADR 18](docs/adr/0018-a-model-may-carry-request-options.md)) |
 | `trusted.json` | **where trusted skills are recorded** — optional |

@@ -378,3 +378,91 @@ class TestCallContext:
         )
 
         assert result.text == "abc-123"
+
+
+class TestChangingTheFile:
+    """`with_config`: the servers an edit did not touch are not reconnected."""
+
+    @staticmethod
+    def _declared(*names: str, enabled: bool = True) -> McpConfig:
+        return McpConfig.parse(
+            {
+                "mcpServers": {
+                    name: {
+                        "command": sys.executable,
+                        "args": ["-c", STDIO_SERVER_SOURCE],
+                        "enabled": enabled,
+                    }
+                    for name in names
+                }
+            }
+        )
+
+    async def test_an_unchanged_server_is_the_same_object(
+        self, toy: MCPServer, allow_everything: Policy, settings: ToolsSettings
+    ) -> None:
+        first = ToolRegistry.from_config(
+            self._declared("a"), policy=allow_everything, builtin=toy, settings=settings
+        )
+        kept = first._servers[1]
+
+        second, retired = first.with_config(self._declared("a", "b"))
+
+        assert kept in second._servers
+        assert retired == ()
+        assert [server.name for server in second._servers] == ["toy", "a", "b"]
+        await second.aclose()
+
+    async def test_a_removed_or_switched_off_server_is_handed_back_not_closed(
+        self, toy: MCPServer, allow_everything: Policy, settings: ToolsSettings
+    ) -> None:
+        first = ToolRegistry.from_config(
+            self._declared("a", "b"), policy=allow_everything, builtin=toy, settings=settings
+        )
+        gone = first._servers[1]
+
+        second, retired = first.with_config(self._declared("b"))
+
+        assert retired == (gone,)
+        assert gone not in second._servers
+        off, retired_again = second.with_config(self._declared("b", enabled=False))
+        assert [server.name for server in retired_again] == ["b"]
+        assert [server.name for server in off._servers] == ["toy"]
+        await first.aclose()
+
+    async def test_a_changed_declaration_is_a_new_server(
+        self, toy: MCPServer, allow_everything: Policy, settings: ToolsSettings
+    ) -> None:
+        first = ToolRegistry.from_config(
+            self._declared("a"), policy=allow_everything, builtin=toy, settings=settings
+        )
+        before = first._servers[1]
+        changed = McpConfig.parse(
+            {
+                "mcpServers": {
+                    "a": {"command": sys.executable, "args": ["-c", STDIO_SERVER_SOURCE, "x"]}
+                }
+            }
+        )
+
+        second, retired = first.with_config(changed)
+
+        assert retired == (before,)
+        assert second._servers[1] is not before
+        await first.aclose()
+        await second.aclose()
+
+    async def test_the_builtin_stays_and_says_so(
+        self, toy: MCPServer, allow_everything: Policy, settings: ToolsSettings
+    ) -> None:
+        first = ToolRegistry.from_config(
+            McpConfig(), policy=allow_everything, builtin=toy, settings=settings
+        )
+
+        second, retired = first.with_config(self._declared("a"))
+        status = await second.status()
+
+        assert retired == ()
+        assert [(s.name, s.builtin) for s in status] == [("toy", True), ("a", False)]
+        assert second.policy is allow_everything
+        await second.aclose()

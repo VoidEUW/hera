@@ -47,4 +47,4 @@ pure — no I/O, no file — and `hera_core.permission_rules` owns the file.
 - Rules from a profile are shown and not editable here; no profile carries any yet, and when one does
   the screen already says where each rule came from.
 - #108 (per-tool checkboxes on the Servers screen) builds on this: unchecking a tool writes a `deny`
-  rule through `rulebook.add`.
+  rule through `rulebook.add` ([ADR 24](0024-the-servers-screen-writes-mcp-json.md)).

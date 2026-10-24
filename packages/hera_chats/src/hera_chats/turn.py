@@ -73,7 +73,7 @@ from hera_providers import (
 )
 from hera_skillsets import SkillRouter
 from hera_skillsets import render as render_skills
-from hera_tools import ToolInvocation
+from hera_tools import Catalogue, ToolInvocation
 
 _FRAME_ROLES = {
     FrameRole.SYSTEM: Role.SYSTEM,
@@ -513,10 +513,21 @@ class Turn:
         which reads to a model as "you have no tools" and earns a paragraph about it. A model
         flagged `tool_calling=False` (ADR 19) gets the same treatment for a different reason: it
         cannot use what it would be offered, so it is not offered anything.
+
+        A tool the policy denies is not offered either. Left in, it was a tool she could see,
+        choose and be refused, a round trip spent learning what a person had already decided --
+        and unchecking a tool on the Servers screen (#108) says *she does not have this*, not
+        *she may try*. Called by name anyway, it is still refused at dispatch.
         """
         if self._registry is None or not self._settings.tool_calling:
             return [], ""
-        catalogue = await self._registry.catalogue()
+        offered = await self._registry.catalogue()
+        catalogue = Catalogue.of(
+            tool
+            for tool in offered.tools
+            if self._registry.check(tool.name, profile=self._profile_slug).decision
+            is not Decision.DENY
+        )
         listing = "\n".join(
             f"- `{tool.name}` — {tool.description or tool.title}" for tool in catalogue.tools
         )

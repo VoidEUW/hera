@@ -393,7 +393,7 @@ the right, search at the top. The nav is ordered by what you reach for:
 |---|---|
 | **Models** | Registered endpoints. First, because nothing else in Hera does anything until she is pointed at one — and because *testing* one belongs here: the endpoint is asked what it has, and the answer either fills a list you can pick from or says plainly why it could not |
 | **Skills** | With usage counts, and whatever is wrong with each |
-| **Servers** | MCP, with the failure reason when there is one |
+| **Servers** | Every MCP server as a box — hers first, with the ocellus — and its tools inside, each with a checkbox ([ADR 24](adr/0024-the-servers-screen-writes-mcp-json.md)) |
 | **Permissions** | allow · deny · ask, with rules from a card marked as such |
 | **Mind** | The twelve regions, each with its tier and its revision count |
 | **Dreaming** | Listed and disabled. A v0.3 feature you can see coming is a promise; one you cannot is a surprise |
@@ -422,6 +422,15 @@ Hera-specific additions: a skill row shows whether it is **pinned** to a profile
 shows whether it is **connected**, with its failure reason when it is not. `hera_tools` already
 reports both — `ToolRegistry.status()` returns exactly `name`, `connected`, `tools` and `failure`
 per server, so this screen is a direct rendering of that.
+
+**Servers** is a list of boxes (`Collapsible`, lazy): a mark — the ocellus for hers, a letter in a disc
+for the rest — the name, whether it is connected, a wrench with the tool count, and a pen and a bin
+for the ones in `mcp.json`. Opening a box asks the server for its tools, each a row with its
+description (clamped to three lines — her own are paragraphs of prompt) and a checkbox on the right.
+Unchecked is a `deny` rule and she is not offered the tool; when a *wider* rule is what turned it off
+the row says which. **New server** opens a sheet: name (read-only once made), *Command* or *Web
+address*, arguments one per line, environment or headers as rows whose saved secrets show as *Saved —
+type to replace*, and an enabled switch. `$lib/servers.ts` is the form as data.
 
 **Permissions** is the third list, and it has no equivalent in the reference: allow, deny and ask
 rules over `server__tool` patterns ([ADR 23](adr/0023-permission-rules-are-kept-over-the-shipped-policy.md)).

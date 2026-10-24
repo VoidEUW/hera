@@ -280,6 +280,68 @@ export const t = {
 		notConnected: 'not connected'
 	},
 
+	/** Settings → Servers: the boxes, their tools, and the add-a-server form (#108). */
+	serverEditor: {
+		newServer: 'New server',
+		editServer: 'Edit server',
+		hers: 'Hers — part of Hera, not in mcp.json',
+		off: 'Off',
+		stdio: 'Command',
+		http: 'Web address',
+		kindLabel: 'How it is reached',
+		kindHelp: {
+			stdio: 'Hera starts it as a program on this machine and talks to it directly.',
+			http: 'It is already running somewhere, and Hera connects to its address.'
+		},
+		name: 'Name',
+		nameHelp:
+			'Letters, digits, “-” and “_”. It becomes the front of each tool: name__tool, and is what a permission rule is written against.',
+		nameLocked: 'The name is what its tools and rules are called. To rename it, add a new one.',
+		namePlaceholder: 'filesystem',
+		command: 'Command',
+		commandPlaceholder: 'npx',
+		args: 'Arguments',
+		argsHelp: 'One per line.',
+		argsPlaceholder: '-y\n@modelcontextprotocol/server-filesystem\n/Users/me/notes',
+		cwd: 'Working directory',
+		cwdHelp: 'Optional. Where the program starts.',
+		url: 'Address',
+		urlPlaceholder: 'https://example.com/mcp',
+		env: 'Environment',
+		envHelp:
+			'Set for the program only. Write ${NAME} to read a value from Hera’s own environment instead of saving it here.',
+		headers: 'Headers',
+		headersHelp:
+			'Sent with every request. Write ${NAME} to read a value from Hera’s own environment instead of saving it here.',
+		key: 'Name',
+		value: 'Value',
+		hiddenValue: 'Saved — type to replace',
+		addRow: 'Add',
+		removeRow: 'Remove this one',
+		enabled: 'Enabled',
+		enabledHelp: 'Off keeps it in the file without starting it.',
+		save: 'Save server',
+		create: 'Add server',
+		cancel: 'Cancel',
+		needName: 'Give it a name.',
+		needCommand: 'Say which command to run.',
+		needUrl: 'Say where it is.',
+		edit: 'Edit this server',
+		delete: 'Remove this server',
+		deleteTitle: 'Remove this server?',
+		deleteBody: (name: string) =>
+			`${name} is taken out of mcp.json and stopped. Its tools go with it; rules that name them stay.`,
+		deleteYes: 'Remove',
+		deleteKeep: 'Keep it',
+		toolsHeading: 'Tools',
+		noTools: 'It has not offered any tools.',
+		notConnected: 'Not connected, so there are no tools to list.',
+		toolOn: (tool: string) => `She may use ${tool}`,
+		deniedBy: (rule: string) => `Off by the rule ${rule}`,
+		switchOff: 'Switched off in mcp.json. Edit it to turn it on.',
+		toolsLoading: 'Reading its tools…'
+	},
+
 	/** Settings → Permissions: rules a person can make, change and remove (#109). */
 	permissions: {
 		rulesHeading: 'Rules',
@@ -399,7 +461,8 @@ export const t = {
 		blurbModels: 'Where she runs. Any OpenAI-compatible endpoint.',
 		blurbDreaming: 'How she will reflect on herself — not built yet.',
 		blurbSkills: 'Packages of instructions she can be given for a kind of task.',
-		blurbServers: 'The MCP servers she can reach, and the tools each one brings.',
+		blurbServers:
+			'The MCP servers she can reach, and the tools each one brings. Switch a tool off and she no longer has it.',
 		blurbPermissions: 'What she may do without asking.',
 		permissionsFallback: 'Anything not matched below:',
 		toolCount: (n: number) => `${n} ${n === 1 ? 'tool' : 'tools'}`,
@@ -419,7 +482,7 @@ export const t = {
 		noSkills:
 			'A skill is a folder with a SKILL.md in it — a name, a description of when to use it, and instructions. Put one in your skills directory and it appears here.',
 		noServers:
-			'Tools come from MCP servers listed in mcp.json. Add one and it appears here with its tools.',
+			'Tools come from MCP servers. Add one and it appears here with its tools — or list it in mcp.json yourself.',
 		noPermissions: 'No rules yet. Make one, or answer “always” on a card.',
 		broken: 'Could not be read',
 		by: (author: string) => `by ${author}`,
