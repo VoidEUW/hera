@@ -8,11 +8,13 @@
 	 * called twice while mounted.
 	 */
 	import Button from '$lib/components/ui/Button.svelte';
+	import Icon from '$lib/components/ui/Icon.svelte';
 	import Pill from '$lib/components/ui/Pill.svelte';
 	import Textarea from '$lib/components/ui/Textarea.svelte';
 	import { api, type Region } from '$lib/api/client';
 	import { t } from '$lib/i18n';
 	import { Placeholder } from '$lib/loading.svelte';
+	import { tooltip } from '$lib/tooltip';
 	import Rows from './Rows.svelte';
 
 	interface Props {
@@ -81,12 +83,14 @@
 	<Rows label={t.settings.loading} />
 {:else}
 	{#each visible as region (region.id)}
+		{@const tier = region.tier === 'owner_fixed' ? t.settings.ownerFixed : t.settings.evolvable}
 		<section class="region">
 			<div class="region-head">
 				<h3>{region.title}</h3>
-				<Pill tone={region.tier === 'owner_fixed' ? 'neutral' : 'authority'} dot={false}>
-					{region.tier === 'owner_fixed' ? t.settings.ownerFixed : t.settings.evolvable}
-				</Pill>
+				<!-- A glance, not a sentence per row: the sentence is the tooltip and the icon's name. -->
+				<span class="tier" use:tooltip={tier}>
+					<Icon name={region.tier === 'owner_fixed' ? 'lock' : 'sprout'} label={tier} />
+				</span>
 				<span class="caption generation">{t.settings.generation(region.generation)}</span>
 			</div>
 			<p class="caption purpose">{region.purpose}</p>
@@ -132,6 +136,11 @@
 		display: flex;
 		align-items: center;
 		gap: 8px;
+	}
+
+	.tier {
+		display: inline-flex;
+		color: var(--text-muted);
 	}
 
 	.generation {

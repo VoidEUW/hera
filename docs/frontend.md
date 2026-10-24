@@ -395,9 +395,9 @@ the right, search at the top. The nav is ordered by what you reach for:
 | **Skills** | With usage counts, and whatever is wrong with each |
 | **Servers** | Every MCP server as a box — hers first, with the ocellus — and its tools inside, each with a checkbox ([ADR 24](adr/0024-the-servers-screen-writes-mcp-json.md)) |
 | **Permissions** | allow · deny · ask, with rules from a card marked as such |
-| **Mind** | The twelve regions, each with its tier and its revision count |
+| **Mind** | The twelve regions, each with its tier as an icon (a lock when only you may change it, a sprout when she may propose changes — the sentence is its tooltip) and its revision count |
 | **Dreaming** | Listed and disabled. A v0.3 feature you can see coming is a promise; one you cannot is a surprise |
-| **Memory** | What she knows about you, with a **space-left bar**: every enabled memory is in the prompt, so the ceiling is a thing a person steers by rather than a limit they hit. Disabling one keeps it and gives the space back |
+| **Memory** | What she knows about you, with a **space-left bar**: every enabled memory is in the prompt, so the ceiling is a thing a person steers by rather than a limit they hit. Disabling one keeps it and gives the space back; the state word sits left of the switch in a fixed slot so the switch never moves, and an entry is one box — the summary and the reason are behind *Summary and reason*, because neither reaches the prompt |
 
 The profile menu is a popover rather than a second modal — four controls do not deserve a sheet
 over the conversation.

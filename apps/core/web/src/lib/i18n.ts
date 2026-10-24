@@ -244,6 +244,8 @@ export const t = {
 		text: 'What she knows',
 		why: 'Why it was kept',
 		whyHint: 'Optional',
+		// The disclosure under the one box: the two fields that never reach her prompt.
+		more: 'Summary and reason',
 		editNote:
 			'Only what she knows goes into her prompt. The summary and the reason are for this screen.',
 		delete: 'Delete',

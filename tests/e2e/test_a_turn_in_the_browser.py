@@ -305,6 +305,22 @@ def test_settings_holds_what_changes_her_behaviour(page: Any) -> None:
     page.wait_for_selector("[role=dialog]", state="detached", timeout=10_000)
 
 
+def test_mind_shows_a_regions_tier_as_an_icon_not_a_sentence(page: Any) -> None:
+    """A lock for what only the person may change, a sprout for what she may propose changes
+    to. The sentence is the icon's name and its tooltip, not a line printed on every row."""
+    page.get_by_role("button", name="Settings").first.click()
+    page.get_by_role("button", name="Mind", exact=True).click()
+    panel = page.locator("[role=dialog] section.region").first
+    panel.wait_for(timeout=15_000)
+
+    fixed = page.locator("section.region").get_by_role("img", name="Only you may change this")
+    evolvable = page.locator("section.region").get_by_role(
+        "img", name="She may propose changes to this"
+    )
+    assert fixed.count() + evolvable.count() == page.locator("section.region").count()
+    assert page.locator("section.region").get_by_text("Only you may change this").count() == 0
+
+
 def test_manage_servers_lands_on_the_servers_tab(page: Any) -> None:
     """Issue #45: the composer's servers chip opens a read-only menu, and its "Manage
     servers" button used to always reopen Settings on Models — the tab it defaults to,
@@ -861,6 +877,21 @@ class TestWhatSheRemembers:
         assert panel.get_by_text("runs-models-locally").count() == 1
         assert panel.locator("li.item.off").count() == 1
 
+    def test_the_switch_does_not_move_when_its_word_changes(self, page: Any) -> None:
+        """The word sits left of the switch in a slot as wide as the longer one, so flipping
+        between *In use* and *Kept, not used* leaves the thing being clicked where it was."""
+        self._remember(page)
+        panel = self._open_memory(page)
+        switch = panel.get_by_role("switch", name="Use runs-models-locally")
+
+        before = switch.bounding_box()
+        switch.click()
+        panel.get_by_text("Kept, not used").wait_for(timeout=15_000)
+        after = switch.bounding_box()
+
+        assert before is not None and after is not None
+        assert after["x"] == before["x"]
+
     def test_a_person_can_correct_what_she_wrote_down(self, page: Any) -> None:
         """Behind a Save rather than on blur, unlike Settings → Emotions: the body is a paragraph,
         and a blur that commits is a blur that can commit half a sentence."""
@@ -868,6 +899,12 @@ class TestWhatSheRemembers:
         panel = self._open_memory(page)
 
         panel.get_by_role("button", name="Edit").click()
+        # One box for the body; the summary and the reason are behind a disclosure, because
+        # neither enters her prompt.
+        assert panel.get_by_label("Summary", exact=True).count() == 0
+        panel.get_by_role("button", name="Summary and reason").click()
+        assert panel.get_by_label("Summary", exact=True).count() == 1
+        assert panel.get_by_label("Why it was kept").count() == 1
         panel.locator("li.item textarea").fill("They run local models on an M4 Pro, not a Studio.")
         panel.get_by_role("button", name="Save").click()
 
