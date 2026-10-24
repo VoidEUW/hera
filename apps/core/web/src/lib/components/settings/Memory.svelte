@@ -51,6 +51,8 @@
 	 * can be true, and one mode field would let an edit survive a delete confirmation opening. */
 	let editing = $state('');
 	let draft = $state({ text: '', description: '', why: '' });
+	/** The summary and the reason, which never reach her prompt, are shut until asked for. */
+	let more = $state(false);
 
 	const shown = $derived(
 		memories.filter(
@@ -111,6 +113,7 @@
 	function edit(memory: MemoryItem) {
 		confirming = '';
 		editing = memory.key;
+		more = false;
 		draft = { text: memory.text, description: memory.description, why: memory.why };
 	}
 
@@ -212,10 +215,14 @@
 							{#if memory.scope === 'chat'}<Pill tone="live">{t.memory.hereOnly}</Pill>{/if}
 							<Pill>{memory.source === 'auto' ? t.memory.hers : t.memory.yours}</Pill>
 							<span class="cost">{t.memory.tokens(memory.tokens)}</span>
+							<!-- Left of the switch, in a slot as wide as the longer word: the switch is what a
+							     person aims at, and it must not move when the word changes. -->
+							<span class="state" aria-hidden="true">
+								{memory.enabled ? t.memory.on : t.memory.offOne}
+							</span>
 							<Checkbox
 								variant="switch"
 								checked={memory.enabled}
-								label={memory.enabled ? t.memory.on : t.memory.offOne}
 								ariaLabel={t.memory.useIt(memory.key)}
 								onchange={() => toggle(memory)}
 							/>
@@ -223,24 +230,37 @@
 
 						{#if editing === memory.key}
 							<div class="editor">
-								<Input
-									label={t.memory.description}
-									value={draft.description}
-									onchange={(value) => (draft.description = value)}
-								/>
 								<Textarea
 									label={t.memory.text}
 									rows={4}
 									value={draft.text}
 									onchange={(value) => (draft.text = value)}
 								/>
-								<Input
-									label={t.memory.why}
-									value={draft.why}
-									placeholder={t.memory.whyHint}
-									onchange={(value) => (draft.why = value)}
-								/>
 								<p class="note">{t.memory.editNote}</p>
+								<span class="more">
+									<Button
+										variant="ghost"
+										size="sm"
+										icon={more ? 'chevD' : 'chevR'}
+										aria-expanded={more}
+										onclick={() => (more = !more)}
+									>
+										{t.memory.more}
+									</Button>
+								</span>
+								{#if more}
+									<Input
+										label={t.memory.description}
+										value={draft.description}
+										onchange={(value) => (draft.description = value)}
+									/>
+									<Input
+										label={t.memory.why}
+										value={draft.why}
+										placeholder={t.memory.whyHint}
+										onchange={(value) => (draft.why = value)}
+									/>
+								{/if}
 							</div>
 						{:else}
 							{#if memory.description}<p class="description">{memory.description}</p>{/if}
@@ -395,6 +415,18 @@
 		margin-left: auto;
 		font-size: 12px;
 		color: var(--text-faint);
+	}
+
+	/* As wide as "Kept, not used", so the switch beside it stays where it is. */
+	.state {
+		min-width: 14ch;
+		font-size: 13px;
+		color: var(--text-faint);
+		text-align: right;
+	}
+
+	.more {
+		align-self: flex-start;
 	}
 
 	.description {
