@@ -391,6 +391,7 @@ the right, search at the top. The nav is ordered by what you reach for:
 
 | | |
 |---|---|
+| **Usage** | Tokens per day for the last thirty days, read and written stacked, and the last 24 hours, 7 and 30 days under it. The newest bar is the one being read until you point at another or move with the arrow keys; its numbers are the line above the chart ([ADR 25](adr/0025-usage-is-a-ledger.md)) |
 | **Models** | Registered endpoints. First, because nothing else in Hera does anything until she is pointed at one — and because *testing* one belongs here: the endpoint is asked what it has, and the answer either fills a list you can pick from or says plainly why it could not |
 | **Skills** | With usage counts, and whatever is wrong with each |
 | **Servers** | Every MCP server as a box — hers first, with the ocellus — and its tools inside, each with a checkbox ([ADR 24](adr/0024-the-servers-screen-writes-mcp-json.md)) |

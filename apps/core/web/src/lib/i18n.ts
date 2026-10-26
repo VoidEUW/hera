@@ -257,6 +257,28 @@ export const t = {
 		none: 'Nothing yet. She writes these as she learns things worth keeping, and you can drop a markdown file into your memories directory yourself.'
 	},
 
+	/** Settings → Usage (#111). */
+	usage: {
+		loading: 'Loading usage…',
+		chart: (days: number) => `Tokens per day, the last ${days} days`,
+		prompt: 'Read',
+		completion: 'Written',
+		/** The legend's longer names, for a person who wonders what "read" means here. */
+		promptLong: 'Prompt tokens — what she read: the conversation, her mind, the tools',
+		completionLong: 'Completion tokens — what she wrote back',
+		day: 'Last 24 hours',
+		week: 'Last 7 days',
+		month: 'Last 30 days',
+		tokens: (n: number) => `${n.toLocaleString()} tokens`,
+		split: (prompt: number, completion: number) =>
+			`${prompt.toLocaleString()} read · ${completion.toLocaleString()} written`,
+		readout: (date: string, prompt: number, completion: number) =>
+			`${date}: ${prompt.toLocaleString()} read, ${completion.toLocaleString()} written`,
+		none: 'Nothing yet. Each answer she gives adds its tokens here, on the day it was given.',
+		note: 'Counts are what the model endpoint reports for each answer. A server that reports nothing counts as nothing, and Hera does not estimate.',
+		zone: (zone: string) => `Days in ${zone}`
+	},
+
 	skills: {
 		title: 'Skills for this chat',
 		blurb:
@@ -444,6 +466,7 @@ export const t = {
 		account: 'Account',
 		general: 'General',
 		hotkeys: 'Hotkeys',
+		usage: 'Usage',
 		models: 'Models',
 		mind: 'Mind',
 		memory: 'Memory',
@@ -458,6 +481,7 @@ export const t = {
 		blurbAccount: 'Who you are to Hera: a name, an email and a picture.',
 		blurbGeneral: 'This browser and this machine: appearance, language, time zone, notifications.',
 		blurbHotkeys: 'The keys that do what a button on screen already does.',
+		blurbUsage: 'How many tokens her answers took, day by day.',
 		blurbMind: 'The text that shapes how she thinks and speaks, one region at a time.',
 		blurbMemory: 'What she knows about you, and how much room it takes.',
 		blurbModels: 'Where she runs. Any OpenAI-compatible endpoint.',

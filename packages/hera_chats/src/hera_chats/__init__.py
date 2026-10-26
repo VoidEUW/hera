@@ -39,18 +39,20 @@ from hera_chats.history import (
     says_something,
     turn_to_messages,
 )
-from hera_chats.models import Chat, Message, Project
+from hera_chats.models import Chat, Message, Project, TurnUsage
 from hera_chats.ports import Tools
 from hera_chats.render import for_export
 from hera_chats.repository import (
     ChatRepository,
     MessageRepository,
     ProjectRepository,
+    UsageRepository,
     slugify,
     title_from,
 )
 from hera_chats.settings import ChatsSettings
 from hera_chats.turn import Turn, TurnContext, TurnOrchestrator
+from hera_chats.usage import DayUsage, Tokens, UsageSummary, summarise, window_start
 
 __all__ = [
     "CHAT_EVENT_ADAPTER",
@@ -63,6 +65,7 @@ __all__ = [
     "ChatRepository",
     "ChatsSettings",
     "CloseReason",
+    "DayUsage",
     "Message",
     "MessageRepository",
     "PermissionDecided",
@@ -70,12 +73,16 @@ __all__ = [
     "Project",
     "ProjectRepository",
     "SkillSelected",
+    "Tokens",
     "ToolResultEvent",
     "Tools",
     "Turn",
     "TurnClosed",
     "TurnContext",
     "TurnOrchestrator",
+    "TurnUsage",
+    "UsageRepository",
+    "UsageSummary",
     "build_history",
     "coalesce",
     "compose",
@@ -84,7 +91,9 @@ __all__ = [
     "for_export",
     "says_something",
     "slugify",
+    "summarise",
     "title_from",
     "turn_to_messages",
     "visible_text",
+    "window_start",
 ]

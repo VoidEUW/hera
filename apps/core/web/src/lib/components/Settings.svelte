@@ -36,6 +36,7 @@
 	import Screen from './settings/Screen.svelte';
 	import Servers from './settings/Servers.svelte';
 	import Skills from './settings/Skills.svelte';
+	import Usage from './settings/Usage.svelte';
 
 	interface Props {
 		onclose?: () => void;
@@ -105,6 +106,8 @@
 							<General {filter} />
 						{:else if tab === 'hotkeys'}
 							<Hotkeys {filter} />
+						{:else if tab === 'usage'}
+							<Usage />
 						{:else if tab === 'models'}
 							<Models {filter} />
 						{:else if tab === 'memory'}

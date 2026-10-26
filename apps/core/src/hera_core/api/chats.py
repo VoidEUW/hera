@@ -43,6 +43,7 @@ from hera_chats import (
     ProjectRepository,
     Turn,
     TurnContext,
+    UsageRepository,
     build_history,
     events_of,
     for_export,
@@ -500,6 +501,9 @@ def _record(
         if message is None:
             return None
         messages.record(message, turn.recorded, prompt_fingerprint=turn.prompt_fingerprint)
+        # Beside the message rather than read back out of it: the message goes when the chat
+        # does, and what the turn cost was spent all the same (ADR 25).
+        UsageRepository(session).record(message, turn.recorded)
         if turn.skill_ids:
             SkillUsageRepository(session).record(owner_id, turn.skill_ids)
         chat = ChatRepository(session).get(chat_id)

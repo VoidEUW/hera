@@ -50,7 +50,9 @@ describe('a component', () => {
 			// never is.
 			'lib/components/ui/Spinner.svelte',
 			'lib/components/ui/SendButton.svelte',
-			'lib/components/ui/ContextMeter.svelte'
+			'lib/components/ui/ContextMeter.svelte',
+			// Bars, not icons: a chart's rectangles scaled to data (#111).
+			'lib/components/ui/BarChart.svelte'
 		]);
 		const offenders = components(src)
 			.filter((path) => !drawers.has(relative(src, path)))

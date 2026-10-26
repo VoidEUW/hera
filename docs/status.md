@@ -60,6 +60,16 @@ words with the tools it covers, a three-way switch, an edit form with a live pre
 would match, and a confirmation before deleting. Rules that ship with Hera can be changed, not
 deleted. One mechanism (`hera_core.rulebook`) serves the screen and the card.
 
+### What her answers cost ([#111](https://github.com/VoidEUW/hera/issues/111), [ADR 25](adr/0025-usage-is-a-ledger.md))
+
+Settings → Usage, in the App group: a bar per day for the last thirty days, with read (prompt) and
+written (completion) tokens stacked, and totals for the last 24 hours, 7 days and 30 days. The chart is
+`ui/BarChart.svelte`, inline SVG on theme tokens with no library; the newest bar is read out until a
+person points at another or moves with the arrow keys. The numbers come from a ledger, `chat_usage`,
+written beside each recorded turn and never deleted with the chat, so a day's bar does not shrink when a
+chat from that day is removed or an answer is asked again. Migration 0006 backfills it from the stored
+`turn_closed` events. `GET /usage?days=&tz=` cuts the days in the browser's time zone.
+
 ### Servers are boxes, and a person can add one ([#108](https://github.com/VoidEUW/hera/issues/108))
 
 Settings → Servers shows every server as a box — hers first, marked with the ocellus — with its state

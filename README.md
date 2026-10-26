@@ -92,7 +92,7 @@ Everything Hera owns lives under `~/.hera/` (`HERA_HOME` overrides it):
 
 | | |
 |---|---|
-| `hera.sqlite3` | chats, messages, projects, profiles, permissions |
+| `hera.sqlite3` | chats, messages, projects, profiles, and what each answer cost in tokens |
 | `mind/` | a real git repository, one file per mind region |
 | `memories/<key>.md` | what she knows about you — one file each, and the filename is the key |
 | `skills/<name>/SKILL.md` | skill packages |

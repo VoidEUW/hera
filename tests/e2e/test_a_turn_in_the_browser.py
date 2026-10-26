@@ -281,6 +281,7 @@ def test_settings_holds_what_changes_her_behaviour(page: Any) -> None:
         "Account",
         "General",
         "Hotkeys",
+        "Usage",
         "Mind",
         "Memory",
         "Models",

@@ -29,7 +29,7 @@ from uuid import UUID
 from hera_skillsets.models import ID_PATTERN
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from hera_chats import Chat, Message, Project
+from hera_chats import Chat, Message, Project, Tokens, UsageSummary
 from hera_core.account import Account
 from hera_core.config import ProviderKind, validate_provider_name
 from hera_core.model_presets import PRESETS, ModelPreset
@@ -1076,3 +1076,65 @@ class AvatarIn(BaseModel):
     """A picture as a data URL, the way an attachment arrives."""
 
     data_url: str = Field(min_length=1)
+
+
+class TokensOut(BaseModel):
+    """Prompt and completion tokens, added up."""
+
+    model_config = ConfigDict(frozen=True)
+
+    prompt_tokens: int
+    completion_tokens: int
+
+    @classmethod
+    def of(cls, tokens: Tokens) -> TokensOut:
+        return cls(prompt_tokens=tokens.prompt_tokens, completion_tokens=tokens.completion_tokens)
+
+
+class UsageDayOut(TokensOut):
+    """One local day's bar."""
+
+    date: date
+
+
+class UsageTotalsOut(BaseModel):
+    """The three rolling windows under the chart."""
+
+    model_config = ConfigDict(frozen=True)
+
+    day: TokensOut
+    week: TokensOut
+    month: TokensOut
+
+
+class UsageOut(BaseModel):
+    """Settings → Usage (#111): a bar per day, oldest first and ending today, and the totals.
+
+    ``timezone`` is the zone the days were cut in, so the screen can say which one it was
+    when it is not the browser's own.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    days: list[UsageDayOut]
+    totals: UsageTotalsOut
+    timezone: str
+
+    @classmethod
+    def of(cls, summary: UsageSummary, timezone: str) -> UsageOut:
+        return cls(
+            days=[
+                UsageDayOut(
+                    date=day.date,
+                    prompt_tokens=day.tokens.prompt_tokens,
+                    completion_tokens=day.tokens.completion_tokens,
+                )
+                for day in summary.days
+            ],
+            totals=UsageTotalsOut(
+                day=TokensOut.of(summary.day),
+                week=TokensOut.of(summary.week),
+                month=TokensOut.of(summary.month),
+            ),
+            timezone=timezone,
+        )
