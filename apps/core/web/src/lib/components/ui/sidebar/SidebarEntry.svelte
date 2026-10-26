@@ -212,4 +212,12 @@
 	.pinned .action {
 		opacity: 1;
 	}
+
+	/* Nothing hovers on a touch screen, so a row's action that waits for one is never reached
+	   (#41). There it is simply always shown. */
+	@media (hover: none) {
+		.action {
+			opacity: 1;
+		}
+	}
 </style>

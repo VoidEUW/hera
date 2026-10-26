@@ -286,7 +286,7 @@
 	<div class="held-hers"><Skeleton rows={4} height={16} gap={9} widths={[100, 96, 100, 58]} /></div>
 {/snippet}
 
-<Topbar title={session.chat?.title || t.empty.title}>
+<Topbar title={session.chat?.title || t.empty.title} onmenu={() => (workspace.railOpen = true)}>
 	{#if contextLimit && session.chat}
 		<ContextMeter used={session.context ?? 0} limit={contextLimit} />
 	{/if}
@@ -473,6 +473,22 @@
 		flex: none;
 		padding: 12px 24px max(20px, env(safe-area-inset-bottom));
 		background: linear-gradient(to top, var(--ground) 70%, transparent);
+	}
+
+	/* On a phone 24px a side is an eighth of the screen spent on margin (#41); 12px put the text
+	   against the glass. */
+	@media (max-width: 780px) {
+		.scroll {
+			padding-inline: 18px;
+			/* The end of the transcript is the end of the scroll: it does not hand the gesture on to
+			   the page, which on iOS would move the bar and the composer with it. */
+			overscroll-behavior: contain;
+		}
+
+		.foot {
+			padding-inline: 18px;
+			padding-bottom: max(12px, env(safe-area-inset-bottom));
+		}
 	}
 
 	/* The conversation arrives where its shape was, rather than replacing it between frames. */

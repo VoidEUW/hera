@@ -116,7 +116,7 @@
 					onclick={() => onanswer?.(choice.allow, choice.remember)}
 				>
 					<!-- Drawn, not read: `aria-keyshortcuts` already tells a screen reader the key. -->
-					<span aria-hidden="true"><Kbd>{choice.key}</Kbd></span>
+					<span aria-hidden="true"><Kbd decorative>{choice.key}</Kbd></span>
 					{choice.label}
 				</Button>
 			{/each}

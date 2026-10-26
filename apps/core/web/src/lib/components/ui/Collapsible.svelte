@@ -156,4 +156,13 @@
 		color: var(--text-muted);
 		font-size: 13px;
 	}
+
+	/* The indent lines the body up under the title, past the chevron. On a phone that is a tenth
+	   of the screen, twice over when one box opens inside another (a model inside its endpoint),
+	   so there the body starts where the header does (#41). */
+	@media (max-width: 780px) {
+		.inner {
+			padding-left: 14px;
+		}
+	}
 </style>

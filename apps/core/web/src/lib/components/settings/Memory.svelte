@@ -503,4 +503,38 @@
 	.failed {
 		color: var(--danger);
 	}
+
+	/* On a phone the row does not fit on one line: the key, its badges, the cost, the word and the
+	   switch were wider than the card, and the switch ran off its edge (#41). The key gets a line
+	   of its own, and the rest follow with the switch still at the end. */
+	@media (max-width: 780px) {
+		.top {
+			flex-wrap: wrap;
+			row-gap: 6px;
+		}
+
+		.key {
+			flex: 1 0 100%;
+			overflow-wrap: anywhere;
+		}
+
+		.cost {
+			margin-left: 0;
+		}
+
+		.state {
+			min-width: 0;
+			margin-left: auto;
+		}
+
+		/* The gauge's three figures wrap as whole phrases, not word by word inside three columns. */
+		.reading {
+			flex-wrap: wrap;
+			row-gap: 2px;
+		}
+
+		.reading > * {
+			white-space: nowrap;
+		}
+	}
 </style>

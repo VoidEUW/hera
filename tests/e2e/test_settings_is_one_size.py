@@ -74,3 +74,15 @@ def test_the_sheet_is_one_size_whatever_is_in_it(page: Any) -> None:
         sizes[screen] = (round(box["width"]), round(box["height"]), round(box["y"]))
 
     assert len(set(sizes.values())) == 1, sizes
+
+
+def test_the_desktop_shows_the_list_beside_the_screen(page: Any) -> None:
+    """A phone shows the list *or* a screen (#41); the desktop keeps both, side by side, and has
+    no way back because there is nowhere to go back to."""
+    settings(page)
+    nav = page.locator("[role='dialog'] .sidebar").bounding_box()
+    panel = page.locator("[role='dialog'] .panel").bounding_box()
+    assert nav is not None and panel is not None
+    assert nav["x"] + nav["width"] <= panel["x"]
+    assert abs(nav["y"] - panel["y"]) < 40
+    assert not page.get_by_role("button", name="All settings").is_visible()

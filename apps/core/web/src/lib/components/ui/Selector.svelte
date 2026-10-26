@@ -52,6 +52,9 @@
 		placeholder?: string;
 		/** A tooltip on the trigger. */
 		hint?: string;
+		/** A `chip` trigger's text below the phone breakpoint (`Chip`'s `short`); `''` is the
+		 * icon alone. */
+		short?: string;
 		/** A visible label above a `field` trigger, and a help line under it — the same frame a
 		 * text field beside it has. */
 		caption?: string;
@@ -70,6 +73,7 @@
 		disabled = false,
 		placeholder = '',
 		hint,
+		short,
 		caption,
 		help,
 		onchange
@@ -134,6 +138,7 @@
 		haspopup="menu"
 		{label}
 		{hint}
+		{short}
 		{disabled}
 		onclick={toggle}
 		onkeydown={openFrom}>{shown}</Chip

@@ -44,28 +44,45 @@
 	const GAP = 6;
 	const EDGE = 8;
 
-	$effect(() => {
-		if (!open || !anchor || !menu) return;
-		const box = anchor.getBoundingClientRect();
-		const width = Math.max(box.width, 200);
-		menu.style.minWidth = `${width}px`;
-		const own = menu.getBoundingClientRect();
+	/** Where the menu goes, from its anchor and its own size.
+	 *
+	 * The size is the layout box (`offsetWidth`/`offsetHeight`), not `getBoundingClientRect`: the
+	 * menu is measured as it starts its `menu.enter` scale, and a rectangle read then is 95% of the
+	 * real one. */
+	function position(target: HTMLDivElement, from: HTMLElement) {
+		const box = from.getBoundingClientRect();
+		target.style.minWidth = `${Math.max(box.width, 200)}px`;
+		const width = target.offsetWidth;
+		const height = target.offsetHeight;
 		const roomBelow = window.innerHeight - box.bottom - GAP - EDGE;
 		const roomAbove = box.top - GAP - EDGE;
 		const above =
 			placement === 'above'
-				? own.height <= roomAbove || roomAbove > roomBelow
-				: own.height > roomBelow && roomAbove > roomBelow;
-		const left = align === 'end' ? box.right - own.width : box.left;
+				? height <= roomAbove || roomAbove > roomBelow
+				: height > roomBelow && roomAbove > roomBelow;
+		const left = align === 'end' ? box.right - width : box.left;
 		place = {
-			top: above ? box.top - GAP - own.height : box.bottom + GAP,
-			left: Math.min(Math.max(EDGE, left), window.innerWidth - own.width - EDGE),
+			top: above ? box.top - GAP - height : box.bottom + GAP,
+			left: Math.min(Math.max(EDGE, left), window.innerWidth - width - EDGE),
 			above
 		};
-		const chosen = menu.querySelector<HTMLElement>(
+	}
+
+	$effect(() => {
+		if (!open || !anchor || !menu) return;
+		const target = menu;
+		const from = anchor;
+		position(target, from);
+		const chosen = target.querySelector<HTMLElement>(
 			'[role^="menuitem"][aria-checked="true"]:not([disabled])'
 		);
 		(chosen ?? items()[0])?.focus();
+		// A menu can change size while it is open — the skill list arrives after the menu does —
+		// and one placed for its empty size then hangs off the edge of the screen until it is
+		// opened a second time. So it is placed again whenever it resizes.
+		const watch = new ResizeObserver(() => position(target, from));
+		watch.observe(target);
+		return () => watch.disconnect();
 	});
 
 	$effect(() => {

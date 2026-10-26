@@ -52,6 +52,33 @@
 		workspace.railOpen = false;
 	});
 
+	// On a phone the shell is the part of the screen the browser is actually showing (#41). iOS
+	// Safari does not shrink the page for the keyboard: it slides the whole page up under it, so
+	// the top bar went off the top and the conversation scrolled as one sheet with the bar and
+	// the composer. Following `visualViewport` keeps the bar at the top and the composer on the
+	// keyboard, with only the transcript scrolling between them. The CSS that reads these is
+	// below the breakpoint only, so the desktop is untouched; a pinch-zoomed view is left alone,
+	// because then the visible part is meant to be smaller than the page.
+	$effect(() => {
+		const view = window.visualViewport;
+		if (!view) return;
+		const root = document.documentElement;
+		const follow = () => {
+			if (view.scale > 1.01) return;
+			root.style.setProperty('--view-height', `${view.height}px`);
+			root.style.setProperty('--view-top', `${view.offsetTop}px`);
+		};
+		follow();
+		view.addEventListener('resize', follow);
+		view.addEventListener('scroll', follow);
+		return () => {
+			view.removeEventListener('resize', follow);
+			view.removeEventListener('scroll', follow);
+			root.style.removeProperty('--view-height');
+			root.style.removeProperty('--view-top');
+		};
+	});
+
 	/** **New chat** goes to the start screen rather than making a chat.
 	 *
 	 * It used to create one and navigate into it, which meant every new conversation opened as
@@ -192,7 +219,11 @@
 				{activeProjectId}
 				onnew={newChat}
 				onsettings={() => workspace.openSettings()}
-				onsearch={() => (palette = 'all')}
+				onsearch={() => {
+					// The sheet steps aside for the palette, as it does for Settings (#41).
+					workspace.railOpen = false;
+					palette = 'all';
+				}}
 				settingsOpen={workspace.settingsOpen}
 				onrename={(id, title) => workspace.renameChat(id, title)}
 				ondelete={removeChat}
@@ -265,6 +296,20 @@
 	}
 
 	@media (max-width: 780px) {
+		/* Pinned to what the browser is showing (see the `visualViewport` effect above), so the page
+		   itself never scrolls — only the transcript inside it does. */
+		.shell {
+			position: fixed;
+			inset: var(--view-top, 0px) 0 auto 0;
+			height: var(--view-height, 100dvh);
+		}
+
+		/* A screen with a top bar carries its own menu button in it (`Topbar`'s `onmenu`); this
+		   floating one is for the screens without a bar — the start screen and a project. */
+		.shell:has(:global(.topbar .lead)) .menu {
+			display: none;
+		}
+
 		/* Off-canvas by default and brought on screen by `.menu` — nothing slides in from
 		   off-screen (the interface's one rule about motion), so this is the same plain
 		   `animation: fade` Settings already draws its own sheet with, not a translate. */
@@ -288,8 +333,9 @@
 
 		.menu {
 			display: block;
-			position: fixed;
-			top: max(14px, env(safe-area-inset-top));
+			/* Inside the shell rather than the viewport, so it moves with the shell. */
+			position: absolute;
+			top: calc(14px + env(safe-area-inset-top));
 			left: max(14px, env(safe-area-inset-left));
 			z-index: 9;
 			border-radius: 50%;

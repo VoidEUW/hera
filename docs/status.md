@@ -80,6 +80,28 @@ Speed is measured by Hera, so every endpoint has it. Checking the counts fixed t
 
 Each message's corner shows its speed beside its token count.
 
+### The interface on a phone ([#41](https://github.com/VoidEUW/hera/issues/41))
+
+Phone-only, behind the 780px breakpoint or `(hover: none)`. The desktop is pixel-identical to
+before, checked by comparing desktop screenshots of every Settings screen between the two builds.
+- The composer's chips go short (a mark and a count), and the model keeps its name.
+- Settings is full-screen: a list of sections, then one screen with *All settings* to go back,
+  and the search on the screen.
+- Opening Settings or the palette from the rail sheet closes the sheet.
+- A memory's switch stays inside its card, and the close button lines up with the content.
+- Only the transcript scrolls. The shell follows the visible part of the screen, so the bar and
+  the composer stay put when iOS opens the keyboard. The chat's menu button is in its bar.
+- Short chips never shrink, so a count is never cut off on a 375pt iPhone, checked in WebKit.
+- A menu opened for the first time is on the screen. It is placed again when its content arrives,
+  and this applies at every width.
+- No key chords on a touch screen, and a rail row's menu without a hover.
+- 16px text fields, because iOS zooms into anything smaller.
+- Top sheets sit under the status bar, and nested boxes lose their indent.
+
+`tests/e2e/test_on_a_phone.py` checks each of these at 390×844 with touch, along with no sideways
+scrolling on any screen; eight of its ten tests fail on the build before. The preview film adds
+the Settings screen, the palette and the composer's chips on the phone.
+
 ### She asks several things at once ([#64](https://github.com/VoidEUW/hera/issues/64), [ADR 26](adr/0026-a-question-may-come-in-threes.md))
 
 `hera__ask` takes `questions`: one to three independent questions, each with up to four `options`,

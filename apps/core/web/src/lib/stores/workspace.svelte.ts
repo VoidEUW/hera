@@ -153,6 +153,10 @@ export class Workspace {
 	openSettings(section: SettingsTab = 'account') {
 		this.settingsTab = section;
 		this.settingsOpen = true;
+		// On a phone Settings is opened from the rail sheet, and left the sheet open behind it —
+		// so closing Settings landed back in the rail rather than where you were (#41). Nothing
+		// reads this above the breakpoint.
+		this.railOpen = false;
 	}
 
 	get activeProfile(): Profile | null {
