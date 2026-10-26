@@ -26,7 +26,7 @@
 	import type { AnswerRequired, AnyEvent, Artifact, PermissionRequired } from '$lib/api/events';
 	import { size } from '$lib/attachments';
 	import { t } from '$lib/i18n';
-	import { isAnswered, reduce, replyTo } from '$lib/turn';
+	import { isAnswered, reduce, repliesTo } from '$lib/turn';
 	import { tooltip } from '$lib/tooltip';
 	import { seconds, speed, speedOf } from '$lib/usage';
 	import ActivityRow from './ActivityRow.svelte';
@@ -52,8 +52,9 @@
 		streaming?: boolean;
 		busy?: boolean;
 		onanswer?: (callId: string, allow: boolean, remember: boolean) => void;
-		/** Reply to a question she asked. The turn resumes with the words as that call's result. */
-		onreply?: (callId: string, text: string) => void;
+		/** Reply to the questions she asked, one answer each. The turn resumes with them as that
+		 * call's result. */
+		onreply?: (callId: string, answers: string[]) => void;
 		/** Ask again from this message. Text rewords the question; nothing repeats it. */
 		onredo?: (text?: string) => void;
 		/** Give up on a turn that stopped arriving and ask again — the stalled spinner's Retry. */
@@ -334,9 +335,9 @@
 				{@const card = item.event as AnswerRequired}
 				<QuestionCard
 					{card}
-					reply={isAnswered(events, card.call_id) ? replyTo(events, card.call_id) : null}
+					replies={isAnswered(events, card.call_id) ? repliesTo(events, card.call_id) : null}
 					{busy}
-					onreply={(text) => onreply?.(card.call_id, text)}
+					onreply={(answers) => onreply?.(card.call_id, answers)}
 				/>
 			{/if}
 		{/each}

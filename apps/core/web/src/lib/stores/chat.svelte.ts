@@ -265,10 +265,10 @@ export class ChatSession {
 
 	/** Reply to a question she asked. The same resume as a permission answer, through the same
 	 * `#consume`, because it is the same suspension with a different card on it. */
-	async reply(callId: string, text: string) {
+	async reply(callId: string, answers: string[]) {
 		if (!this.chat || this.streaming) return;
 		await this.#consume(() =>
-			answerQuestion(this.chat!.id, { call_id: callId, text }, this.#begin())
+			answerQuestion(this.chat!.id, { call_id: callId, answers }, this.#begin())
 		);
 	}
 

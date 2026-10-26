@@ -412,7 +412,10 @@ ASKING_SCRIPT: list[Any] = [
     # when being wrong would cost real work. The turn stops here.
     [
         TextDelta(text="Before I summarise it — "),
-        tool_call("hera__ask", {"question": "Which deck do you mean?", "kind": "unsure"}),
+        tool_call(
+            "hera__ask",
+            {"questions": [{"question": "Which deck do you mean?"}], "kind": "unsure"},
+        ),
         TurnEnd(reason="tool_calls"),
     ],
     # And carries on with the reply in hand, as the result of its own call.
@@ -473,6 +476,75 @@ class TestSheAsksAndWaits:
         page.wait_for_selector("text=The 2024 one.", timeout=15_000)
         page.wait_for_selector("text=three slides on ticket lifetime", timeout=15_000)
         assert page.url == url
+
+
+SEVERAL_QUESTIONS_SCRIPT: list[Any] = [
+    # Two questions that stand apart, in one call (ADR 26) — the first with choices.
+    [
+        tool_call(
+            "hera__ask",
+            {
+                "questions": [
+                    {"question": "Which deck do you mean?", "options": ["2024", "2025"]},
+                    {"question": "Should I keep the speaker notes?"},
+                ],
+                "kind": "choice",
+            },
+        ),
+        TurnEnd(reason="tool_calls"),
+    ],
+    text_turn("The 2024 deck, notes kept: three slides on ticket lifetime."),
+]
+
+
+class TestSheAsksSeveralAtOnce:
+    """One call with two questions is one card with two fields and one Reply, and each answer
+    reaches her beside the question it belongs to."""
+
+    @pytest.fixture
+    def script(self) -> list[Any]:
+        return SEVERAL_QUESTIONS_SCRIPT
+
+    def test_a_choice_and_a_sentence_are_one_reply(self, page: Any, server: str) -> None:
+        composer = page.locator("textarea").first
+        composer.fill("Summarise the deck")
+        composer.press("Enter")
+
+        page.wait_for_url("**/chat/**", timeout=15_000)
+        page.wait_for_selector("text=Should I keep the speaker notes?", timeout=30_000)
+
+        card = page.locator("aside.card")
+        assert card.count() == 1, "one call is one card, however many questions it holds"
+        assert card.locator("textarea").count() == 2
+
+        # Picking a choice is the whole answer to the first question.
+        choice = card.get_by_role("button", name="2024", exact=True)
+        choice.click()
+        assert choice.get_attribute("aria-pressed") == "true"
+
+        notes = card.locator("textarea").nth(1)
+        notes.fill("Yes, keep them.")
+        card.get_by_role("button", name="Reply").click()
+
+        page.wait_for_selector("text=three slides on ticket lifetime", timeout=30_000)
+        assert page.locator("article.hers").count() == 1
+
+        # What she was handed: each answer beside its question, as the result of her own call.
+        chat_id = page.url.rstrip("/").split("/")[-1]
+        detail = page.request.get(f"{server}/api/v1/chats/{chat_id}").json()
+        events = detail["messages"][1]["events"]
+        result = next(e for e in events if e["type"] == "tool_result")
+        assert result["text"] == (
+            "1. Which deck do you mean? → 2024\n"
+            "2. Should I keep the speaker notes? → Yes, keep them."
+        )
+
+        # And after a reload the card is settled, with both replies on it.
+        page.reload(wait_until="networkidle")
+        page.wait_for_selector("text=Yes, keep them.", timeout=15_000)
+        settled = page.locator("aside.card")
+        assert settled.locator("textarea").count() == 0
+        assert settled.locator(".reply").all_inner_texts() == ["2024", "Yes, keep them."]
 
 
 class TestATurnThatFailed:

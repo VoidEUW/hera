@@ -10,7 +10,8 @@ only change should be which transport it is served over.
 ``emotion`` used to be the first tool here and is gone -- ADR 17 supersedes ADR 3. What replaced
 it is nothing: a stance she means is a sentence she writes. ``ask`` is what survived that
 removal, and it stands on its own -- its ``kind`` is a closed set about the *question* rather
-than a word borrowed from a vocabulary of moods.
+than a word borrowed from a vocabulary of moods. One call carries up to three questions that
+stand apart from each other, each with a few choices if the answer is a pick (ADR 26).
 
 ``note`` is **unwired**, and deliberately so: it waits for somewhere to write notes. It still
 appears in the catalogue and answers "not available in this deployment", because a model that
@@ -42,11 +43,12 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from contextlib import contextmanager
-from typing import Literal
+from typing import Annotated, Literal, NotRequired, TypedDict
 
 from mcp.server.mcpserver import Context, MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
 from mcp.types import CallToolResult, TextContent
+from pydantic import Field, TypeAdapter
 
 from hera_mcp.ports import (
     Artifacts,
@@ -95,6 +97,45 @@ ASK_KINDS: tuple[AskKind, ...] = ("unsure", "blocked", "choice")
 Named here for the reason :data:`ASK_TOOL` is: the interface draws a tone per kind, and a set
 agreed on in two places is one that can disagree.
 """
+
+ASK_MAX_QUESTIONS = 3
+"""The most questions one ``ask`` may carry (ADR 26).
+
+Several, because a person answering three independent questions on one card beats three
+suspended turns in a row. Three, because a card past that is a form, and a model holding that
+many open questions has usually not decided what it is doing yet."""
+
+ASK_MAX_OPTIONS = 4
+"""The most choices one question may offer. Two is the floor — one option is not a choice — and
+past four a person reads a list instead of picking."""
+
+
+class AskQuestion(TypedDict):
+    """One question inside an ``ask``, as the model writes it."""
+
+    question: str
+    options: NotRequired[
+        Annotated[
+            list[str],
+            Field(
+                min_length=2,
+                max_length=ASK_MAX_OPTIONS,
+                description="Optional. Short choices when the answer is a pick, not free text.",
+            ),
+        ]
+    ]
+
+
+_ASK_QUESTION_SCHEMA = {
+    key: value for key, value in TypeAdapter(AskQuestion).json_schema().items() if key != "title"
+}
+"""The item schema, written into ``questions`` inline.
+
+Left to itself the SDK puts a nested type behind ``$ref`` into ``$defs``, and the schema is
+prompt text: a model reading the catalogue has to follow a pointer to learn what one question
+looks like, and the smaller ones ADR 19 targets do not reliably do that. Inlined, the shape is
+where the array is. Validation still runs against :class:`AskQuestion`; only what is *shown*
+changes."""
 
 CHAT_ID_META = "hera/chatId"
 """Where a call says which conversation it belongs to (ADR 12).
@@ -177,22 +218,44 @@ def build_builtin_server(
     # looked up by the card to pick a colour -- which coupled a question to a feature that has
     # since been removed, and meant a question could be labelled `curious` for no reason anybody
     # could act on. Three occasions about the *question*, in the schema, nothing to invent.
+    #
+    # `questions` is a list since ADR 26, and the description used to say the opposite -- "ask
+    # one question rather than a list". What changed is that every question was a suspended
+    # turn: three things she needed to know were three round trips, each re-sending the whole
+    # conversation. One card with three fields costs one. What did not change is why the list is
+    # short and why it is only for questions that stand apart: an answer that decides whether
+    # the next question makes sense has to arrive before that question is asked. `kind` stays
+    # one per call, so the card has one tone.
     @server.tool(
         name=ASK_TOOL,
         title="Ask the person a question",
         description=(
-            "Ask the person something and wait for their answer. This stops your turn: they "
-            "see your question, type a reply, and you continue with it. Use it when being "
-            "wrong would cost them real work -- a fact only they have, two readings of the "
-            "request that lead somewhere genuinely different, or something hard to undo. Do "
-            "not use it to be reassured, to ask what you could look up, or to check in; and "
-            "ask one question rather than a list. If you can sensibly choose and say what you "
-            "chose, do that instead. `kind` says what sort of question it is: `unsure` when "
-            "you need a fact only they have, `blocked` when you cannot go on until they "
-            "answer, `choice` when you have two sensible readings and they should pick."
+            "Ask the person what you need to continue, and wait for their answer. This stops "
+            "your turn: they see your questions, reply, and you continue with what they said. "
+            "Use it when being wrong would cost them real work -- a fact only they have, two "
+            "readings of the request that lead somewhere genuinely different, or something "
+            "hard to undo. Do not use it to be reassured, to ask what you could look up, or to "
+            "check in. If you can sensibly choose and say what you chose, do that instead. Put "
+            "every question you need into one call, and do not call this twice in a row; but "
+            "bundle only questions that are independent -- if one answer changes whether the "
+            "next question makes sense, ask the first one alone. Give a question `options` "
+            "when the answer is a pick between a few short choices; they can still answer in "
+            "their own words. `kind` says what sort of question it is: `unsure` when you need "
+            "a fact only they have, `blocked` when you cannot go on until they answer, "
+            "`choice` when you have two sensible readings and they should pick."
         ),
     )
-    async def ask(question: str, kind: AskKind = "unsure") -> str:
+    async def ask(
+        questions: Annotated[
+            list[AskQuestion],
+            Field(
+                min_length=1,
+                max_length=ASK_MAX_QUESTIONS,
+                json_schema_extra={"items": _ASK_QUESTION_SCHEMA},
+            ),
+        ],
+        kind: AskKind = "unsure",
+    ) -> str:
         # Reached only when this server is driven directly -- over the transport v0.3 exposes,
         # or by a test. Inside a turn the question never gets here. Saying so plainly beats
         # returning something that looks like an answer nobody gave.

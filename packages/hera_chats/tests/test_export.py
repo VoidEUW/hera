@@ -14,6 +14,7 @@ from hera_chats import (
     Message,
     PermissionDecided,
     PermissionRequired,
+    Question,
     SkillSelected,
     ToolResultEvent,
     TurnClosed,
@@ -178,13 +179,39 @@ class TestAQuestion:
             role="assistant",
             events=[
                 AnswerRequired(
-                    call_id="c1", tool="hera__ask", question="Which one?", kind="choice"
+                    call_id="c1",
+                    tool="hera__ask",
+                    questions=(Question(text="Which one?"),),
+                    kind="choice",
                 ),
-                AnswerGiven(call_id="c1", text="The second."),
+                AnswerGiven(call_id="c1", answers=("The second.",)),
             ],
         )
         text = for_export(chat, [assistant])
         assert "> asked: Which one? — replied: The second." in text
+
+    def test_several_asked_in_one_call_are_each_answered(self, owner_id: UUID) -> None:
+        """ADR 26: one call, one exchange per question."""
+        chat = _chat(owner_id)
+        assistant = _message(
+            owner_id,
+            chat.id,
+            role="assistant",
+            events=[
+                AnswerRequired(
+                    call_id="c1",
+                    tool="hera__ask",
+                    questions=(
+                        Question(text="Which deck?", options=("2024", "2025")),
+                        Question(text="Keep the notes?"),
+                    ),
+                ),
+                AnswerGiven(call_id="c1", answers=("2024", "Yes.")),
+            ],
+        )
+        text = for_export(chat, [assistant])
+        assert "> asked: Which deck? — replied: 2024" in text
+        assert "> asked: Keep the notes? — replied: Yes." in text
 
     def test_asked_and_still_waiting(self, owner_id: UUID) -> None:
         chat = _chat(owner_id)
@@ -192,7 +219,11 @@ class TestAQuestion:
             owner_id,
             chat.id,
             role="assistant",
-            events=[AnswerRequired(call_id="c1", tool="hera__ask", question="Which one?")],
+            events=[
+                AnswerRequired(
+                    call_id="c1", tool="hera__ask", questions=(Question(text="Which one?"),)
+                )
+            ],
         )
         text = for_export(chat, [assistant])
         assert "> asked: Which one? — awaiting a reply" in text

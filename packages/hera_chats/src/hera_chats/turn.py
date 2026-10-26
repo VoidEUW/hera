@@ -29,12 +29,14 @@ import time
 from collections import Counter
 from collections.abc import AsyncGenerator, AsyncIterator, Mapping, Sequence
 from dataclasses import dataclass, field
+from typing import Any
 
 from hera_chats.events import (
     AnswerRequired,
     ChatEvent,
     CloseReason,
     PermissionRequired,
+    Question,
     SkillSelected,
     ToolResultEvent,
     TurnClosed,
@@ -128,8 +130,8 @@ class TurnContext:
     """Call ids a person has just refused. Refused calls still get a result — the model is
     told it was not allowed, which is what lets it try something else instead of hanging."""
 
-    answers: Mapping[str, str] = field(default_factory=dict)
-    """Replies to questions she asked, by call id.
+    answers: Mapping[str, Sequence[str]] = field(default_factory=dict)
+    """Replies to questions she asked, by call id — one per question the call held, in order.
 
     The other half of :attr:`confirmed`. A confirmed call is *run* and its result comes from a
     tool; an answered one is not run at all and its result is what the person typed. Both
@@ -324,7 +326,7 @@ class Turn:
                         AnswerRequired(
                             call_id=call.id,
                             tool=call.name,
-                            question=_text_argument(call, "question"),
+                            questions=_questions(call),
                             kind=_text_argument(call, "kind"),
                         )
                     )
@@ -614,6 +616,13 @@ class Turn:
         wanted = set(self._settings.asking_tools)
         return [call for call in calls if call.name in wanted and call.id not in answered]
 
+    def _questions_of(self, call_id: str) -> tuple[Question, ...]:
+        """What a call being answered asked, read off the card it was recorded as."""
+        for event in self.context.resume:
+            if isinstance(event, AnswerRequired) and event.call_id == call_id:
+                return event.questions
+        return ()
+
     async def _answer(self, calls: Sequence[ToolCallReady]) -> AsyncIterator[ChatEvent]:
         """Run a batch of calls in parallel and record what came back.
 
@@ -670,7 +679,8 @@ class Turn:
                 yield self._record(_looping(call, looping[call.id]))
                 continue
             if call.id in replied:
-                yield self._record(_answered(call, replied[call.id]))
+                asked = self._questions_of(call.id)
+                yield self._record(_answered(call, replied[call.id], asked))
                 continue
             result = by_id.get(call.id)
             if result is None:
@@ -966,22 +976,71 @@ def _text_argument(call: ToolCallReady, name: str) -> str:
     return value.strip() if isinstance(value, str) else ""
 
 
-def _answered(call: ToolCallReady, text: str) -> ToolResultEvent:
+def _questions(call: ToolCallReady) -> tuple[Question, ...]:
+    """The questions off an asking call, as tolerant as :func:`_text_argument` and for its reason.
+
+    Nothing validates these: the call is never dispatched, so the schema ``hera_mcp`` publishes
+    is a request the model may not have honoured. A bare string in the list is a question with
+    no choices; ``options`` with fewer than two left after blanks are dropped is no choice at all.
+    A call in the shape the tool had before it took a list — one ``question`` — is still one
+    question, because a model that read an older catalogue in its history may write it that way.
+    Nothing is capped here: how many is the schema's business, and this package may not learn it.
+    """
+    listed = call.arguments.get("questions")
+    found: list[Question] = []
+    if isinstance(listed, list):
+        for item in listed:
+            if isinstance(item, str) and item.strip():
+                found.append(Question(text=item.strip()))
+            elif isinstance(item, dict) and isinstance(item.get("question"), str):
+                found.append(Question(text=item["question"].strip(), options=_options(item)))
+    if found:
+        return tuple(found)
+    # One empty question rather than none: a card with nothing on it says so, which reads as
+    # what happened, where a card with no questions at all reads as a bug.
+    return (Question(text=_text_argument(call, "question")),)
+
+
+def _options(item: dict[str, Any]) -> tuple[str, ...]:
+    offered = item.get("options")
+    if not isinstance(offered, list):
+        return ()
+    options = tuple(o.strip() for o in offered if isinstance(o, str) and o.strip())
+    return options if len(options) >= 2 else ()
+
+
+_NO_REPLY = "they replied with nothing — take it as no answer and carry on"
+
+
+def _answered(
+    call: ToolCallReady, replies: Sequence[str], questions: Sequence[Question]
+) -> ToolResultEvent:
     """A person's reply, shaped as the result of the call that asked for it.
 
     ``ok=True``: they answered, and that is a success even when the answer is *no* or *I do not
     know*. Failing the call for an unwelcome answer would tell the model its question was
     broken rather than that it now has one.
+
+    One question is answered by its reply alone, as it always was. Several are numbered and each
+    reply is put beside its question, because a model reading three bare lines has to line them
+    up with its own call by position, and that is exactly the bookkeeping it gets wrong.
     """
-    said = text.strip()
-    return ToolResultEvent(
-        call_id=call.id,
-        tool=call.name,
-        ok=True,
-        # Attributed, because it lands in the same slot a tool's output would and the model
-        # should not have to infer which of the two it is reading.
-        text=said or "they replied with nothing — take it as no answer and carry on",
-    )
+    said = [reply.strip() for reply in replies]
+    # Attributed, because it lands in the same slot a tool's output would and the model should
+    # not have to infer which of the two it is reading.
+    if not any(said):
+        text = _NO_REPLY
+    elif len(said) == 1:
+        text = said[0]
+    else:
+        asked = [question.text for question in questions]
+        lines = []
+        for number, reply in enumerate(said, start=1):
+            question = asked[number - 1] if number <= len(asked) else ""
+            lead = f"{number}. {question} → " if question else f"{number}. "
+            lines.append(lead + (reply or "no answer"))
+        text = "\n".join(lines)
+    return ToolResultEvent(call_id=call.id, tool=call.name, ok=True, text=text)
 
 
 def _refused(call: ToolCallReady, *, configured: bool) -> ToolResultEvent:

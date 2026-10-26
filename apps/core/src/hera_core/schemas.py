@@ -23,7 +23,7 @@ import binascii
 import json
 import re
 from datetime import date, datetime
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 from uuid import UUID
 
 from hera_skillsets.models import ID_PATTERN
@@ -387,19 +387,20 @@ class PermissionAnswer(BaseModel):
 
 
 class QuestionAnswer(BaseModel):
-    """A person's reply to a question she asked.
+    """A person's reply to the questions one call asked.
 
-    One call, not a list, which is where this differs from :class:`PermissionAnswer`: several
-    permissions can be settled with one click because the answer is the same word, and two
-    questions cannot — each wants its own sentence. The turn only ever poses one at a time for
-    the same reason.
+    One call, not a list of calls, which is where this differs from :class:`PermissionAnswer`:
+    several permissions can be settled with one click because the answer is the same word, and
+    two cards cannot — each wants its own sentences. A call may hold several questions (ADR 26),
+    so the reply is one answer per question, in the order they were asked.
     """
 
     call_id: str = Field(min_length=1)
-    text: str = Field(max_length=8000)
-    """What they typed. May be empty: saying nothing is an answer, and she is told so rather
-    than being left waiting. Capped because it becomes a tool result inside the next prompt,
-    and an unbounded paste there is a context window spent without anybody choosing to."""
+    answers: list[Annotated[str, Field(max_length=8000)]] = Field(min_length=1)
+    """What they typed or picked, one per question. Each may be empty: saying nothing is an
+    answer, and she is told so rather than being left waiting. Capped because it becomes a tool
+    result inside the next prompt, and an unbounded paste there is a context window spent
+    without anybody choosing to."""
 
 
 class RegionOut(BaseModel):

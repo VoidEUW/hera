@@ -368,10 +368,11 @@ export function isAnswered(events: AnyEvent[], callId: string): boolean {
 	);
 }
 
-/** What a person typed into a question card, for a message rendered from the persisted list. */
-export function replyTo(events: AnyEvent[], callId: string): string {
+/** What a person answered on a question card, one per question, for a message rendered from
+ * the persisted list. Empty when they have not answered yet. */
+export function repliesTo(events: AnyEvent[], callId: string): string[] {
 	const given = events.find(
 		(event) => event.type === 'answer_given' && (event as { call_id: string }).call_id === callId
 	);
-	return given ? ((given as { text: string }).text ?? '') : '';
+	return given ? ((given as { answers: string[] }).answers ?? []) : [];
 }

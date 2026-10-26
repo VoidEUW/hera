@@ -34,7 +34,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
+from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, model_validator
 
 from hera_providers import TextDelta, ThinkingDelta, ToolCallReady, ToolCallStarted, Usage
 
@@ -144,6 +144,19 @@ class PermissionDecided(BaseModel):
     visibly different from **Allow once** afterwards, or nobody can tell whether it stuck."""
 
 
+class Question(BaseModel):
+    """One of the questions in an :class:`AnswerRequired`, and the choices offered for it.
+
+    ``options`` is empty for a question answered in words. When there are some, a person may
+    still answer in words — the choices are a shortcut, not a fence.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    text: str
+    options: tuple[str, ...] = ()
+
+
 class AnswerRequired(BaseModel):
     """She asked the person something. The turn stops here until they reply.
 
@@ -156,6 +169,9 @@ class AnswerRequired(BaseModel):
     The reply becomes the ``tool_result`` for ``call_id``, which is what lets her carry on
     reading it as an ordinary answer to an ordinary call. Nothing about the model's side of the
     loop knows a person was involved.
+
+    One call may carry several questions (ADR 26), and they are one card and one reply rather
+    than one event each, because they are one call and so have one result.
     """
 
     model_config = ConfigDict(frozen=True)
@@ -163,7 +179,7 @@ class AnswerRequired(BaseModel):
     type: Literal["answer_required"] = "answer_required"
     call_id: str
     tool: str
-    question: str
+    questions: tuple[Question, ...]
     kind: str = ""
     """What sort of question it is — *unsure*, *blocked* or *choice* (ADR 17).
 
@@ -176,6 +192,21 @@ class AnswerRequired(BaseModel):
     It used to be a word from the emotion vocabulary, which is why it is worth saying what it is
     not: a question is not a mood, and labelling one *curious* told nobody anything."""
 
+    @model_validator(mode="before")
+    @classmethod
+    def _one_question(cls, data: object) -> object:
+        """Read a turn persisted when a call held one question, as a call holding one.
+
+        The same argument :attr:`kind` stays a ``str`` for: an event list is a record of what
+        happened, so it keeps parsing after the tool that produced it has changed. Folded here,
+        once, so nothing downstream — the export, the API, the browser — learns there were
+        ever two shapes.
+        """
+        if isinstance(data, dict) and "questions" not in data and "question" in data:
+            rest = {key: value for key, value in data.items() if key != "question"}
+            return {**rest, "questions": [{"text": data["question"]}]}
+        return data
+
 
 class AnswerGiven(BaseModel):
     """A person replied to an :class:`AnswerRequired`.
@@ -183,13 +214,25 @@ class AnswerGiven(BaseModel):
     Recorded for the reason :class:`PermissionDecided` is: a reloaded turn has to show a
     settled card rather than a live reply field. Inferring it from whether a ``tool_result``
     turned up later would be a rule about event ordering living in the browser.
+
+    ``answers`` is one reply per question, in the order they were asked.
     """
 
     model_config = ConfigDict(frozen=True)
 
     type: Literal["answer_given"] = "answer_given"
     call_id: str
-    text: str
+    answers: tuple[str, ...]
+
+    @model_validator(mode="before")
+    @classmethod
+    def _one_answer(cls, data: object) -> object:
+        """A reply persisted when there was one question, as one answer — see
+        :meth:`AnswerRequired._one_question`."""
+        if isinstance(data, dict) and "answers" not in data and "text" in data:
+            rest = {key: value for key, value in data.items() if key != "text"}
+            return {**rest, "answers": [data["text"]]}
+        return data
 
 
 class TurnTiming(BaseModel):
