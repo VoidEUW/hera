@@ -51,16 +51,16 @@ const message = (over: Partial<Message>): Message => ({
 	...over
 });
 
-describe('usage', () => {
+describe('context', () => {
 	it('is null before anything has been said', () => {
 		const session = new ChatSession();
-		expect(session.usage).toBeNull();
+		expect(session.context).toBeNull();
 	});
 
 	it('reads the live turn once it has closed with usage', () => {
 		const session = new ChatSession();
 		session.draft = [usage(120)];
-		expect(session.usage?.total_tokens).toBe(120);
+		expect(session.context).toBe(120);
 	});
 
 	it('keeps the previous total while a new turn is streaming, rather than dropping to zero', () => {
@@ -72,7 +72,7 @@ describe('usage', () => {
 		// A turn in flight has events but no `turn_closed` yet — that only arrives at the very
 		// end of the stream.
 		session.draft = [{ type: 'text_delta', text: 'thinking…' }];
-		expect(session.usage?.total_tokens).toBe(340);
+		expect(session.context).toBe(340);
 	});
 
 	it('falls back to the last persisted message once the draft is cleared', () => {
@@ -81,13 +81,13 @@ describe('usage', () => {
 			message({ id: 'a', role: 'user', content: 'hi', sequence: 1 }),
 			message({ id: 'b', role: 'assistant', sequence: 2, events: [usage(340)] })
 		];
-		expect(session.usage?.total_tokens).toBe(340);
+		expect(session.context).toBe(340);
 	});
 
 	it('is null when the last message is the person’s own, not an answer', () => {
 		const session = new ChatSession();
 		session.messages = [message({ role: 'user', content: 'hi', events: [] })];
-		expect(session.usage).toBeNull();
+		expect(session.context).toBeNull();
 	});
 
 	it('is null when the endpoint never reported usage', () => {
@@ -99,7 +99,23 @@ describe('usage', () => {
 				]
 			})
 		];
-		expect(session.usage).toBeNull();
+		expect(session.context).toBeNull();
+	});
+
+	it('is the last round, not the turn’s total, when the turn recorded it', () => {
+		// Three tool rounds at about 10k each: 30k spent, 10k in the window.
+		const session = new ChatSession();
+		session.draft = [
+			{
+				type: 'turn_closed',
+				reason: 'completed',
+				usage: { prompt_tokens: 30_300, completion_tokens: 380, total_tokens: 30_680 },
+				context_tokens: 10_500,
+				iterations: 3,
+				error: ''
+			}
+		];
+		expect(session.context).toBe(10_500);
 	});
 });
 

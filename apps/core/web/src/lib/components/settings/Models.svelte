@@ -25,6 +25,7 @@
 	import { Placeholder } from '$lib/loading.svelte';
 	import { PROVIDER_KINDS } from '$lib/providers';
 	import ProviderCard from './ProviderCard.svelte';
+	import LoadFailed from './LoadFailed.svelte';
 	import Rows from './Rows.svelte';
 
 	interface Props {
@@ -37,6 +38,9 @@
 	let presets = $state<ModelPreset[]>([]);
 	let active = $state('');
 	let error = $state<string | null>(null);
+	/** Why the screen could not load, if it could not — kept as thrown, for `LoadFailed`. A
+	 * failed save is `error` instead, said beside the screen that is still there. */
+	let failed = $state<unknown>(null);
 	let adding = $state(false);
 
 	const blank = () => ({
@@ -81,8 +85,9 @@
 			presets = body.presets;
 			active = body.active;
 			error = null;
+			failed = null;
 		} catch (cause) {
-			error = say(cause);
+			failed = cause;
 		} finally {
 			settling.set(false);
 		}
@@ -114,6 +119,8 @@
 
 {#if waiting}
 	<Rows label={t.settings.loadingModels} />
+{:else if failed !== null}
+	<LoadFailed cause={failed} what={t.loadFailed.what.models} onretry={load} />
 {:else}
 	{#if error}
 		<p class="error">{error}</p>

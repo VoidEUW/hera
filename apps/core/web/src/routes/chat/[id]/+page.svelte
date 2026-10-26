@@ -288,7 +288,7 @@
 
 <Topbar title={session.chat?.title || t.empty.title}>
 	{#if contextLimit && session.chat}
-		<ContextMeter used={session.usage?.total_tokens ?? 0} limit={contextLimit} />
+		<ContextMeter used={session.context ?? 0} limit={contextLimit} />
 	{/if}
 	{#if published && session.chat}
 		<!-- The way back to something published nine turns ago: the count while the side view is

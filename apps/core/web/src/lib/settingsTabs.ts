@@ -10,6 +10,7 @@ export type Tab =
 	| 'account'
 	| 'general'
 	| 'hotkeys'
+	| 'usage'
 	| 'models'
 	| 'skills'
 	| 'servers'
@@ -33,7 +34,13 @@ export const GROUPS: Array<{ label: string; entries: TabEntry[] }> = [
 		entries: [
 			{ id: 'account', label: t.settings.account, blurb: t.settings.blurbAccount, icon: 'user' },
 			{ id: 'general', label: t.settings.general, blurb: t.settings.blurbGeneral, icon: 'sliders' },
-			{ id: 'hotkeys', label: t.settings.hotkeys, blurb: t.settings.blurbHotkeys, icon: 'keyboard' }
+			{
+				id: 'hotkeys',
+				label: t.settings.hotkeys,
+				blurb: t.settings.blurbHotkeys,
+				icon: 'keyboard'
+			},
+			{ id: 'usage', label: t.settings.usage, blurb: t.settings.blurbUsage, icon: 'chart' }
 		]
 	},
 	{

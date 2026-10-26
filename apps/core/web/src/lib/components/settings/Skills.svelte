@@ -24,6 +24,7 @@
 	import SkillEditor from './SkillEditor.svelte';
 	import { t } from '$lib/i18n';
 	import { Placeholder } from '$lib/loading.svelte';
+	import LoadFailed from './LoadFailed.svelte';
 	import Rows from './Rows.svelte';
 
 	interface Props {
@@ -38,6 +39,9 @@
 	/** `undefined` is closed, `null` is a new skill, a skill is that skill. */
 	let editing = $state<Skill | null | undefined>(undefined);
 	let error = $state<string | null>(null);
+	/** Why the screen could not load, if it could not — kept as thrown, for `LoadFailed`. A
+	 * failed save is `error` instead, said beside the screen that is still there. */
+	let failed = $state<unknown>(null);
 
 	const shown = $derived(
 		skills.filter(
@@ -71,8 +75,9 @@
 			broken = found.broken;
 			trustProblem = found.trust_problem;
 			error = null;
+			failed = null;
 		} catch (cause) {
-			error = cause instanceof Error ? cause.message : String(cause);
+			failed = cause;
 		} finally {
 			settling.set(false);
 		}
@@ -114,6 +119,8 @@
 
 {#if waiting}
 	<Rows label={t.settings.loadingSkills} />
+{:else if failed !== null}
+	<LoadFailed cause={failed} what={t.loadFailed.what.skills} onretry={load} />
 {:else}
 	{#if error}
 		<p class="problem caption">{error}</p>

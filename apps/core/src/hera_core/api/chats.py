@@ -43,6 +43,7 @@ from hera_chats import (
     ProjectRepository,
     Turn,
     TurnContext,
+    UsageRepository,
     build_history,
     events_of,
     for_export,
@@ -69,7 +70,16 @@ from hera_core.schemas import (
 )
 from hera_core.sse import HEADERS, MEDIA_TYPE, event_frame, frame
 from hera_profiles import Profile, ProfileRepository
-from hera_providers import ChatMessage, ChatRequest, FakeProvider, Role, TextDelta, ToolCallReady
+from hera_providers import (
+    ChatMessage,
+    ChatRequest,
+    FakeProvider,
+    Role,
+    TextDelta,
+    ToolCallReady,
+    TurnEnd,
+    Usage,
+)
 from hera_skillsets import SkillUsageRepository
 
 router = APIRouter(tags=["chats"])
@@ -460,15 +470,17 @@ def _stream(
             # because this block runs when the generator ended without the turn finishing.
             turn.close("cancelled")
             title = None
+            titling: Usage | None = None
             if completed and first_message and not chat.title and turn.cleaned_text.strip():
                 # A summarized title is the goal, but a chat that never gets one because the
                 # auxiliary call happened to fail is worse than one titled from the raw message
                 # -- that fallback is what this feature is replacing as the *common* case, not
                 # what it should leave behind as the failure case.
-                title = await _chat_title(container, turn.cleaned_text) or title_from(
-                    turn.cleaned_text
-                )
-            persisted = _record(container, owner_id, chat_id, message_id, turn, title=title)
+                named, titling = await _chat_title(container, turn.cleaned_text)
+                title = named or title_from(turn.cleaned_text)
+            persisted = _record(
+                container, owner_id, chat_id, message_id, turn, title=title, titling=titling
+            )
             if persisted is not None:
                 yield frame("done", persisted)
 
@@ -483,6 +495,7 @@ def _record(
     turn: Turn,
     *,
     title: str | None = None,
+    titling: Usage | None = None,
 ) -> dict[str, Any] | None:
     """Store the turn in its own short unit of work, and return the ``done`` payload.
 
@@ -500,6 +513,13 @@ def _record(
         if message is None:
             return None
         messages.record(message, turn.recorded, prompt_fingerprint=turn.prompt_fingerprint)
+        # Beside the message rather than read back out of it: the message goes when the chat
+        # does, and what the turn cost was spent all the same (ADR 25).
+        usage = UsageRepository(session)
+        usage.record(message, turn.recorded)
+        # The request that named the chat is not part of her answer, but it ran on the same
+        # endpoint and was paid for the same way.
+        usage.record_title(message, titling)
         if turn.skill_ids:
             SkillUsageRepository(session).record(owner_id, turn.skill_ids)
         chat = ChatRepository(session).get(chat_id)
@@ -511,13 +531,17 @@ def _record(
         return MessageOut.of(message).model_dump(mode="json")
 
 
-async def _chat_title(container: Container, text: str) -> str | None:
-    """Ask the configured model to summarize the incoming message as a short title."""
+async def _chat_title(container: Container, text: str) -> tuple[str | None, Usage | None]:
+    """Ask the configured model to summarize the incoming message as a short title.
+
+    Returns the title, or ``None`` when there is not a usable one, and what the request cost
+    when the endpoint said -- a request that failed part way may still have been paid for.
+    """
     provider = container.orchestrator.provider
     # FakeProvider scripts correspond to user-visible turns; consuming another scripted turn
     # here would change every API test's conversation. Real providers handle this auxiliary call.
     if isinstance(provider, FakeProvider):
-        return None
+        return None, None
     request = ChatRequest(
         model=container.orchestrator.settings.model,
         messages=[
@@ -545,24 +569,27 @@ async def _chat_title(container: Container, text: str) -> str | None:
         max_tokens=1000,
         extra=container.orchestrator.settings.extra,
     )
+    spent: Usage | None = None
     try:
         parts: list[str] = []
         async with asyncio.timeout(_TITLE_TIMEOUT_SECONDS):
             async for event in provider.stream(request):
                 if isinstance(event, TextDelta):
                     parts.append(event.text)
+                elif isinstance(event, TurnEnd):
+                    spent = event.usage
         generated = " ".join("".join(parts).strip().split()).strip(" \t\n\"'`#*-•")
         if not generated or generated.casefold() == title_from(text).casefold():
-            return None
-        return title_from(generated, limit=60)
+            return None, spent
+        return title_from(generated, limit=60), spent
     except asyncio.CancelledError:
-        return None
+        return None, spent
     except TimeoutError:
         logger.warning("Automatic chat title took longer than %ss", _TITLE_TIMEOUT_SECONDS)
-        return None
+        return None, spent
     except Exception:
         logger.exception("Could not generate an automatic chat title")
-        return None
+        return None, spent
 
 
 # -- assembling one turn ------------------------------------------------------------------

@@ -12,14 +12,22 @@ migration that quietly drops a table.
 
 from __future__ import annotations
 
-from hera_chats.models import Chat, Message, Project
+from hera_chats.models import Chat, Message, Project, TurnUsage
 from hera_profiles.models import Profile
 from hera_skillsets.models import SkillUsage
 from sqlmodel import SQLModel
 
 from hera_core.account import Account
 
-ALL_TABLES: tuple[type[SQLModel], ...] = (Profile, SkillUsage, Project, Chat, Message, Account)
+ALL_TABLES: tuple[type[SQLModel], ...] = (
+    Profile,
+    SkillUsage,
+    Project,
+    Chat,
+    Message,
+    TurnUsage,
+    Account,
+)
 """Every table, in dependency-free order. Cross-package references are bare UUIDs, so there is
 no ordering constraint to respect — which is exactly why that rule exists."""
 

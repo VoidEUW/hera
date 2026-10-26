@@ -104,6 +104,31 @@ export interface MemoryItem {
 	problems: string[];
 }
 
+/** Prompt and completion tokens, added up. */
+export interface Tokens {
+	prompt_tokens: number;
+	completion_tokens: number;
+}
+
+/** Settings → Usage (#111): a bar per day, oldest first and ending today, and three rolling
+ * totals. `timezone` is the zone the days were cut in. */
+export interface UsageReport {
+	days: Array<Tokens & { date: string }>;
+	totals: { day: UsageWindow; week: UsageWindow; month: UsageWindow };
+	timezone: string;
+}
+
+/** One rolling window. Each extra is `null` when nothing in it measured that: no turn
+ * reported its cache, none was timed. */
+export interface UsageWindow extends Tokens {
+	reasoning_tokens: number | null;
+	/** Nought to one, over the turns whose endpoint reported its cache. */
+	cache_rate: number | null;
+	/** Measured by Hera, including the network. */
+	tokens_per_second: number | null;
+	first_token_ms: number | null;
+}
+
 export interface MemoryBudget {
 	used: number;
 	/** Sent rather than known here: it is a deployment setting, and a bar drawn against a number
@@ -545,6 +570,10 @@ export const api = {
 	 * back on. */
 	memories: () => request<MemoryItem[]>('/memories'),
 	memoryBudget: () => request<MemoryBudget>('/memories/budget'),
+	/** What the turns cost, cut into days in `tz` — the browser's own zone, so "today" is the
+	 * reader's today. Left empty, the server uses the one set on General, then UTC. */
+	usage: (days = 30, tz = '') =>
+		request<UsageReport>(`/usage?${new URLSearchParams({ days: String(days), tz })}`),
 	/** Edit one, or switch it on or off. A field left out is left alone.
 	 *
 	 * One call for both because they are one act from the store's side and one row on screen —

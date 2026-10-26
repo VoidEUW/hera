@@ -212,7 +212,9 @@ export const t = {
 		 * `completion_tokens`, not the turn's total — the prompt side is mostly history carried
 		 * forward, not something this message produced (issue #51 rules dollars out entirely — a
 		 * deployment's pricing isn't Hera's to know either way). */
-		tokens: (n: number) => `${n.toLocaleString()} tokens`
+		tokens: (n: number) => `${n.toLocaleString()} tokens`,
+		/** The tooltip on that corner: how long before anything came back. */
+		firstToken: (after: string) => `First token after ${after}`
 	},
 
 	memory: {
@@ -255,6 +257,32 @@ export const t = {
 		cancel: 'Cancel',
 		export: 'Export MEMORY.md',
 		none: 'Nothing yet. She writes these as she learns things worth keeping, and you can drop a markdown file into your memories directory yourself.'
+	},
+
+	/** Settings → Usage (#111). */
+	usage: {
+		loading: 'Loading usage…',
+		chart: (days: number) => `Tokens per day, the last ${days} days`,
+		prompt: 'Read',
+		completion: 'Written',
+		/** The legend's longer names, for a person who wonders what "read" means here. */
+		promptLong: 'Prompt tokens — what she read: the conversation, her mind, the tools',
+		completionLong: 'Completion tokens — what she wrote back',
+		day: 'Last 24 hours',
+		week: 'Last 7 days',
+		month: 'Last 30 days',
+		tokens: (n: number) => `${n.toLocaleString()} tokens`,
+		split: (prompt: number, completion: number) =>
+			`${prompt.toLocaleString()} read · ${completion.toLocaleString()} written`,
+		/** Under the split, when the endpoint said how much of the writing was thinking. */
+		reasoning: (n: number) => `of which ${n.toLocaleString()} thinking`,
+		cache: (share: string) => `${share} of what she read was cached`,
+		pace: (speed: string, wait: string) => `${speed} · first token after ${wait}`,
+		readout: (date: string, prompt: number, completion: number) =>
+			`${date}: ${prompt.toLocaleString()} read, ${completion.toLocaleString()} written`,
+		none: 'Nothing yet. Each answer she gives adds its tokens here, on the day it was given.',
+		note: 'Token counts and the cache are what the model endpoint reports; a server that reports nothing counts as nothing, and Hera does not estimate. Speed and the wait for the first token are measured by Hera, so they include the network. The request that names a new chat is counted too.',
+		zone: (zone: string) => `Days in ${zone}`
 	},
 
 	skills: {
@@ -444,6 +472,7 @@ export const t = {
 		account: 'Account',
 		general: 'General',
 		hotkeys: 'Hotkeys',
+		usage: 'Usage',
 		models: 'Models',
 		mind: 'Mind',
 		memory: 'Memory',
@@ -458,6 +487,7 @@ export const t = {
 		blurbAccount: 'Who you are to Hera: a name, an email and a picture.',
 		blurbGeneral: 'This browser and this machine: appearance, language, time zone, notifications.',
 		blurbHotkeys: 'The keys that do what a button on screen already does.',
+		blurbUsage: 'How many tokens her answers took, day by day.',
 		blurbMind: 'The text that shapes how she thinks and speaks, one region at a time.',
 		blurbMemory: 'What she knows about you, and how much room it takes.',
 		blurbModels: 'Where she runs. Any OpenAI-compatible endpoint.',
@@ -861,6 +891,33 @@ export const t = {
 		signInPasskey: 'Sign in with a passkey',
 		registerPasskey: 'Register with a passkey'
 	},
+	/** A pane that could not load (`$lib/errors`). `what` is lower case: "usage". */
+	loadFailed: {
+		serverTitle: (what: string) => `Could not load ${what}`,
+		serverBody:
+			'Hera’s server ran into an error while reading this. Trying again may help; if it keeps happening, the server’s log says why — the line below is what it answered.',
+		refused: 'Refused',
+		refusedBody:
+			'The server refused the request. The line below is what it said, and usually what to change.',
+		offlineTitle: (what: string) => `Could not reach the server for ${what}`,
+		offlineBody: 'Nothing answered. Is hera serve still running?',
+		notFound: 'Not found',
+		notFoundTitle: (what: string) => `The server does not know where ${what} is`,
+		notFoundBody:
+			'The interface may be newer than the server it is talking to. Restart hera serve and try again.',
+		detail: 'What the server said',
+		/** What each settings screen loads, for the title: "Could not load usage". */
+		what: {
+			usage: 'usage',
+			memory: 'her memories',
+			mind: 'her mind regions',
+			skills: 'skills',
+			servers: 'servers',
+			permissions: 'permission rules',
+			models: 'models'
+		}
+	},
+
 	errorPage: {
 		offline: 'Offline',
 		server: 'Server error',

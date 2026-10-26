@@ -13,6 +13,7 @@ Python.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
@@ -27,13 +28,101 @@ event list with the same shape a finished one has.
 
 
 class Usage(BaseModel):
-    """Token counts, when the server reports them. Many local servers do not."""
+    """Token counts, when the server reports them. Many local servers do not.
+
+    The three counts every OpenAI-compatible server agrees on, and the extras some of them add,
+    read out of whichever shape that server uses by :meth:`from_wire`. An extra is ``None`` when
+    the server did not say — never ``0``, because "no prompt tokens came from the cache" and
+    "this server does not tell you" are different facts, and a cache rate averaged over the
+    second would be a lie about the first.
+    """
 
     model_config = ConfigDict(frozen=True)
 
     prompt_tokens: int = 0
     completion_tokens: int = 0
     total_tokens: int = 0
+
+    cached_tokens: int | None = None
+    """Prompt tokens the server did not have to process again, because it had them cached."""
+
+    reasoning_tokens: int | None = None
+    """Completion tokens spent thinking. Already inside ``completion_tokens``."""
+
+    server_prompt_ms: float | None = None
+    """How long the server says it took to read the prompt, without the network."""
+
+    server_generation_ms: float | None = None
+    """How long the server says it took to write the completion, without the network."""
+
+    @classmethod
+    def from_wire(
+        cls, usage: Mapping[str, Any] | None, timings: Mapping[str, Any] | None = None
+    ) -> Usage | None:
+        """Normalise a server's ``usage`` object, and llama.cpp's ``timings`` beside it.
+
+        Where each extra lives, by who sends it:
+
+        - cached prompt tokens: ``prompt_tokens_details.cached_tokens`` (OpenAI, OpenRouter,
+          vLLM, Anthropic's compatible layer) · ``prompt_cache_hit_tokens`` (DeepSeek) ·
+          ``cached_tokens`` at the top (Moonshot) · ``timings.cache_n`` (llama.cpp);
+        - reasoning tokens: ``completion_tokens_details.reasoning_tokens``;
+        - server timings: ``timings.prompt_ms`` and ``timings.predicted_ms`` (llama.cpp).
+
+        ``None`` when neither object carries anything.
+        """
+        usage = usage if isinstance(usage, Mapping) else {}
+        timings = timings if isinstance(timings, Mapping) else {}
+        if not usage and not timings:
+            return None
+        prompt = _count(usage.get("prompt_tokens"))
+        completion = _count(usage.get("completion_tokens"))
+        if not usage:
+            # llama.cpp's timings alone still say how much was read and written.
+            prompt = _count(timings.get("prompt_n")) + _count(timings.get("cache_n"))
+            completion = _count(timings.get("predicted_n"))
+        total = _count(usage.get("total_tokens")) or prompt + completion
+        prompt_details = _mapping(usage.get("prompt_tokens_details"))
+        completion_details = _mapping(usage.get("completion_tokens_details"))
+        return cls(
+            prompt_tokens=prompt,
+            completion_tokens=completion,
+            total_tokens=total,
+            cached_tokens=_first_count(
+                prompt_details.get("cached_tokens"),
+                usage.get("prompt_cache_hit_tokens"),
+                usage.get("cached_tokens"),
+                timings.get("cache_n"),
+            ),
+            reasoning_tokens=_first_count(completion_details.get("reasoning_tokens")),
+            server_prompt_ms=_duration(timings.get("prompt_ms")),
+            server_generation_ms=_duration(timings.get("predicted_ms")),
+        )
+
+
+def _mapping(value: object) -> Mapping[str, Any]:
+    return value if isinstance(value, Mapping) else {}
+
+
+def _count(value: object) -> int:
+    """A token count, or 0 for anything that is not one. ``bool`` is an ``int`` and is refused."""
+    if isinstance(value, bool) or not isinstance(value, int | float) or value < 0:
+        return 0
+    return int(value)
+
+
+def _first_count(*values: object) -> int | None:
+    """The first of ``values`` that is a count at all, or ``None`` if none is."""
+    for value in values:
+        if not isinstance(value, bool) and isinstance(value, int | float) and value >= 0:
+            return int(value)
+    return None
+
+
+def _duration(value: object) -> float | None:
+    if isinstance(value, bool) or not isinstance(value, int | float) or value < 0:
+        return None
+    return float(value)
 
 
 class TextDelta(BaseModel):

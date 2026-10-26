@@ -8,6 +8,10 @@ their v0.2 half is files, which needs embeddings.
 
 A **message** stores its whole event list. That is the record the interface re-renders from at
 ``done``, and it is why live view and reload cannot disagree.
+
+A **usage** row is what one closed turn cost, kept apart from the message it came from (ADR 25):
+a message is deleted with its chat or when a question is asked again, and the tokens it took were
+spent all the same.
 """
 
 from __future__ import annotations
@@ -181,3 +185,51 @@ class Message(Entity, table=True):
     prompt_fingerprint: str = ""
     """Which prompt produced this, from ``hera_prompts``. Two answers that disagree are much
     easier to explain when you can tell whether they came from the same prompt."""
+
+
+class TurnUsage(Entity, table=True):
+    """The tokens one closed turn took, as the endpoint reported them (#111, ADR 25).
+
+    A ledger, not a view over messages: it is written when a turn is recorded and nothing
+    deletes it. Deleting a chat or asking a question again removes the messages, and a usage
+    screen that shrank whenever that happened would be reporting what is *left*, not what was
+    spent. It holds counts and bare ids only, so keeping it keeps nothing anybody said.
+    """
+
+    __tablename__ = "chat_usage"
+
+    __table_args__ = (
+        # One row per `turn_closed` in a message: a turn that paused for a card and resumed
+        # carries one for each part, and recording the message again must not count either twice.
+        UniqueConstraint("message_id", "ordinal"),
+        Index(None, "owner_id", "at"),
+        Index(None, "created_at", "id"),
+    )
+
+    owner_id: UUID
+    chat_id: UUID
+    message_id: UUID
+
+    ordinal: int = 0
+    """Which ``turn_closed`` in the message this is, from zero. ``-1`` is the request that named
+    the chat, which belongs to the message's turn but is not one of its parts."""
+
+    source: str = "turn"
+    """``turn`` for her answer, ``title`` for the request that named the chat."""
+
+    at: datetime = Field(sa_type=_TIMESTAMP)
+    """When the turn closed — when the row was written, or for a backfilled row, when its
+    message was last written. What the screen buckets into days."""
+
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+
+    # What some servers report and others do not. `None` is "not reported" and is left out of
+    # every rate, rather than counted as nothing (`hera_providers.Usage`).
+    cached_tokens: int | None = None
+    reasoning_tokens: int | None = None
+
+    # Measured by Hera, on this side of the wire (`hera_chats.events.TurnTiming`).
+    first_token_ms: float | None = None
+    generating_ms: float | None = None
+    timed_completion_tokens: int | None = None

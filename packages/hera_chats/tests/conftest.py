@@ -16,7 +16,7 @@ from chat_support import StubTools, WriteSkill
 
 # Importing the models registers chat_* into SQLModel.metadata, which is what the `db` fixture
 # from hera_storage creates tables from.
-from hera_chats.models import Message, Project  # noqa: F401
+from hera_chats.models import Message, Project, TurnUsage  # noqa: F401
 from sqlmodel import Session
 
 from hera_chats import (

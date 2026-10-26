@@ -29,7 +29,7 @@ from uuid import UUID
 from hera_skillsets.models import ID_PATTERN
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from hera_chats import Chat, Message, Project
+from hera_chats import Chat, Message, Project, Totals, UsageSummary
 from hera_core.account import Account
 from hera_core.config import ProviderKind, validate_provider_name
 from hera_core.model_presets import PRESETS, ModelPreset
@@ -1076,3 +1076,90 @@ class AvatarIn(BaseModel):
     """A picture as a data URL, the way an attachment arrives."""
 
     data_url: str = Field(min_length=1)
+
+
+class TokensOut(BaseModel):
+    """Prompt and completion tokens, added up."""
+
+    model_config = ConfigDict(frozen=True)
+
+    prompt_tokens: int
+    completion_tokens: int
+
+
+class UsageDayOut(TokensOut):
+    """One local day's bar."""
+
+    date: date
+
+
+class WindowOut(TokensOut):
+    """One rolling window: its tokens, and what is known about them.
+
+    Each extra is ``None`` when nothing in the window measured it: no row reported its cache, no
+    turn was timed. The screen leaves such a line out rather than drawing a nought.
+    """
+
+    reasoning_tokens: int | None = None
+    cache_rate: float | None = None
+    """Share of the prompt the endpoint had cached, nought to one, over the turns that said."""
+
+    tokens_per_second: float | None = None
+    """Completion tokens over the time spent writing them, as Hera measured it."""
+
+    first_token_ms: float | None = None
+    """How long a turn took, on average, before anything came back."""
+
+    @classmethod
+    def of_totals(cls, totals: Totals) -> WindowOut:
+        return cls(
+            prompt_tokens=totals.tokens.prompt_tokens,
+            completion_tokens=totals.tokens.completion_tokens,
+            reasoning_tokens=totals.reasoning_tokens,
+            cache_rate=totals.cache_rate,
+            tokens_per_second=totals.tokens_per_second,
+            first_token_ms=totals.first_token_ms,
+        )
+
+
+class UsageTotalsOut(BaseModel):
+    """The three rolling windows under the chart."""
+
+    model_config = ConfigDict(frozen=True)
+
+    day: WindowOut
+    week: WindowOut
+    month: WindowOut
+
+
+class UsageOut(BaseModel):
+    """Settings → Usage (#111): a bar per day, oldest first and ending today, and the totals.
+
+    ``timezone`` is the zone the days were cut in, so the screen can say which one it was
+    when it is not the browser's own.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    days: list[UsageDayOut]
+    totals: UsageTotalsOut
+    timezone: str
+
+    @classmethod
+    def of(cls, summary: UsageSummary, timezone: str) -> UsageOut:
+        return cls(
+            days=[
+                UsageDayOut(
+                    date=day.date,
+                    prompt_tokens=day.tokens.prompt_tokens,
+                    completion_tokens=day.tokens.completion_tokens,
+                )
+                for day in summary.days
+            ],
+            totals=UsageTotalsOut(
+                day=WindowOut.of_totals(summary.day),
+                week=WindowOut.of_totals(summary.week),
+                month=WindowOut.of_totals(summary.month),
+            ),
+            timezone=timezone,
+        )

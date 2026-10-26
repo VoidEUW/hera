@@ -20,6 +20,7 @@
 	import { t } from '$lib/i18n';
 	import { Placeholder } from '$lib/loading.svelte';
 	import { describePattern } from '$lib/permissions';
+	import LoadFailed from './LoadFailed.svelte';
 	import Rows from './Rows.svelte';
 	import RuleEditor from './RuleEditor.svelte';
 
@@ -32,6 +33,9 @@
 	let rules = $state<Rule[]>([]);
 	let fallback = $state<Decision>('ask');
 	let error = $state<string | null>(null);
+	/** Why the screen could not load, if it could not — kept as thrown, for `LoadFailed`. A
+	 * failed save is `error` instead, said beside the screen that is still there. */
+	let failed = $state<unknown>(null);
 	/** The editor: a rule being changed, `'new'`, or closed. */
 	let editing = $state<Rule | 'new' | null>(null);
 	let deleting = $state<Rule | null>(null);
@@ -77,6 +81,7 @@
 	async function load() {
 		const token = ++generation;
 		error = null;
+		failed = null;
 		settling.set(true);
 		try {
 			const found = await api.permissions();
@@ -85,7 +90,7 @@
 			fallback = found.fallback;
 		} catch (cause) {
 			if (token !== generation) return;
-			error = cause instanceof Error ? cause.message : String(cause);
+			failed = cause;
 		} finally {
 			if (token === generation) settling.set(false);
 		}
@@ -129,6 +134,8 @@
 
 {#if settling.shown}
 	<Rows label={t.settings.loading} />
+{:else if failed !== null}
+	<LoadFailed cause={failed} what={t.loadFailed.what.permissions} onretry={load} />
 {:else}
 	<section class="fallback">
 		<div class="what">

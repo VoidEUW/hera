@@ -14,6 +14,7 @@
 	import { t } from '$lib/i18n';
 	import { Placeholder } from '$lib/loading.svelte';
 	import { workspace } from '$lib/stores/workspace.svelte';
+	import LoadFailed from './LoadFailed.svelte';
 	import Rows from './Rows.svelte';
 	import ServerBox from './ServerBox.svelte';
 	import ServerEditor from './ServerEditor.svelte';
@@ -26,6 +27,9 @@
 
 	let servers = $state<Server[]>([]);
 	let error = $state<string | null>(null);
+	/** Why the screen could not load, if it could not — kept as thrown, for `LoadFailed`. A
+	 * failed save is `error` instead, said beside the screen that is still there. */
+	let failed = $state<unknown>(null);
 	/** The editor: a server being changed, `'new'`, or closed. */
 	let editing = $state<Server | 'new' | null>(null);
 	let deleting = $state<Server | null>(null);
@@ -44,6 +48,7 @@
 	async function load() {
 		const token = ++generation;
 		error = null;
+		failed = null;
 		settling.set(true);
 		try {
 			const found = await api.servers();
@@ -51,7 +56,7 @@
 			servers = found;
 		} catch (cause) {
 			if (token !== generation) return;
-			error = cause instanceof Error ? cause.message : String(cause);
+			failed = cause;
 		} finally {
 			if (token === generation) settling.set(false);
 		}
@@ -87,6 +92,8 @@
 
 {#if settling.shown}
 	<Rows label={t.settings.loading} />
+{:else if failed !== null}
+	<LoadFailed cause={failed} what={t.loadFailed.what.servers} onretry={load} />
 {:else}
 	<div class="bar">
 		<Button variant="highlighted" size="sm" icon="plus" onclick={() => (editing = 'new')}>

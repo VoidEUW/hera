@@ -15,6 +15,7 @@
 	import { t } from '$lib/i18n';
 	import { Placeholder } from '$lib/loading.svelte';
 	import { tooltip } from '$lib/tooltip';
+	import LoadFailed from './LoadFailed.svelte';
 	import Rows from './Rows.svelte';
 
 	interface Props {
@@ -27,6 +28,9 @@
 	let drafts = $state<Record<string, string>>({});
 	let savedRegion = $state<string | null>(null);
 	let error = $state<string | null>(null);
+	/** Why the screen could not load, if it could not — kept as thrown, for `LoadFailed`. A
+	 * failed save is `error` instead, said beside the screen that is still there. */
+	let failed = $state<unknown>(null);
 
 	const visible = $derived(
 		regions.filter(
@@ -49,6 +53,7 @@
 	async function load() {
 		const token = ++generation;
 		error = null;
+		failed = null;
 		settling.set(true);
 		try {
 			const found = await api.regions();
@@ -57,7 +62,7 @@
 			drafts = Object.fromEntries(found.map((region) => [region.id, region.text]));
 		} catch (cause) {
 			if (token !== generation) return;
-			error = cause instanceof Error ? cause.message : String(cause);
+			failed = cause;
 		} finally {
 			if (token === generation) settling.set(false);
 		}
@@ -81,6 +86,8 @@
 
 {#if settling.shown}
 	<Rows label={t.settings.loading} />
+{:else if failed !== null}
+	<LoadFailed cause={failed} what={t.loadFailed.what.mind} onretry={load} />
 {:else}
 	{#each visible as region (region.id)}
 		{@const tier = region.tier === 'owner_fixed' ? t.settings.ownerFixed : t.settings.evolvable}

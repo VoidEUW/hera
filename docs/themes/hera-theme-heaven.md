@@ -684,6 +684,22 @@ How full the conversation's context window is, in the top bar's toolbar. A 16px 
 - Parts and states: share 0–85% (laurel); past 85% (danger); absent when the model declares no context length
 - Motion: `bar.indeterminate` (the arc's fill moves on the loading bar's curve)
 
+#### Bar chart · `hera/bar-chart`
+
+Stacked bars, one per slot — Settings → Usage's thirty days (#111). Inline SVG stretched to the width it is given, so nothing inside it is text: the readout above the plot, the legend beside it, and the first and last labels under it are ordinary type. One bar is always the one being read — the newest until a person points or moves with the arrow keys — and it sits on a `--hover` column; its numbers are the readout, never a tooltip over the neighbouring bars. A legend entry's longer name is its tooltip.
+
+- Tokens: `--text-faint` (the quiet series), `--laurel` (the live one), `--hover`, `--line`, `--text`, `--text-muted`, `--radius-sm`, `--focus-width`
+- Parts and states: readout; legend; plot (focus ring on keyboard focus); ends; empty data draws no bars
+- Motion: none — the chart is read, not watched
+
+#### Error page · panel (extends `hera/error-page`)
+
+The same card for one pane of a larger screen, such as a settings screen that could not load. It has no ground of its own and no full height, a 32px mark, a 21px title and a 13px body. The kind's word over the title carries the status when the caller knows it (`500 · Server error`), because the number is what a person searches for. The server's own words sit behind the disclosure, and **Try again** is the one action.
+
+- Tokens: as `hera/error-page`
+- Parts and states: as `hera/error-page`, at pane size
+- Motion: `error.enter`
+
 #### Attachment chip · `hera/attachment`
 
 A file going with a message, and the same file in the sent bubble. The builder's `.att`, as its own component: icon or thumbnail, name, size or "uploading" with a 2px laurel bar on the bottom edge, and a small close button while it can still be taken off.

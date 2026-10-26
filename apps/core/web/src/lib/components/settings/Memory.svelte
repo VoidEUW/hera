@@ -33,6 +33,7 @@
 	import Textarea from '$lib/components/ui/Textarea.svelte';
 	import { t } from '$lib/i18n';
 	import { Placeholder } from '$lib/loading.svelte';
+	import LoadFailed from './LoadFailed.svelte';
 	import Rows from './Rows.svelte';
 
 	interface Props {
@@ -44,6 +45,9 @@
 	let memories = $state<MemoryItem[]>([]);
 	let budget = $state<MemoryBudget | null>(null);
 	let error = $state('');
+	/** Why the screen could not load, if it could not — kept as thrown, for `LoadFailed`. A
+	 * failed save is `error` instead, said beside the screen that is still there. */
+	let failed = $state<unknown>(null);
 	let confirming = $state('');
 
 	/** Which memory is open for editing, and the draft of it. One at a time, and separate from
@@ -85,8 +89,9 @@
 		try {
 			[memories, budget] = await Promise.all([api.memories(), api.memoryBudget()]);
 			error = '';
+			failed = null;
 		} catch (cause) {
-			error = say(cause);
+			failed = cause;
 		} finally {
 			settling.set(false);
 		}
@@ -152,6 +157,8 @@
 
 {#if waiting}
 	<Rows label={t.settings.loadingMemory} />
+{:else if failed !== null}
+	<LoadFailed cause={failed} what={t.loadFailed.what.memory} onretry={load} />
 {:else}
 	<section class="memory">
 		<!-- The same mark the gutter draws beside `remember`, so the row in a conversation and the

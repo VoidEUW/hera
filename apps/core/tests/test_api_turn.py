@@ -27,6 +27,7 @@ from hera_providers import (
     ProviderUnavailable,
     TextDelta,
     TurnEnd,
+    Usage,
     text_turn,
     thinking_turn,
     tool_call,
@@ -138,6 +139,34 @@ class TestASimpleTurn:
             detail = (await client.get(f"{API}/chats/{chat_id}")).json()
 
         assert detail["chat"]["title"] == "Kerberos Authentication"
+
+    async def test_the_title_request_is_counted_as_usage(self, make_services: Any) -> None:
+        """It runs on the same endpoint and is paid for the same way (#111). Counted as its own
+        row, so her answer's numbers stay hers."""
+
+        class ProviderWithTitle:
+            def __init__(self) -> None:
+                self.chat = FakeProvider(
+                    [text_turn("Hello.", usage=Usage(prompt_tokens=500, completion_tokens=5))]
+                )
+
+            async def stream(self, request: Any) -> AsyncIterator[Any]:
+                if "Summarize the user's" in str(request.messages[0].content):
+                    yield TextDelta(text="Kerberos Authentication")
+                    yield TurnEnd(usage=Usage(prompt_tokens=80, completion_tokens=300))
+                    return
+                async for event in self.chat.stream(request):
+                    yield event
+
+            async def aclose(self) -> None:
+                await self.chat.aclose()
+
+        services = make_services(ProviderWithTitle())
+        async with _client(services) as client:
+            await talk(client, await open_chat(client), "Explain Kerberos")
+            day = (await client.get(f"{API}/usage", params={"tz": "UTC"})).json()["totals"]["day"]
+
+        assert (day["prompt_tokens"], day["completion_tokens"]) == (580, 305)
 
     async def test_a_failed_title_request_falls_back_to_the_raw_message(
         self, make_services: Any

@@ -20,6 +20,7 @@ from hera_core.api import (
     providers,
     servers,
     system,
+    usage,
 )
 
 router = APIRouter()
@@ -33,5 +34,6 @@ router.include_router(providers.router)
 router.include_router(servers.router)
 router.include_router(profiles.router)
 router.include_router(system.router)
+router.include_router(usage.router)
 
 __all__ = ["router"]

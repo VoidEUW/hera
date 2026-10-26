@@ -60,6 +60,7 @@ from hera_providers import (
     TextDelta,
     ThinkingDelta,
     TurnEnd,
+    Usage,
     text_turn,
     tool_call,
 )
@@ -99,6 +100,9 @@ SCRIPT: Sequence[Turn] = [
             "Kerberos hands you a **ticket-granting ticket** once, ",
             "and derives a service ticket from it for each service you touch.\n\n",
             "The TGT is what expires; the service tickets are downstream of it.",
+            usage=Usage(
+                prompt_tokens=6120, completion_tokens=180, total_tokens=6300, cached_tokens=0
+            ),
         ),
     ],
     [
@@ -111,6 +115,9 @@ SCRIPT: Sequence[Turn] = [
     text_turn(
         "Short version: one TGT buys every service ticket, ",
         "and the expiry you configure lives on the TGT.",
+        usage=Usage(
+            prompt_tokens=14800, completion_tokens=240, total_tokens=15040, cached_tokens=6100
+        ),
     ),
     # A turn that never starts.
     REFUSAL,
@@ -773,6 +780,95 @@ def act_servers(page: Page, base: str, shots: Path, report: Report) -> None:
         page.wait_for_timeout(300)
 
 
+def seed_usage(days: int = 29) -> None:
+    """Earlier days for the Usage chart (#111), written straight into the ledger.
+
+    The film's turns all happen in the minute it runs, so on their own they make one bar at the
+    right-hand end. A reviewer judging the chart needs a month of bars, and the ledger is the
+    only place a past day can come from.
+    """
+    from datetime import timedelta
+    from uuid import uuid4
+
+    from hera_storage.base import utcnow
+
+    from hera_chats import TurnUsage, UsageRepository
+    from hera_core.settings import CoreSettings
+    from hera_storage import Database, StorageSettings
+
+    owner = CoreSettings().owner_id
+    database = Database(StorageSettings())
+    now = utcnow()
+    with database.session() as session:
+        usage = UsageRepository(session)
+        for back in range(1, days + 1):
+            if back % 6 == 0:
+                continue  # a day off now and then, as a real month has
+            for turn in range(1 + (back * 7) % 4):
+                usage.add(
+                    TurnUsage(
+                        owner_id=owner,
+                        chat_id=uuid4(),
+                        message_id=uuid4(),
+                        at=now - timedelta(days=back, hours=turn),
+                        prompt_tokens=(prompt := 3000 + (back * 1931 + turn * 977) % 9000),
+                        completion_tokens=(written := 150 + (back * 211 + turn * 89) % 700),
+                        cached_tokens=prompt * (40 + (back * 13) % 50) // 100,
+                        first_token_ms=600.0 + (back * 137) % 1400,
+                        generating_ms=written / (38 + (back * 7) % 20) * 1000,
+                        timed_completion_tokens=written,
+                    )
+                )
+    database.dispose()
+
+
+def act_usage(page: Page, base: str, shots: Path, report: Report) -> None:
+    """Settings → Usage: a month of bars, the totals, and reading an earlier day (#111).
+
+    Its own act rather than an entry in `SETTINGS_TABS`, because the chart needs days the run
+    did not live through, and a tab filmed before they exist would be a picture of one bar.
+    """
+    with report.scene("usage-month", "settings", page, shots):
+        seed_usage()
+        page.goto(base, wait_until="networkidle")
+        page.get_by_role("button", name="Settings").first.click(timeout=5_000)
+        page.wait_for_selector("[role='dialog']", timeout=10_000)
+        page.get_by_role("navigation", name="Settings").get_by_role("button", name="Usage").click()
+        settled(page)
+        page.get_by_role("slider").wait_for(timeout=10_000)
+        page.wait_for_timeout(700)
+        shoot(page, shots, "43-settings-usage")
+
+    with report.scene("usage-reading-a-day", "settings", page, shots):
+        chart = page.get_by_role("slider")
+        chart.focus()
+        for _ in range(5):
+            chart.press("ArrowLeft")
+        page.wait_for_timeout(400)
+        shoot(page, shots, "44-usage-a-day")
+        page.keyboard.press("Escape")
+        page.wait_for_timeout(300)
+
+    with report.scene("settings-load-failed", "settings", page, shots):
+        # A pane that could not load, at pane size. The failure is the route's, forced here,
+        # so the console's one expected error is the browser reporting that 500.
+        page.route(
+            "**/api/v1/usage?*",
+            lambda route: route.fulfill(
+                status=500, json={"detail": "no such column: chat_usage.source"}
+            ),
+        )
+        page.get_by_role("button", name="Settings").first.click(timeout=5_000)
+        page.get_by_role("navigation", name="Settings").get_by_role("button", name="Usage").click()
+        page.locator("[role='dialog'] [role='alert']").wait_for(timeout=10_000)
+        page.get_by_text("What the server said").click()
+        page.wait_for_timeout(600)
+        shoot(page, shots, "52-settings-load-failed")
+        page.unroute("**/api/v1/usage?*")
+        page.keyboard.press("Escape")
+        page.wait_for_timeout(300)
+
+
 def act_profile(page: Page, base: str, shots: Path, report: Report) -> None:
     """Settings → General, and the light theme it carries.
 
@@ -978,6 +1074,7 @@ def main() -> int:
                 act_settings,
                 act_permissions,
                 act_servers,
+                act_usage,
                 act_profile,
                 act_design,
             ):

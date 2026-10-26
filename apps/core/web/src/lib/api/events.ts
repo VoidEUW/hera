@@ -95,6 +95,26 @@ export interface AnswerGiven {
 	text: string;
 }
 
+/** What a turn cost, as the endpoint reported it. The extras are absent or `null` when the
+ * endpoint did not say — never 0 for "unknown" (`hera_providers.Usage`). */
+export interface TokenUsage {
+	prompt_tokens: number;
+	completion_tokens: number;
+	total_tokens: number;
+	cached_tokens?: number | null;
+	reasoning_tokens?: number | null;
+	server_prompt_ms?: number | null;
+	server_generation_ms?: number | null;
+}
+
+/** How long a turn took, measured by Hera on this side of the wire. */
+export interface TurnTiming {
+	first_token_ms: number | null;
+	waiting_ms: number;
+	generating_ms: number;
+	timed_completion_tokens: number;
+}
+
 export interface TurnClosed {
 	type: 'turn_closed';
 	reason:
@@ -104,7 +124,12 @@ export interface TurnClosed {
 		| 'awaiting_answer'
 		| 'max_iterations'
 		| 'failed';
-	usage: { prompt_tokens: number; completion_tokens: number; total_tokens: number } | null;
+	/** Every round added up: what the turn cost. */
+	usage: TokenUsage | null;
+	/** The last round's prompt and completion: how full the window is now. Absent on a turn
+	 * stored before it was recorded. */
+	context_tokens?: number | null;
+	timing?: TurnTiming | null;
 	iterations: number;
 	error: string;
 }

@@ -8,16 +8,21 @@ from __future__ import annotations
 
 import re
 from collections.abc import Sequence
+from datetime import datetime
 from typing import Any, cast
 from uuid import UUID
 
 from sqlalchemy.orm.attributes import flag_modified
 from sqlmodel import Session, col, desc, func
 
-from hera_chats.events import CHAT_EVENT_ADAPTER, ChatEvent, visible_text
+from hera_chats.events import CHAT_EVENT_ADAPTER, ChatEvent, TurnClosed, TurnTiming, visible_text
 from hera_chats.history import Attachment
-from hera_chats.models import JSON_FIELDS, Chat, Message, Project
+from hera_chats.models import JSON_FIELDS, Chat, Message, Project, TurnUsage
+from hera_providers import Usage
 from hera_storage import Repository, utcnow
+
+TITLE_ORDINAL = -1
+"""Where the request that named the chat sits among a message's usage rows."""
 
 _SLUG_STRIP = re.compile(r"[^a-z0-9]+")
 
@@ -284,3 +289,74 @@ class MessageRepository(Repository[Message]):
             self.session.delete(row)
         self.session.flush()
         return len(rows)
+
+
+class UsageRepository(Repository[TurnUsage]):
+    """The tokens each closed turn took, kept after the messages are gone (ADR 25)."""
+
+    def __init__(self, session: Session) -> None:
+        super().__init__(TurnUsage, session)
+
+    def record(self, message: Message, events: Sequence[ChatEvent]) -> list[TurnUsage]:
+        """Write a row for every ``turn_closed`` in ``events`` that reported usage and has none.
+
+        A message is recorded again each time a paused turn resumes, with the earlier part's
+        ``turn_closed`` still in it — so a row is keyed by its position among them, and the
+        ones already written are left alone rather than counted twice.
+        """
+        closes = [event for event in events if isinstance(event, TurnClosed)]
+        if not any(close.usage for close in closes):
+            return []
+        written = self._written(message)
+        added = [
+            self.add(self._row(message, ordinal, close.usage, close.timing))
+            for ordinal, close in enumerate(closes)
+            if close.usage is not None and ordinal not in written
+        ]
+        self.session.flush()
+        return added
+
+    def record_title(self, message: Message, usage: Usage | None) -> TurnUsage | None:
+        """The request that named the chat. Not part of her answer, and spent all the same."""
+        if usage is None or TITLE_ORDINAL in self._written(message):
+            return None
+        row = self.add(self._row(message, TITLE_ORDINAL, usage, None, source="title"))
+        self.session.flush()
+        return row
+
+    def _written(self, message: Message) -> set[int]:
+        return {row.ordinal for row in self.list(col(TurnUsage.message_id) == message.id)}
+
+    @staticmethod
+    def _row(
+        message: Message,
+        ordinal: int,
+        usage: Usage,
+        timing: TurnTiming | None,
+        *,
+        source: str = "turn",
+    ) -> TurnUsage:
+        timed = timing is not None and timing.timed_completion_tokens > 0
+        return TurnUsage(
+            owner_id=message.owner_id,
+            chat_id=message.chat_id,
+            message_id=message.id,
+            ordinal=ordinal,
+            source=source,
+            at=utcnow(),
+            prompt_tokens=usage.prompt_tokens,
+            completion_tokens=usage.completion_tokens,
+            cached_tokens=usage.cached_tokens,
+            reasoning_tokens=usage.reasoning_tokens,
+            first_token_ms=timing.first_token_ms if timing is not None else None,
+            generating_ms=timing.generating_ms if timed and timing else None,
+            timed_completion_tokens=timing.timed_completion_tokens if timed and timing else None,
+        )
+
+    def since(self, owner_id: UUID, start: datetime) -> list[TurnUsage]:
+        """Every row of ``owner_id``'s from ``start`` on, oldest first."""
+        return self.list(
+            col(TurnUsage.owner_id) == owner_id,
+            col(TurnUsage.at) >= start,
+            order_by=col(TurnUsage.at),
+        )

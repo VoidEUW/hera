@@ -13,7 +13,9 @@
 	import AttachmentChip from '$lib/components/ui/AttachmentChip.svelte';
 	import Auth from '$lib/components/ui/Auth.svelte';
 	import Avatar from '$lib/components/ui/Avatar.svelte';
+	import BarChart from '$lib/components/ui/BarChart.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
+	import ErrorPage from '$lib/components/ui/ErrorPage.svelte';
 	import Checkbox from '$lib/components/ui/Checkbox.svelte';
 	import Confirm from '$lib/components/ui/Confirm.svelte';
 	import Palette, { type PaletteItem } from '$lib/components/ui/Palette.svelte';
@@ -358,7 +360,7 @@ Pick a direction before writing a line of CSS.
 	</section>
 
 	<section>
-		<h2>Feedback · loading, stalled, bars, skeleton</h2>
+		<h2>Feedback · loading, stalled, bars, a chart, skeleton</h2>
 		<div class="row">
 			<Spinner size={14} />
 			<Spinner size={20} label="Loading the model" />
@@ -378,6 +380,28 @@ Pick a direction before writing a line of CSS.
 			<ProgressBar label="Indeterminate" />
 			<ProgressBar label="Thick, danger" value={0.92} thick tone="danger" meter />
 		</div>
+		<BarChart
+			label="Tokens per day, a sample fortnight"
+			bars={Array.from({ length: 14 }, (_, day) => ({
+				label: `Day ${day + 1}`,
+				values: [4000 + ((day * 2917) % 9000), 300 + ((day * 613) % 900)]
+			}))}
+			series={[
+				{ label: 'Read', tone: 'quiet', hint: 'Prompt tokens' },
+				{ label: 'Written', tone: 'live', hint: 'Completion tokens' }
+			]}
+			describe={(bar) => `${bar.label}: ${bar.values[0]} read, ${bar.values[1]} written`}
+			ends={['Day 1', 'Day 14']}
+		/>
+		<ErrorPage
+			size="panel"
+			kind="server"
+			code="500 · Server error"
+			title="Could not load usage"
+			body="Hera’s server ran into an error while reading this. Trying again may help."
+			primary={{ label: 'Try again', onclick: () => {} }}
+			detail={{ label: 'What the server said', text: '500 · Internal Server Error' }}
+		/>
 		<Skeleton rows={3} />
 	</section>
 

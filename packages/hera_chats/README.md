@@ -60,6 +60,17 @@ message carrying the calls, then one `tool` message per result, then a further a
 message — flattening it loses the pairing between a call and its answer, and a model that
 cannot match `tool_call_id` ignores the result silently. Thinking never goes back.
 
+What a turn cost is the exception: it is also written to `chat_usage`, one row per `turn_closed`
+that reported usage, by `UsageRepository.record` — and nothing deletes those rows, because a
+message goes with its chat and the tokens were spent all the same
+([ADR 25](../../docs/adr/0025-usage-is-a-ledger.md)). `summarise` cuts them into the reader's
+days and totals the last 24 hours, 7 and 30 days, with the cache share, thinking tokens and speed where something measured them.
+
+A turn's close carries both what it cost (`usage`, every round added up) and how full the window
+is (`context_tokens`, the last round alone), with `timing` measured by Hera on this side of the wire.
+The running totals live on the `Turn`, so a stopped or failed turn still closes with the rounds that
+finished.
+
 ## Projects
 
 A container with behaviour, not a folder: a name, instructions, pinned skills, a default
