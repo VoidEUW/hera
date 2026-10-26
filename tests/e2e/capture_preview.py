@@ -1006,7 +1006,32 @@ def act_mobile(page: Page, base: str, shots: Path, report: Report, chat_url: str
         page.wait_for_selector("[role='dialog']", timeout=10_000)
         settled(page)
         page.wait_for_timeout(500)
+        # The list of sections first (#41): a phone shows the list or a screen, not both.
         shoot(page, shots, "73-phone-settings")
+
+    with report.scene("phone-settings-screen", "phone", page, shots):
+        page.locator("[role='dialog']").get_by_role("button", name="Models", exact=True).click()
+        page.wait_for_timeout(600)
+        shoot(page, shots, "74-phone-settings-screen")
+        page.get_by_role("button", name="All settings").click()
+        page.wait_for_timeout(300)
+        page.keyboard.press("Escape")
+        page.wait_for_timeout(400)
+
+    with report.scene("phone-palette", "phone", page, shots):
+        page.get_by_role("button", name="Open menu").first.click(timeout=5_000)
+        page.wait_for_timeout(400)
+        page.get_by_role("button", name="Search chats").first.click(timeout=5_000)
+        page.wait_for_timeout(500)
+        shoot(page, shots, "75-phone-palette")
+        page.keyboard.press("Escape")
+        page.wait_for_timeout(300)
+
+    with report.scene("phone-composer-chips", "phone", page, shots):
+        # The composer's chips go short on a phone: a mark and a count, and the model keeps its
+        # name (#41).
+        page.locator(".composer").first.scroll_into_view_if_needed()
+        page.locator(".composer").first.screenshot(path=str(shots / "76-phone-composer.png"))
 
 
 # -- the run -----------------------------------------------------------------------------
@@ -1120,6 +1145,10 @@ def main() -> int:
                 record_video_dir=str(videos),
                 record_video_size={"width": 390, "height": 844},
                 color_scheme="dark",
+                # A touch screen, not only a narrow one, so the film shows what a phone draws:
+                # no key chords, a rail row's menu without a hover (#41).
+                is_mobile=True,
+                has_touch=True,
             )
             mobile_page = mobile.new_page()
             report.attach(mobile_page, "phone")

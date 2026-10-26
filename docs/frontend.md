@@ -664,6 +664,43 @@ direct and never coy. She is the goddess of the household, not a mascot.
   control. The activity gutter collapses each block to one summary row that expands on tap —
   nothing is removed, only the resting state is quieter. Installable: a manifest and a service
   worker that never touches `/api/*`, so it cannot sit between a phone and a streaming turn.
+- **On a phone, nothing about the desktop changes** (#41). Everything below sits behind the
+  same 780px breakpoint, or behind `(hover: none)` for what only a touch screen needs, so a
+  desktop at desktop width draws exactly what it drew before. A desktop screenshot of every
+  Settings screen was compared pixel for pixel against the build before the change.
+  - The composer's chips go short: `Chip`'s `short` and `shortIcon` give a mark and a count in
+    place of a label. The full label stays in the button for a screen reader. The model keeps
+    its name and takes the room the others gave up.
+  - Settings is the whole screen and shows a list of sections, then one screen with a way back
+    (*All settings*). The search moves onto the screen, because what it filters is the screen.
+    It opens on a screen when the caller asked for one, such as "Manage servers". The list is
+    the page itself, not a card on the ground. The close button lines up with the content
+    instead of sitting across a corner.
+  - A memory's row puts its key on a line of its own, so the switch stays inside the card.
+  - Only the transcript scrolls. The page cannot scroll or bounce. The shell follows
+    `visualViewport`, so when iOS slides the page up for the keyboard, the top bar stays at the
+    top and the composer sits on the keyboard. The chat's menu button is part of its top bar
+    (`Topbar`'s `onmenu`) instead of a floating button pinned over the bar's corner, which came
+    apart from the bar whenever iOS moved the page. The floating one is left for the screens
+    without a bar: the start screen and a project.
+  - A short chip never shrinks; only the model's name gives way. Before, a full toolbar
+    squeezed every chip, and a count or an icon was cut off, worst on a 375pt iPhone.
+  - A menu is placed again whenever it resizes, and measured by its layout box rather than its
+    on-screen rectangle. The skill list arrives after its menu opens, so the menu used to be placed
+    for its empty size and grow off the screen until it was opened a second time. Measuring
+    during the entrance scale also read 95% of the real size. This fix applies at every width.
+    On desktop it only moves a menu that was in the wrong place; the model menu is
+    pixel-identical.
+  - Opening Settings or the palette from the rail sheet closes the sheet, so nothing is left
+    open behind them.
+  - A touch screen draws no key chords beside the controls they mirror (`Kbd decorative`). The
+    Hotkeys screen still lists them. It shows a rail row's menu without waiting for a hover,
+    because there is none.
+  - Text fields are 16px, because iOS zooms the page into a smaller one and stays zoomed.
+    The palette and the editors open just under the status bar, where the keyboard leaves them
+    room. A box opened inside another drops its 38px indent.
+  - `tests/e2e/test_on_a_phone.py` drives all of it at 390×844 with touch, and asks every screen
+    whether it is wider than the phone.
 - **Keyboard first.** Visible focus, the composer focused on load, and every chord in
   `lib/keys.ts` — see *Keyboard* below.
 

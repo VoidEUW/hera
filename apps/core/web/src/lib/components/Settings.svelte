@@ -16,11 +16,20 @@
 	 *
 	 * A modal, because settings is somewhere you go and come back from, and a modal keeps the
 	 * conversation visible behind it.
+	 *
+	 * **On a phone it is a list, then a screen** (#41). Side by side does not fit 390px, and the
+	 * row of sections it used to fold into overlapped itself. So below the breakpoint Settings
+	 * shows the sections until one is chosen, then that screen alone with a way back — and the
+	 * search moves onto the screen, because what it filters is the screen. It opens on the list
+	 * unless the caller asked for a particular screen. Nothing here reads `listing` above the
+	 * breakpoint; the desktop never sees it.
 	 */
+	import { untrack } from 'svelte';
 	import { t } from '$lib/i18n';
 	import SearchBar from '$lib/components/ui/SearchBar.svelte';
 	import Modal from '$lib/components/ui/Modal.svelte';
 	import Ocellus from '$lib/components/ui/Ocellus.svelte';
+	import IconButton from '$lib/components/ui/IconButton.svelte';
 	import { ENTRIES, GROUPS, type Tab } from '$lib/settingsTabs';
 	import Sidebar from '$lib/components/ui/sidebar/Sidebar.svelte';
 	import SidebarEntry from '$lib/components/ui/sidebar/SidebarEntry.svelte';
@@ -55,6 +64,22 @@
 
 	const filter = $derived(query.trim().toLowerCase());
 	const current = $derived(ENTRIES.find((entry) => entry.id === tab) ?? ENTRIES[0]);
+
+	// The list first, unless the caller asked for a screen: the default tab is what an unaimed
+	// opening lands on, and anything else (the composer's "Manage servers") is aimed.
+	let listing = $state(untrack(() => tab === 'account'));
+	let shown = untrack(() => tab);
+	$effect(() => {
+		// A screen asked for while Settings is open (⌘/ for the Hotkeys) is shown, not listed.
+		if (tab === shown) return;
+		shown = tab;
+		listing = false;
+	});
+
+	function choose(next: Tab) {
+		listing = false;
+		ontab?.(next);
+	}
 </script>
 
 <Modal
@@ -64,7 +89,7 @@
 	sheetclass="settings"
 	{onclose}
 >
-	<div class="body">
+	<div class="body" class:listing>
 		<Sidebar variant="settings" label={t.settings.title}>
 			{#snippet head()}
 				<div class="brand">
@@ -87,7 +112,7 @@
 							label={entry.label}
 							active={tab === entry.id}
 							meta={entry.soon ? t.settings.soon : undefined}
-							onclick={() => ontab?.(entry.id)}
+							onclick={() => choose(entry.id)}
 						/>
 					{/each}
 				</SidebarGroup>
@@ -95,6 +120,18 @@
 		</Sidebar>
 
 		<div class="panel">
+			<!-- The phone's way back to the list, and the search beside it. Not drawn above the
+			     breakpoint, where the list is always beside the screen. -->
+			<div class="back">
+				<IconButton icon="chevL" label={t.settings.back} onclick={() => (listing = true)} />
+				<div class="find">
+					<SearchBar
+						value={query}
+						placeholder={t.settings.search}
+						onchange={(value) => (query = value)}
+					/>
+				</div>
+			</div>
 			<!-- Keyed by the tab, so a new pane arrives on the theme's `settings.switch` fade rather
 			     than replacing the old one in place. -->
 			{#key tab}
@@ -183,13 +220,57 @@
 		overflow-y: auto;
 	}
 
-	@media (max-width: 600px) {
+	.back {
+		display: none;
+	}
+
+	/* On a phone: the whole screen, and either the list or one screen in it. */
+	@media (max-width: 780px) {
+		:global(.sheet.settings) {
+			inset: 0;
+			width: 100%;
+			height: 100dvh;
+			margin: 0;
+			border: 0;
+			border-radius: 0;
+			padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
+				env(safe-area-inset-left);
+		}
+
 		.body {
-			flex-direction: column;
+			border-radius: 0;
+		}
+
+		.body.listing .panel,
+		.body:not(.listing) :global(.sidebar) {
+			display: none;
 		}
 
 		.panel {
-			padding: 14px 16px 24px;
+			padding: 10px 16px 24px;
+		}
+
+		.back {
+			display: flex;
+			align-items: center;
+			gap: 8px;
+			min-height: 40px;
+			/* Clear of the close button, which sits at the end of this row. */
+			margin-right: 34px;
+			margin-bottom: 12px;
+		}
+
+		/* The way out lines up with the content instead of the sheet's corner: the same 16px from
+		   the edge the list and the screen keep, and centred on their first row — the brand on
+		   the list, the back button and search on a screen. */
+		:global(.sheet.settings .floating) {
+			top: calc(env(safe-area-inset-top) + 19px);
+			right: calc(env(safe-area-inset-right) + 16px);
+		}
+
+		.find {
+			flex: 1;
+			min-width: 0;
 		}
 	}
 </style>

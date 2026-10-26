@@ -184,4 +184,18 @@
 	.counter {
 		font-variant-numeric: tabular-nums;
 	}
+
+	/* iOS zooms the whole page into a field whose text is under 16px, and does not zoom back
+	   out (#41). So on a phone a field's text is 16px. */
+	@media (max-width: 780px) {
+		.control,
+		.mono {
+			font-size: 16px;
+		}
+
+		/* Already above the line, and set larger on purpose. */
+		.prose {
+			font-size: calc(var(--prose-size) - 1px);
+		}
+	}
 </style>

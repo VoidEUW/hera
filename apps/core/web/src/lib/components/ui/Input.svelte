@@ -142,4 +142,13 @@
 	.inline:focus-visible {
 		box-shadow: none;
 	}
+
+	/* iOS zooms the whole page into a field whose text is under 16px, and does not zoom back
+	   out (#41). So on a phone a field's text is 16px. */
+	@media (max-width: 780px) {
+		.control,
+		.mono {
+			font-size: 16px;
+		}
+	}
 </style>

@@ -244,6 +244,17 @@
 		overflow-y: auto;
 	}
 
+	/* On a phone a top sheet — the palette, the server and rule editors — starts just under the
+	   status bar instead of a seventh of the way down (#41). The keyboard takes the bottom half of
+	   the screen the moment a field in it is focused, and 14vh of empty glass above the sheet is
+	   room the form then does not have. */
+	@media (max-width: 780px) {
+		.sheet.top {
+			top: max(10px, env(safe-area-inset-top));
+			max-height: calc(100dvh - 20px - env(safe-area-inset-top));
+		}
+	}
+
 	header {
 		display: flex;
 		align-items: flex-start;

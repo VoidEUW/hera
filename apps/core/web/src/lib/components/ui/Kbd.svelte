@@ -26,4 +26,14 @@
 		font: 500 10.5px/1 var(--font-mono);
 		white-space: nowrap;
 	}
+
+	/* A chord beside the control it mirrors means nothing without a keyboard (#41), so a touch
+	   screen does not draw it. A screen *about* keys (Hotkeys) draws its keys whatever the
+	   device, which is why this is `decorative` only — and why it is a question about the
+	   pointer, not the width: a narrow desktop window still has a keyboard. */
+	@media (hover: none) and (pointer: coarse) {
+		.key[aria-hidden='true'] {
+			display: none;
+		}
+	}
 </style>

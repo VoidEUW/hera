@@ -240,6 +240,8 @@
 			on={connected.length > 0}
 			haspopup="menu"
 			expanded={serversOpen}
+			short={String(connected.length)}
+			shortIcon="plug"
 			onclick={() => (serversOpen = !serversOpen)}
 		>
 			{t.composer.serverCount(connected.length)}
@@ -283,6 +285,7 @@
 				}))}
 				value={profileId ?? ''}
 				label={t.composer.profile}
+				short=""
 				placement="above"
 				onchange={(id) => onprofile?.(id)}
 			/>
@@ -298,6 +301,7 @@
 					choices={reasoningChoices}
 					value={reasoningValue}
 					label={t.composer.reasoning}
+					short=""
 					placement="above"
 					align="end"
 					onchange={(value) => onreasoning?.(activeEntry.name, activeModel.id, value)}
@@ -307,6 +311,8 @@
 					on={thinkingOn}
 					pressed={thinkingOn}
 					hint={thinkingOn ? t.composer.thinkingOn : t.composer.thinkingOff}
+					short=""
+					shortIcon="brain"
 					onclick={() => onthinking?.(activeEntry.name, activeModel.id, !thinkingOn)}
 				>
 					{thinkingOn ? t.composer.thinking : t.composer.thinkingOff}
@@ -319,6 +325,7 @@
 					haspopup="menu"
 					expanded={budgetOpen}
 					label={t.composer.budgetTitle}
+					short=""
 					onclick={() => (budgetOpen = !budgetOpen)}
 				>
 					{budget === null ? t.composer.effort.default : t.composer.budget(budget)}
@@ -362,12 +369,14 @@
 			{/if}
 		{/if}
 
-		<ModelSelector
-			{providers}
-			{activeProvider}
-			onmodel={(provider, model) => onmodel?.(provider, model)}
-			onsettings={() => onsettings?.('models')}
-		/>
+		<span class="model">
+			<ModelSelector
+				{providers}
+				{activeProvider}
+				onmodel={(provider, model) => onmodel?.(provider, model)}
+				onsettings={() => onsettings?.('models')}
+			/>
+		</span>
 
 		<SendButton
 			{busy}
@@ -444,6 +453,30 @@
 	.space {
 		flex: 1;
 		min-width: 4px;
+	}
+
+	/* A wrapper with no box of its own on the desktop. */
+	.model {
+		display: contents;
+	}
+
+	/* On a phone the other chips go short (`Chip`'s `short`), and the model keeps its name: it is
+	   the one a person reads before sending, so it takes the room the others gave up. */
+	@media (max-width: 780px) {
+		.space {
+			display: none;
+		}
+
+		.model {
+			display: flex;
+			flex: 1 1 auto;
+			justify-content: flex-end;
+			min-width: 0;
+		}
+
+		.model :global(.chip) {
+			max-width: 100%;
+		}
 	}
 
 	.custom {

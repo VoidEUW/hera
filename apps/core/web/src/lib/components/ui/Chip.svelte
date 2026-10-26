@@ -7,6 +7,13 @@
 	 * The leading mark is a dot (a toggle, on or off) or an icon (a selector); a selector chip
 	 * ends in a chevron that turns while its menu is open. `pressed` is set only when the chip is
 	 * itself the switch; a chip that opens a menu says so with `haspopup` and `expanded`.
+	 *
+	 * **On a phone a chip can go short** (#41). A toolbar of full labels does not fit 390px, and
+	 * every chip squeezing its own label to an ellipsis left four chips nobody could read. `short`
+	 * is what the chip says below the breakpoint instead — a count, or nothing — and `shortIcon`
+	 * stands in for the dot there, so a chip that is a dot on the desktop is a picture on the
+	 * phone. The full label is still in the button, hidden only from the eye, so its name does not
+	 * change with the width. Without `short` a chip is the same at every width.
 	 */
 	import type { Snippet } from 'svelte';
 	import type { IconName } from '$lib/icons';
@@ -28,6 +35,10 @@
 		/** A tooltip, for when the label alone is a name you would have to already know. */
 		hint?: string;
 		label?: string;
+		/** What the chip says below the phone breakpoint. `''` is the icon alone. */
+		short?: string;
+		/** The mark below the phone breakpoint, in place of the dot. */
+		shortIcon?: IconName;
 		ref?: HTMLButtonElement | null;
 		onclick?: (event: MouseEvent) => void;
 		onkeydown?: (event: KeyboardEvent) => void;
@@ -46,6 +57,8 @@
 		disabled = false,
 		hint,
 		label,
+		short,
+		shortIcon,
 		ref = $bindable(),
 		onclick,
 		onkeydown,
@@ -58,6 +71,7 @@
 <button
 	bind:this={ref}
 	class="chip"
+	class:compact={short !== undefined}
 	class:on
 	class:open={expanded}
 	type="button"
@@ -70,13 +84,23 @@
 	{onclick}
 	{onkeydown}
 >
-	{#if showDot}<span class="dot" aria-hidden="true"></span>{/if}
+	{#if showDot}<span class="dot" class:long={!!shortIcon} aria-hidden="true"></span>{/if}
+	{#if shortIcon}
+		<span class="short mark" aria-hidden="true"
+			><Icon name={shortIcon} size="calc(var(--icon-size) - 2px)" /></span
+		>
+	{/if}
 	{#if image}
 		<img class="image" src={image} alt="" />
 	{:else if icon}
 		<Icon name={icon} size="calc(var(--icon-size) - 2px)" />
 	{/if}
-	<span class="text">{@render children()}</span>
+	{#if short === undefined}
+		<span class="text">{@render children()}</span>
+	{:else}
+		<span class="text long">{@render children()}</span>
+		{#if short}<span class="text short" aria-hidden="true">{short}</span>{/if}
+	{/if}
 	{#if chevron}<span class="chevron"><Icon name="chevD" size="calc(var(--icon-size) - 2px)" /></span
 		>{/if}
 </button>
@@ -163,5 +187,45 @@
 
 	.on .dot {
 		background: var(--brass);
+	}
+
+	.short {
+		display: none;
+	}
+
+	.mark {
+		color: var(--text-faint);
+	}
+
+	.on .mark {
+		color: var(--brass);
+	}
+
+	/* Below the breakpoint the short form is the visible one. The long label is hidden from the
+	   eye only, the usual visually-hidden recipe, so it is still the button's name. */
+	@media (max-width: 780px) {
+		.short {
+			display: inline-flex;
+		}
+
+		/* A short chip is already as small as it gets, so it does not shrink further: in a full
+		   toolbar every chip used to give up room, and a count or an icon was cut off. The one that
+		   gives way is the one with a name to shorten, the model's. */
+		.compact {
+			flex: none;
+		}
+
+		.long {
+			position: absolute;
+			width: 1px;
+			height: 1px;
+			overflow: hidden;
+			clip-path: inset(50%);
+			white-space: nowrap;
+		}
+
+		.dot.long {
+			display: none;
+		}
 	}
 </style>

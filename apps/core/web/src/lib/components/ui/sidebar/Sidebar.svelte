@@ -186,35 +186,19 @@
 		outline: none;
 	}
 
-	/* The settings variant on a narrow screen: a horizontal row of entries above the pane. The
-	   group labels go, because a row of sections reads by its entries alone. */
-	@media (max-width: 600px) {
+	/* The settings variant on a phone: Settings shows either this list or one screen (#41), so
+	   the list is the page itself — the whole width, no card floating on the ground, and the same
+	   inset the screen beside it has, so the two read as one sheet. */
+	@media (max-width: 780px) {
 		.settings {
+			flex: 1;
 			width: auto;
 			height: auto;
-		}
-
-		.settings .body {
-			flex-direction: row;
-			overflow-x: auto;
-			overflow-y: hidden;
-		}
-
-		.settings .body :global(.group) {
-			flex-direction: row;
-			margin-top: 0;
-		}
-
-		.settings .body :global(.label-row) {
-			display: none;
-		}
-
-		.settings .body :global(.inner) {
-			flex-direction: row;
-		}
-
-		.settings .body :global(.label) {
-			overflow: visible;
+			margin: 0;
+			padding: 10px 16px 16px;
+			border-radius: 0;
+			background: none;
+			box-shadow: none;
 		}
 	}
 </style>

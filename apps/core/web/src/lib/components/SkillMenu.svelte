@@ -74,6 +74,8 @@
 	haspopup="menu"
 	expanded={open}
 	hint={on.join(', ') || undefined}
+	short={on.length ? String(on.length) : ''}
+	shortIcon="spark"
 	onclick={toggleMenu}
 >
 	{on.length ? t.composer.skillCount(on.length) : t.skills.pick}

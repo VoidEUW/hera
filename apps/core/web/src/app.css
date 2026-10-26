@@ -97,6 +97,17 @@ body {
 	margin: 0;
 }
 
+/* On a phone the page does not scroll and does not bounce: the shell is pinned to the screen and
+   the transcript is what scrolls (#41). Without this, iOS drags the whole page — bar, transcript
+   and composer together — whenever a scroll reaches an end. */
+@media (max-width: 780px) {
+	html,
+	body {
+		overflow: hidden;
+		overscroll-behavior: none;
+	}
+}
+
 body {
 	background: var(--ground);
 	color: var(--text);

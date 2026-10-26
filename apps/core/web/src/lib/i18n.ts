@@ -462,6 +462,8 @@ export const t = {
 		close: 'Close find'
 	},
 	settings: {
+		/** The phone's way from one settings screen back to the list of them. */
+		back: 'All settings',
 		title: 'Settings',
 		subtitle: 'How she works: what she runs on, what she knows, what she may do.',
 		close: 'Close',
