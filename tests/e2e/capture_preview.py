@@ -128,7 +128,21 @@ SCRIPT: Sequence[Turn] = [
     # tool is never run, so nothing has to be wired for the card to appear.
     [
         TextDelta(text="Before I summarise it - "),
-        tool_call("hera__ask", {"question": "Which deck do you mean?", "kind": "unsure"}),
+        tool_call(
+            "hera__ask",
+            {
+                # Two questions in one call (ADR 26), the first with choices, so the film
+                # shows the chips as well as the field.
+                "questions": [
+                    {
+                        "question": "Which deck do you mean?",
+                        "options": ["The 2024 one", "The 2025 draft"],
+                    },
+                    {"question": "Should I keep the speaker notes?"},
+                ],
+                "kind": "unsure",
+            },
+        ),
         TurnEnd(reason="tool_calls"),
     ],
     # Which she then carries on with, the reply having become the result of her own call.

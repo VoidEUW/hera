@@ -32,3 +32,4 @@ later.
 | [23](0023-permission-rules-are-kept-over-the-shipped-policy.md) | Permission rules are kept in a file, laid over the policy Hera ships with | accepted |
 | [24](0024-the-servers-screen-writes-mcp-json.md) | The Servers screen writes `mcp.json`, and a tool that is switched off is not offered | accepted |
 | [25](0025-usage-is-a-ledger.md) | What a turn cost is kept in a ledger, not read back out of the messages | accepted |
+| [26](0026-a-question-may-come-in-threes.md) | One question card may hold up to three questions | accepted |

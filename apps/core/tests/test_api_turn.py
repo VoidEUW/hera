@@ -26,6 +26,7 @@ from hera_providers import (
     FakeProvider,
     ProviderUnavailable,
     TextDelta,
+    ToolCallReady,
     TurnEnd,
     Usage,
     text_turn,
@@ -875,7 +876,14 @@ class TestTheQuestionCard:
         self, make_services: Any
     ) -> None:
         provider = FakeProvider(
-            [tool_turn(tool_call("hera__ask", {"question": "Which deck?", "kind": "unsure"}))]
+            [
+                tool_turn(
+                    tool_call(
+                        "hera__ask",
+                        {"questions": [{"question": "Which deck?"}], "kind": "unsure"},
+                    )
+                )
+            ]
         )
         services = make_services(provider, StubTools())
         async with _client(services) as client:
@@ -891,7 +899,7 @@ class TestTheQuestionCard:
             "done",
         ]
         card = payload(frames, "answer_required")
-        assert card["question"] == "Which deck?"
+        assert card["questions"] == [{"text": "Which deck?", "options": []}]
         assert card["kind"] == "unsure"
         assert payload(frames, "turn_closed")["reason"] == "awaiting_answer"
 
@@ -903,7 +911,7 @@ class TestTheQuestionCard:
     async def test_replying_resumes_the_same_message(self, make_services: Any) -> None:
         provider = FakeProvider(
             [
-                tool_turn(tool_call("hera__ask", {"question": "Which deck?"})),
+                tool_turn(_ask("Which deck?")),
                 text_turn("The 2024 one, then."),
             ]
         )
@@ -915,7 +923,7 @@ class TestTheQuestionCard:
             frames = sse(
                 await client.post(
                     f"{API}/chats/{chat_id}/answers",
-                    json={"call_id": "call_hera__ask", "text": "The 2024 one."},
+                    json={"call_id": "call_hera__ask", "answers": ["The 2024 one."]},
                 )
             )
             detail = (await client.get(f"{API}/chats/{chat_id}")).json()
@@ -938,7 +946,7 @@ class TestTheQuestionCard:
     async def test_an_unasked_call_id_is_a_404(self, make_services: Any) -> None:
         """Otherwise a resumed turn carries a tool result for a call that was never made, and
         the model is handed an answer to a question it did not ask."""
-        provider = FakeProvider([tool_turn(tool_call("hera__ask", {"question": "Which?"}))])
+        provider = FakeProvider([tool_turn(_ask("Which?"))])
         services = make_services(provider, StubTools())
         async with _client(services) as client:
             chat_id = await open_chat(client)
@@ -946,7 +954,7 @@ class TestTheQuestionCard:
 
             response = await client.post(
                 f"{API}/chats/{chat_id}/answers",
-                json={"call_id": "call_something_else", "text": "hello"},
+                json={"call_id": "call_something_else", "answers": ["hello"]},
             )
 
         assert response.status_code == 404
@@ -958,10 +966,71 @@ class TestTheQuestionCard:
 
             response = await client.post(
                 f"{API}/chats/{chat_id}/answers",
-                json={"call_id": "call_hera__ask", "text": "hello"},
+                json={"call_id": "call_hera__ask", "answers": ["hello"]},
             )
 
         assert response.status_code == 404
+
+    async def test_several_questions_are_answered_at_once(self, make_services: Any) -> None:
+        """ADR 26. One card, one reply carrying an answer per question, and the model reads
+        each answer beside the question it belongs to."""
+        provider = FakeProvider(
+            [
+                tool_turn(
+                    tool_call(
+                        "hera__ask",
+                        {
+                            "questions": [
+                                {"question": "Which deck?", "options": ["2024", "2025"]},
+                                {"question": "Keep the notes?"},
+                            ]
+                        },
+                    )
+                ),
+                text_turn("Done."),
+            ]
+        )
+        services = make_services(provider, StubTools())
+        async with _client(services) as client:
+            chat_id = await open_chat(client)
+            frames = await talk(client, chat_id, "summarise it")
+            card = payload(frames, "answer_required")
+
+            await client.post(
+                f"{API}/chats/{chat_id}/answers",
+                json={"call_id": "call_hera__ask", "answers": ["2024", "Yes, keep them."]},
+            )
+            detail = (await client.get(f"{API}/chats/{chat_id}")).json()
+
+        assert card["questions"] == [
+            {"text": "Which deck?", "options": ["2024", "2025"]},
+            {"text": "Keep the notes?", "options": []},
+        ]
+        given = next(e for e in detail["messages"][1]["events"] if e["type"] == "answer_given")
+        assert given["answers"] == ["2024", "Yes, keep them."]
+
+        sent = " ".join(str(message.content) for message in provider.requests[1].messages)
+        assert "1. Which deck? → 2024" in sent
+        assert "2. Keep the notes? → Yes, keep them." in sent
+
+    async def test_an_answer_per_question_is_required(self, make_services: Any) -> None:
+        """Padding a short reply would put an answer beside the wrong question."""
+        provider = FakeProvider([tool_turn(_ask("Which?", "Why?"))])
+        services = make_services(provider, StubTools())
+        async with _client(services) as client:
+            chat_id = await open_chat(client)
+            await talk(client, chat_id, "go")
+
+            response = await client.post(
+                f"{API}/chats/{chat_id}/answers",
+                json={"call_id": "call_hera__ask", "answers": ["only one"]},
+            )
+
+        assert response.status_code == 422
+
+
+def _ask(*questions: str) -> ToolCallReady:
+    return tool_call("hera__ask", {"questions": [{"question": text} for text in questions]})
 
 
 class TestWhenTheModelFails:

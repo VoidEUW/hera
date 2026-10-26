@@ -34,6 +34,8 @@ from hera_mcp.ports import (
 from hera_mcp.server import (
     ARTIFACT_META,
     ASK_KINDS,
+    ASK_MAX_OPTIONS,
+    ASK_MAX_QUESTIONS,
     ASK_TOOL,
     BUILTIN_SERVER_NAME,
     CHAT_ID_META,
@@ -41,12 +43,15 @@ from hera_mcp.server import (
     SEARCH_LIMIT,
     TOOL_NAMES,
     AskKind,
+    AskQuestion,
     build_builtin_server,
 )
 
 __all__ = [
     "ARTIFACT_META",
     "ASK_KINDS",
+    "ASK_MAX_OPTIONS",
+    "ASK_MAX_QUESTIONS",
     "ASK_TOOL",
     "BUILTIN_SERVER_NAME",
     "CHAT_ID_META",
@@ -55,6 +60,7 @@ __all__ = [
     "TOOL_NAMES",
     "Artifacts",
     "AskKind",
+    "AskQuestion",
     "Hit",
     "Memories",
     "NoteWriter",

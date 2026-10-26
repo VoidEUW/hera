@@ -274,8 +274,8 @@
 		void session.answer([callId], allow, remember);
 	}
 
-	function reply(callId: string, text: string) {
-		void session.reply(callId, text);
+	function reply(callId: string, answers: string[]) {
+		void session.reply(callId, answers);
 	}
 </script>
 

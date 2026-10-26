@@ -27,6 +27,8 @@ from mcp_support import (
 from hera_mcp import (
     ARTIFACT_META,
     ASK_KINDS,
+    ASK_MAX_OPTIONS,
+    ASK_MAX_QUESTIONS,
     ASK_TOOL,
     BUILTIN_SERVER_NAME,
     SCRATCH_LISTING_LIMIT,
@@ -76,7 +78,7 @@ class TestAsk:
         """Reached over the transport v0.3 exposes, or by a test. Saying so plainly beats
         returning something that looks like an answer nobody gave."""
         async with talking_to(wired) as client:
-            result = await client.call_tool("ask", {"question": "which port?"})
+            result = await client.call_tool("ask", {"questions": [{"question": "which port?"}]})
 
         assert result.is_error
         assert "not put to anybody" in said(result)
@@ -94,14 +96,67 @@ class TestAsk:
 
         ask = next(tool for tool in listing.tools if tool.name == ASK_TOOL)
         properties = ask.input_schema.get("properties", {})
-        assert sorted(properties) == ["kind", "question"]
-        assert ask.input_schema.get("required") == ["question"]
+        assert sorted(properties) == ["kind", "questions"]
+        assert ask.input_schema.get("required") == ["questions"]
         assert set(_enum_of(properties["kind"])) == set(ASK_KINDS)
+
+    async def test_several_questions_fit_in_one_call(self, wired: MCPServer) -> None:
+        """ADR 26. A short list, each item a question and maybe a few choices — and written
+        *inline*, because the schema is prompt text and a ``$ref`` is a pointer a small model
+        has to follow to learn what one question looks like."""
+        async with talking_to(wired) as client:
+            listing = await client.list_tools()
+
+        ask = next(tool for tool in listing.tools if tool.name == ASK_TOOL)
+        questions = ask.input_schema["properties"]["questions"]
+        assert questions["type"] == "array"
+        assert (questions["minItems"], questions["maxItems"]) == (1, ASK_MAX_QUESTIONS)
+
+        item = questions["items"]
+        assert item["required"] == ["question"]
+        options = item["properties"]["options"]
+        assert options["type"] == "array"
+        assert (options["minItems"], options["maxItems"]) == (2, ASK_MAX_OPTIONS)
+        assert "$defs" not in ask.input_schema
+        assert "$ref" not in str(ask.input_schema)
+
+    async def test_the_description_asks_for_one_call_not_several(self, wired: MCPServer) -> None:
+        """What the list is for, said where the model reads it. Without the sentence a model
+        keeps asking one question per call, which is what it was told for a year."""
+        async with talking_to(wired) as client:
+            listing = await client.list_tools()
+
+        ask = next(tool for tool in listing.tools if tool.name == ASK_TOOL)
+        assert ask.description is not None
+        assert "one call" in ask.description
+        assert "independent" in ask.description
+        assert "one question rather than a list" not in ask.description
+
+    @pytest.mark.parametrize(
+        "questions",
+        [
+            [],
+            [{"question": str(n)} for n in range(ASK_MAX_QUESTIONS + 1)],
+            [{"question": "which?", "options": ["only one"]}],
+            [{"question": "which?", "options": [str(n) for n in range(ASK_MAX_OPTIONS + 1)]}],
+        ],
+        ids=["none", "too-many", "one-option", "too-many-options"],
+    )
+    async def test_the_limits_are_refused_by_the_schema(
+        self, wired: MCPServer, questions: list[dict[str, Any]]
+    ) -> None:
+        async with talking_to(wired) as client:
+            result = await client.call_tool("ask", {"questions": questions})
+
+        assert result.is_error
+        assert "not put to anybody" not in said(result)
 
     async def test_a_kind_outside_the_set_is_refused_by_the_schema(self, wired: MCPServer) -> None:
         """A result rather than a crash, like every other validation failure here."""
         async with talking_to(wired) as client:
-            result = await client.call_tool("ask", {"question": "well?", "kind": "curious"})
+            result = await client.call_tool(
+                "ask", {"questions": [{"question": "well?"}], "kind": "curious"}
+            )
 
         assert result.is_error
 
@@ -121,7 +176,7 @@ class TestAsk:
         """No port, so it is refused for the reason above rather than for being unavailable —
         a deployment that wired nothing still has a question she can ask."""
         async with talking_to(bare) as client:
-            result = await client.call_tool("ask", {"question": "which port?"})
+            result = await client.call_tool("ask", {"questions": [{"question": "which port?"}]})
 
         assert result.is_error
         assert "not available" not in said(result)

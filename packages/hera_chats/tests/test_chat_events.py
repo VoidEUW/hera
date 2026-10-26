@@ -5,9 +5,12 @@ from __future__ import annotations
 from hera_chats import (
     CHAT_EVENT_ADAPTER,
     LIST_ADAPTER,
+    AnswerGiven,
+    AnswerRequired,
     ChatEvent,
     PermissionDecided,
     PermissionRequired,
+    Question,
     SkillSelected,
     ToolResultEvent,
     TurnClosed,
@@ -23,6 +26,13 @@ EVERY_VARIANT: list[ChatEvent] = [
     ToolCallReady(id="c1", name="fs__read_file", arguments={"path": "x"}),
     PermissionRequired(call_id="c1", tool="fs__read_file", reason="it writes to disk"),
     PermissionDecided(call_id="c1", allowed=True, remembered=True),
+    AnswerRequired(
+        call_id="c2",
+        tool="hera__ask",
+        questions=(Question(text="Which?", options=("this", "that")), Question(text="Why?")),
+        kind="choice",
+    ),
+    AnswerGiven(call_id="c2", answers=("this", "because")),
     ToolResultEvent(call_id="c1", tool="fs__read_file", text="contents", duration_ms=12),
     TurnClosed(reason="completed", usage=Usage(total_tokens=90), iterations=2),
 ]
@@ -51,6 +61,8 @@ class TestTheUnion:
             "tool_call_ready",
             "permission_required",
             "permission_decided",
+            "answer_required",
+            "answer_given",
             "tool_result",
             "turn_closed",
         ]
@@ -88,6 +100,38 @@ class TestTheUnion:
         restored = CHAT_EVENT_ADAPTER.validate_python(stored)
         assert isinstance(restored, ToolResultEvent)
         assert restored.failure == "brand_new"
+
+
+class TestAQuestionPersistedBeforeItTookAList:
+    """ADR 26. A call used to hold one ``question`` and a reply one ``text``; turns saved then
+    are a record of what happened and keep loading, as one question and one answer."""
+
+    def test_the_card_reads_as_one_question(self) -> None:
+        stored = {
+            "type": "answer_required",
+            "call_id": "c1",
+            "tool": "hera__ask",
+            "question": "Which deck?",
+            "kind": "unsure",
+        }
+        event = CHAT_EVENT_ADAPTER.validate_python(stored)
+        assert isinstance(event, AnswerRequired)
+        assert event.questions == (Question(text="Which deck?"),)
+        assert event.kind == "unsure"
+
+    def test_the_reply_reads_as_one_answer(self) -> None:
+        stored = {"type": "answer_given", "call_id": "c1", "text": "The 2024 one."}
+        event = CHAT_EVENT_ADAPTER.validate_python(stored)
+        assert isinstance(event, AnswerGiven)
+        assert event.answers == ("The 2024 one.",)
+
+    def test_it_is_written_back_in_the_new_shape(self) -> None:
+        """Nothing downstream — the API, the browser — sees the old field names."""
+        stored = {"type": "answer_given", "call_id": "c1", "text": "Yes."}
+        dumped = CHAT_EVENT_ADAPTER.dump_python(
+            CHAT_EVENT_ADAPTER.validate_python(stored), mode="json"
+        )
+        assert dumped == {"type": "answer_given", "call_id": "c1", "answers": ["Yes."]}
 
 
 class TestCoalescing:

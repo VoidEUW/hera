@@ -17,8 +17,15 @@
 	 * **Laurel, not brass.** Brass is authority — the colour of *this needs a decision*. A
 	 * question is her turning towards you, and drawing it in the permission colour would make
 	 * being asked feel like being stopped.
+	 *
+	 * **One card per call, however many questions are in it** (ADR 26). They are one call and so
+	 * have one result; a card each would be three things to settle for one answer. One field per
+	 * question, one Reply for all of them. A question with `options` offers them as chips above
+	 * its field — picking one is the answer, typing replaces the pick — because the choices are a
+	 * shortcut she offered, not a fence around what a person may say.
 	 */
 	import Button from './ui/Button.svelte';
+	import Chip from './ui/Chip.svelte';
 	import Pill from './ui/Pill.svelte';
 	import Textarea from './ui/Textarea.svelte';
 	import Icon from './ui/Icon.svelte';
@@ -28,17 +35,20 @@
 
 	interface Props {
 		card: AnswerRequired;
-		/** What they typed, once they have. Read from the persisted `answer_given` rather than
-		 * inferred from whether a result turned up afterwards. */
-		reply?: string | null;
+		/** What they answered, one per question, once they have. Read from the persisted
+		 * `answer_given` rather than inferred from whether a result turned up afterwards. */
+		replies?: string[] | null;
 		busy?: boolean;
-		onreply?: (text: string) => void;
+		onreply?: (answers: string[]) => void;
 	}
 
-	let { card, reply = null, busy = false, onreply }: Props = $props();
+	let { card, replies = null, busy = false, onreply }: Props = $props();
 
-	let draft = $state('');
-	const settled = $derived(reply !== null);
+	// By position, because a question has no identity but its place in the call. A pick and a
+	// draft never both hold for one question: whichever the person touched last is the answer.
+	let drafts = $state<Record<number, string>>({});
+	let picked = $state<Record<number, number>>({});
+	const settled = $derived(replies !== null);
 
 	// What sort of question it is, said in the person's words rather than the tool's (ADR 17).
 	//
@@ -53,10 +63,33 @@
 	// *doubt* on a question card in 2026 is a puzzle rather than information.
 	const label = $derived(isAskKind(card.kind) ? t.question.kinds[card.kind] : '');
 
+	function answerTo(index: number): string {
+		const choice = picked[index];
+		if (choice !== undefined) return card.questions[index].options[choice] ?? '';
+		return drafts[index] ?? '';
+	}
+
+	function pick(index: number, choice: number) {
+		if (busy || settled) return;
+		// Pressing the picked chip again lets go of it, the way any toggle does.
+		if (picked[index] === choice) {
+			delete picked[index];
+			return;
+		}
+		picked[index] = choice;
+		drafts[index] = '';
+	}
+
+	function write(index: number, value: string) {
+		drafts[index] = value;
+		if (value) delete picked[index];
+	}
+
 	function send() {
 		if (busy || settled) return;
-		onreply?.(draft);
-		draft = '';
+		onreply?.(card.questions.map((_, index) => answerTo(index)));
+		drafts = {};
+		picked = {};
 	}
 
 	function onkeydown(event: KeyboardEvent) {
@@ -70,7 +103,8 @@
 </script>
 
 <!-- The theme's question card (`hera/question-card`, soft look with `qc.frame: none`): a brass
-     capital header with its mark, her question in the body face, and the free answer under it.
+     capital header with its mark, then each question in the body face with its choices and the
+     free answer under it.
      No frame — it sits in the flow of her answer, where she asked. -->
 <aside class="card" class:settled>
 	<p class="head">
@@ -79,28 +113,45 @@
 		{#if label}<Pill tone={card.kind === 'blocked' ? 'authority' : 'neutral'}>{label}</Pill>{/if}
 	</p>
 
-	<p class="question">{card.question || t.question.nothing}</p>
+	{#each card.questions as question, index (index)}
+		<div class="item">
+			<p class="question">{question.text || t.question.nothing}</p>
 
-	{#if settled}
-		<p class="reply">{reply || t.question.noReply}</p>
-	{:else}
-		<div class="answer">
-			<Textarea
-				autofocus
-				rows={2}
-				value={draft}
-				disabled={busy}
-				placeholder={t.question.placeholder}
-				ariaLabel={card.question || t.question.asked}
-				{onkeydown}
-				onchange={(value) => (draft = value)}
-			/>
-			<div class="actions">
-				<span class="hint">{t.composer.hint}</span>
-				<Button variant="highlighted" size="sm" disabled={busy} onclick={send}>
-					{t.question.send}
-				</Button>
-			</div>
+			{#if settled}
+				<p class="reply">{replies?.[index] || t.question.noReply}</p>
+			{:else}
+				{#if question.options.length > 0}
+					<div class="options" role="group" aria-label={t.question.options}>
+						{#each question.options as option, choice (choice)}
+							<Chip
+								on={picked[index] === choice}
+								pressed={picked[index] === choice}
+								disabled={busy}
+								onclick={() => pick(index, choice)}>{option}</Chip
+							>
+						{/each}
+					</div>
+				{/if}
+				<Textarea
+					autofocus={index === 0}
+					rows={2}
+					value={drafts[index] ?? ''}
+					disabled={busy}
+					placeholder={question.options.length > 0 ? t.question.ownWords : t.question.placeholder}
+					ariaLabel={question.text || t.question.asked}
+					{onkeydown}
+					onchange={(value) => write(index, value)}
+				/>
+			{/if}
+		</div>
+	{/each}
+
+	{#if !settled}
+		<div class="actions">
+			<span class="hint">{t.composer.hint}</span>
+			<Button variant="highlighted" size="sm" disabled={busy} onclick={send}>
+				{t.question.send}
+			</Button>
 		</div>
 	{/if}
 </aside>
@@ -145,10 +196,17 @@
 		line-height: 1.5;
 	}
 
-	.answer {
+	/* One question and its answer. The card's own gap separates them from each other. */
+	.item {
 		display: flex;
 		flex-direction: column;
 		gap: 8px;
+	}
+
+	.options {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 6px;
 	}
 
 	.actions {

@@ -74,11 +74,20 @@ export interface PermissionDecided {
 	remembered: boolean;
 }
 
+/** One of the questions a call asked (ADR 26). `options` is empty for one answered in words;
+ * when there are some, a person may still answer in words. */
+export interface AskQuestion {
+	text: string;
+	options: string[];
+}
+
 export interface AnswerRequired {
 	type: 'answer_required';
 	call_id: string;
 	tool: string;
-	question: string;
+	/** Never empty. A turn persisted when a call held one question arrives as a list of one —
+	 * the server folds the old shape, so this file knows only the new one. */
+	questions: AskQuestion[];
 	/** What sort of question it is: one of `ASK_KINDS`.
 	 *
 	 * Typed as a plain `string` and not as the union, mirroring `hera_chats.AnswerRequired.kind`.
@@ -92,7 +101,8 @@ export interface AnswerRequired {
 export interface AnswerGiven {
 	type: 'answer_given';
 	call_id: string;
-	text: string;
+	/** One per question, in the order they were asked. */
+	answers: string[];
 }
 
 /** What a turn cost, as the endpoint reported it. The extras are absent or `null` when the

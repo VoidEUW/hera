@@ -171,7 +171,9 @@ already looking. `tone` and `character` are the mind regions that govern it. An
 `Literal` of `unsure · blocked · choice` — the three occasions the `uncertainty` region already
 describes — in the tool's own schema, where the model cannot invent one and the card does not have
 to look one up. `AnswerRequired.kind` stays a plain `str`, because `hera_chats` may not learn her
-tool's schema and a turn persisted before the set was closed still has to load.
+tool's schema and a turn persisted before the set was closed still has to load. One call carries up
+to three independent `questions`, each with optional `options`, and is still one card with one
+reply ([ADR 26](docs/adr/0026-a-question-may-come-in-threes.md)); `kind` stays once per call.
 
 Which language she answers in is the `language` mind region, edited on Settings → Mind like every
 other behaviour.

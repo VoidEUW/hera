@@ -80,6 +80,16 @@ Speed is measured by Hera, so every endpoint has it. Checking the counts fixed t
 
 Each message's corner shows its speed beside its token count.
 
+### She asks several things at once ([#64](https://github.com/VoidEUW/hera/issues/64), [ADR 26](adr/0026-a-question-may-come-in-threes.md))
+
+`hera__ask` takes `questions`: one to three independent questions, each with up to four `options`,
+and `kind` once per call. It is still one card, with a field per question and one Reply; options are
+chips above the field, and typing replaces a pick. The reply reaches her numbered, each answer beside
+its question. The schema is inlined rather than behind `$ref`, because it is prompt text.
+`AnswerRequired.questions` and `AnswerGiven.answers` replace the single fields, and turns stored in
+the old shape are folded into the new one when read. `POST /chats/{id}/answers` takes one answer
+per question.
+
 ### Servers are boxes, and a person can add one ([#108](https://github.com/VoidEUW/hera/issues/108))
 
 Settings → Servers shows every server as a box — hers first, marked with the ocellus — with its state

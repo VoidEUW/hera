@@ -20,6 +20,7 @@ from hera_chats import (
     Chat,
     ChatsSettings,
     PermissionRequired,
+    Question,
     SkillSelected,
     ToolResultEvent,
     TurnClosed,
@@ -758,7 +759,14 @@ class TestAskingBack:
     async def test_a_question_stops_the_turn(self, make_orchestrator: Make) -> None:
         tools = StubTools()
         provider = FakeProvider(
-            [tool_turn(tool_call("hera__ask", {"question": "Which slide deck?", "kind": "unsure"}))]
+            [
+                tool_turn(
+                    tool_call(
+                        "hera__ask",
+                        {"questions": [{"question": "Which slide deck?"}], "kind": "unsure"},
+                    )
+                )
+            ]
         )
 
         events = await drain(
@@ -773,7 +781,7 @@ class TestAskingBack:
         ]
         card = events[2]
         assert isinstance(card, AnswerRequired)
-        assert card.question == "Which slide deck?"
+        assert card.questions == (Question(text="Which slide deck?"),)
         assert card.kind == "unsure"
         assert isinstance(events[-1], TurnClosed)
         assert events[-1].reason == "awaiting_answer"
@@ -782,7 +790,7 @@ class TestAskingBack:
         """It is not work for a tool. The server has a body for it that refuses, which is what
         a caller outside a turn gets; inside one it never reaches the registry at all."""
         tools = StubTools()
-        provider = FakeProvider([tool_turn(tool_call("hera__ask", {"question": "Which?"}))])
+        provider = FakeProvider([tool_turn(_ask("Which?"))])
 
         await drain(make_orchestrator(provider, tools).begin(TurnContext(text="go")).stream())
 
@@ -793,16 +801,14 @@ class TestAskingBack:
         person was in it. The words arrive where a tool's output would have."""
         tools = StubTools()
         paused = await drain(
-            make_orchestrator(
-                FakeProvider([tool_turn(tool_call("hera__ask", {"question": "Which?"}))]), tools
-            )
+            make_orchestrator(FakeProvider([tool_turn(_ask("Which?"))]), tools)
             .begin(TurnContext(text="go"))
             .stream()
         )
 
         resumed = make_orchestrator(
             FakeProvider([text_turn("The second one, then.")]), tools
-        ).begin(TurnContext(text="", resume=paused, answers={"call_hera__ask": "The 2024 one."}))
+        ).begin(TurnContext(text="", resume=paused, answers={"call_hera__ask": ["The 2024 one."]}))
         events = await drain(resumed.stream())
 
         assert kinds(events) == ["tool_result", "text_delta", "turn_closed"]
@@ -820,15 +826,13 @@ class TestAskingBack:
         question was broken instead of that it went unanswered."""
         tools = StubTools()
         paused = await drain(
-            make_orchestrator(
-                FakeProvider([tool_turn(tool_call("hera__ask", {"question": "Which?"}))]), tools
-            )
+            make_orchestrator(FakeProvider([tool_turn(_ask("Which?"))]), tools)
             .begin(TurnContext(text="go"))
             .stream()
         )
 
         resumed = make_orchestrator(FakeProvider([text_turn("Carrying on.")]), tools).begin(
-            TurnContext(text="", resume=paused, answers={"call_hera__ask": "   "})
+            TurnContext(text="", resume=paused, answers={"call_hera__ask": ["   "]})
         )
         events = await drain(resumed.stream())
 
@@ -842,15 +846,13 @@ class TestAskingBack:
         what would happen if the call were only matched on its name."""
         tools = StubTools()
         paused = await drain(
-            make_orchestrator(
-                FakeProvider([tool_turn(tool_call("hera__ask", {"question": "Which?"}))]), tools
-            )
+            make_orchestrator(FakeProvider([tool_turn(_ask("Which?"))]), tools)
             .begin(TurnContext(text="go"))
             .stream()
         )
 
         resumed = make_orchestrator(FakeProvider([text_turn("Right.")]), tools).begin(
-            TurnContext(text="", resume=paused, answers={"call_hera__ask": "That one."})
+            TurnContext(text="", resume=paused, answers={"call_hera__ask": ["That one."]})
         )
         events = await drain(resumed.stream())
 
@@ -863,7 +865,7 @@ class TestAskingBack:
         runs `hera__ask` as an ordinary call — which the server itself then refuses."""
         tools = StubTools()
         orchestrator = TurnOrchestrator(
-            provider=FakeProvider([tool_turn(tool_call("hera__ask", {"question": "Which?"}))]),
+            provider=FakeProvider([tool_turn(_ask("Which?"))]),
             builder=builder,  # type: ignore[arg-type]
             router=router,  # type: ignore[arg-type]
             registry=tools,
@@ -874,6 +876,115 @@ class TestAskingBack:
 
         assert "answer_required" not in kinds(events)
         assert tools.dispatched != []
+
+    async def test_several_questions_are_one_card(self, make_orchestrator: Make) -> None:
+        """ADR 26. One call, so one card and one result — not a card per question, which would
+        be three things to settle for a call that can only have one answer."""
+        provider = FakeProvider(
+            [
+                tool_turn(
+                    tool_call(
+                        "hera__ask",
+                        {
+                            "questions": [
+                                {"question": " Which deck? ", "options": ["2024", " 2025 ", ""]},
+                                {"question": "Keep the notes?"},
+                            ],
+                            "kind": "choice",
+                        },
+                    )
+                )
+            ]
+        )
+
+        events = await drain(
+            make_orchestrator(provider, StubTools()).begin(TurnContext(text="go")).stream()
+        )
+
+        cards = [event for event in events if isinstance(event, AnswerRequired)]
+        assert len(cards) == 1
+        assert cards[0].questions == (
+            Question(text="Which deck?", options=("2024", "2025")),
+            Question(text="Keep the notes?"),
+        )
+
+    @pytest.mark.parametrize(
+        ("arguments", "expected"),
+        [
+            # The shape the tool had before it took a list, from a model that remembers it.
+            ({"question": "Which?"}, (Question(text="Which?"),)),
+            # A list of bare strings is a list of questions without choices.
+            ({"questions": ["Which?", "Why?"]}, (Question(text="Which?"), Question(text="Why?"))),
+            # One option is not a choice; it is dropped, and the question kept.
+            (
+                {"questions": [{"question": "Which?", "options": ["only"]}]},
+                (Question(text="Which?"),),
+            ),
+            # Nothing usable is one empty question, which the card says plainly.
+            ({"questions": [{"nope": 1}]}, (Question(text=""),)),
+            ({}, (Question(text=""),)),
+        ],
+        ids=["legacy", "strings", "one-option", "garbage", "empty"],
+    )
+    async def test_what_the_model_wrote_is_read_tolerantly(
+        self,
+        make_orchestrator: Make,
+        arguments: dict[str, object],
+        expected: tuple[Question, ...],
+    ) -> None:
+        """Nothing validates these arguments — the call is never dispatched — so a card is
+        built from whatever arrived rather than failing on it."""
+        provider = FakeProvider([tool_turn(tool_call("hera__ask", arguments))])
+
+        events = await drain(
+            make_orchestrator(provider, StubTools()).begin(TurnContext(text="go")).stream()
+        )
+
+        card = next(event for event in events if isinstance(event, AnswerRequired))
+        assert card.questions == expected
+
+    async def test_several_replies_are_numbered_beside_their_questions(
+        self, make_orchestrator: Make
+    ) -> None:
+        """A model reading three bare lines has to line them up with its own call by
+        position. Each reply goes beside the question it answers instead."""
+        tools = StubTools()
+        paused = await drain(
+            make_orchestrator(FakeProvider([tool_turn(_ask("Which deck?", "Keep notes?"))]), tools)
+            .begin(TurnContext(text="go"))
+            .stream()
+        )
+
+        resumed = make_orchestrator(FakeProvider([text_turn("Right.")]), tools).begin(
+            TurnContext(text="", resume=paused, answers={"call_hera__ask": ["2024", " "]})
+        )
+        events = await drain(resumed.stream())
+
+        result = events[0]
+        assert isinstance(result, ToolResultEvent)
+        assert result.ok
+        assert result.text == "1. Which deck? → 2024\n2. Keep notes? → no answer"
+
+    async def test_several_replies_all_empty_say_so_once(self, make_orchestrator: Make) -> None:
+        tools = StubTools()
+        paused = await drain(
+            make_orchestrator(FakeProvider([tool_turn(_ask("Which?", "Why?"))]), tools)
+            .begin(TurnContext(text="go"))
+            .stream()
+        )
+
+        resumed = make_orchestrator(FakeProvider([text_turn("Carrying on.")]), tools).begin(
+            TurnContext(text="", resume=paused, answers={"call_hera__ask": ["", ""]})
+        )
+        events = await drain(resumed.stream())
+
+        result = events[0]
+        assert isinstance(result, ToolResultEvent)
+        assert "replied with nothing" in result.text
+
+
+def _ask(*questions: str) -> ToolCallReady:
+    return tool_call("hera__ask", {"questions": [{"question": text} for text in questions]})
 
 
 class TestWhenThingsGoWrong:

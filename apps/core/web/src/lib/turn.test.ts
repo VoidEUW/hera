@@ -9,7 +9,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { AnyEvent } from './api/events';
-import { isAnswered, reduce, replyTo } from './turn';
+import { isAnswered, reduce, repliesTo } from './turn';
 
 const text = (t: string): AnyEvent => ({ type: 'text_delta', text: t });
 const closed = (reason = 'completed'): AnyEvent => ({
@@ -131,7 +131,7 @@ describe('prose', () => {
 				type: 'answer_required',
 				call_id: 'q1',
 				tool: 'hera__ask',
-				question: 'Which deck?',
+				questions: [{ text: 'Which deck?', options: [] }],
 				kind: 'choice'
 			},
 			{ type: 'thinking_delta', text: 'b' },
@@ -255,7 +255,7 @@ describe('question cards', () => {
 		type: 'answer_required',
 		call_id: 'q1',
 		tool: 'hera__ask',
-		question: 'Which deck?',
+		questions: [{ text: 'Which deck?', options: [] }],
 		kind: 'unsure'
 	};
 
@@ -281,7 +281,7 @@ describe('question cards', () => {
 		const turn = reduce([
 			call('q1', 'hera__ask'),
 			asked,
-			{ type: 'answer_given', call_id: 'q1', text: 'The 2024 one.' },
+			{ type: 'answer_given', call_id: 'q1', answers: ['The 2024 one.'] },
 			result('q1', 'hera__ask', { text: 'The 2024 one.' }),
 			text('Right.'),
 			closed()
@@ -295,20 +295,20 @@ describe('question cards', () => {
 		const events = [
 			call('q1', 'hera__ask'),
 			asked,
-			{ type: 'answer_given', call_id: 'q1', text: 'The 2024 one.' } as AnyEvent,
+			{ type: 'answer_given', call_id: 'q1', answers: ['The 2024 one.'] } as AnyEvent,
 			result('q1', 'hera__ask'),
 			closed()
 		];
 
 		expect(reduce(events).awaiting).toHaveLength(0);
 		expect(isAnswered(events, 'q1')).toBe(true);
-		expect(replyTo(events, 'q1')).toBe('The 2024 one.');
+		expect(repliesTo(events, 'q1')).toEqual(['The 2024 one.']);
 	});
 
 	it('leaves an unanswered question with no reply to show', () => {
 		const events = [call('q1', 'hera__ask'), asked, closed('awaiting_answer')];
 		expect(isAnswered(events, 'q1')).toBe(false);
-		expect(replyTo(events, 'q1')).toBe('');
+		expect(repliesTo(events, 'q1')).toEqual([]);
 	});
 });
 
@@ -558,12 +558,12 @@ describe('a call she has begun but not finished writing', () => {
 	it('draws no gutter row for a question she has begun', () => {
 		const turn = reduce([
 			started('a1', 'hera__ask'),
-			call('a1', 'hera__ask', { question: 'Which deck?' }),
+			call('a1', 'hera__ask', { questions: [{ question: 'Which deck?' }] }),
 			{
 				type: 'answer_required',
 				call_id: 'a1',
 				tool: 'hera__ask',
-				question: 'Which deck?',
+				questions: [{ text: 'Which deck?', options: [] }],
 				kind: ''
 			},
 			closed('awaiting_answer')

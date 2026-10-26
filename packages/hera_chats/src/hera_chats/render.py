@@ -119,7 +119,15 @@ def _tool_detail(call: ToolCallReady, result: ToolResultEvent | None) -> str:
 
 
 def _answer_line(event: AnswerRequired, given: AnswerGiven | None) -> str:
-    line = f"> asked: {event.question}"
-    if given is not None:
-        return f"{line} — replied: {given.text}"
-    return f"{line} — awaiting a reply"
+    # One line per question, each with its own reply: a call that asked three things reads as
+    # three exchanges, which is what a person reading the export remembers having.
+    replies = given.answers if given is not None else ()
+    lines = []
+    for index, question in enumerate(event.questions):
+        line = f"> asked: {question.text}"
+        if given is None:
+            lines.append(f"{line} — awaiting a reply")
+        else:
+            reply = replies[index] if index < len(replies) else ""
+            lines.append(f"{line} — replied: {reply}")
+    return "\n\n".join(lines)

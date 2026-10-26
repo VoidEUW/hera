@@ -372,11 +372,25 @@ def answer_question(
     # Checked against the paused turn rather than trusted: a call id that was never asked about
     # would otherwise resume a turn with an answer to nothing in it, and the model would be
     # handed a tool result for a call it never made.
-    asked = {event.call_id for event in recorded if isinstance(event, AnswerRequired)}
-    if payload.call_id not in asked:
+    asked = next(
+        (
+            event
+            for event in recorded
+            if isinstance(event, AnswerRequired) and event.call_id == payload.call_id
+        ),
+        None,
+    )
+    if asked is None:
         raise not_found("question to answer")
+    # One answer per question. Padding or trimming a mismatch would put a reply beside the
+    # wrong question, and she would carry on with it as though that is what was said.
+    if len(payload.answers) != len(asked.questions):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=f"that call asked {len(asked.questions)} question(s) and needs one answer each",
+        )
 
-    given = AnswerGiven(call_id=payload.call_id, text=payload.text)
+    given = AnswerGiven(call_id=payload.call_id, answers=tuple(payload.answers))
 
     return _stream(
         container,
@@ -386,7 +400,7 @@ def answer_question(
         text="",
         lead=[given],
         resume=[*recorded, given],
-        answers={payload.call_id: payload.text},
+        answers={payload.call_id: payload.answers},
     )
 
 

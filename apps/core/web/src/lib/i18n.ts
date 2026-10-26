@@ -167,6 +167,10 @@ export const t = {
 		asked: 'asked you',
 		nothing: 'She asked something, and it arrived empty.',
 		placeholder: 'Answer…',
+		/** The field under a question that offers choices: picking one is enough. */
+		ownWords: 'Or in your own words…',
+		/** The label on the row of choices, for a screen reader. */
+		options: 'Choices',
 		noReply: 'You answered with nothing.',
 		send: 'Reply',
 		/** What sort of question it is, from `hera_mcp.ASK_KINDS` (ADR 17). Three words in the

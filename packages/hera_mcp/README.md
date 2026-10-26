@@ -20,11 +20,14 @@ The server is mounted under its own `name`, so `"hera"` is written once, here.
 
 ## The one that is never run
 
-`hera__ask(question, kind)` is the tool a **person** answers. `hera_chats` recognises it by name
-before dispatch — through `ChatsSettings.asking_tools`, filled in from `ASK_TOOL`, because that
-package may not import this one — records the question, and closes the turn the way a permission
-card closes it. The reply becomes that call's `tool_result`, so nothing on the model's side of the
-loop learns a person was in it.
+`hera__ask(questions, kind)` is the tool a **person** answers. `questions` holds one to three
+questions, each `{question, options?}` with two to four short choices when the answer is a pick
+([ADR 26](../../docs/adr/0026-a-question-may-come-in-threes.md)), and `kind` is one of
+`unsure · blocked · choice`, once per call. `hera_chats` recognises it by name before dispatch —
+through `ChatsSettings.asking_tools`, filled in from `ASK_TOOL`, because that package may not import
+this one — records the questions as one card, and closes the turn the way a permission card closes
+it. The reply becomes that call's `tool_result`, so nothing on the model's side of the loop learns a
+person was in it.
 
 The body here therefore only runs when something drives this server from *outside* a turn, and it
 refuses, saying the question was not put to anybody. Returning something that looks like an answer
