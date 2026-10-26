@@ -93,3 +93,32 @@ def test_an_answer_is_a_bar_today_and_in_every_total(page: Any) -> None:
     chart.press("ArrowLeft")
     assert chart.get_attribute("aria-valuenow") == "29"
     assert re.search(r": 0 read, 0 written$", chart.get_attribute("aria-valuetext") or "")
+
+
+def test_a_screen_that_cannot_load_says_so_and_can_try_again(page: Any) -> None:
+    """A 500 used to be one grey line reading `500 Internal Server Error`. It is now the error
+    page at pane size: the status, what it means, what the server said, and a way back."""
+    failing = {"on": True}
+
+    def answer(route: Any) -> None:
+        if failing["on"]:
+            route.fulfill(status=500, json={"detail": "no such column: chat_usage.source"})
+        else:
+            route.continue_()
+
+    page.route("**/api/v1/usage?*", answer)
+    page.get_by_role("button", name="Settings").first.click()
+    page.get_by_role("navigation", name="Settings").get_by_role("button", name="Usage").click()
+
+    panel = page.locator("[role=dialog]")
+    alert = panel.get_by_role("alert")
+    alert.wait_for(timeout=15_000)
+    assert alert.get_by_text("500 · Server error").count() == 1
+    assert alert.get_by_role("heading", name="Could not load usage").count() == 1
+    alert.get_by_text("What the server said").click()
+    assert alert.get_by_text("no such column: chat_usage.source").count() == 1
+
+    failing["on"] = False
+    alert.get_by_role("button", name="Try again").click()
+    panel.locator("dl.totals").wait_for(timeout=15_000)
+    assert panel.get_by_role("alert").count() == 0

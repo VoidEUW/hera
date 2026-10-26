@@ -68,7 +68,7 @@ written (completion) tokens stacked, and totals for the last 24 hours, 7 days an
 person points at another or moves with the arrow keys. The numbers come from a ledger, `chat_usage`,
 written beside each recorded turn and never deleted with the chat, so a day's bar does not shrink when a
 chat from that day is removed or an answer is asked again. Migration 0006 backfills it from the stored
-`turn_closed` events. `GET /usage?days=&tz=` cuts the days in the browser's time zone.
+`turn_closed` events, and 0007 adds the cache, reasoning and timing columns. `GET /usage?days=&tz=` cuts the days in the browser's time zone.
 
 Each window also shows the share of the prompt the endpoint had cached, the thinking tokens, and the
 speed with the wait for the first token. Cache and thinking are shown when the endpoint reports them.

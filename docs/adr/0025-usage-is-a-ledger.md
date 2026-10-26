@@ -32,6 +32,8 @@ deletes it.**
   next to the skill-usage count, through `hera_chats.UsageRepository`.
 - Migration 0006 backfills it from the `turn_closed` events of the messages that still exist, dated
   by when each message was last written.
+  Migration 0007 adds the cache, reasoning and timing columns. It is a separate revision because a
+  database that already ran 0006 never runs it again.
 - `GET /usage?days=30&tz=` cuts the rows into days in the reader's time zone (the browser sends its
   own, then the one on Settings → General, then UTC). The three totals are rolling windows. Counts
   are only what the endpoint reported: Hera does not estimate, so an endpoint that reports nothing

@@ -692,6 +692,14 @@ Stacked bars, one per slot — Settings → Usage's thirty days (#111). Inline S
 - Parts and states: readout; legend; plot (focus ring on keyboard focus); ends; empty data draws no bars
 - Motion: none — the chart is read, not watched
 
+#### Error page · panel (extends `hera/error-page`)
+
+The same card for one pane of a larger screen, such as a settings screen that could not load. It has no ground of its own and no full height, a 32px mark, a 21px title and a 13px body. The kind's word over the title carries the status when the caller knows it (`500 · Server error`), because the number is what a person searches for. The server's own words sit behind the disclosure, and **Try again** is the one action.
+
+- Tokens: as `hera/error-page`
+- Parts and states: as `hera/error-page`, at pane size
+- Motion: `error.enter`
+
 #### Attachment chip · `hera/attachment`
 
 A file going with a message, and the same file in the sent bubble. The builder's `.att`, as its own component: icon or thumbnail, name, size or "uploading" with a 2px laurel bar on the bottom edge, and a small close button while it can still be taken off.

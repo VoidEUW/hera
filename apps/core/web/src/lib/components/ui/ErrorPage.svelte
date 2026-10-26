@@ -26,6 +26,12 @@
 
 	interface Props {
 		kind: Kind;
+		/** `page` replaces a whole screen; `panel` stands in for one pane of a larger one — a
+		 * settings screen, a side view — and is the same card, scaled to the room it has. */
+		size?: 'page' | 'panel';
+		/** The small line over the title. Defaults to the kind's own word; a caller that knows the
+		 * status says it (`500 · Server error`), because the number is what a person searches for. */
+		code?: string;
 		title: string;
 		body: string;
 		/** A command to copy, with a line saying what it does. */
@@ -38,7 +44,18 @@
 		children?: Snippet;
 	}
 
-	let { kind, title, body, command, primary, secondary, detail, children }: Props = $props();
+	let {
+		kind,
+		size = 'page',
+		code,
+		title,
+		body,
+		command,
+		primary,
+		secondary,
+		detail,
+		children
+	}: Props = $props();
 
 	async function copy(text: string) {
 		try {
@@ -50,10 +67,10 @@
 	}
 </script>
 
-<div class="page">
+<div class="page {size}">
 	<section class="card {kind}" role={kind === 'not-found' ? undefined : 'alert'}>
 		<Ocellus
-			size={44}
+			size={size === 'panel' ? 32 : 44}
 			closed={kind === 'offline'}
 			tone={kind === 'server'
 				? 'server'
@@ -63,7 +80,7 @@
 						? 'model'
 						: undefined}
 		/>
-		<div class="code">{t.errorPage[kind]}</div>
+		<div class="code">{code ?? t.errorPage[kind]}</div>
 		<h1>{title}</h1>
 		<p class="body">{body}</p>
 
@@ -121,6 +138,28 @@
 		background: var(--surface);
 		text-align: center;
 		animation: rise var(--motion-error-enter);
+	}
+
+	/* A pane, not a screen: no ground of its own and no claim on the full height, so it sits in
+	   the panel it replaced rather than pushing the panel's frame around. */
+	.panel {
+		min-height: 0;
+		padding: 28px 0;
+		background: none;
+	}
+
+	.panel .card {
+		gap: 10px;
+		max-width: 440px;
+		padding: 24px;
+	}
+
+	.panel h1 {
+		font-size: 21px;
+	}
+
+	.panel .body {
+		font-size: 13px;
 	}
 
 	@keyframes rise {

@@ -15,12 +15,14 @@
 	import { t } from '$lib/i18n';
 	import { Placeholder } from '$lib/loading.svelte';
 	import { bars, browserZone, isEmpty, rate, seconds, speed } from '$lib/usage';
+	import LoadFailed from './LoadFailed.svelte';
 	import Rows from './Rows.svelte';
 
 	const DAYS = 30;
 
 	let report = $state<UsageReport | null>(null);
-	let error = $state('');
+	/** Why the report could not be read, if it could not. Kept as thrown, for `LoadFailed`. */
+	let failed = $state<unknown>(null);
 
 	/** Set where the load begins and ends, as on Memory: a fetch from this machine can finish
 	 * before effects next flush, and an effect over a flag would never draw the placeholder. */
@@ -36,9 +38,9 @@
 	async function load() {
 		try {
 			report = await api.usage(DAYS, zone);
-			error = '';
+			failed = null;
 		} catch (cause) {
-			error = cause instanceof Error ? cause.message : String(cause);
+			failed = cause;
 		} finally {
 			settling.set(false);
 		}
@@ -56,12 +58,10 @@
 	);
 </script>
 
-{#if error}
-	<p class="failed">{error}</p>
-{/if}
-
 {#if settling.shown}
 	<Rows label={t.usage.loading} />
+{:else if failed !== null}
+	<LoadFailed cause={failed} what={t.loadFailed.what.usage} onretry={load} />
 {:else if report}
 	<section class="usage">
 		{#if isEmpty(report)}
@@ -161,8 +161,7 @@
 	}
 
 	.note,
-	.empty,
-	.failed {
+	.empty {
 		margin: 0;
 		max-width: var(--measure);
 		font-size: 12.5px;
@@ -172,10 +171,6 @@
 	.empty {
 		font-size: 13.5px;
 		color: var(--text-muted);
-	}
-
-	.failed {
-		color: var(--danger);
 	}
 
 	@media (max-width: 600px) {

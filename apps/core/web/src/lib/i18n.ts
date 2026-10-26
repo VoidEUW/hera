@@ -891,6 +891,33 @@ export const t = {
 		signInPasskey: 'Sign in with a passkey',
 		registerPasskey: 'Register with a passkey'
 	},
+	/** A pane that could not load (`$lib/errors`). `what` is lower case: "usage". */
+	loadFailed: {
+		serverTitle: (what: string) => `Could not load ${what}`,
+		serverBody:
+			'Hera’s server ran into an error while reading this. Trying again may help; if it keeps happening, the server’s log says why — the line below is what it answered.',
+		refused: 'Refused',
+		refusedBody:
+			'The server refused the request. The line below is what it said, and usually what to change.',
+		offlineTitle: (what: string) => `Could not reach the server for ${what}`,
+		offlineBody: 'Nothing answered. Is hera serve still running?',
+		notFound: 'Not found',
+		notFoundTitle: (what: string) => `The server does not know where ${what} is`,
+		notFoundBody:
+			'The interface may be newer than the server it is talking to. Restart hera serve and try again.',
+		detail: 'What the server said',
+		/** What each settings screen loads, for the title: "Could not load usage". */
+		what: {
+			usage: 'usage',
+			memory: 'her memories',
+			mind: 'her mind regions',
+			skills: 'skills',
+			servers: 'servers',
+			permissions: 'permission rules',
+			models: 'models'
+		}
+	},
+
 	errorPage: {
 		offline: 'Offline',
 		server: 'Server error',

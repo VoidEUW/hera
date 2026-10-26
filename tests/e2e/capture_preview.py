@@ -849,6 +849,25 @@ def act_usage(page: Page, base: str, shots: Path, report: Report) -> None:
         page.keyboard.press("Escape")
         page.wait_for_timeout(300)
 
+    with report.scene("settings-load-failed", "settings", page, shots):
+        # A pane that could not load, at pane size. The failure is the route's, forced here,
+        # so the console's one expected error is the browser reporting that 500.
+        page.route(
+            "**/api/v1/usage?*",
+            lambda route: route.fulfill(
+                status=500, json={"detail": "no such column: chat_usage.source"}
+            ),
+        )
+        page.get_by_role("button", name="Settings").first.click(timeout=5_000)
+        page.get_by_role("navigation", name="Settings").get_by_role("button", name="Usage").click()
+        page.locator("[role='dialog'] [role='alert']").wait_for(timeout=10_000)
+        page.get_by_text("What the server said").click()
+        page.wait_for_timeout(600)
+        shoot(page, shots, "52-settings-load-failed")
+        page.unroute("**/api/v1/usage?*")
+        page.keyboard.press("Escape")
+        page.wait_for_timeout(300)
+
 
 def act_profile(page: Page, base: str, shots: Path, report: Report) -> None:
     """Settings → General, and the light theme it carries.

@@ -15,6 +15,7 @@
 	import Avatar from '$lib/components/ui/Avatar.svelte';
 	import BarChart from '$lib/components/ui/BarChart.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
+	import ErrorPage from '$lib/components/ui/ErrorPage.svelte';
 	import Checkbox from '$lib/components/ui/Checkbox.svelte';
 	import Confirm from '$lib/components/ui/Confirm.svelte';
 	import Palette, { type PaletteItem } from '$lib/components/ui/Palette.svelte';
@@ -391,6 +392,15 @@ Pick a direction before writing a line of CSS.
 			]}
 			describe={(bar) => `${bar.label}: ${bar.values[0]} read, ${bar.values[1]} written`}
 			ends={['Day 1', 'Day 14']}
+		/>
+		<ErrorPage
+			size="panel"
+			kind="server"
+			code="500 · Server error"
+			title="Could not load usage"
+			body="Hera’s server ran into an error while reading this. Trying again may help."
+			primary={{ label: 'Try again', onclick: () => {} }}
+			detail={{ label: 'What the server said', text: '500 · Internal Server Error' }}
 		/>
 		<Skeleton rows={3} />
 	</section>

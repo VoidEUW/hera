@@ -226,6 +226,44 @@ class TestMigrations:
         assert rows[0].chat_id == chat
         database.dispose()
 
+    def test_a_ledger_made_by_0006_gains_what_is_known_without_losing_a_row(self) -> None:
+        """0007 is its own revision because 0006 had already been run (#111): a database at
+        0006 never runs it again, and reading the ledger there failed on columns it did not
+        have. Rows already there become turns with every extra unknown."""
+        from alembic import command
+        from sqlalchemy import text
+        from sqlmodel import Session, select
+
+        from hera_chats import TurnUsage
+        from hera_core.migrations import alembic_config
+
+        database = Database.in_memory()
+        config = alembic_config(database)
+        command.upgrade(config, "0006")
+        with database.engine.begin() as connection:
+            connection.execute(
+                text(
+                    "INSERT INTO chat_usage (id, created_at, updated_at, owner_id, chat_id,"
+                    " message_id, ordinal, at, prompt_tokens, completion_tokens) VALUES"
+                    " (:id, :now, :now, :o, :c, :m, 0, :now, 900, 30)"
+                ),
+                {
+                    "id": uuid4().hex,
+                    "now": "2026-10-26 10:00:00.000000",
+                    "o": uuid4().hex,
+                    "c": uuid4().hex,
+                    "m": uuid4().hex,
+                },
+            )
+
+        command.upgrade(config, "head")
+
+        with Session(database.engine) as session:
+            [row] = list(session.exec(select(TurnUsage)).all())
+        assert (row.source, row.prompt_tokens, row.completion_tokens) == ("turn", 900, 30)
+        assert row.cached_tokens is None and row.first_token_ms is None
+        database.dispose()
+
     def test_all_tables_carry_a_package_prefix(self) -> None:
         """All models share one MetaData, so an unprefixed name from two packages collides."""
         for name in TABLE_NAMES:
