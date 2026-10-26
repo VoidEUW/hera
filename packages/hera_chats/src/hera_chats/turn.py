@@ -25,6 +25,7 @@ would be a turn that dies with the tab.
 from __future__ import annotations
 
 import asyncio
+import time
 from collections import Counter
 from collections.abc import AsyncGenerator, AsyncIterator, Mapping, Sequence
 from dataclasses import dataclass, field
@@ -37,6 +38,7 @@ from hera_chats.events import (
     SkillSelected,
     ToolResultEvent,
     TurnClosed,
+    TurnTiming,
     coalesce,
 )
 from hera_chats.history import Attachment, content_of, says_something, turn_to_messages
@@ -168,6 +170,10 @@ class _Round:
     calls: list[ToolCallReady] = field(default_factory=list)
     usage: Usage | None = None
     reason: str = "stop"
+    waiting_ms: float | None = None
+    """Request sent to the first thing back. ``None`` until the round has ended."""
+    generating_ms: float | None = None
+    """First thing back to the round's end. ``None`` when nothing came back before the end."""
 
 
 class Turn:
@@ -202,6 +208,12 @@ class Turn:
         # skills and the permission card twice.
         self._inherited = len(self._recorded)
         self._closed = False
+        # What this turn's rounds have cost and taken so far. Held here rather than in `_run`'s
+        # locals so a turn that is stopped, cut off or fails still closes with the rounds that
+        # did finish -- they were spent whether or not the turn got to the end.
+        self._spent: Usage | None = None
+        self._context: int | None = None
+        self._timing: TurnTiming | None = None
         # How often each identical call has run in this turn, and what it said. Keyed on the
         # tool and its arguments, so `search("a")` and `search("b")` are different calls and
         # `search("a")` twice is the same one.
@@ -278,20 +290,14 @@ class Turn:
             async for event in self._answer(pending):
                 yield event
 
-        total = Usage()
-        reported = False
         for iteration in range(1, self._settings.max_iterations + 1):
             round_ = _Round()
             async for event in self._ask(self._messages(base), tools, round_):
                 yield event
-            if round_.usage is not None:
-                reported = True
-                total = _add(total, round_.usage)
+            self._count(round_)
 
             if not round_.calls:
-                yield self._close(
-                    "completed", usage=total if reported else None, iterations=iteration
-                )
+                yield self._close("completed", iterations=iteration)
                 return
 
             blocked = self._blocked(round_.calls)
@@ -305,9 +311,7 @@ class Turn:
                             reason=reason,
                         )
                     )
-                yield self._close(
-                    "awaiting_permission", usage=total if reported else None, iterations=iteration
-                )
+                yield self._close("awaiting_permission", iterations=iteration)
                 return
 
             # A question is checked after permission and before dispatch. After, because a
@@ -328,9 +332,7 @@ class Turn:
                 # stopped; running the rest would act on the assumption the question was about.
                 # They are never sent to the model either, because the resumed turn rebuilds
                 # history from the event list and there is no result for them in it.
-                yield self._close(
-                    "awaiting_answer", usage=total if reported else None, iterations=iteration
-                )
+                yield self._close("awaiting_answer", iterations=iteration)
                 return
 
             async for event in self._answer(round_.calls):
@@ -344,15 +346,9 @@ class Turn:
         final = _Round()
         async for event in self._ask([*self._messages(base), _wrap_up()], [], final):
             yield event
-        if final.usage is not None:
-            reported = True
-            total = _add(total, final.usage)
+        self._count(final)
 
-        yield self._close(
-            "max_iterations",
-            usage=total if reported else None,
-            iterations=self._settings.max_iterations,
-        )
+        yield self._close("max_iterations", iterations=self._settings.max_iterations)
 
     # -- building the request -----------------------------------------------------------
 
@@ -550,13 +546,22 @@ class Turn:
             # see ChatsSettings.extra.
             extra=self._settings.extra,
         )
+        sent = _clock()
+        first: float | None = None
         async for event in self._provider.stream(request):
             if isinstance(event, TurnEnd):
                 # Consumed, not forwarded: it is the model's full stop for this round trip,
                 # and a turn with tools in it has several. See hera_chats.events.
                 round_.usage = event.usage
                 round_.reason = event.reason
+                ended = _clock()
+                round_.waiting_ms = _ms((first if first is not None else ended) - sent)
+                round_.generating_ms = None if first is None else _ms(ended - first)
                 continue
+            if first is None:
+                # Anything at all: a thought, a word, the start of a call. The wait a person
+                # sits through ends when something moves, not when the first visible word does.
+                first = _clock()
             if isinstance(event, ToolCallStarted):
                 # Streamed, not recorded. It says *she has begun calling this* minutes before
                 # the arguments finish arriving, which is the difference between a screen that
@@ -740,20 +745,48 @@ class Turn:
         """
         return self._close(reason, error=error)
 
+    def _count(self, round_: _Round) -> None:
+        """Add one finished round to what the turn has cost and taken."""
+        if round_.usage is not None:
+            self._spent = _add(self._spent, round_.usage)
+            self._context = round_.usage.prompt_tokens + round_.usage.completion_tokens
+        if round_.waiting_ms is None:
+            return
+        timing = self._timing or TurnTiming(first_token_ms=round_.waiting_ms)
+        # Speed is completion tokens over generating time, so a round only adds to either when
+        # it has both: a round with no count would add time with nothing to divide it into.
+        generating = round_.generating_ms if round_.usage is not None else None
+        self._timing = TurnTiming(
+            first_token_ms=timing.first_token_ms,
+            waiting_ms=timing.waiting_ms + round_.waiting_ms,
+            generating_ms=timing.generating_ms + (generating or 0.0),
+            timed_completion_tokens=timing.timed_completion_tokens
+            + (round_.usage.completion_tokens if generating is not None and round_.usage else 0),
+        )
+
     def _close(
         self,
         reason: CloseReason,
         *,
-        usage: Usage | None = None,
         iterations: int = 0,
         error: str = "",
     ) -> ChatEvent:
-        """Append the one terminator. Idempotent, so a cancellation after a close is a no-op."""
+        """Append the one terminator. Idempotent, so a cancellation after a close is a no-op.
+
+        Always with what the finished rounds cost, however the turn ended.
+        """
         if self._closed:
             return self._recorded[-1]
         self._closed = True
         return self._record(
-            TurnClosed(reason=reason, usage=usage, iterations=iterations, error=error)
+            TurnClosed(
+                reason=reason,
+                usage=self._spent,
+                context_tokens=self._context,
+                timing=self._timing,
+                iterations=iterations,
+                error=error,
+            )
         )
 
 
@@ -960,9 +993,33 @@ def _refused(call: ToolCallReady, *, configured: bool) -> ToolResultEvent:
     return ToolResultEvent(call_id=call.id, tool=call.name, ok=False, failure="denied", text=text)
 
 
-def _add(total: Usage, extra: Usage) -> Usage:
+_clock = time.monotonic
+"""Where round timings are read from. A module attribute so a test can stand a fake in for it."""
+
+
+def _ms(seconds: float) -> float:
+    return round(max(0.0, seconds) * 1000, 1)
+
+
+def _add(total: Usage | None, extra: Usage) -> Usage:
+    """Two rounds' usage together. An extra only one of them reported keeps that one's value;
+    one neither reported stays unknown rather than becoming 0."""
+    if total is None:
+        return extra
     return Usage(
         prompt_tokens=total.prompt_tokens + extra.prompt_tokens,
         completion_tokens=total.completion_tokens + extra.completion_tokens,
         total_tokens=total.total_tokens + extra.total_tokens,
+        cached_tokens=_either(total.cached_tokens, extra.cached_tokens),
+        reasoning_tokens=_either(total.reasoning_tokens, extra.reasoning_tokens),
+        server_prompt_ms=_either(total.server_prompt_ms, extra.server_prompt_ms),
+        server_generation_ms=_either(total.server_generation_ms, extra.server_generation_ms),
     )
+
+
+def _either[N: (int, float)](left: N | None, right: N | None) -> N | None:
+    if left is None:
+        return right
+    if right is None:
+        return left
+    return left + right

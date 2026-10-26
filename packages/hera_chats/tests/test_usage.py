@@ -14,6 +14,7 @@ from hera_chats import (
     MessageRepository,
     Tokens,
     TurnClosed,
+    TurnTiming,
     TurnUsage,
     UsageRepository,
     summarise,
@@ -135,9 +136,9 @@ class TestTheSummary:
         ]
         summary = summarise(rows, now=NOW, zone=ZoneInfo("UTC"), days=30)
 
-        assert summary.day == Tokens(1, 1)
-        assert summary.week == Tokens(11, 3)
-        assert summary.month == Tokens(111, 6)
+        assert summary.day.tokens == Tokens(1, 1)
+        assert summary.week.tokens == Tokens(11, 3)
+        assert summary.month.tokens == Tokens(111, 6)
 
     def test_a_short_chart_still_has_the_months_total(self) -> None:
         """The totals do not depend on how many bars were asked for."""
@@ -145,9 +146,94 @@ class TestTheSummary:
         summary = summarise(rows, now=NOW, zone=ZoneInfo("UTC"), days=7)
 
         assert sum(day.tokens.prompt_tokens for day in summary.days) == 0
-        assert summary.month.prompt_tokens == 100
+        assert summary.month.tokens.prompt_tokens == 100
 
     def test_the_window_reaches_the_first_local_day_or_a_month_back(self) -> None:
         utc = ZoneInfo("UTC")
         assert window_start(now=NOW, zone=utc, days=7) == NOW - timedelta(days=30)
         assert window_start(now=NOW, zone=utc, days=60) == datetime(2026, 8, 28, tzinfo=utc)
+
+
+class TestWhatIsKnownAboutTheTokens:
+    def test_a_row_keeps_the_extras_and_the_timing(self, session: Session, chat: Chat) -> None:
+        message = MessageRepository(session).start_assistant_message(chat)
+        close = TurnClosed(
+            usage=Usage(
+                prompt_tokens=1000,
+                completion_tokens=100,
+                total_tokens=1100,
+                cached_tokens=800,
+                reasoning_tokens=60,
+            ),
+            timing=TurnTiming(
+                first_token_ms=420.0,
+                waiting_ms=500.0,
+                generating_ms=2000.0,
+                timed_completion_tokens=100,
+            ),
+        )
+        [written] = UsageRepository(session).record(message, [close])
+
+        assert (written.cached_tokens, written.reasoning_tokens) == (800, 60)
+        assert (written.first_token_ms, written.generating_ms) == (420.0, 2000.0)
+        assert written.timed_completion_tokens == 100
+        assert written.source == "turn"
+
+    def test_the_title_request_is_its_own_row_and_only_once(
+        self, session: Session, chat: Chat
+    ) -> None:
+        usage = UsageRepository(session)
+        message = MessageRepository(session).start_assistant_message(chat)
+        spent = Usage(prompt_tokens=80, completion_tokens=400, total_tokens=480)
+
+        first = usage.record_title(message, spent)
+        again = usage.record_title(message, spent)
+        nothing = usage.record_title(message, None)
+
+        assert first is not None and (first.source, first.ordinal) == ("title", -1)
+        assert again is None and nothing is None
+        # And the turn's own rows still start at nought beside it.
+        [turn] = usage.record(message, [closed(10, 1)])
+        assert turn.ordinal == 0
+
+    def test_the_cache_rate_is_over_the_turns_that_said(self) -> None:
+        """One turn reported 900 of 1000 cached, another said nothing: 90%, not 45%."""
+        said = row(NOW - timedelta(hours=1), prompt=1000)
+        said.cached_tokens = 900
+        silent = row(NOW - timedelta(hours=2), prompt=1000)
+        summary = summarise([said, silent], now=NOW, zone=ZoneInfo("UTC"), days=1)
+
+        assert summary.day.cache_rate == 0.9
+        assert summary.day.tokens.prompt_tokens == 2000
+
+    def test_nothing_measured_is_none_not_nought(self) -> None:
+        summary = summarise([row(NOW)], now=NOW, zone=ZoneInfo("UTC"), days=1)
+        assert summary.day.cache_rate is None
+        assert summary.day.tokens_per_second is None
+        assert summary.day.first_token_ms is None
+        assert summary.day.reasoning_tokens is None
+
+    def test_speed_is_timed_tokens_over_time_spent_writing(self) -> None:
+        fast = row(NOW - timedelta(hours=1), completion=200)
+        fast.generating_ms, fast.timed_completion_tokens, fast.first_token_ms = 2000.0, 200, 300.0
+        slow = row(NOW - timedelta(hours=2), completion=100)
+        slow.generating_ms, slow.timed_completion_tokens, slow.first_token_ms = 3000.0, 100, 900.0
+        untimed = row(NOW - timedelta(hours=3), completion=5000)
+        summary = summarise([fast, slow, untimed], now=NOW, zone=ZoneInfo("UTC"), days=1)
+
+        assert summary.day.tokens_per_second == 60.0  # 300 tokens over 5 s
+        assert summary.day.first_token_ms == 600.0
+
+    def test_a_title_row_counts_its_tokens_and_not_its_wait(self) -> None:
+        title = row(NOW - timedelta(hours=1))
+        title.source, title.first_token_ms = "title", 5000.0
+        summary = summarise([title], now=NOW, zone=ZoneInfo("UTC"), days=1)
+
+        assert summary.day.tokens.prompt_tokens == 100
+        assert summary.day.first_token_ms is None
+
+    def test_reasoning_adds_up_where_reported(self) -> None:
+        one, two, three = (row(NOW - timedelta(hours=h)) for h in (1, 2, 3))
+        one.reasoning_tokens, two.reasoning_tokens = 40, 2
+        summary = summarise([one, two, three], now=NOW, zone=ZoneInfo("UTC"), days=1)
+        assert summary.day.reasoning_tokens == 42

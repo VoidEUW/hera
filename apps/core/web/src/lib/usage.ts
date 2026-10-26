@@ -6,6 +6,7 @@
  * under it come to disagree.
  */
 import type { UsageReport } from '$lib/api/client';
+import type { TurnClosed, TurnTiming } from '$lib/api/events';
 import type { Bar } from '$lib/components/ui/BarChart.svelte';
 
 /** The zone this browser is in, so "today" on the chart is the reader's today. */
@@ -46,4 +47,36 @@ export function isEmpty(report: UsageReport): boolean {
 		prompt_tokens + completion_tokens === 0 &&
 		report.days.every((day) => day.prompt_tokens + day.completion_tokens === 0)
 	);
+}
+
+/** How full the window is after a turn: its last round's prompt and completion.
+ *
+ * A turn stored before that was recorded only has the sum of its rounds, which reads high on a
+ * turn that used tools — still the best figure there is for it, so it is used rather than none. */
+export function contextOf(closed: TurnClosed | null | undefined): number | null {
+	if (!closed) return null;
+	if (closed.context_tokens != null) return closed.context_tokens;
+	if (!closed.usage) return null;
+	return closed.usage.prompt_tokens + closed.usage.completion_tokens;
+}
+
+/** Tokens per second while writing, or `null` when the turn was not both timed and counted. */
+export function speedOf(timing: TurnTiming | null | undefined): number | null {
+	if (!timing || timing.generating_ms <= 0 || timing.timed_completion_tokens <= 0) return null;
+	return timing.timed_completion_tokens / (timing.generating_ms / 1000);
+}
+
+/** `48 tok/s` — whole numbers, because a tenth of a token a second is noise. */
+export function speed(perSecond: number): string {
+	return `${Math.round(perSecond).toLocaleString()} tok/s`;
+}
+
+/** `850 ms` below a second, `1.2 s` above it. */
+export function seconds(ms: number): string {
+	return ms < 1000 ? `${Math.round(ms)} ms` : `${(ms / 1000).toFixed(1)} s`;
+}
+
+/** `72%` — a share from nought to one. */
+export function rate(share: number): string {
+	return `${Math.round(share * 100)}%`;
 }

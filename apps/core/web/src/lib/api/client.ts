@@ -114,8 +114,19 @@ export interface Tokens {
  * totals. `timezone` is the zone the days were cut in. */
 export interface UsageReport {
 	days: Array<Tokens & { date: string }>;
-	totals: { day: Tokens; week: Tokens; month: Tokens };
+	totals: { day: UsageWindow; week: UsageWindow; month: UsageWindow };
 	timezone: string;
+}
+
+/** One rolling window. Each extra is `null` when nothing in it measured that: no turn
+ * reported its cache, none was timed. */
+export interface UsageWindow extends Tokens {
+	reasoning_tokens: number | null;
+	/** Nought to one, over the turns whose endpoint reported its cache. */
+	cache_rate: number | null;
+	/** Measured by Hera, including the network. */
+	tokens_per_second: number | null;
+	first_token_ms: number | null;
 }
 
 export interface MemoryBudget {

@@ -27,6 +27,8 @@
 	import { size } from '$lib/attachments';
 	import { t } from '$lib/i18n';
 	import { isAnswered, reduce, replyTo } from '$lib/turn';
+	import { tooltip } from '$lib/tooltip';
+	import { seconds, speed, speedOf } from '$lib/usage';
 	import ActivityRow from './ActivityRow.svelte';
 	import ArtifactCard from './ArtifactCard.svelte';
 	import PermissionCard from './PermissionCard.svelte';
@@ -142,6 +144,10 @@
 	 * like it cost as much as the essay it was asked to shorten. `null` on a turn still running,
 	 * and on one closed against a provider that never reported usage. */
 	const generated = $derived(closed?.usage?.completion_tokens ?? null);
+
+	/** How fast she wrote it, as Hera measured it, and how long before anything came back. */
+	const perSecond = $derived(speedOf(closed?.timing));
+	const waited = $derived(closed?.timing?.first_token_ms ?? null);
 
 	/** What the clipboard gets. `content` is the server's derived text and is what a reloaded
 	 * message carries; a turn still streaming has only its events, so the prose is joined back
@@ -354,7 +360,11 @@
 		{#if canCopy || canRedo || generated !== null}
 			<div class="actions">
 				{#if generated !== null}
-					<span class="tokens">{t.turn.tokens(generated)}</span>
+					<span
+						class="tokens"
+						use:tooltip={waited !== null ? t.turn.firstToken(seconds(waited)) : undefined}
+						>{t.turn.tokens(generated)}{perSecond !== null ? ` · ${speed(perSecond)}` : ''}</span
+					>
 				{/if}
 				{#if canCopy}
 					<IconButton

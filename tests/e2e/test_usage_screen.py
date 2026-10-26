@@ -21,9 +21,17 @@ def script() -> list[Any]:
     return [
         text_turn(
             "Counted.",
-            usage=Usage(prompt_tokens=12000, completion_tokens=345, total_tokens=12345),
+            usage=Usage(
+                prompt_tokens=12000, completion_tokens=345, total_tokens=12345, cached_tokens=9000
+            ),
         )
     ]
+
+
+@pytest.fixture
+def stream_delay() -> float:
+    """A little time between fragments, so there is a writing time to measure a speed over."""
+    return 0.02
 
 
 @pytest.fixture
@@ -56,6 +64,9 @@ def test_a_fresh_install_says_there_is_nothing_yet(page: Any) -> None:
     # The totals are still there, at nought: a screen that drops its numbers when they are
     # zero leaves a person wondering whether it worked.
     assert panel.locator("dl.totals dd strong").all_inner_texts() == ["0 tokens"] * 3
+    # Nothing measured, so no rate and no speed: a nought would be a claim nobody made.
+    assert panel.get_by_text("cached").count() == 0
+    assert panel.get_by_text("tok/s").count() == 0
 
 
 def test_an_answer_is_a_bar_today_and_in_every_total(page: Any) -> None:
@@ -73,6 +84,9 @@ def test_an_answer_is_a_bar_today_and_in_every_total(page: Any) -> None:
     assert chart.get_attribute("aria-valuenow") == "30"
     assert "12,000 read, 345 written" in (chart.get_attribute("aria-valuetext") or "")
     assert panel.locator("dl.totals dd strong").all_inner_texts() == ["12,345 tokens"] * 3
+    # What the endpoint said about its cache, and what Hera's own clock measured.
+    assert panel.get_by_text("75% of what she read was cached").count() == 3
+    assert panel.get_by_text(re.compile(r"tok/s · first token after")).count() == 3
 
     # The keyboard reads the day before, which had nothing.
     chart.focus()

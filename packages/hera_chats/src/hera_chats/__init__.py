@@ -27,6 +27,7 @@ from hera_chats.events import (
     SkillSelected,
     ToolResultEvent,
     TurnClosed,
+    TurnTiming,
     coalesce,
     visible_text,
 )
@@ -52,7 +53,7 @@ from hera_chats.repository import (
 )
 from hera_chats.settings import ChatsSettings
 from hera_chats.turn import Turn, TurnContext, TurnOrchestrator
-from hera_chats.usage import DayUsage, Tokens, UsageSummary, summarise, window_start
+from hera_chats.usage import DayUsage, Tokens, Totals, UsageSummary, summarise, window_start
 
 __all__ = [
     "CHAT_EVENT_ADAPTER",
@@ -76,10 +77,12 @@ __all__ = [
     "Tokens",
     "ToolResultEvent",
     "Tools",
+    "Totals",
     "Turn",
     "TurnClosed",
     "TurnContext",
     "TurnOrchestrator",
+    "TurnTiming",
     "TurnUsage",
     "UsageRepository",
     "UsageSummary",

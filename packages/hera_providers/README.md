@@ -53,6 +53,12 @@ than through each variant, so round-tripping stays a property of the union.
 A stream always ends in exactly one `TurnEnd`, including when the server never reported a
 finish reason.
 
+**`Usage` is read from whatever shape the server uses.** `Usage.from_wire` takes the `usage`
+object, and llama.cpp's `timings` beside it. It fills in the prompt, completion and total counts,
+and the extras some servers add: cached prompt tokens, reasoning tokens, and the server's own
+prompt and generation times. An extra the server did not send is `None`, never `0`, because
+"nothing was cached" and "this server does not say" are different facts.
+
 **Reasoning stays a separate channel all the way up.** It is displayed differently, and it must
 never be fed back into the next turn as if it were the answer.
 

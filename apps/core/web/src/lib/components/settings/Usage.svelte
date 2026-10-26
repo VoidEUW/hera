@@ -10,11 +10,11 @@
 	 * it answer *how much*. Read and written are drawn apart because they are different costs:
 	 * read is mostly the conversation and her mind sent again each turn, written is her answer.
 	 */
-	import { api, type Tokens, type UsageReport } from '$lib/api/client';
+	import { api, type UsageReport, type UsageWindow } from '$lib/api/client';
 	import BarChart from '$lib/components/ui/BarChart.svelte';
 	import { t } from '$lib/i18n';
 	import { Placeholder } from '$lib/loading.svelte';
-	import { bars, browserZone, isEmpty } from '$lib/usage';
+	import { bars, browserZone, isEmpty, rate, seconds, speed } from '$lib/usage';
 	import Rows from './Rows.svelte';
 
 	const DAYS = 30;
@@ -51,7 +51,7 @@
 					[t.usage.day, report.totals.day],
 					[t.usage.week, report.totals.week],
 					[t.usage.month, report.totals.month]
-				] as Array<[string, Tokens]>)
+				] as Array<[string, UsageWindow]>)
 			: []
 	);
 </script>
@@ -86,6 +86,19 @@
 					<dd>
 						<strong>{t.usage.tokens(tokens.prompt_tokens + tokens.completion_tokens)}</strong>
 						<span>{t.usage.split(tokens.prompt_tokens, tokens.completion_tokens)}</span>
+						{#if tokens.reasoning_tokens}
+							<span>{t.usage.reasoning(tokens.reasoning_tokens)}</span>
+						{/if}
+						<!-- Each only when something measured it: a nought here would be a claim
+						     nobody made. -->
+						{#if tokens.cache_rate !== null}
+							<span class="extra">{t.usage.cache(rate(tokens.cache_rate))}</span>
+						{/if}
+						{#if tokens.tokens_per_second !== null && tokens.first_token_ms !== null}
+							<span class="extra">
+								{t.usage.pace(speed(tokens.tokens_per_second), seconds(tokens.first_token_ms))}
+							</span>
+						{/if}
 					</dd>
 				</div>
 			{/each}
@@ -141,6 +154,10 @@
 	dd span {
 		font-size: 12px;
 		color: var(--text-muted);
+	}
+
+	dd .extra {
+		color: var(--text-faint);
 	}
 
 	.note,

@@ -53,7 +53,15 @@ class TestUsage:
         assert len(body["days"]) == 30
         assert body["days"][-1]["date"] == today_in("UTC")
         assert {d["prompt_tokens"] + d["completion_tokens"] for d in body["days"]} == {0}
-        assert body["totals"]["month"] == {"prompt_tokens": 0, "completion_tokens": 0}
+        assert body["totals"]["month"] == {
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            # Nothing measured is nothing to show, not a nought.
+            "reasoning_tokens": None,
+            "cache_rate": None,
+            "tokens_per_second": None,
+            "first_token_ms": None,
+        }
         assert body["timezone"] == "UTC"
 
     async def test_a_turn_lands_on_today_and_in_every_total(self, client: AsyncClient) -> None:
@@ -65,7 +73,8 @@ class TestUsage:
         today = body["days"][-1]
         assert (today["prompt_tokens"], today["completion_tokens"]) == (2700, 100)
         for window in ("day", "week", "month"):
-            assert body["totals"][window] == {"prompt_tokens": 2700, "completion_tokens": 100}
+            totals = body["totals"][window]
+            assert (totals["prompt_tokens"], totals["completion_tokens"]) == (2700, 100)
 
     async def test_deleting_the_chat_does_not_unspend_it(self, client: AsyncClient) -> None:
         chat = await turn(client)
@@ -113,3 +122,34 @@ class TestUsage:
         assert (await client.get(f"{API}/usage")).json()["timezone"] == "UTC"
         await client.patch(f"{API}/preferences", json={"timezone": "Asia/Tokyo"})
         assert (await client.get(f"{API}/usage")).json()["timezone"] == "Asia/Tokyo"
+
+
+class TestWhatIsKnown:
+    @pytest.fixture
+    def services(self, make_services: Any) -> Services:
+        built: Services = make_services(
+            FakeProvider(
+                [
+                    text_turn(
+                        "Cached.",
+                        usage=Usage(
+                            prompt_tokens=1000,
+                            completion_tokens=40,
+                            total_tokens=1040,
+                            cached_tokens=750,
+                            reasoning_tokens=12,
+                        ),
+                    )
+                ]
+            )
+        )
+        return built
+
+    async def test_cache_reasoning_and_speed_reach_the_screen(self, client: AsyncClient) -> None:
+        await turn(client)
+        day = (await client.get(f"{API}/usage", params={"tz": "UTC"})).json()["totals"]["day"]
+
+        assert day["cache_rate"] == 0.75
+        assert day["reasoning_tokens"] == 12
+        # Measured by Hera, so present for every endpoint; how fast depends on the machine.
+        assert day["first_token_ms"] is not None and day["first_token_ms"] >= 0

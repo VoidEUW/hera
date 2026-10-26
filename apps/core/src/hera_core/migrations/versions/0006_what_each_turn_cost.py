@@ -48,8 +48,14 @@ _usage = sa.table(
     sa.column("message_id", sa.Uuid()),
     sa.column("ordinal", sa.Integer()),
     sa.column("at", _STAMP),
+    sa.column("source", sa.String()),
     sa.column("prompt_tokens", sa.Integer()),
     sa.column("completion_tokens", sa.Integer()),
+    sa.column("cached_tokens", sa.Integer()),
+    sa.column("reasoning_tokens", sa.Integer()),
+    sa.column("first_token_ms", sa.Float()),
+    sa.column("generating_ms", sa.Float()),
+    sa.column("timed_completion_tokens", sa.Integer()),
 )
 
 
@@ -64,8 +70,14 @@ def upgrade() -> None:
         sa.Column("message_id", sa.Uuid(), nullable=False),
         sa.Column("ordinal", sa.Integer(), nullable=False),
         sa.Column("at", hera_storage.base.UTCDateTime(timezone=True), nullable=False),
+        sa.Column("source", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column("prompt_tokens", sa.Integer(), nullable=False),
         sa.Column("completion_tokens", sa.Integer(), nullable=False),
+        sa.Column("cached_tokens", sa.Integer(), nullable=True),
+        sa.Column("reasoning_tokens", sa.Integer(), nullable=True),
+        sa.Column("first_token_ms", sa.Float(), nullable=True),
+        sa.Column("generating_ms", sa.Float(), nullable=True),
+        sa.Column("timed_completion_tokens", sa.Integer(), nullable=True),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_chat_usage")),
         sa.UniqueConstraint("message_id", "ordinal", name=op.f("uq_chat_usage_message_id")),
     )
@@ -132,6 +144,13 @@ def _row(
         "message_id": message_id,
         "ordinal": ordinal,
         "at": at,
+        "source": "turn",
         "prompt_tokens": int(usage.get("prompt_tokens") or 0),
         "completion_tokens": int(usage.get("completion_tokens") or 0),
+        # A turn stored before these were read carries none of them: unknown, not nought.
+        "cached_tokens": None,
+        "reasoning_tokens": None,
+        "first_token_ms": None,
+        "generating_ms": None,
+        "timed_completion_tokens": None,
     }

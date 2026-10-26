@@ -37,6 +37,38 @@ deletes it.**
   are only what the endpoint reported: Hera does not estimate, so an endpoint that reports nothing
   counts as nothing.
 
+### What is known about the tokens, and who says so
+
+The counts alone made the screen easy to misread, and checking them turned up three places they
+were wrong. So this decision also settles what else is recorded, and where each figure comes from.
+
+- **The endpoint says**: prompt and completion tokens, and where the server sends them, **cached
+  prompt tokens** and **reasoning tokens**. Servers put these in different places, and
+  `hera_providers.Usage.from_wire` reads all of them, so nothing above that package knows about
+  any one server:
+  - `prompt_tokens_details.cached_tokens` (OpenAI, OpenRouter, vLLM, Anthropic's compatible
+    layer);
+  - `prompt_cache_hit_tokens` (DeepSeek);
+  - top-level `cached_tokens` (Moonshot);
+  - llama.cpp's `timings.cache_n`;
+  - `completion_tokens_details.reasoning_tokens`.
+- **Hera measures**: for every round, the wait from sending the request to the first thing back,
+  and the time from there to the round's end. This works on every endpoint because it asks
+  nothing of the server, and it includes the network, which is what the person waits through.
+  Speed is completion tokens over writing time, only for rounds that were both timed and counted.
+- **Unknown is not nought.** Each extra is `None` when it was not reported or measured, and every
+  rate is taken over the rows that have it. An endpoint that never reports its cache has no cache
+  rate; a 0% would claim it had one. The screen leaves such a line out.
+- **Cost and context are different figures.** `TurnClosed.usage` adds up every round of a turn,
+  which is what it cost. `TurnClosed.context_tokens` is the last round's prompt plus completion,
+  which is how full the window is. A turn with three tool rounds sends the conversation three
+  times, and the composer's meter used to show all three.
+- **A turn that does not finish still counts what it spent.** The running totals live on the
+  turn, not in a loop's locals, so a stopped, cut-off or failed turn closes with the rounds that
+  did finish.
+- **The request that names a new chat is counted too**, as its own row (`source = "title"`), so
+  her answers' figures stay hers and the endpoint's bill still adds up.
+
 ## Consequences
 
 - Deleting a chat keeps its usage rows. They hold counts and ids, nothing anybody said, so keeping
@@ -47,3 +79,8 @@ deletes it.**
   the upgrade.
 - A per-model or per-chat breakdown later is a `GROUP BY` on this table, not a new scan of every
   message's JSON.
+- Rows backfilled from before this decision have no cache, reasoning or timing figures. They count
+  toward the token totals and are left out of every rate.
+- Live speed while an answer is streaming is not part of this; it belongs to
+  [#137](https://github.com/VoidEUW/hera/issues/137). The figure here is the measured one, after
+  the answer has finished.

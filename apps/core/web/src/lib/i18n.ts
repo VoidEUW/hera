@@ -212,7 +212,9 @@ export const t = {
 		 * `completion_tokens`, not the turn's total — the prompt side is mostly history carried
 		 * forward, not something this message produced (issue #51 rules dollars out entirely — a
 		 * deployment's pricing isn't Hera's to know either way). */
-		tokens: (n: number) => `${n.toLocaleString()} tokens`
+		tokens: (n: number) => `${n.toLocaleString()} tokens`,
+		/** The tooltip on that corner: how long before anything came back. */
+		firstToken: (after: string) => `First token after ${after}`
 	},
 
 	memory: {
@@ -272,10 +274,14 @@ export const t = {
 		tokens: (n: number) => `${n.toLocaleString()} tokens`,
 		split: (prompt: number, completion: number) =>
 			`${prompt.toLocaleString()} read · ${completion.toLocaleString()} written`,
+		/** Under the split, when the endpoint said how much of the writing was thinking. */
+		reasoning: (n: number) => `of which ${n.toLocaleString()} thinking`,
+		cache: (share: string) => `${share} of what she read was cached`,
+		pace: (speed: string, wait: string) => `${speed} · first token after ${wait}`,
 		readout: (date: string, prompt: number, completion: number) =>
 			`${date}: ${prompt.toLocaleString()} read, ${completion.toLocaleString()} written`,
 		none: 'Nothing yet. Each answer she gives adds its tokens here, on the day it was given.',
-		note: 'Counts are what the model endpoint reports for each answer. A server that reports nothing counts as nothing, and Hera does not estimate.',
+		note: 'Token counts and the cache are what the model endpoint reports; a server that reports nothing counts as nothing, and Hera does not estimate. Speed and the wait for the first token are measured by Hera, so they include the network. The request that names a new chat is counted too.',
 		zone: (zone: string) => `Days in ${zone}`
 	},
 

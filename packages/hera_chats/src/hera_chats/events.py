@@ -192,6 +192,31 @@ class AnswerGiven(BaseModel):
     text: str
 
 
+class TurnTiming(BaseModel):
+    """How long the turn's round trips took, measured by Hera from this side of the wire.
+
+    Every endpoint gets this, because it needs nothing from the server: the clock starts when a
+    request is sent, *waiting* ends at the first thing that comes back, and *generating* runs from
+    there to the round's end. Waiting therefore includes the network and the server reading the
+    prompt, which is what a person sitting in front of it waits for.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    first_token_ms: float | None = None
+    """How long the first round took to answer at all: what a person waited for anything."""
+
+    waiting_ms: float = 0.0
+    """Every round's wait for its first token, added together."""
+
+    generating_ms: float = 0.0
+    """Every round's time from its first token to its end, added together."""
+
+    timed_completion_tokens: int = 0
+    """Completion tokens of the rounds that were both timed and counted. Divided by
+    ``generating_ms`` it is the speed; dividing all of them would count rounds with no time."""
+
+
 class TurnClosed(BaseModel):
     """The turn is over. Exactly one, always last."""
 
@@ -200,7 +225,18 @@ class TurnClosed(BaseModel):
     type: Literal["turn_closed"] = "turn_closed"
     reason: CloseReason = "completed"
     usage: Usage | None = None
-    """Every round trip's usage added together, when the server reported any."""
+    """Every round trip's usage added together, when the server reported any.
+
+    What the turn *cost*. Not how full the context window is: a turn with three tool rounds sends
+    the conversation three times, and this counts all three. That is ``context_tokens``.
+    """
+
+    context_tokens: int | None = None
+    """The last round's prompt and completion: what is in the window once this turn is over, and
+    so roughly what the next request starts from. ``None`` when the server reported nothing."""
+
+    timing: TurnTiming | None = None
+    """How long it took. ``None`` on a turn that never sent a request."""
 
     iterations: int = 0
     """How many times the model was called. One for a turn with no tools in it."""

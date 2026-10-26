@@ -70,6 +70,16 @@ written beside each recorded turn and never deleted with the chat, so a day's ba
 chat from that day is removed or an answer is asked again. Migration 0006 backfills it from the stored
 `turn_closed` events. `GET /usage?days=&tz=` cuts the days in the browser's time zone.
 
+Each window also shows the share of the prompt the endpoint had cached, the thinking tokens, and the
+speed with the wait for the first token. Cache and thinking are shown when the endpoint reports them.
+Speed is measured by Hera, so every endpoint has it. Checking the counts fixed three bugs:
+- the composer's context meter showed the sum of a turn's rounds, and now shows the last round
+  (`TurnClosed.context_tokens`);
+- a stopped or failed turn lost the rounds that had finished;
+- the request that names a new chat was never counted.
+
+Each message's corner shows its speed beside its token count.
+
 ### Servers are boxes, and a person can add one ([#108](https://github.com/VoidEUW/hera/issues/108))
 
 Settings → Servers shows every server as a box — hers first, marked with the ocellus — with its state

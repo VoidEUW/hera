@@ -23,6 +23,7 @@ import { frames } from '$lib/api/sse';
 import { t } from '$lib/i18n';
 import { notifications } from '$lib/notifications.svelte';
 import { reduce, type Turn } from '$lib/turn';
+import { contextOf } from '$lib/usage';
 
 /** How long, and how often, `cancel` waits for the server to write down a stopped turn. */
 const SETTLE_WAIT_MS = 100;
@@ -60,22 +61,22 @@ export class ChatSession {
 		return reduce(this.draft);
 	}
 
-	/** The last exchange's token usage, for the composer's context-window bar. The last turn's
-	 * total, not a running sum across the chat — a new turn re-sends the whole history, so the
-	 * last one's total is the right proxy for how much of the window the *next* request needs.
+	/** How full the context window is, for the composer's bar: the last round of the last turn
+	 * (`contextOf`), not the turn's total — a turn with three tool rounds sends the conversation
+	 * three times, and adding those up measures what it cost, not what the next request carries.
 	 * `null` while nothing has been said yet, or when the endpoint never reported usage.
 	 *
 	 * The live turn only has an answer once `turn_closed` arrives, right at the end of the
 	 * stream — checking it first and falling back to the last persisted message, rather than
 	 * switching source the moment a turn starts, is what keeps the bar showing the *previous*
-	 * total while a new one streams in instead of dropping to zero and jumping back once it
+	 * figure while a new one streams in instead of dropping to zero and jumping back once it
 	 * closes. */
-	get usage() {
-		const live = this.turn.closed?.usage;
-		if (live) return live;
+	get context(): number | null {
+		const live = contextOf(this.turn.closed);
+		if (live !== null) return live;
 		const last = this.messages.at(-1);
 		if (last?.role !== 'assistant') return null;
-		return reduce(last.events).closed?.usage ?? null;
+		return contextOf(reduce(last.events).closed);
 	}
 
 	/** Calls waiting on a person — in the live turn, or in the last message after a reload. */

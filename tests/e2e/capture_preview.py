@@ -100,7 +100,9 @@ SCRIPT: Sequence[Turn] = [
             "Kerberos hands you a **ticket-granting ticket** once, ",
             "and derives a service ticket from it for each service you touch.\n\n",
             "The TGT is what expires; the service tickets are downstream of it.",
-            usage=Usage(prompt_tokens=6120, completion_tokens=180, total_tokens=6300),
+            usage=Usage(
+                prompt_tokens=6120, completion_tokens=180, total_tokens=6300, cached_tokens=0
+            ),
         ),
     ],
     [
@@ -113,7 +115,9 @@ SCRIPT: Sequence[Turn] = [
     text_turn(
         "Short version: one TGT buys every service ticket, ",
         "and the expiry you configure lives on the TGT.",
-        usage=Usage(prompt_tokens=14800, completion_tokens=240, total_tokens=15040),
+        usage=Usage(
+            prompt_tokens=14800, completion_tokens=240, total_tokens=15040, cached_tokens=6100
+        ),
     ),
     # A turn that never starts.
     REFUSAL,
@@ -807,8 +811,12 @@ def seed_usage(days: int = 29) -> None:
                         chat_id=uuid4(),
                         message_id=uuid4(),
                         at=now - timedelta(days=back, hours=turn),
-                        prompt_tokens=3000 + (back * 1931 + turn * 977) % 9000,
-                        completion_tokens=150 + (back * 211 + turn * 89) % 700,
+                        prompt_tokens=(prompt := 3000 + (back * 1931 + turn * 977) % 9000),
+                        completion_tokens=(written := 150 + (back * 211 + turn * 89) % 700),
+                        cached_tokens=prompt * (40 + (back * 13) % 50) // 100,
+                        first_token_ms=600.0 + (back * 137) % 1400,
+                        generating_ms=written / (38 + (back * 7) % 20) * 1000,
+                        timed_completion_tokens=written,
                     )
                 )
     database.dispose()

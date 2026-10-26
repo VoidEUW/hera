@@ -211,7 +211,11 @@ class TurnUsage(Entity, table=True):
     message_id: UUID
 
     ordinal: int = 0
-    """Which ``turn_closed`` in the message this is, from zero."""
+    """Which ``turn_closed`` in the message this is, from zero. ``-1`` is the request that named
+    the chat, which belongs to the message's turn but is not one of its parts."""
+
+    source: str = "turn"
+    """``turn`` for her answer, ``title`` for the request that named the chat."""
 
     at: datetime = Field(sa_type=_TIMESTAMP)
     """When the turn closed — when the row was written, or for a backfilled row, when its
@@ -219,3 +223,13 @@ class TurnUsage(Entity, table=True):
 
     prompt_tokens: int = 0
     completion_tokens: int = 0
+
+    # What some servers report and others do not. `None` is "not reported" and is left out of
+    # every rate, rather than counted as nothing (`hera_providers.Usage`).
+    cached_tokens: int | None = None
+    reasoning_tokens: int | None = None
+
+    # Measured by Hera, on this side of the wire (`hera_chats.events.TurnTiming`).
+    first_token_ms: float | None = None
+    generating_ms: float | None = None
+    timed_completion_tokens: int | None = None

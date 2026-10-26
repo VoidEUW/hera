@@ -15,10 +15,14 @@ from uuid import UUID
 from sqlalchemy.orm.attributes import flag_modified
 from sqlmodel import Session, col, desc, func
 
-from hera_chats.events import CHAT_EVENT_ADAPTER, ChatEvent, TurnClosed, visible_text
+from hera_chats.events import CHAT_EVENT_ADAPTER, ChatEvent, TurnClosed, TurnTiming, visible_text
 from hera_chats.history import Attachment
 from hera_chats.models import JSON_FIELDS, Chat, Message, Project, TurnUsage
+from hera_providers import Usage
 from hera_storage import Repository, utcnow
+
+TITLE_ORDINAL = -1
+"""Where the request that named the chat sits among a message's usage rows."""
 
 _SLUG_STRIP = re.compile(r"[^a-z0-9]+")
 
@@ -303,25 +307,51 @@ class UsageRepository(Repository[TurnUsage]):
         closes = [event for event in events if isinstance(event, TurnClosed)]
         if not any(close.usage for close in closes):
             return []
-        written = {row.ordinal for row in self.list(col(TurnUsage.message_id) == message.id)}
-        now = utcnow()
+        written = self._written(message)
         added = [
-            self.add(
-                TurnUsage(
-                    owner_id=message.owner_id,
-                    chat_id=message.chat_id,
-                    message_id=message.id,
-                    ordinal=ordinal,
-                    at=now,
-                    prompt_tokens=close.usage.prompt_tokens,
-                    completion_tokens=close.usage.completion_tokens,
-                )
-            )
+            self.add(self._row(message, ordinal, close.usage, close.timing))
             for ordinal, close in enumerate(closes)
             if close.usage is not None and ordinal not in written
         ]
         self.session.flush()
         return added
+
+    def record_title(self, message: Message, usage: Usage | None) -> TurnUsage | None:
+        """The request that named the chat. Not part of her answer, and spent all the same."""
+        if usage is None or TITLE_ORDINAL in self._written(message):
+            return None
+        row = self.add(self._row(message, TITLE_ORDINAL, usage, None, source="title"))
+        self.session.flush()
+        return row
+
+    def _written(self, message: Message) -> set[int]:
+        return {row.ordinal for row in self.list(col(TurnUsage.message_id) == message.id)}
+
+    @staticmethod
+    def _row(
+        message: Message,
+        ordinal: int,
+        usage: Usage,
+        timing: TurnTiming | None,
+        *,
+        source: str = "turn",
+    ) -> TurnUsage:
+        timed = timing is not None and timing.timed_completion_tokens > 0
+        return TurnUsage(
+            owner_id=message.owner_id,
+            chat_id=message.chat_id,
+            message_id=message.id,
+            ordinal=ordinal,
+            source=source,
+            at=utcnow(),
+            prompt_tokens=usage.prompt_tokens,
+            completion_tokens=usage.completion_tokens,
+            cached_tokens=usage.cached_tokens,
+            reasoning_tokens=usage.reasoning_tokens,
+            first_token_ms=timing.first_token_ms if timing is not None else None,
+            generating_ms=timing.generating_ms if timed and timing else None,
+            timed_completion_tokens=timing.timed_completion_tokens if timed and timing else None,
+        )
 
     def since(self, owner_id: UUID, start: datetime) -> list[TurnUsage]:
         """Every row of ``owner_id``'s from ``start`` on, oldest first."""

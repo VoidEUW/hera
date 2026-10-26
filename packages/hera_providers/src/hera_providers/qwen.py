@@ -64,9 +64,11 @@ class QwenAdapter:
 
     def feed(self, chunk: Mapping[str, Any]) -> Iterator[Event]:
         """Consume one decoded chunk of the stream."""
-        usage = chunk.get("usage")
-        if isinstance(usage, Mapping):
-            self._usage = Usage.model_validate(dict(usage))
+        # `usage` arrives on the last chunk (or a trailing one of its own), and llama.cpp puts
+        # `timings` beside it. Either may come without the other.
+        reported = Usage.from_wire(chunk.get("usage"), chunk.get("timings"))
+        if reported is not None:
+            self._usage = reported
 
         choices = chunk.get("choices")
         if not isinstance(choices, list) or not choices:

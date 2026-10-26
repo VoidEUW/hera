@@ -1,8 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import type { UsageReport } from '$lib/api/client';
-import { bars, dayLabel, isEmpty } from './usage';
+import { bars, contextOf, dayLabel, isEmpty, rate, seconds, speed, speedOf } from './usage';
 
-const zero = { prompt_tokens: 0, completion_tokens: 0 };
+const zero = {
+	prompt_tokens: 0,
+	completion_tokens: 0,
+	reasoning_tokens: null,
+	cache_rate: null,
+	tokens_per_second: null,
+	first_token_ms: null
+};
 
 function report(days: Array<[string, number, number]>, month = zero): UsageReport {
 	return {
@@ -50,7 +57,74 @@ describe('isEmpty', () => {
 
 	it('is not empty when only the month has tokens, beyond a short chart', () => {
 		expect(
-			isEmpty(report([['2026-10-26', 0, 0]], { prompt_tokens: 9, completion_tokens: 1 }))
+			isEmpty(report([['2026-10-26', 0, 0]], { ...zero, prompt_tokens: 9, completion_tokens: 1 }))
 		).toBe(false);
+	});
+});
+
+describe('contextOf', () => {
+	const close = (over: Record<string, unknown>) =>
+		({
+			type: 'turn_closed',
+			reason: 'completed',
+			usage: null,
+			iterations: 1,
+			error: '',
+			...over
+		}) as never;
+
+	it('is the recorded last round', () => {
+		expect(contextOf(close({ context_tokens: 900 }))).toBe(900);
+	});
+
+	it('falls back to prompt plus completion for a turn stored before that was recorded', () => {
+		expect(
+			contextOf(close({ usage: { prompt_tokens: 100, completion_tokens: 5, total_tokens: 0 } }))
+		).toBe(105);
+	});
+
+	it('is null with nothing reported', () => {
+		expect(contextOf(close({}))).toBeNull();
+		expect(contextOf(null)).toBeNull();
+	});
+});
+
+describe('speedOf', () => {
+	it('is timed tokens over the time spent writing', () => {
+		expect(
+			speedOf({
+				first_token_ms: 300,
+				waiting_ms: 300,
+				generating_ms: 2000,
+				timed_completion_tokens: 96
+			})
+		).toBe(48);
+	});
+
+	it('is null when nothing was both timed and counted', () => {
+		expect(
+			speedOf({
+				first_token_ms: 300,
+				waiting_ms: 300,
+				generating_ms: 0,
+				timed_completion_tokens: 0
+			})
+		).toBeNull();
+		expect(speedOf(null)).toBeNull();
+	});
+});
+
+describe('formatting', () => {
+	it('says a speed in whole tokens', () => {
+		expect(speed(47.6)).toBe('48 tok/s');
+	});
+
+	it('says milliseconds below a second and seconds above', () => {
+		expect(seconds(850)).toBe('850 ms');
+		expect(seconds(1234)).toBe('1.2 s');
+	});
+
+	it('says a share as a percentage', () => {
+		expect(rate(0.724)).toBe('72%');
 	});
 });
