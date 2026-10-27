@@ -18,7 +18,7 @@ export interface Failure {
 	detail: { label: string; text: string };
 }
 
-/** `what` names the thing that failed to load — "usage", "her mind regions". */
+/** `what` names the thing that failed to load — "usage", "Hera’s mind regions". */
 export function failure(cause: unknown, what: string): Failure {
 	const said = cause instanceof Error ? cause.message : String(cause);
 	const detail = (text: string) => ({ label: t.loadFailed.detail, text });

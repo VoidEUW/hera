@@ -316,7 +316,7 @@ def test_mind_shows_a_regions_tier_as_an_icon_not_a_sentence(page: Any) -> None:
 
     fixed = page.locator("section.region").get_by_role("img", name="Only you may change this")
     evolvable = page.locator("section.region").get_by_role(
-        "img", name="She may propose changes to this"
+        "img", name="Hera may propose changes to this"
     )
     assert fixed.count() + evolvable.count() == page.locator("section.region").count()
     assert page.locator("section.region").get_by_text("Only you may change this").count() == 0
@@ -452,7 +452,7 @@ class TestSheAsksAndWaits:
         # What sort of question it is, said in the person's words rather than the tool's
         # (ADR 17). Three closed kinds, so this is a label the interface owns rather than a word
         # the model reached for out of a vocabulary.
-        page.wait_for_selector("text=she is unsure", timeout=5_000)
+        page.wait_for_selector("text=Hera is unsure", timeout=5_000)
 
         # The composer is blocked while the question is open: there is one thing to answer and
         # two places to type it would be a question about which one counts.
@@ -983,7 +983,7 @@ class TestWhatSheRemembers:
 
         panel.get_by_text("an M4 Pro, not a Studio").wait_for(timeout=15_000)
         # The badge says who *started* it, not who touched it last.
-        assert panel.get_by_text("she wrote it").count() == 1
+        assert panel.get_by_text("Hera wrote it").count() == 1
 
     def test_it_can_be_taken_somewhere_that_is_not_hera(self, page: Any) -> None:
         """A plain `<a download>` at the export route. The document is partly text a model
@@ -1040,7 +1040,7 @@ class TestALongTraceCollapses:
         # count line. A summary of the trace, not a placeholder where it was.
         rows = "article.hers .rows .row"
         assert page.locator(rows).count() == 4
-        summary = page.locator("article.hers .summary button", has_text="4 things she did")
+        summary = page.locator("article.hers .summary button", has_text="4 things Hera did")
         summary.wait_for(timeout=5_000)
         assert page.locator(f"{rows}:visible").count() == 1
         assert page.locator(f"{rows}:visible", has_text="the coat pockets").count() == 1

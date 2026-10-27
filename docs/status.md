@@ -80,6 +80,14 @@ Speed is measured by Hera, so every endpoint has it. Checking the counts fixed t
 
 Each message's corner shows its speed beside its token count.
 
+### Hera, then she ([#223](https://github.com/VoidEUW/hera/issues/223))
+
+The interface called her *she* more often than *Hera*, often with nothing before it that said who
+*she* was. Every string now names Hera, and *she* only points back to a Hera named earlier in the
+same string. A pill, heading or tooltip read on its own says *Hera*. This covers every string in
+`i18n.ts` and the region descriptions on Settings → Mind. Prompt text and tool descriptions are
+unchanged, so her behaviour is too. The rule is in `docs/frontend.md` § *Voice*.
+
 ### The interface on a phone ([#41](https://github.com/VoidEUW/hera/issues/41))
 
 Phone-only, behind the 780px breakpoint or `(hover: none)`. The desktop is pixel-identical to

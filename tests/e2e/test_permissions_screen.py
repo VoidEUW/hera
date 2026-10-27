@@ -59,7 +59,7 @@ def test_a_rule_made_here_is_kept_flipped_and_deleted_after_asking(server: str, 
     page.get_by_role("button", name="New rule").click()
     page.get_by_label("Name").fill("Reading files")
     page.get_by_label("Applies to").fill("fs__read*")
-    page.get_by_text("None of her tools right now.").wait_for(timeout=5_000)
+    page.get_by_text("None of Hera\u2019s tools right now.").wait_for(timeout=5_000)
     page.get_by_role("dialog", name="New rule").get_by_role("radio", name="Allow").click()
     page.get_by_label("Why").fill("It only reads.")
     page.get_by_role("button", name="Add rule").click()
@@ -122,7 +122,7 @@ def test_the_form_says_which_tools_a_pattern_covers_before_it_is_added(
     page.get_by_role("button", name="New rule").click()
     page.get_by_label("Applies to").fill("hera__*")
 
-    page.get_by_text("of her tools now:").wait_for(timeout=5_000)
+    page.get_by_text("of Hera\u2019s tools now:").wait_for(timeout=5_000)
     assert page.locator(".tool").filter(has_text="hera__note").count() == 1
 
 
