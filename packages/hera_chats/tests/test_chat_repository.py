@@ -193,13 +193,22 @@ class TestChats:
 
     def test_the_first_message_names_the_chat(self, chats: ChatRepository, owner_id: UUID) -> None:
         chat = chats.create(owner_id)
-        chats.touch(chat, title="Explain Kerberos")
+        chats.name(chat, "Explain Kerberos")
         assert chat.title == "Explain Kerberos"
 
     def test_a_named_chat_is_not_renamed(self, chats: ChatRepository, owner_id: UUID) -> None:
         chat = chats.create(owner_id, title="Chosen by hand")
-        chats.touch(chat, title="Something else")
+        chats.name(chat, "Something else")
         assert chat.title == "Chosen by hand"
+
+    def test_naming_is_not_activity(self, chats: ChatRepository, owner_id: UUID) -> None:
+        """The title arrives after the turn that touched the chat. Counting it as activity
+        would reorder the rail a second time for one message."""
+        chat = chats.create(owner_id)
+        chats.touch(chat)
+        said = chat.last_message_at
+        chats.name(chat, "Explain Kerberos")
+        assert chat.last_message_at == said
 
     def test_filtering_by_project(self, chats: ChatRepository, owner_id: UUID) -> None:
         project_id = uuid4()

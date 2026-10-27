@@ -12,8 +12,9 @@
  */
 
 export interface Frame {
-	/** The SSE event name, which is the event's own `type` — or `done` for the transport's
-	 * closing frame carrying the persisted message. */
+	/** The SSE event name, which is the event's own `type` — or `done` for the frame carrying
+	 * the persisted message, and on a chat's first message `chat_titled` after it, carrying the
+	 * chat with its new name (#226). */
 	name: string;
 	data: unknown;
 }

@@ -15,7 +15,9 @@ from uuid import uuid4
 import pytest
 from core_support import API, StubTools, WriteSkill, names, payload, sse
 from httpx import ASGITransport, AsyncClient
+from sqlmodel import select
 
+from hera_chats import Message
 from hera_core.app import create_app
 from hera_core.chat_files import FileArtifacts, FileScratchpad
 from hera_core.wiring import Services
@@ -53,11 +55,21 @@ async def talk(client: AsyncClient, chat_id: str, text: str) -> list[tuple[str, 
 
 class TestASimpleTurn:
     async def test_the_frames_are_the_events_plus_done(self, make_services: Any) -> None:
+        """And on a chat's first message, its name after `done` (#226)."""
         services = make_services(FakeProvider([text_turn("Hel", "lo.")]))
         async with _client(services) as client:
             frames = await talk(client, await open_chat(client), "hi")
 
-        assert names(frames) == ["text_delta", "text_delta", "turn_closed", "done"]
+        assert names(frames) == ["text_delta", "text_delta", "turn_closed", "done", "chat_titled"]
+
+    async def test_only_the_first_message_names_the_chat(self, make_services: Any) -> None:
+        services = make_services(FakeProvider([text_turn("One."), text_turn("Two.")]))
+        async with _client(services) as client:
+            chat_id = await open_chat(client)
+            await talk(client, chat_id, "first")
+            frames = await talk(client, chat_id, "second")
+
+        assert names(frames) == ["text_delta", "turn_closed", "done"]
 
     async def test_each_frame_is_named_by_the_events_own_type(self, make_services: Any) -> None:
         """The SSE event name and the ``type`` inside the JSON are the same string from the
@@ -67,7 +79,7 @@ class TestASimpleTurn:
             frames = await talk(client, await open_chat(client), "hi")
 
         for name, body in frames:
-            if name != "done":
+            if name not in {"done", "chat_titled"}:
                 assert body["type"] == name
 
     async def test_done_carries_the_persisted_message(self, make_services: Any) -> None:
@@ -141,6 +153,40 @@ class TestASimpleTurn:
 
         assert detail["chat"]["title"] == "Kerberos Authentication"
 
+    async def test_the_answer_is_done_before_the_title_is_asked_for(
+        self, make_services: Any
+    ) -> None:
+        """#226. The title was awaited ahead of `done`, so the first answer in every chat sat
+        finished on screen -- Stop button up, composer busy -- for as long as a second request to
+        the model took. Now the turn is stored and `done` sent first, and the name follows."""
+        stored_when_asked: list[list[str]] = []
+
+        class ProviderWithTitle:
+            def __init__(self) -> None:
+                self.chat = FakeProvider([text_turn("Hello.")])
+
+            async def stream(self, request: Any) -> AsyncIterator[Any]:
+                if "Summarize the user's" in str(request.messages[0].content):
+                    with services.database.session() as session:
+                        rows = session.exec(select(Message)).all()
+                        stored_when_asked.append([row.content for row in rows if row.events])
+                    yield TextDelta(text="Kerberos Authentication")
+                    yield TurnEnd()
+                    return
+                async for event in self.chat.stream(request):
+                    yield event
+
+            async def aclose(self) -> None:
+                await self.chat.aclose()
+
+        services = make_services(ProviderWithTitle())
+        async with _client(services) as client:
+            frames = await talk(client, await open_chat(client), "Explain Kerberos")
+
+        assert stored_when_asked == [["Hello."]], "the answer was stored before the title began"
+        assert names(frames)[-2:] == ["done", "chat_titled"]
+        assert payload(frames, "chat_titled")["title"] == "Kerberos Authentication"
+
     async def test_the_title_request_is_counted_as_usage(self, make_services: Any) -> None:
         """It runs on the same endpoint and is paid for the same way (#111). Counted as its own
         row, so her answer's numbers stay hers."""
@@ -202,8 +248,8 @@ class TestASimpleTurn:
     async def test_a_title_request_that_hangs_does_not_hold_up_the_turn(
         self, make_services: Any, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """The title is awaited before `done` and before the turn is persisted, so an endpoint
-        that never answers it must cost a short wait and a raw-text title, not the whole turn."""
+        """The title holds the stream open after `done`, so an endpoint that never answers it
+        must cost a short wait and a raw-text title, not a stream that never ends."""
         monkeypatch.setattr("hera_core.api.chats._TITLE_TIMEOUT_SECONDS", 0.05)
 
         class ProviderWhoseTitleCallHangs:
@@ -329,6 +375,7 @@ class TestSkillsAndTools:
             "text_delta",
             "turn_closed",
             "done",
+            "chat_titled",
         ]
         assert payload(frames, "tool_result")["text"] == "ran fs__read_file"
 
@@ -368,7 +415,7 @@ class TestARealMcpServer:
         # the chat id survives a batch rather than only a call on its own.
         assert results["hera__scratch_list"]["ok"]
         assert "empty" in results["hera__scratch_list"]["text"]
-        assert names(frames)[-2:] == ["turn_closed", "done"]
+        assert names(frames)[-3:] == ["turn_closed", "done", "chat_titled"]
 
     async def test_a_scratchpad_write_lands_in_this_conversations_directory(
         self, make_services: Any, mcp_registry: ToolRegistry
@@ -763,6 +810,7 @@ class TestThePermissionCard:
             "permission_required",
             "turn_closed",
             "done",
+            "chat_titled",
         ]
         card = payload(frames, "permission_required")
         assert card["tool"] == "fs__read_file"
@@ -897,6 +945,7 @@ class TestTheQuestionCard:
             "answer_required",
             "turn_closed",
             "done",
+            "chat_titled",
         ]
         card = payload(frames, "answer_required")
         assert card["questions"] == [{"text": "Which deck?", "options": []}]
@@ -1045,7 +1094,7 @@ class TestWhenTheModelFails:
         async with _client(services) as client:
             frames = await talk(client, await open_chat(client), "hi")
 
-        assert names(frames) == ["turn_closed", "done"]
+        assert names(frames) == ["turn_closed", "done", "chat_titled"]
         closed = payload(frames, "turn_closed")
         assert closed["reason"] == "failed"
         assert "unreachable" in closed["error"]
@@ -1108,7 +1157,7 @@ class TestAttachments:
         assert user["content"] == "read this", "the stored message is what was typed"
         assert user["attachments"] == [{"name": "notes.md", "bytes": 28, "media_type": ""}]
         assert "slide 14" not in str(user["attachments"]), "contents do not come back"
-        assert names(frames)[-1] == "done"
+        assert names(frames)[-2:] == ["done", "chat_titled"]
 
     async def test_a_picture_reaches_the_model_as_a_content_part(self, make_services: Any) -> None:
         """The bytes go on the wire, not a link: the endpoint is usually a local server with no
@@ -1154,7 +1203,7 @@ class TestAttachments:
         chip = detail["messages"][0]["attachments"][0]
         assert chip == {"name": "shot.png", "bytes": 9, "media_type": "image/png"}
         assert url not in str(detail), "the bytes do not come back with the conversation"
-        assert names(frames)[-1] == "done"
+        assert names(frames)[-2:] == ["done", "chat_titled"]
 
     async def test_a_message_with_no_picture_stays_a_plain_string(self, make_services: Any) -> None:
         """An installation that never attaches one never sends a differently shaped request."""

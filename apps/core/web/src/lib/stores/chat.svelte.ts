@@ -50,6 +50,8 @@ export class ChatSession {
 	pendingFiles = $state<Attachment[]>([]);
 
 	#abort: AbortController | null = null;
+	/** The name a `chat_titled` frame brought, until a read of the chat has it too. */
+	#named: { id: string; title: string } | null = null;
 	/** Which load owns the session, counted rather than named.
 	 *
 	 * A chat id is not enough: `A → B → A` gives two loads the same name, and the first one's
@@ -135,6 +137,7 @@ export class ChatSession {
 		this.stop();
 		this.loaded = false;
 		this.chat = null;
+		this.#named = null;
 		this.messages = [];
 		this.draft = [];
 		this.error = null;
@@ -308,6 +311,17 @@ export class ChatSession {
 					// persisted message takes its place, so a reload cannot show something
 					// different from what was just watched.
 					this.#settle(frame.data as Message);
+					// And the turn is over. The stream may stay open for the chat's name, which
+					// is not part of the answer and must not hold the composer (#226).
+					this.streaming = false;
+					continue;
+				}
+				if (frame.name === 'chat_titled') {
+					const named = frame.data as Chat;
+					if (this.chat?.id === named.id) {
+						this.#named = { id: named.id, title: named.title };
+						this.chat = { ...this.chat, title: named.title };
+					}
 					continue;
 				}
 				this.draft = [...this.draft, frame.data as AnyEvent];
@@ -346,7 +360,14 @@ export class ChatSession {
 		try {
 			const detail = await api.chat(this.chat.id);
 			if (token !== this.#load) return;
-			this.chat = detail.chat;
+			// The refresh at `done` is read while the chat is still being named, and the name
+			// can arrive on the stream before this does. A read that predates the name does not
+			// take it back; one that has it ends the wait, so a later rename to nothing is not
+			// undone either.
+			const named = this.#named?.id === detail.chat.id ? this.#named : null;
+			if (detail.chat.title || !named) this.#named = null;
+			this.chat =
+				detail.chat.title || !named ? detail.chat : { ...detail.chat, title: named.title };
 			this.messages = detail.messages;
 		} catch {
 			/* the draft already showed the answer; a failed refresh is not worth an error */
