@@ -80,6 +80,17 @@ def test_the_desktop_shows_the_list_beside_the_screen(page: Any) -> None:
     """A phone shows the list *or* a screen (#41); the desktop keeps both, side by side, and has
     no way back because there is nowhere to go back to."""
     settings(page)
+    # The sheet scales in, and two boxes read a frame apart mid-entrance are measured at two
+    # different scales. So it is read once what is drawn is as wide as its layout box.
+    page.wait_for_function(
+        """() => {
+            const sheet = document.querySelector('.sheet.settings');
+            const drawn = sheet.getBoundingClientRect();
+            return Math.abs(drawn.width - sheet.offsetWidth) < 0.05
+                && Math.abs(drawn.height - sheet.offsetHeight) < 0.05;
+        }""",
+        timeout=5_000,
+    )
     nav = page.locator("[role='dialog'] .sidebar").bounding_box()
     panel = page.locator("[role='dialog'] .panel").bounding_box()
     assert nav is not None and panel is not None
