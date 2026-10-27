@@ -12,7 +12,7 @@ models reachable the same way work too (ADR 19).
 ## Read first
 
 - `docs/status.md` — where the rebuild stands, what is settled, what is next. Start here
-- `docs/versions/` — what each version is for and in what order it lands. **v0.2.1 is tagged**;
+- `docs/versions/` — what each version is for and in what order it lands. **v0.2.2 is tagged** (v0.2.1 and a security patch);
   v0.3.0, the widening one, is next. Read the one you are working on before
   touching its packages
 - `ARCHITECTURE.md` — the packages, the layering rule, the shape of a turn

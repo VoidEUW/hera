@@ -3,7 +3,7 @@
 Current state of the rebuild, so a new session can start without re-reading history. A snapshot,
 not a changelog — historical detail and full rationale live in `versions/` and the ADRs.
 
-**Updated:** 2026-10-27 · **Version:** v0.2.1 tagged, v0.3.0 next · **Strategy:** thin spine
+**Updated:** 2026-10-27 · **Version:** v0.2.2 tagged, v0.3.0 next · **Strategy:** thin spine
 first, then deepen
 
 ## What v0.2.1 brought
@@ -288,7 +288,8 @@ whatever the file turns out to be.
 |---|---|---|
 | v0.1 | shipped | spine: message in → model boundary → router → mind → turn orchestrator → SSE out |
 | v0.2.0 | **tagged** | organise → produce → remember: projects, scratchpad, artifacts, memory (3 of 5 planned milestones — the other two moved, not dropped) |
-| v0.2.1 | in progress | polish: `⌘K` palette, hotkeys, `hera__read_resource`, ADR 17, diagrams |
+| v0.2.1 | **tagged** | polish: `⌘K` palette, hotkeys, `hera__read_resource`, ADR 17, diagrams |
+| v0.2.2 | **tagged** | security patch: `opentelemetry-api` 1.45.1 (ships, through `mcp`); `virtualenv` and `filelock` for `pre-commit` |
 | v0.3.0 | planned | dreaming, sandbox, `hera-code` — see [versions/v0.3.0.md](versions/v0.3.0.md) |
 
 Dreaming and the redesign pass both moved out of v0.2.0 on purpose — dreaming because every
