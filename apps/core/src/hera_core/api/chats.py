@@ -87,10 +87,15 @@ logger = logging.getLogger(__name__)
 
 EXPORT_TYPE = "text/markdown; charset=utf-8"
 
-# How long the title may take. It is awaited before `done` is sent and before the turn is
-# persisted, so a slow endpoint would otherwise hold both for as long as its own HTTP timeout
-# (minutes) -- over a name the chat can do without, because the raw-message title is the fallback.
+# How long the title may take. It runs after `done`, so it no longer holds up the answer (#226),
+# but it still holds the stream open and the request to the endpoint -- and a slow endpoint would
+# otherwise keep both for as long as its own HTTP timeout (minutes) over a name the chat can do
+# without, because the raw-message title is the fallback.
 _TITLE_TIMEOUT_SECONDS = 15.0
+
+# Namings that outlive the response that started them. Held here because the event loop keeps only
+# a weak reference to a task, and one collected mid-flight names nothing.
+_naming: set[asyncio.Task[dict[str, Any] | None]] = set()
 
 
 @router.get("/chats", response_model=list[ChatOut])
@@ -483,20 +488,16 @@ def _stream(
             # outcome it actually had; `cancelled` is the honest word for one that did not,
             # because this block runs when the generator ended without the turn finishing.
             turn.close("cancelled")
-            title = None
-            titling: Usage | None = None
-            if completed and first_message and not chat.title and turn.cleaned_text.strip():
-                # A summarized title is the goal, but a chat that never gets one because the
-                # auxiliary call happened to fail is worse than one titled from the raw message
-                # -- that fallback is what this feature is replacing as the *common* case, not
-                # what it should leave behind as the failure case.
-                named, titling = await _chat_title(container, turn.cleaned_text)
-                title = named or title_from(turn.cleaned_text)
-            persisted = _record(
-                container, owner_id, chat_id, message_id, turn, title=title, titling=titling
-            )
+            persisted = _record(container, owner_id, chat_id, message_id, turn)
             if persisted is not None:
                 yield frame("done", persisted)
+        # Named after `done`, never before it (#226). The title is a second request to the same
+        # model, and awaited ahead of `done` it held the finished answer -- composer, Stop button
+        # and all -- for as long as that request took, on the first message of every chat.
+        if completed and first_message and not chat.title and turn.cleaned_text.strip():
+            named = await _name(container, chat_id, message_id, turn.cleaned_text)
+            if named is not None:
+                yield frame("chat_titled", named)
 
     return StreamingResponse(frames(), media_type=MEDIA_TYPE, headers=dict(HEADERS))
 
@@ -507,9 +508,6 @@ def _record(
     chat_id: UUID,
     message_id: UUID,
     turn: Turn,
-    *,
-    title: str | None = None,
-    titling: Usage | None = None,
 ) -> dict[str, Any] | None:
     """Store the turn in its own short unit of work, and return the ``done`` payload.
 
@@ -529,20 +527,51 @@ def _record(
         messages.record(message, turn.recorded, prompt_fingerprint=turn.prompt_fingerprint)
         # Beside the message rather than read back out of it: the message goes when the chat
         # does, and what the turn cost was spent all the same (ADR 25).
-        usage = UsageRepository(session)
-        usage.record(message, turn.recorded)
-        # The request that named the chat is not part of her answer, but it ran on the same
-        # endpoint and was paid for the same way.
-        usage.record_title(message, titling)
+        UsageRepository(session).record(message, turn.recorded)
         if turn.skill_ids:
             SkillUsageRepository(session).record(owner_id, turn.skill_ids)
         chat = ChatRepository(session).get(chat_id)
         if chat is not None:
-            # `title` is already the summarized title, the raw-text fallback, or `None` when
-            # there was nothing to title this round (not the first message, or the chat is
-            # already named) -- `touch` only ever fills in a chat that has no title yet.
-            ChatRepository(session).touch(chat, title=title or "")
+            ChatRepository(session).touch(chat)
         return MessageOut.of(message).model_dump(mode="json")
+
+
+async def _name(
+    container: Container, chat_id: UUID, message_id: UUID, text: str
+) -> dict[str, Any] | None:
+    """Name the chat from its first message, and return it as it now is for the stream.
+
+    The naming runs as its own task and the stream waits on it through a shield. A person who
+    closes the tab, or sends the next message, the moment `done` arrives ends this response, and
+    the chat is named all the same rather than left with no title at all.
+    """
+    task = asyncio.create_task(_named(container, chat_id, message_id, text))
+    _naming.add(task)
+    task.add_done_callback(_naming.discard)
+    return await asyncio.shield(task)
+
+
+async def _named(
+    container: Container, chat_id: UUID, message_id: UUID, text: str
+) -> dict[str, Any] | None:
+    # A summarized title is the goal, but a chat that never gets one because the auxiliary call
+    # happened to fail is worse than one titled from the raw message -- that fallback is what this
+    # feature is replacing as the *common* case, not what it should leave behind as the failure
+    # case.
+    generated, spent = await _chat_title(container, text)
+    with container.database.session() as session:
+        message = MessageRepository(session).get(message_id)
+        if message is not None:
+            # Not part of her answer, but it ran on the same endpoint and was paid for the same
+            # way (ADR 25).
+            UsageRepository(session).record_title(message, spent)
+        chats = ChatRepository(session)
+        chat = chats.get(chat_id)
+        if chat is None:
+            return None
+        # Only a chat with no name yet: one renamed by hand while this ran keeps that name.
+        chats.name(chat, generated or title_from(text))
+        return ChatOut.of(chat).model_dump(mode="json")
 
 
 async def _chat_title(container: Container, text: str) -> tuple[str | None, Usage | None]:

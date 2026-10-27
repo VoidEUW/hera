@@ -293,3 +293,45 @@ describe('cancel', () => {
 		expect(session.cancelling).toBe(false);
 	});
 });
+
+describe('a first message', () => {
+	afterEach(() => {
+		vi.unstubAllGlobals();
+	});
+
+	const encoder = new TextEncoder();
+	const sse = (name: string, data: unknown) =>
+		encoder.encode(`event: ${name}\ndata: ${JSON.stringify(data)}\n\n`);
+
+	it('gives the composer back at done, and takes the name that follows (#226)', async () => {
+		let push!: ReadableStreamDefaultController<Uint8Array>;
+		const body = new ReadableStream<Uint8Array>({ start: (controller) => (push = controller) });
+		// The refresh at `done` reads the chat before it has been named, and answers late.
+		const refresh = deferred<Response>();
+		const unnamed = { ...chatDetail('a'), chat: { ...chatDetail('a').chat, title: '' } };
+		vi.stubGlobal('fetch', (_url: string, init?: RequestInit) =>
+			init?.method === 'POST' ? Promise.resolve(new Response(body)) : refresh.promise
+		);
+
+		const session = new ChatSession();
+		session.chat = unnamed.chat;
+		const sent = session.send('Explain Kerberos');
+
+		push.enqueue(sse('text_delta', { type: 'text_delta', text: 'Hello.' }));
+		push.enqueue(sse('done', message({ id: 'h', content: 'Hello.', sequence: 1 })));
+		await vi.waitFor(() => expect(session.messages.at(-1)?.id).toBe('h'));
+
+		// The stream is still open for the name, and the turn is over all the same.
+		expect(session.streaming).toBe(false);
+		expect(session.busy).toBe(false);
+
+		push.enqueue(sse('chat_titled', { ...unnamed.chat, title: 'Kerberos authentication' }));
+		push.close();
+		await sent;
+		expect(session.chat?.title).toBe('Kerberos authentication');
+
+		refresh.resolve(new Response(JSON.stringify(unnamed)));
+		await vi.waitFor(() => expect(session.messages).toEqual([]));
+		expect(session.chat?.title).toBe('Kerberos authentication');
+	});
+});

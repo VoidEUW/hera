@@ -47,6 +47,12 @@ more frame — `done` — carries the **persisted** message. The client throws a
 rendered optimistically and re-renders from that, which is what makes the server render
 authoritative: live view and reload cannot disagree.
 
+`done` is the end of the turn, and the client treats it that way. On a chat's first message one
+frame follows it: `chat_titled`, carrying the chat with the name a second request to the model gave
+it (#226). That request runs after `done` rather than before, because a title is not part of the
+answer, and waiting on it held the finished answer for as long as the request took. It runs as its
+own task, so a person who leaves the moment `done` arrives still gets a named chat.
+
 ## Building the interface
 
 ```bash

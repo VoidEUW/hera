@@ -80,6 +80,14 @@ Speed is measured by Hera, so every endpoint has it. Checking the counts fixed t
 
 Each message's corner shows its speed beside its token count.
 
+### The first answer ends when it ends ([#226](https://github.com/VoidEUW/hera/issues/226))
+
+The first answer in a new chat finished 5–10 seconds after its last word: the chat's title, a
+second request to the same model, was awaited before `done`. Now the turn is stored and `done`
+sent first, and the chat is named after it, in its own task so a person who leaves straight away
+still gets a name. The name follows on the same stream as a `chat_titled` frame, and the browser
+ends the turn at `done`.
+
 ### Hera, then she ([#223](https://github.com/VoidEUW/hera/issues/223))
 
 The interface called her *she* more often than *Hera*, often with nothing before it that said who

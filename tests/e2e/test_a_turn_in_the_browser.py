@@ -145,6 +145,20 @@ def test_a_question_is_edited_and_an_answer_tried_again(page: Any) -> None:
     assert page.locator("text=Explain Kerberos in one line").count() >= 1
 
 
+def test_the_first_answer_names_the_chat_in_the_rail(page: Any) -> None:
+    """The name arrives after `done` now (#226), on the same stream, and the rail takes it
+    without a reload."""
+    composer = page.locator("textarea").first
+    composer.fill("Explain Kerberos")
+    composer.press("Enter")
+    page.wait_for_url("**/chat/**", timeout=15_000)
+    page.wait_for_selector("text=ticket-granting ticket", timeout=30_000)
+
+    rail = page.locator('nav[aria-label="Hera"] a[href^="/chat/"]')
+    rail.filter(has_text="Explain Kerberos").wait_for(timeout=10_000)
+    assert page.get_by_role("button", name="Send").count() == 1, "the turn is over"
+
+
 def test_a_chat_is_renamed_and_deleted_from_the_rail(page: Any) -> None:
     """The ⋯ menu, which is the only way to correct a title she chose or to throw a
     conversation away. Renaming is an input where the title was; deleting asks first."""

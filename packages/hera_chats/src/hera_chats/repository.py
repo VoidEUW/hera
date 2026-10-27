@@ -174,9 +174,13 @@ class ChatRepository(Repository[Chat]):
         chat.pinned_skills = list(dict.fromkeys(names))
         return self.save(chat)
 
-    def touch(self, chat: Chat, *, title: str = "") -> Chat:
-        """Record that something was said, and name the chat if it has no name yet."""
+    def touch(self, chat: Chat) -> Chat:
+        """Record that something was said."""
         chat.last_message_at = utcnow()
+        return self.save(chat)
+
+    def name(self, chat: Chat, title: str) -> Chat:
+        """Name the chat if it has no name yet. Not activity: nothing was said."""
         if title and not chat.title:
             chat.title = title
         return self.save(chat)
