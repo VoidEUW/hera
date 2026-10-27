@@ -3,10 +3,10 @@
 Current state of the rebuild, so a new session can start without re-reading history. A snapshot,
 not a changelog — historical detail and full rationale live in `versions/` and the ADRs.
 
-**Updated:** 2026-10-21 · **Version:** v0.2.0 tagged, v0.2.1 in release candidates (rc4) · **Strategy:** thin spine
+**Updated:** 2026-10-27 · **Version:** v0.2.1 tagged, v0.3.0 next · **Strategy:** thin spine
 first, then deepen
 
-## Now: v0.2.1
+## What v0.2.1 brought
 
 ### Every component is the theme's own
 

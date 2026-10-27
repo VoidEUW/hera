@@ -31,8 +31,7 @@ and from the rest of the ecosystem.
 
 ## Status
 
-**v0.2.1 is in release candidates** — see the [releases](https://github.com/VoidEUW/hera/releases)
-for the latest. v0.2.0 made her *accumulate* (projects, a scratchpad, artifacts, memory); v0.2.1 is
+**v0.2.1 is the latest release** — see the [releases](https://github.com/VoidEUW/hera/releases). v0.2.0 made her *accumulate* (projects, a scratchpad, artifacts, memory); v0.2.1 is
 the polish pass: the interface rebuilt on one theme, the command palette and hotkeys, editable
 artifacts, diagrams, reading a skill's bundled files. **Dreaming and experience training are
 v0.3.** Each version is planned in [docs/versions/](docs/versions/) before the work starts, and
@@ -74,12 +73,12 @@ uv run hera serve                 # http://localhost:8756
 Or with Docker — the image is built for amd64 and arm64:
 
 ```bash
-docker run -p 8756:8756 -v hera_data:/data ghcr.io/voideuw/hera:rc
+docker run -p 8756:8756 -v hera_data:/data ghcr.io/voideuw/hera:latest
 # or, from a checkout: docker compose up
 ```
 
-`:rc` follows the newest release candidate, and an exact version (`:0.2.1-rc5`) is always there.
-`:latest` is always the newest *release* and appears with v0.2.1 — until then use `:rc`. A container
+`:latest` is always the newest *release*, `:rc` follows the newest release candidate, and an exact
+version (`:0.2.1`) is always there. A container
 reaches a model on the host through `host.docker.internal` — see the comments in
 [docker-compose.yml](docker-compose.yml).
 
