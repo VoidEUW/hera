@@ -310,9 +310,8 @@ that cannot work. It says *Hera is not answering* rather than *network error*, b
 that failed did not cross a network — if the page loaded and `/api/v1` did not, a process is not
 running, and the next thing anybody needs is the command that starts it.
 
-It is also the one screen that uses the **name** rather than the pronoun. Everything else in the
-interface calls her *she*, which is what § *Voice* below is about; here there is no conversation
-and nothing has a voice, and what a person needs to name is the program they are about to restart.
+Here the name is the program's rather than hers: there is no conversation and nothing has a
+voice, and what a person needs to name is the program they are about to restart.
 
 ## The screen
 
@@ -641,6 +640,12 @@ Failures explain what happened and what to do, in the interface's voice, and the
 apologise. *"filesystem is not running — check the command in Servers"* beats *"Sorry, something
 went wrong."* Empty screens are invitations: an empty Skills list says what a skill is and offers
 the button, the way the reference does.
+
+**Hera, then she** (#223). A string in the interface names Hera; *she* and *her* only point back
+to a Hera already named in the same string — *Hera writes these as she learns things*. A label read
+on its own — a pill, a heading, a tooltip, a placeholder — has nothing before it to point back to,
+so it says *Hera is unsure*, *Servers Hera can reach*, *What should Hera call you?*. A pronoun with
+nothing to refer to read as somebody the interface never introduced.
 
 Hera's own voice — the greeting, and anything written as her rather than about her — is warm and
 direct and never coy. She is the goddess of the household, not a mascot.

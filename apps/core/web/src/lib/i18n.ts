@@ -5,6 +5,10 @@
  * seam is the point — CLAUDE.md requires it, and a component with a literal in it is a
  * component that has to be reopened for every language.
  *
+ * **Hera, then she** (#223). A string names Hera; *she* and *her* only point back to a Hera
+ * already named in the same string. A label read on its own — a pill, a heading, a tooltip —
+ * has nothing before it to point back to, so it says Hera.
+ *
  * Sentence case. Active voice. A control says what happens: **Send**, not *Submit*. An action
  * keeps its name all the way through — the button that says "Always allow" produces a
  * confirmation that says "Always allowed". Failures explain what happened and what to do, and
@@ -38,7 +42,7 @@ export const t = {
 		 * model's `options.reasoning_effort` applies to every chat from the next message on. */
 		reasoning: 'Reasoning',
 		thinking: 'Thinking',
-		thinkingOn: 'She is thinking. Click to turn it off.',
+		thinkingOn: 'Hera is thinking. Click to turn it off.',
 		thinkingOff: 'Not thinking. Click to turn it on.',
 		budgetTitle: 'Thinking budget, in tokens',
 		budget: (tokens: number) =>
@@ -106,7 +110,7 @@ export const t = {
 	project: {
 		instructions: 'Instructions',
 		instructionsHint:
-			'What we are working on. If a sentence would still be true in a project about something else, it belongs in her mind instead.',
+			'What we are working on. If a sentence would still be true in a project about something else, it belongs in Hera’s mind instead.',
 		skills: 'Pinned skills',
 		skillsHint: 'Every chat in this project carries these, ahead of the profile’s.',
 		chooseSkills: 'Choose skills',
@@ -137,7 +141,7 @@ export const t = {
 		slash: 'skill · you asked for it',
 		retrieved: 'skill · matched this turn',
 		lines: (n: number) => `${n} lines — scroll for the rest`,
-		didThings: (n: number) => (n === 1 ? '1 thing she did' : `${n} things she did`),
+		didThings: (n: number) => (n === 1 ? '1 thing Hera did' : `${n} things Hera did`),
 		did: 'did',
 		unknown: 'Something this version does not know how to show'
 	},
@@ -165,7 +169,7 @@ export const t = {
 	question: {
 		answered: 'Answered',
 		asked: 'asked you',
-		nothing: 'She asked something, and it arrived empty.',
+		nothing: 'Hera asked something, and it arrived empty.',
 		placeholder: 'Answer…',
 		/** The field under a question that offers choices: picking one is enough. */
 		ownWords: 'Or in your own words…',
@@ -178,9 +182,9 @@ export const t = {
 		 * *she cannot go on* is what it means to whoever is being asked. A kind not in here —
 		 * a turn persisted before the set was closed carries a stance word — draws nothing. */
 		kinds: {
-			unsure: 'she is unsure',
-			blocked: 'she cannot go on',
-			choice: 'she needs you to choose'
+			unsure: 'Hera is unsure',
+			blocked: 'Hera cannot go on',
+			choice: 'Hera needs you to choose'
 		} as Record<string, string>
 	},
 
@@ -193,7 +197,7 @@ export const t = {
 		// Not "Send": the composer's button already says that, and this one does something
 		// else -- it replaces a question that was already asked.
 		saveAndSend: 'Ask again',
-		editNote: 'Her answer to the old wording goes.',
+		editNote: 'Hera’s answer to the old wording goes.',
 		/** The speaker labels over a message: yours, and hers by name. */
 		you: 'You',
 		thinking: 'Thinking'
@@ -209,7 +213,7 @@ export const t = {
 		 * invites a rewording of the question, which is the wrong response to a request the
 		 * provider refused. */
 		silent: 'This turn stopped without an answer',
-		max_iterations: 'She ran out of tool calls and answered with what she had',
+		max_iterations: 'Hera ran out of tool calls and answered with what she had',
 		awaiting_permission: 'Waiting for you',
 		awaiting_answer: 'Waiting for your answer',
 		/** How many tokens *this message* generated, in the corner nobody has to look at.
@@ -223,13 +227,13 @@ export const t = {
 
 	memory: {
 		blurb:
-			'What she has written down about you. Every one of these that is switched on is in her prompt, whole — there is nothing to search and nothing that can quietly fail to arrive. That takes space, so the space is here to see.',
+			'What Hera has written down about you. Every one of these that is switched on is in her prompt, whole — there is nothing to search and nothing that can quietly fail to arrive. That takes space, so the space is here to see.',
 		/** The number that matters, said first. *Left* is what a person is steering by; *used of*
 		 * is the detail underneath it. */
 		left: (n: number) => `${n.toLocaleString()} tokens left`,
 		used: (used: number, limit: number) =>
 			`${used.toLocaleString()} of ${limit.toLocaleString()} used`,
-		spaceLabel: 'Space her memories take',
+		spaceLabel: 'Space Hera’s memories take',
 		carried: (n: number) => `${n} ${n === 1 ? 'memory' : 'memories'}`,
 		off: (n: number) => `${n} switched off`,
 		tokens: (n: number) => `${n} tokens`,
@@ -239,7 +243,7 @@ export const t = {
 		offOne: 'Kept, not used',
 		useIt: (key: string) => `Use ${key}`,
 		hereOnly: 'this chat only',
-		hers: 'she wrote it',
+		hers: 'Hera wrote it',
 		yours: 'you wrote it',
 		because: (why: string) => `because ${why}`,
 		edit: 'Edit',
@@ -247,20 +251,20 @@ export const t = {
 		// The three fields a person may change. The key is not one of them: the filename is the
 		// identity, so renaming would make a different memory with the same words in it.
 		description: 'Summary',
-		text: 'What she knows',
+		text: 'What Hera knows',
 		why: 'Why it was kept',
 		whyHint: 'Optional',
 		// The disclosure under the one box: the two fields that never reach her prompt.
 		more: 'Summary and reason',
 		editNote:
-			'Only what she knows goes into her prompt. The summary and the reason are for this screen.',
+			'Only what Hera knows goes into her prompt. The summary and the reason are for this screen.',
 		delete: 'Delete',
 		// The only delete in the system that actually removes a memory. Her own `forget` keeps
 		// the file, so this sentence has to be the one that says the difference out loud.
 		deleteAsk: 'Delete this memory? It is not kept anywhere else.',
 		cancel: 'Cancel',
 		export: 'Export MEMORY.md',
-		none: 'Nothing yet. She writes these as she learns things worth keeping, and you can drop a markdown file into your memories directory yourself.'
+		none: 'Nothing yet. Hera writes these as she learns things worth keeping, and you can drop a markdown file into your memories directory yourself.'
 	},
 
 	/** Settings → Usage (#111). */
@@ -270,8 +274,8 @@ export const t = {
 		prompt: 'Read',
 		completion: 'Written',
 		/** The legend's longer names, for a person who wonders what "read" means here. */
-		promptLong: 'Prompt tokens — what she read: the conversation, her mind, the tools',
-		completionLong: 'Completion tokens — what she wrote back',
+		promptLong: 'Prompt tokens — what Hera read: the conversation, her mind, the tools',
+		completionLong: 'Completion tokens — what Hera wrote back',
 		day: 'Last 24 hours',
 		week: 'Last 7 days',
 		month: 'Last 30 days',
@@ -280,11 +284,11 @@ export const t = {
 			`${prompt.toLocaleString()} read · ${completion.toLocaleString()} written`,
 		/** Under the split, when the endpoint said how much of the writing was thinking. */
 		reasoning: (n: number) => `of which ${n.toLocaleString()} thinking`,
-		cache: (share: string) => `${share} of what she read was cached`,
+		cache: (share: string) => `${share} of what Hera read was cached`,
 		pace: (speed: string, wait: string) => `${speed} · first token after ${wait}`,
 		readout: (date: string, prompt: number, completion: number) =>
 			`${date}: ${prompt.toLocaleString()} read, ${completion.toLocaleString()} written`,
-		none: 'Nothing yet. Each answer she gives adds its tokens here, on the day it was given.',
+		none: 'Nothing yet. Each answer Hera gives adds its tokens here, on the day it was given.',
 		note: 'Token counts and the cache are what the model endpoint reports; a server that reports nothing counts as nothing, and Hera does not estimate. Speed and the wait for the first token are measured by Hera, so they include the network. The request that names a new chat is counted too.',
 		zone: (zone: string) => `Days in ${zone}`
 	},
@@ -292,7 +296,7 @@ export const t = {
 	skills: {
 		title: 'Skills for this chat',
 		blurb:
-			'Switched on for every message here, whatever retrieval decides. She still finds others on her own.',
+			'Switched on for every message here, whatever retrieval decides. Hera still finds others on her own.',
 		search: 'Search skills',
 		close: 'Close',
 		nothing: 'No description — retrieval can never find this one.',
@@ -301,13 +305,13 @@ export const t = {
 	},
 
 	servers: {
-		title: 'Servers she can reach',
+		title: 'Servers Hera can reach',
 		blurb:
 			'Only connected servers count — one that failed to start changes nothing for the next message. Adding or removing one happens in Settings.',
 		close: 'Close',
 		toolSingular: 'tool',
 		toolPlural: 'tools',
-		none: 'No servers connected. Add one in Settings to give her more tools.',
+		none: 'No servers connected. Add one in Settings to give Hera more tools.',
 		configure: 'Manage servers',
 		heading: 'MCP servers',
 		connected: 'connected',
@@ -318,7 +322,7 @@ export const t = {
 	serverEditor: {
 		newServer: 'New server',
 		editServer: 'Edit server',
-		hers: 'Hers — part of Hera, not in mcp.json',
+		hers: 'Part of Hera, not in mcp.json',
 		off: 'Off',
 		stdio: 'Command',
 		http: 'Web address',
@@ -370,7 +374,7 @@ export const t = {
 		toolsHeading: 'Tools',
 		noTools: 'It has not offered any tools.',
 		notConnected: 'Not connected, so there are no tools to list.',
-		toolOn: (tool: string) => `She may use ${tool}`,
+		toolOn: (tool: string) => `Hera may use ${tool}`,
 		deniedBy: (rule: string) => `Off by the rule ${rule}`,
 		switchOff: 'Switched off in mcp.json. Edit it to turn it on.',
 		toolsLoading: 'Reading its tools…'
@@ -389,7 +393,7 @@ export const t = {
 		decisions: {
 			allow: { label: 'Allow', help: 'Runs without asking.' },
 			ask: { label: 'Ask', help: 'Shows a card first, and you answer.' },
-			deny: { label: 'Deny', help: 'Never runs, and she is told so.' }
+			deny: { label: 'Deny', help: 'Never runs, and Hera is told so.' }
 		},
 		decisionLabel: 'What happens',
 		fallbackTitle: 'Everything else',
@@ -401,7 +405,7 @@ export const t = {
 		},
 		builtInNote: 'Built in rules can be changed but not deleted.',
 		covers: (n: number) => (n === 1 ? 'Covers 1 tool' : `Covers ${n} tools`),
-		coversNone: 'Covers none of her tools right now',
+		coversNone: 'Covers none of Hera’s tools right now',
 		name: 'Name',
 		namePlaceholder: 'Reading files',
 		nameHelp: 'Only for you. It does not change what the rule covers.',
@@ -413,8 +417,8 @@ export const t = {
 			'The pattern is what makes it this rule. To cover something else, make a new rule.',
 		previewSearching: 'Checking which tools that covers…',
 		previewMatches: (n: number) =>
-			n === 1 ? 'Covers 1 of her tools now:' : `Covers ${n} of her tools now:`,
-		previewNone: 'None of her tools right now. It will apply when one that matches appears.',
+			n === 1 ? 'Covers 1 of Hera’s tools now:' : `Covers ${n} of Hera’s tools now:`,
+		previewNone: 'None of Hera’s tools right now. It will apply when one that matches appears.',
 		reason: 'Why',
 		reasonHelp: 'Shown on the card, or with the refusal.',
 		reasonPlaceholder: 'It only reads.',
@@ -465,7 +469,7 @@ export const t = {
 		/** The phone's way from one settings screen back to the list of them. */
 		back: 'All settings',
 		title: 'Settings',
-		subtitle: 'How she works: what she runs on, what she knows, what she may do.',
+		subtitle: 'How Hera works: what she runs on, what she knows, what she may do.',
 		close: 'Close',
 		search: 'Search settings',
 		noMatch: 'Nothing here matches that.',
@@ -493,20 +497,20 @@ export const t = {
 		blurbAccount: 'Who you are to Hera: a name, an email and a picture.',
 		blurbGeneral: 'This browser and this machine: appearance, language, time zone, notifications.',
 		blurbHotkeys: 'The keys that do what a button on screen already does.',
-		blurbUsage: 'How many tokens her answers took, day by day.',
-		blurbMind: 'The text that shapes how she thinks and speaks, one region at a time.',
-		blurbMemory: 'What she knows about you, and how much room it takes.',
-		blurbModels: 'Where she runs. Any OpenAI-compatible endpoint.',
-		blurbDreaming: 'How she will reflect on herself — not built yet.',
-		blurbSkills: 'Packages of instructions she can be given for a kind of task.',
+		blurbUsage: 'How many tokens Hera’s answers took, day by day.',
+		blurbMind: 'The text that shapes how Hera thinks and speaks, one region at a time.',
+		blurbMemory: 'What Hera knows about you, and how much room it takes.',
+		blurbModels: 'Where Hera runs. Any OpenAI-compatible endpoint.',
+		blurbDreaming: 'How Hera will reflect on herself — not built yet.',
+		blurbSkills: 'Packages of instructions Hera can be given for a kind of task.',
 		blurbServers:
-			'The MCP servers she can reach, and the tools each one brings. Switch a tool off and she no longer has it.',
-		blurbPermissions: 'What she may do without asking.',
+			'The MCP servers Hera can reach, and the tools each one brings. Switch a tool off and she no longer has it.',
+		blurbPermissions: 'What Hera may do without asking.',
 		permissionsFallback: 'Anything not matched below:',
 		toolCount: (n: number) => `${n} ${n === 1 ? 'tool' : 'tools'}`,
 		soon: 'v0.3',
 		dreamingSoon:
-			'Dreaming and experience training arrive in v0.3. She will propose changes to her own evolvable mind regions, and nothing is written without you accepting it. Memory comes first, in v0.2 — she has to have something to reflect on.',
+			'Dreaming and experience training arrive in v0.3. Hera will propose changes to her own evolvable mind regions, and nothing is written without you accepting it. Memory comes first, in v0.2 — she has to have something to reflect on.',
 		appearance: 'Appearance',
 		system: 'System',
 		light: 'Light',
@@ -515,7 +519,7 @@ export const t = {
 		save: 'Save',
 		saved: 'Saved',
 		ownerFixed: 'Only you may change this',
-		evolvable: 'She may propose changes to this',
+		evolvable: 'Hera may propose changes to this',
 		generation: (n: number) => `${n} ${n === 1 ? 'revision' : 'revisions'}`,
 		noSkills:
 			'A skill is a folder with a SKILL.md in it — a name, a description of when to use it, and instructions. Put one in your skills directory and it appears here.',
@@ -581,7 +585,7 @@ export const t = {
 		pick: 'Add',
 		unreachable: 'Could not reach it',
 		remove: 'Remove',
-		none: 'No endpoint registered yet. Add one and she has somewhere to think.',
+		none: 'No endpoint registered yet. Add one and Hera has somewhere to think.',
 		saved: 'Saved',
 		nameRule: 'Lowercase letters, digits, - and _',
 
@@ -646,7 +650,7 @@ export const t = {
 				declared: 'Told to Hera — nobody publishes this one',
 				none: 'Nothing is known about this model yet'
 			},
-			thinking: 'Let her think',
+			thinking: 'Let Hera think',
 			thinkingToggle: 'Let the model reason before it answers',
 			thinkingBudget: 'Thinking budget (tokens)',
 			/** How a vocabulary gets declared for the ~17 providers whose effort levels are
@@ -692,7 +696,7 @@ export const t = {
 
 	account: {
 		name: 'Name',
-		namePlaceholder: 'What should she call you?',
+		namePlaceholder: 'What should Hera call you?',
 		email: 'Email',
 		emailPlaceholder: 'you@example.org',
 		emailInvalid: 'That does not look like an email address.',
@@ -716,8 +720,8 @@ export const t = {
 	general: {
 		language: 'Language',
 		languageNote:
-			'The language of this interface. Which language she answers in is the language region under Mind.',
-		timezoneNote: 'What she is told the date and time are. She is always told UTC as well.',
+			'The language of this interface. Which language Hera answers in is the language region under Mind.',
+		timezoneNote: 'What Hera is told the date and time are. She is always told UTC as well.',
 		aboutHeading: 'About',
 		version: 'Version',
 		dataFolder: 'Data folder',
@@ -727,7 +731,7 @@ export const t = {
 
 	profileMenu: {
 		timezone: 'Time zone',
-		timezoneHint: 'What she is told the date and time are. She is always told UTC as well.',
+		timezoneHint: 'What Hera is told the date and time are. She is always told UTC as well.',
 		timezoneUtc: 'UTC only',
 		timezoneDetect: (zone: string) => `Use this machine’s (${zone})`,
 		open: 'You and this machine',
@@ -737,7 +741,7 @@ export const t = {
 		language: 'Language',
 		languageOnly: 'English for now; the interface is ready for more.',
 		about: 'About',
-		checking: 'Asking her where she lives…',
+		checking: 'Asking Hera where she lives…',
 		version: (v: string) => `Hera ${v}`,
 		dataIn: 'Your data is in',
 		settings: 'Settings'
@@ -752,7 +756,7 @@ export const t = {
 		notText: (name: string) =>
 			`${name} does not look like text, so there is nothing to send. PDFs are not readable yet.`,
 		notAnImage: (name: string, type: string) =>
-			`${name} is ${type || 'a kind of image'}, which she cannot be shown — PNG, JPEG, WebP and GIF work.`,
+			`${name} is ${type || 'a kind of image'}, which Hera cannot be shown — PNG, JPEG, WebP and GIF work.`,
 		image: 'image',
 		note: 'Attached files are sent as part of your message.'
 	},
@@ -835,9 +839,9 @@ export const t = {
 	/** The screen shown when the first load never answered. Its own block rather than more keys
 	 * under `error`, because this is a whole screen with a voice and not a line of copy. */
 	offline: {
-		/** **Hera, not she.** The rest of the interface calls her *she*, and on this one screen it
-		 * reads wrong: there is no conversation here and nothing has a voice — what has failed is
-		 * a server, and the thing to name is the program you are about to restart. */
+		/** About the program, not about her: there is no conversation here and nothing has a
+		 * voice — what has failed is a server, and the thing to name is the one you are about to
+		 * restart. */
 		title: 'Hera is not answering',
 		/** Deliberately about *the server* and not about *the network*: this runs on the machine
 		 * it talks to, so a failed request here almost always means a process is not running. */
@@ -885,7 +889,7 @@ export const t = {
 		signInTitle: 'Sign in to Hera',
 		registerTitle: 'Create your account',
 		signInBlurb: 'Your chats stay on this machine either way.',
-		registerBlurb: 'One account for every machine she runs on.',
+		registerBlurb: 'One account for every machine Hera runs on.',
 		name: 'Name',
 		email: 'Email',
 		password: 'Password',
@@ -915,8 +919,8 @@ export const t = {
 		/** What each settings screen loads, for the title: "Could not load usage". */
 		what: {
 			usage: 'usage',
-			memory: 'her memories',
-			mind: 'her mind regions',
+			memory: 'Hera’s memories',
+			mind: 'Hera’s mind regions',
 			skills: 'skills',
 			servers: 'servers',
 			permissions: 'permission rules',

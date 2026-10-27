@@ -472,7 +472,7 @@ def act_question(page: Page, chat_url: str, shots: Path, report: Report) -> None
         page.locator("textarea").first.press("Enter")
         page.wait_for_selector("text=Which deck do you mean?", timeout=40_000)
         # The kind of question, said in the person's words rather than the tool's (ADR 17).
-        page.wait_for_selector("text=she is unsure", timeout=10_000)
+        page.wait_for_selector("text=Hera is unsure", timeout=10_000)
         shoot(page, shots, "13-the-question-card")
 
     with report.scene("11-the-reply-resumes-the-turn", "cards", page, shots):

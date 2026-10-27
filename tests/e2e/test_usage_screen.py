@@ -85,7 +85,7 @@ def test_an_answer_is_a_bar_today_and_in_every_total(page: Any) -> None:
     assert "12,000 read, 345 written" in (chart.get_attribute("aria-valuetext") or "")
     assert panel.locator("dl.totals dd strong").all_inner_texts() == ["12,345 tokens"] * 3
     # What the endpoint said about its cache, and what Hera's own clock measured.
-    assert panel.get_by_text("75% of what she read was cached").count() == 3
+    assert panel.get_by_text("75% of what Hera read was cached").count() == 3
     assert panel.get_by_text(re.compile(r"tok/s · first token after")).count() == 3
 
     # The keyboard reads the day before, which had nothing.
