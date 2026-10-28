@@ -23,7 +23,7 @@ dependencies = [
     "httpx2>=2.13.1",
     "mcp>=2.3.0",
     "pydantic>=2.14.1",
-    "pydantic-settings>=2.16.0",
+    "pydantic-settings>=2.16.1",
 ]
 
 [tool.hatch.build.targets.wheel]

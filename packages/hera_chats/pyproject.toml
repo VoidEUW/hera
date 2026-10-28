@@ -27,7 +27,7 @@ dependencies = [
     "hera-storage",
     "hera-tools",
     "pydantic>=2.14.1",
-    "pydantic-settings>=2.16.0",
+    "pydantic-settings>=2.16.1",
     "sqlmodel>=0.0.42",
 ]
 
