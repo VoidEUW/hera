@@ -280,6 +280,17 @@ class TestRemember:
 
         assert not result.is_error
 
+    async def test_a_global_memory_still_carries_its_conversation(
+        self, wired: MCPServer, memories: FakeMemories
+    ) -> None:
+        """Not to be kept for it — to say whose memory it is (ADR 28)."""
+        async with talking_to(wired) as client:
+            await client.call_tool(
+                "remember", {"key": "k", "text": "x", "description": "d"}, meta=in_chat("chat-7")
+            )
+
+        assert memories.written["k"][2:] == ("global", "chat-7")
+
     async def test_a_scope_the_schema_does_not_allow_is_refused(
         self, wired: MCPServer, memories: FakeMemories
     ) -> None:

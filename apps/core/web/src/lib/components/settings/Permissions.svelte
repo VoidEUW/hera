@@ -9,6 +9,11 @@
 	 * three-way switch on the row, because the whole screen exists to be flipped. Rules that ship
 	 * with Hera can be changed and not deleted; the ones from a profile are shown and not touched.
 	 *
+	 * **Two layers, one screen** (ADR 28). *Your rules* come first: each person's own, mostly
+	 * "always" answered on a card, flipped or removed here. *This Hera's rules* are the instance's,
+	 * an admin's to change and everybody else's to read — a person's rule may settle an *ask* in
+	 * them and can never loosen a *deny*.
+	 *
 	 * Counted load, as in `Servers.svelte`.
 	 */
 	import { api, ApiError, type Decision, type Rule } from '$lib/api/client';
@@ -20,6 +25,7 @@
 	import { t } from '$lib/i18n';
 	import { Placeholder } from '$lib/loading.svelte';
 	import { describePattern } from '$lib/permissions';
+	import { workspace } from '$lib/stores/workspace.svelte';
 	import LoadFailed from './LoadFailed.svelte';
 	import Rows from './Rows.svelte';
 	import RuleEditor from './RuleEditor.svelte';
@@ -31,6 +37,8 @@
 	let { filter = '' }: Props = $props();
 
 	let rules = $state<Rule[]>([]);
+	let mine = $state<Rule[]>([]);
+	const admin = $derived(workspace.account?.role === 'admin');
 	let fallback = $state<Decision>('ask');
 	let error = $state<string | null>(null);
 	/** Why the screen could not load, if it could not — kept as thrown, for `LoadFailed`. A
@@ -38,7 +46,7 @@
 	let failed = $state<unknown>(null);
 	/** The editor: a rule being changed, `'new'`, or closed. */
 	let editing = $state<Rule | 'new' | null>(null);
-	let deleting = $state<Rule | null>(null);
+	let deleting = $state<{ rule: Rule; mine: boolean } | null>(null);
 
 	const choices = (['allow', 'ask', 'deny'] as const).map((value) => ({
 		value,
@@ -61,13 +69,11 @@
 		}
 	}
 
-	const visible = $derived(
-		rules.filter(
-			(rule) =>
-				!filter ||
-				`${title(rule)} ${rule.pattern} ${rule.reason} ${rule.name}`.toLowerCase().includes(filter)
-		)
-	);
+	const matching = (rule: Rule) =>
+		!filter ||
+		`${title(rule)} ${rule.pattern} ${rule.reason} ${rule.name}`.toLowerCase().includes(filter);
+	const visible = $derived(rules.filter(matching));
+	const visibleMine = $derived(mine.filter(matching));
 
 	const settling = new Placeholder(true);
 	$effect(() => () => settling.stop());
@@ -84,10 +90,11 @@
 		failed = null;
 		settling.set(true);
 		try {
-			const found = await api.permissions();
+			const [found, own] = await Promise.all([api.permissions(), api.myRules()]);
 			if (token !== generation) return;
 			rules = found.rules;
 			fallback = found.fallback;
+			mine = own;
 		} catch (cause) {
 			if (token !== generation) return;
 			failed = cause;
@@ -112,10 +119,16 @@
 
 	const setFallback = (decision: Decision) => attempt(() => api.setFallback(decision));
 
+	const decideMine = (rule: Rule, decision: Decision) =>
+		attempt(() => api.updateMyRule(rule.pattern, decision));
+
 	function remove() {
-		const rule = deleting;
+		const chosen = deleting;
 		deleting = null;
-		if (rule) void attempt(() => api.deleteRule(rule.pattern));
+		if (!chosen) return;
+		void attempt(() =>
+			chosen.mine ? api.deleteMyRule(chosen.rule.pattern) : api.deleteRule(chosen.rule.pattern)
+		);
 	}
 
 	function saved() {
@@ -124,7 +137,7 @@
 	}
 
 	const SHOWN = 3;
-	const editable = (rule: Rule) => rule.source !== 'profile';
+	const editable = (rule: Rule) => admin && rule.source !== 'profile';
 	const deletable = (rule: Rule) => rule.source === 'you' || rule.source === 'card';
 </script>
 
@@ -137,6 +150,51 @@
 {:else if failed !== null}
 	<LoadFailed cause={failed} what={t.loadFailed.what.permissions} onretry={load} />
 {:else}
+	<div class="bar">
+		<h3>{t.permissions.mineHeading}</h3>
+	</div>
+	<p class="caption note">{t.permissions.mineNote}</p>
+	{#each visibleMine as rule (rule.pattern)}
+		<section class="row">
+			<div class="main">
+				<div class="head">
+					<h3>{title(rule)}</h3>
+					{#if rule.source === 'card'}
+						<Pill tone="authority" dot={false}>{t.permissions.sources.card}</Pill>
+					{/if}
+				</div>
+				<p class="pattern mono">{rule.pattern}</p>
+			</div>
+			<div class="side">
+				<Segmented
+					size="sm"
+					options={choices}
+					value={rule.decision}
+					label={title(rule)}
+					onchange={(next) => decideMine(rule, next)}
+				/>
+				<IconButton
+					icon="trash"
+					size="sm"
+					label={t.permissions.delete}
+					onclick={() => (deleting = { rule, mine: true })}
+				/>
+			</div>
+		</section>
+	{:else}
+		<p class="empty">{filter ? t.settings.noMatch : t.permissions.mineNone}</p>
+	{/each}
+
+	<div class="bar">
+		<h3>{t.permissions.instanceHeading}</h3>
+		{#if admin}
+			<Button variant="highlighted" size="sm" icon="plus" onclick={() => (editing = 'new')}>
+				{t.permissions.newRule}
+			</Button>
+		{/if}
+	</div>
+	{#if !admin}<p class="caption note">{t.permissions.instanceReadOnly}</p>{/if}
+
 	<section class="fallback">
 		<div class="what">
 			<h3>{t.permissions.fallbackTitle}</h3>
@@ -145,21 +203,18 @@
 				{t.permissions.decisions[fallback].help}
 			</p>
 		</div>
-		<Segmented
-			size="sm"
-			options={choices}
-			value={fallback}
-			label={t.permissions.fallbackTitle}
-			onchange={setFallback}
-		/>
+		{#if admin}
+			<Segmented
+				size="sm"
+				options={choices}
+				value={fallback}
+				label={t.permissions.fallbackTitle}
+				onchange={setFallback}
+			/>
+		{:else}
+			<Pill>{t.permissions.decisions[fallback].label}</Pill>
+		{/if}
 	</section>
-
-	<div class="bar">
-		<h3>{t.permissions.rulesHeading}</h3>
-		<Button variant="highlighted" size="sm" icon="plus" onclick={() => (editing = 'new')}>
-			{t.permissions.newRule}
-		</Button>
-	</div>
 
 	{#each visible as rule (rule.pattern + (rule.profile ?? ''))}
 		<section class="row">
@@ -210,7 +265,7 @@
 							icon="trash"
 							size="sm"
 							label={t.permissions.delete}
-							onclick={() => (deleting = rule)}
+							onclick={() => (deleting = { rule, mine: false })}
 						/>
 					{/if}
 				{:else}
@@ -241,7 +296,7 @@
 {#if deleting}
 	<Confirm
 		title={t.permissions.deleteTitle}
-		body={t.permissions.deleteBody(title(deleting))}
+		body={t.permissions.deleteBody(title(deleting.rule))}
 		confirm={t.permissions.deleteYes}
 		cancel={t.permissions.deleteKeep}
 		onconfirm={remove}

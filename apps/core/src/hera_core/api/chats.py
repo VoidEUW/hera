@@ -341,7 +341,7 @@ def answer_permission(
     ]
 
     if payload.remember and container.registry is not None:
-        _remember(container, recorded, answered, allow=payload.allow)
+        _remember(chat.owner_id, recorded, answered, allow=payload.allow)
 
     return _stream(
         container,
@@ -445,6 +445,10 @@ def _stream(
     """
     db.commit()
 
+    # Whose turn this is decides whose mind it speaks from, whose memories it carries and whose
+    # permission rules it runs under (ADR 28). The chat's owner, not the request's: they are the
+    # same person by `require_chat`, and the chat is what the rest of the turn is about.
+    person = container.for_user(chat.owner_id)
     context = _context(
         db,
         chat,
@@ -455,7 +459,9 @@ def _stream(
         # switched off on the settings screen has to stop arriving on the next turn rather than
         # after a restart. It is every enabled memory, whole -- there is no retrieval here, and
         # the ceiling is what keeps that affordable (ADR 16).
-        memories=container.memories.recall(chat_id=str(chat.id)),
+        memories=person.memories.recall(chat_id=str(chat.id)),
+        builder=person.builder,
+        tools=container.tools_for(chat.owner_id),
         # What the browser reported it could not draw, until the file changes -- see
         # `hera_core.problems`. Read here because only the browser can tell, and only she can fix.
         problems=problems.recall(str(chat.id)),
@@ -713,9 +719,9 @@ def _profile_of(session: Session, chat: Chat) -> Profile | None:
 
 
 def _remember(
-    container: Container, recorded: Sequence[ChatEvent], answered: set[str], *, allow: bool
+    owner: UUID, recorded: Sequence[ChatEvent], answered: set[str], *, allow: bool
 ) -> None:
-    """Turn "always" into a rule that survives a restart (:mod:`hera_core.rulebook`)."""
+    """Turn "always" into one of this person's rules (:mod:`hera_core.rulebook`)."""
     tools = {
         event.name
         for event in recorded
@@ -725,7 +731,7 @@ def _remember(
         for event in recorded
         if isinstance(event, PermissionRequired) and event.call_id in answered
     }
-    rulebook.remember(container, sorted(tools), allow=allow)
+    rulebook.remember(owner, sorted(tools), allow=allow)
 
 
 def _require_project(session: Session, project_id: UUID, owner: UUID) -> Project:

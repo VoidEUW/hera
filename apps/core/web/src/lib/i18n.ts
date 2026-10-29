@@ -384,7 +384,12 @@ export const t = {
 
 	/** Settings → Permissions: rules a person can make, change and remove (#109). */
 	permissions: {
-		rulesHeading: 'Rules',
+		mineHeading: 'Your rules',
+		mineNote:
+			'Yours alone, and laid over this Hera’s rules below: one can settle an ask for you, and none can loosen a deny.',
+		mineNone: 'None yet. Answering “always” on a confirmation card makes one here.',
+		instanceHeading: 'This Hera’s rules',
+		instanceReadOnly: 'Set by an admin, for everybody here.',
 		newRule: 'New rule',
 		editRule: 'Edit rule',
 		everything: 'Every tool',
@@ -521,6 +526,14 @@ export const t = {
 		save: 'Save',
 		saved: 'Saved',
 		ownerFixed: 'Only you may change this',
+		shared: 'The same for everybody here',
+		sharedNote: 'Set by an admin for everybody on this Hera.',
+		sharedAdminNote: 'Everybody’s: what you save here applies to every person on this Hera.',
+		mindScope: 'Whose mind',
+		mindMine: 'Yours',
+		mindTemplate: 'Template for new people',
+		mindTemplateNote:
+			'Every new person’s mind starts as a copy of this. Changing it does not change anybody’s mind that already exists.',
 		evolvable: 'Hera may propose changes to this',
 		generation: (n: number) => `${n} ${n === 1 ? 'revision' : 'revisions'}`,
 		noSkills:

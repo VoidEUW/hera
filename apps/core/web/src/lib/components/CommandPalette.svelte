@@ -12,7 +12,7 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { t } from '$lib/i18n';
-	import { ENTRIES } from '$lib/settingsTabs';
+	import { entriesFor } from '$lib/settingsTabs';
 	import { workspace } from '$lib/stores/workspace.svelte';
 	import Palette, { type PaletteItem } from './ui/Palette.svelte';
 
@@ -71,16 +71,16 @@
 			group: t.palette.projects,
 			run: () => void goto(resolve('/project/[id]', { id: project.id }))
 		}));
-		const screens: PaletteItem[] = ENTRIES.filter(
-			(entry) => !entry.soon && entry.id !== 'hotkeys'
-		).map((entry) => ({
-			id: `settings-${entry.id}`,
-			label: entry.label,
-			description: entry.blurb,
-			icon: entry.icon,
-			group: t.palette.settings,
-			run: () => workspace.openSettings(entry.id)
-		}));
+		const screens: PaletteItem[] = entriesFor(workspace.account?.role === 'admin')
+			.filter((entry) => !entry.soon && entry.id !== 'hotkeys')
+			.map((entry) => ({
+				id: `settings-${entry.id}`,
+				label: entry.label,
+				description: entry.blurb,
+				icon: entry.icon,
+				group: t.palette.settings,
+				run: () => workspace.openSettings(entry.id)
+			}));
 		return [...actions, ...chats, ...projects, ...screens];
 	});
 </script>

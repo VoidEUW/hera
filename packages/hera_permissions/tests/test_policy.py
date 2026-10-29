@@ -292,3 +292,46 @@ def test_the_fallback_is_changed_without_touching_the_rules() -> None:
     assert changed.check("other__tool").decision is Decision.DENY
     assert changed.base == policy.base
     assert policy.fallback is Decision.ASK
+
+
+class TestAPersonsOwnRules:
+    """The last layer (ADR 28): settles an ask, tightens anything, never loosens a deny."""
+
+    instance = Policy(
+        base=PermissionSet(
+            rules=[
+                Rule(pattern="shell__*", decision=Decision.DENY, reason="runs commands"),
+                Rule(pattern="fs__*", decision=Decision.ASK),
+                Rule(pattern="hera__*", decision=Decision.ALLOW),
+            ]
+        ),
+        fallback=Decision.ASK,
+    )
+
+    def test_it_settles_an_ask(self) -> None:
+        mine = PermissionSet(rules=[Rule(pattern="fs__read_file", decision=Decision.ALLOW)])
+        outcome = self.instance.for_person(mine).check("fs__read_file")
+        assert outcome.decision is Decision.ALLOW
+        assert outcome.personal
+
+    def test_it_settles_the_fallback_too(self) -> None:
+        mine = PermissionSet(rules=[Rule(pattern="web__*", decision=Decision.ALLOW)])
+        assert self.instance.for_person(mine).check("web__get").decision is Decision.ALLOW
+
+    def test_it_never_loosens_a_deny(self) -> None:
+        mine = PermissionSet(rules=[Rule(pattern="shell__run", decision=Decision.ALLOW)])
+        outcome = self.instance.for_person(mine).check("shell__run")
+        assert outcome.decision is Decision.DENY
+        assert not outcome.personal
+        assert outcome.reason == "runs commands"
+
+    def test_it_may_tighten_what_the_instance_allows(self) -> None:
+        mine = PermissionSet(rules=[Rule(pattern="hera__search", decision=Decision.DENY)])
+        assert self.instance.for_person(mine).check("hera__search").decision is Decision.DENY
+        assert self.instance.for_person(mine).check("hera__note").decision is Decision.ALLOW
+
+    def test_without_rules_nothing_changes(self) -> None:
+        for tool in ("shell__run", "fs__read_file", "hera__note", "web__get"):
+            assert self.instance.for_person(PermissionSet()).check(tool) == self.instance.check(
+                tool
+            )

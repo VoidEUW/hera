@@ -45,7 +45,7 @@ class FakeMemories:
         self.written[key] = (text, description, scope, chat_id)
         return f"remembered {key} ({scope})"
 
-    async def forget(self, key: str) -> str:
+    async def forget(self, key: str, *, chat_id: str = "") -> str:
         self.forgotten.append(key)
         return f"{key} is switched off; the file is kept"
 

@@ -12,7 +12,12 @@ from core_support import API
 from httpx import AsyncClient
 
 from hera_core.wiring import Services
-from hera_memories import MemoriesSettings
+from hera_memories import MemoriesSettings, MemoryStore
+
+
+def mine(services: Services) -> MemoryStore:
+    """The signed-in person's memories — the first admin's, who `client` is."""
+    return services.for_user(services.settings.owner_id).memories
 
 
 class TestListing:
@@ -22,7 +27,7 @@ class TestListing:
         """Including the two fields a turn never sees. The description and the ``why`` are not
         injected, so this screen is the only reason either is worth storing — a list that
         dropped them would make them dead weight on disk."""
-        services.memories.write(
+        mine(services).write(
             "runs-models-locally",
             "They run LM Studio on an M-series Mac.",
             description="Runs local models on Apple silicon",
@@ -43,8 +48,8 @@ class TestListing:
     ) -> None:
         """Not behind a *show disabled* toggle. The switch is about what a turn costs, and a
         list that hid what you switched off would leave you unable to switch it back on."""
-        services.memories.write("kept", "A fact.")
-        services.memories.set_enabled("kept", False)
+        mine(services).write("kept", "A fact.")
+        mine(services).set_enabled("kept", False)
 
         listed = (await client.get(f"{API}/memories")).json()
 
@@ -61,8 +66,8 @@ class TestListing:
     ) -> None:
         """Somebody will open one of these in an editor. A Hera that refuses to answer over one
         stray colon is worse than one memory shown with a complaint beside it."""
-        services.memories.directory.mkdir(parents=True, exist_ok=True)
-        (services.memories.directory / "odd.md").write_text(
+        mine(services).directory.mkdir(parents=True, exist_ok=True)
+        (mine(services).directory / "odd.md").write_text(
             "---\ndescription: a: b: c\n---\n\nStill readable.\n", encoding="utf-8"
         )
 
@@ -76,7 +81,7 @@ class TestTheBar:
     async def test_it_reports_what_is_used_against_the_ceiling(
         self, client: AsyncClient, services: Services
     ) -> None:
-        services.memories.write("first", "x" * 400)
+        mine(services).write("first", "x" * 400)
 
         budget = (await client.get(f"{API}/memories/budget")).json()
 
@@ -90,14 +95,14 @@ class TestTheBar:
     ) -> None:
         """A bar drawn against a constant the browser also knows would be wrong on exactly the
         installs that changed the setting."""
-        services.memories.settings = MemoriesSettings(budget_tokens=500)
+        mine(services).settings = MemoriesSettings(budget_tokens=500)
 
         assert (await client.get(f"{API}/memories/budget")).json()["limit"] == 500
 
     async def test_switching_one_off_gives_the_space_back(
         self, client: AsyncClient, services: Services
     ) -> None:
-        services.memories.write("first", "x" * 400)
+        mine(services).write("first", "x" * 400)
 
         await client.patch(f"{API}/memories/first", json={"enabled": False})
 
@@ -110,23 +115,23 @@ class TestSwitching:
     async def test_it_comes_back_with_the_memory_as_it_now_is(
         self, client: AsyncClient, services: Services
     ) -> None:
-        services.memories.write("first", "A fact.")
+        mine(services).write("first", "A fact.")
 
         response = await client.patch(f"{API}/memories/first", json={"enabled": False})
 
         assert response.status_code == 200
         assert response.json()["enabled"] is False
-        assert services.memories.recall() == ""
+        assert mine(services).recall() == ""
 
     async def test_switching_one_back_on_when_there_is_no_room_is_a_409(
         self, client: AsyncClient, services: Services
     ) -> None:
         """Nothing about the request was wrong — the store is full, which is a different answer
         from *you asked badly*, and the message says what is taking the space."""
-        services.memories.settings = MemoriesSettings(budget_tokens=40)
-        services.memories.write("first", "x" * 100)
-        services.memories.set_enabled("first", False)
-        services.memories.write("second", "y" * 100)
+        mine(services).settings = MemoriesSettings(budget_tokens=40)
+        mine(services).write("first", "x" * 100)
+        mine(services).set_enabled("first", False)
+        mine(services).write("second", "y" * 100)
 
         response = await client.patch(f"{API}/memories/first", json={"enabled": True})
 
@@ -150,12 +155,12 @@ class TestDeleting:
     async def test_a_person_can_remove_one(self, client: AsyncClient, services: Services) -> None:
         """The other half of *nothing a person told her is discarded without a person present*:
         her own ``forget`` keeps the file, and this route is the only thing that unlinks it."""
-        services.memories.write("first", "A fact.")
+        mine(services).write("first", "A fact.")
 
         response = await client.delete(f"{API}/memories/first")
 
         assert response.status_code == 204
-        assert services.memories.all() == []
+        assert mine(services).all() == []
 
     async def test_deleting_one_that_is_gone_is_a_404(self, client: AsyncClient) -> None:
         assert (await client.delete(f"{API}/memories/nothing-here")).status_code == 404
@@ -170,7 +175,7 @@ class TestExport:
     async def test_it_is_the_files_verbatim_so_it_can_be_split_back(
         self, client: AsyncClient, services: Services
     ) -> None:
-        services.memories.write("first", "A fact.", description="The first", why="They said so")
+        mine(services).write("first", "A fact.", description="The first", why="They said so")
 
         response = await client.get(f"{API}/memories/export/MEMORY.md")
 
@@ -185,7 +190,7 @@ class TestExport:
     ) -> None:
         """Partly assembled from text a model wrote, so Hera's own origin is not where it gets
         rendered — the same line `api.artifacts` holds."""
-        services.memories.write("first", "A fact.")
+        mine(services).write("first", "A fact.")
 
         response = await client.get(f"{API}/memories/export/MEMORY.md")
 
@@ -197,8 +202,8 @@ class TestExport:
     ) -> None:
         """A backup that quietly omitted everything you had switched off would be the worst
         kind of surprise to discover from."""
-        services.memories.write("kept", "A fact.")
-        services.memories.set_enabled("kept", False)
+        mine(services).write("kept", "A fact.")
+        mine(services).set_enabled("kept", False)
 
         assert "## kept" in (await client.get(f"{API}/memories/export/MEMORY.md")).text
 
@@ -210,7 +215,7 @@ class TestEditing:
     async def test_the_wording_can_be_corrected(
         self, client: AsyncClient, services: Services
     ) -> None:
-        services.memories.write("a-fact", "They drink tea.", description="Tea")
+        mine(services).write("a-fact", "They drink tea.", description="Tea")
 
         response = await client.patch(
             f"{API}/memories/a-fact", json={"text": "They drink tea, black."}
@@ -218,12 +223,12 @@ class TestEditing:
 
         assert response.status_code == 200
         assert response.json()["text"] == "They drink tea, black."
-        assert "They drink tea, black." in services.memories.recall()
+        assert "They drink tea, black." in mine(services).recall()
 
     async def test_a_field_left_out_is_left_alone(
         self, client: AsyncClient, services: Services
     ) -> None:
-        services.memories.write("a-fact", "They drink tea.", description="Tea", why="They said so")
+        mine(services).write("a-fact", "They drink tea.", description="Tea", why="They said so")
 
         await client.patch(f"{API}/memories/a-fact", json={"description": "Hot drinks"})
 
@@ -239,7 +244,7 @@ class TestEditing:
     ) -> None:
         """The badge says who *started* the memory. Making it mean who touched it last would turn
         the one interesting thing on that row into a modification timestamp with two values."""
-        services.memories.write("a-fact", "They drink tea.", source="auto")
+        mine(services).write("a-fact", "They drink tea.", source="auto")
 
         response = await client.patch(f"{API}/memories/a-fact", json={"text": "They drink coffee."})
 
@@ -248,8 +253,8 @@ class TestEditing:
     async def test_growing_one_past_the_ceiling_is_a_409(
         self, client: AsyncClient, services: Services
     ) -> None:
-        services.memories.settings = MemoriesSettings(budget_tokens=40)
-        services.memories.write("a-fact", "x" * 100)
+        mine(services).settings = MemoriesSettings(budget_tokens=40)
+        mine(services).write("a-fact", "x" * 100)
 
         response = await client.patch(f"{API}/memories/a-fact", json={"text": "y" * 400})
 
@@ -259,7 +264,7 @@ class TestEditing:
     async def test_emptying_one_is_refused_rather_than_leaving_a_blank(
         self, client: AsyncClient, services: Services
     ) -> None:
-        services.memories.write("a-fact", "They drink tea.")
+        mine(services).write("a-fact", "They drink tea.")
 
         response = await client.patch(f"{API}/memories/a-fact", json={"text": "   "})
 

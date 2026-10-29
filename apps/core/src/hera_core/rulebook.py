@@ -14,11 +14,13 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Literal
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
 
 from hera_core import permission_rules
 from hera_core.permission_rules import RuleSource, StoredRule
+from hera_home import user_permissions_path
 from hera_permissions import Decision, Policy, Rule, matches
 
 if TYPE_CHECKING:
@@ -184,21 +186,25 @@ def set_fallback(container: Services, decision: Decision) -> Decision:
     return decision
 
 
-def remember(container: Services, tools: Sequence[str], *, allow: bool) -> None:
-    """Turn "always" on a confirmation card into rules that survive a restart.
+def remember(owner: UUID, tools: Sequence[str], *, allow: bool) -> None:
+    """Turn "always" on a confirmation card into one person's rules, kept across restarts.
+
+    **The person's file, not the instance's** (ADR 28): ``users/<id>/permissions.json``, a layer
+    over everything an admin decided. So the answer can settle an *ask* for them and can never
+    loosen a *deny* — :meth:`hera_permissions.Policy.check` sees to that, at the card and at the
+    dispatch alike. Nothing is swapped here: a person's rules are read for every turn.
 
     Written against the **exact tool name**, not a pattern derived from it. A card about
     ``fs__write_file`` answered with "always" must not quietly permit ``fs__delete_file``; if
     somebody wants the broader rule they can widen it on the Permissions screen, where they can
     see what they are doing.
     """
-    if container.registry is None or not tools:
+    if not tools:
         return
-    registry = container.registry
     decision = Decision.ALLOW if allow else Decision.DENY
+    path = user_permissions_path(str(owner))
     with permission_rules.LOCK:
-        stored = permission_rules.load()
-        policy = registry.policy
+        stored = permission_rules.load(path)
         for tool in sorted(set(tools)):
             rule = Rule(
                 pattern=tool,
@@ -207,9 +213,7 @@ def remember(container: Services, tools: Sequence[str], *, allow: bool) -> None:
                 name=permission_rules.card_name([tool], allow=allow),
             )
             stored = stored.with_rule(_stored(rule, "card"))
-            policy = policy.with_rule(rule)
-        permission_rules.save(stored)
-        _swap(container, policy)
+        permission_rules.save(stored, path)
 
 
 def _registry(container: Services) -> ToolRegistry:
@@ -249,3 +253,35 @@ def _view(rule: Rule, shipped: Policy, stored: permission_rules.StoredPermission
         name=rule.name,
         source=source,
     )
+
+
+# -- a person's own rules (ADR 28) -------------------------------------------------------------
+
+
+def mine(owner: UUID) -> list[StoredRule]:
+    """One person's own rules, sorted by pattern for the reason the instance's are."""
+    stored = permission_rules.load(user_permissions_path(str(owner)))
+    return sorted(stored.rules, key=lambda rule: rule.pattern)
+
+
+def change_mine(owner: UUID, pattern: str, decision: Decision) -> StoredRule:
+    """Flip one of a person's rules. Their own, so nobody else's file is reachable from here."""
+    path = user_permissions_path(str(owner))
+    with permission_rules.LOCK:
+        stored = permission_rules.load(path)
+        current = stored.get(pattern)
+        if current is None:
+            raise NoSuchRule(pattern)
+        changed = current.model_copy(update={"decision": decision})
+        permission_rules.save(stored.with_rule(changed), path)
+    return changed
+
+
+def forget_mine(owner: UUID, pattern: str) -> None:
+    """Remove one of a person's rules: the instance's decision on that tool applies again."""
+    path = user_permissions_path(str(owner))
+    with permission_rules.LOCK:
+        stored = permission_rules.load(path)
+        if stored.get(pattern) is None:
+            raise NoSuchRule(pattern)
+        permission_rules.save(stored.without(pattern), path)

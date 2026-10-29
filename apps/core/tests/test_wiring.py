@@ -14,11 +14,14 @@ this file is the guard for the real assembly, which has nobody to notice on its 
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
+from typing import Any
+from uuid import UUID, uuid4
 
 import pytest
 
+from hera_chats import ChatRepository
 from hera_core.wiring import Services, build_services
-from hera_home import memories_dir
+from hera_home import home, user_memories_dir
 from hera_mcp import ARTIFACT_META, ASK_TOOL, BUILTIN_SERVER_NAME, CHAT_ID_META
 from hera_providers import FakeProvider
 from hera_tools import ToolInvocation
@@ -31,7 +34,10 @@ async def services() -> AsyncIterator[Services]:
     `HERA_HOME` is repointed for every test in this suite, so `ToolRegistry.open` finds no
     `mcp.json` and mounts her own server and nothing else.
     """
+    home().mkdir(parents=True, exist_ok=True)
     built = build_services(provider=FakeProvider([]))
+    # A schema, because a memory call looks its chat up to find whose memory it is (ADR 28).
+    built.database.create_all()
     try:
         yield built
     finally:
@@ -92,34 +98,62 @@ async def test_the_artifacts_port_is_wired_and_answers_with_a_card(services: Ser
     assert result.structured == {ARTIFACT_META: {"name": "page.html", "inline": False, "bytes": 11}}
 
 
+def a_chat(services: Services, owner: UUID | None = None) -> dict[str, str]:
+    """A conversation for a memory call to be part of, as the `_meta` a turn would send."""
+    with services.database.session() as session:
+        chat = ChatRepository(session).create(owner or services.settings.owner_id)
+        return {CHAT_ID_META: str(chat.id)}
+
+
+async def remember(services: Services, context: dict[str, str], **arguments: str) -> Any:
+    assert services.registry is not None
+    return await services.registry.dispatch(
+        ToolInvocation(
+            call_id="m", tool=f"{BUILTIN_SERVER_NAME}__remember", arguments=dict(arguments)
+        ),
+        context=context,
+    )
+
+
 async def test_the_memory_port_is_wired_and_really_writes_a_file(services: Services) -> None:
     """The same guard again, and it is worth having a third time because the failure has the
     same shape every time: a `memories=` argument can be present and be `None`, and then the one
     tool a person most notices missing answers *not available in this deployment* in the middle
     of a working deployment.
 
-    Driven through the real registry, and asserted against the **file**, because a memory that
-    is written anywhere other than `~/.hera/memories/` is a memory nobody can export or edit —
-    which is most of what ADR 16 is for.
+    Driven through the real registry, and asserted against the **file** — in the chat owner's own
+    directory (ADR 28), because a memory written anywhere else is one nobody can find, export or
+    edit, which is most of what ADR 16 is for.
     """
-    assert services.registry is not None
-    result = await services.registry.dispatch(
-        ToolInvocation(
-            call_id="c3",
-            tool=f"{BUILTIN_SERVER_NAME}__remember",
-            arguments={
-                "key": "prefers-short-answers",
-                "text": "They want two sentences, not five.",
-                "description": "Short answers",
-            },
-        ),
-        context={},
+    result = await remember(
+        services,
+        a_chat(services),
+        key="prefers-short-answers",
+        text="They want two sentences, not five.",
+        description="Short answers",
     )
 
     assert result.ok, result.text
-    written = memories_dir() / "prefers-short-answers.md"
+    written = user_memories_dir(str(services.settings.owner_id)) / "prefers-short-answers.md"
     assert written.is_file()
     assert "They want two sentences, not five." in written.read_text(encoding="utf-8")
+
+
+async def test_a_memory_is_kept_by_whoever_owns_the_chat(services: Services) -> None:
+    """Never by an argument, and never in a shared directory: every enabled memory is in its
+    owner's prompt, so one person's must not be in front of another's question."""
+    ben = uuid4()
+    await remember(services, a_chat(services, ben), key="likes-tea", text="Tea.", description="t")
+
+    assert "Tea." in services.for_user(ben).memories.recall()
+    assert services.for_user(services.settings.owner_id).memories.recall() == ""
+
+
+async def test_a_memory_outside_a_conversation_belongs_to_nobody(services: Services) -> None:
+    result = await remember(services, {}, key="orphan", text="x", description="d")
+
+    assert not result.ok
+    assert "not part of a conversation" in result.text
 
 
 async def test_a_memory_she_writes_is_in_the_next_turn_s_prompt(services: Services) -> None:
@@ -130,23 +164,18 @@ async def test_a_memory_she_writes_is_in_the_next_turn_s_prompt(services: Servic
     `recall` is what the streaming route puts on `TurnContext.memories`, so this asserts the
     same call that route makes.
     """
-    assert services.registry is not None
-    await services.registry.dispatch(
-        ToolInvocation(
-            call_id="c4",
-            tool=f"{BUILTIN_SERVER_NAME}__remember",
-            arguments={"key": "drinks-tea", "text": "They drink tea.", "description": "Tea"},
-        ),
-        context={},
+    await remember(
+        services, a_chat(services), key="drinks-tea", text="They drink tea.", description="Tea"
     )
 
-    assert "They drink tea." in services.memories.recall()
+    assert "They drink tea." in services.for_user(services.settings.owner_id).memories.recall()
 
 
 async def test_forgetting_keeps_the_file(services: Services) -> None:
     """`nothing a person told her is discarded without a person present`, asserted where it can
     actually be checked — on disk, after her own tool has run."""
     assert services.registry is not None
+    context = a_chat(services)
     for call_id, tool, arguments in (
         ("c5", "remember", {"key": "a-fact", "text": "Something.", "description": "A fact"}),
         ("c6", "forget", {"key": "a-fact"}),
@@ -155,12 +184,13 @@ async def test_forgetting_keeps_the_file(services: Services) -> None:
             ToolInvocation(
                 call_id=call_id, tool=f"{BUILTIN_SERVER_NAME}__{tool}", arguments=arguments
             ),
-            context={},
+            context=context,
         )
         assert result.ok, result.text
 
-    assert (memories_dir() / "a-fact.md").is_file()
-    assert services.memories.recall() == ""
+    owner = str(services.settings.owner_id)
+    assert (user_memories_dir(owner) / "a-fact.md").is_file()
+    assert services.for_user(services.settings.owner_id).memories.recall() == ""
 
 
 async def test_the_rules_a_person_made_are_laid_over_the_shipped_policy_at_boot() -> None:
@@ -176,7 +206,10 @@ async def test_the_rules_a_person_made_are_laid_over_the_shipped_policy_at_boot(
         )
     )
 
+    home().mkdir(parents=True, exist_ok=True)
     built = build_services(provider=FakeProvider([]))
+    # A schema, because a memory call looks its chat up to find whose memory it is (ADR 28).
+    built.database.create_all()
     try:
         assert built.registry is not None
         policy = built.registry.policy

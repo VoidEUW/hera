@@ -39,10 +39,11 @@ runs code or costs money.**
   `permissions.json`. `hera_home.user_dir()` refuses a malformed id the way `chat_dir()` does.
 - **The mind is cloned from a template.** `~/.hera/mind/` becomes the template an admin edits, and a
   new person's mind starts as a clone of it.
-- **Two policy regions are not cloned.** `safety` and `tool_usage` are read from the template for
-  everybody: instance policy, and a person's copy must not be able to remove it. `about_you`, also
-  owner-fixed, is the person's, because it is about them. `write()` and `propose()` keep their
-  tiers.
+- **Three regions are not cloned.** `safety` and `tool_usage` are read from the template for
+  everybody: instance policy, and a person's copy must not be able to remove it. So is
+  `developer`, added while this was built: it is "standing instructions from whoever runs this
+  deployment", which is the instance by definition. `about_you`, also owner-fixed, is the
+  person's, because it is about them. `write()` and `propose()` keep their tiers.
 - **A tool learns whose memory it is from the chat**, carried in `_meta` exactly as
   [ADR 12](0012-a-chat-has-a-scratchpad.md) carries the chat. It never comes from an argument. The
   application resolves the chat's owner and hands the port that person's store.

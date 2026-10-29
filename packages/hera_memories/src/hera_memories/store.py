@@ -399,7 +399,9 @@ class MemoryPort:
             description=description,
             why=why,
             scope=scope,
-            chat_id=chat_id,
+            # The conversation arrives for both scopes, because it says whose memory this is;
+            # only a chat-scoped one is *kept for* it.
+            chat_id=chat_id if scope == "chat" else "",
             source="auto",
         )
         budget = await asyncio.to_thread(self.store.budget)
@@ -409,7 +411,7 @@ class MemoryPort:
             f"{budget.left} of {budget.limit} left)"
         )
 
-    async def forget(self, key: str) -> str:
+    async def forget(self, key: str, *, chat_id: str = "") -> str:
         memory = await asyncio.to_thread(self.store.set_enabled, key, False)
         budget = await asyncio.to_thread(self.store.budget)
         return (

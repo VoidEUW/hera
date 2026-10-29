@@ -1,7 +1,9 @@
 """What she knows about you, for the screen that shows it (ADR 16).
 
-Five routes over a directory. There is no table and no id: ``~/.hera/memories/<key>.md`` is the
-store and the filename is the identity, exactly as it is for an artifact one milestone earlier.
+Five routes over a directory. There is no table and no id: ``~/.hera/users/<id>/memories/<key>.md``
+is the store and the filename is the identity, exactly as it is for an artifact. **The directory is
+the signed-in person's** (ADR 28): every enabled memory is in their prompt, so one person's must
+never be in front of another's question.
 
 **This is the only place any of it is ever shown.** Every enabled memory is already in her
 prompt, so nothing here exists to help *her* — it exists because a store you cannot see is a
@@ -19,12 +21,16 @@ wrote, and Hera's own origin is not where that gets rendered.
 
 from __future__ import annotations
 
+import asyncio
+from uuid import UUID
+
 from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import Response
 
 from hera_core.deps import Container, Owner, not_found
 from hera_core.schemas import BudgetOut, MemoryOut, MemoryPatch
-from hera_memories import Memory, MemoryFull, MemoryRefused
+from hera_core.wiring import Services
+from hera_memories import Memory, MemoryFull, MemoryRefused, MemoryStore
 
 router = APIRouter(tags=["memories"])
 
@@ -40,7 +46,7 @@ async def list_memories(owner: Owner, container: Container) -> list[MemoryOut]:
     what a turn costs, and a list that hid what you had switched off would leave you unable to
     switch it back on.
     """
-    return [_out(memory) for memory in container.memories.all()]
+    return [_out(memory) for memory in (await _mine(container, owner)).all()]
 
 
 @router.get("/memories/budget", response_model=BudgetOut)
@@ -50,7 +56,7 @@ async def memory_budget(owner: Owner, container: Container) -> BudgetOut:
     Its own route rather than a field on the list, because the bar and the list are refreshed by
     different things: switching one memory changes the bar, and the list is already in hand.
     """
-    budget = container.memories.budget()
+    budget = (await _mine(container, owner)).budget()
     return BudgetOut(
         used=budget.used, limit=budget.limit, count=budget.count, disabled=budget.disabled
     )
@@ -72,7 +78,7 @@ async def update_memory(
     """
     try:
         return _out(
-            container.memories.update(
+            (await _mine(container, owner)).update(
                 key,
                 text=payload.text,
                 description=payload.description,
@@ -90,7 +96,7 @@ async def update_memory(
 async def delete_memory(key: str, owner: Owner, container: Container) -> None:
     """Remove the file. A person's decision and nobody else's — see the module docstring."""
     try:
-        removed = container.memories.delete(key)
+        removed = (await _mine(container, owner)).delete(key)
     except MemoryRefused as refused:
         raise _refused(refused, key) from refused
     if not removed:
@@ -106,13 +112,18 @@ async def export_memories(owner: Owner, container: Container) -> Response:
     you can hand to another tool.
     """
     return Response(
-        content=container.memories.export(),
+        content=(await _mine(container, owner)).export(),
         media_type=EXPORT_TYPE,
         headers={
             "Content-Disposition": f'attachment; filename="{EXPORT_FILENAME}"',
             "X-Content-Type-Options": "nosniff",
         },
     )
+
+
+async def _mine(container: Services, owner: UUID) -> MemoryStore:
+    """The signed-in person's store. Off the event loop: the first time, it clones a mind."""
+    return (await asyncio.to_thread(container.for_user, owner)).memories
 
 
 def _out(memory: Memory) -> MemoryOut:

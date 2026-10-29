@@ -2,6 +2,11 @@
 	/**
 	 * Her mind regions: the text that governs how she behaves, one editable region at a time.
 	 *
+	 * **Your** mind (ADR 28): every person has their own, cloned from the instance's template.
+	 * The shared regions — `safety`, `tool_usage`, `developer` — are the instance's and read from
+	 * the template for everybody, so for anybody but an admin they are drawn read-only, and for an
+	 * admin a save there is everybody's. An admin can also switch to the template itself.
+	 *
 	 * Fetches for itself and holds its own placeholder, like Memory and Skills. The load is
 	 * counted rather than flagged — see `Servers.svelte`, which carries the longer note — though
 	 * here the screen is mounted once per visit, so the count only matters if `load` is ever
@@ -10,8 +15,10 @@
 	import Button from '$lib/components/ui/Button.svelte';
 	import Icon from '$lib/components/ui/Icon.svelte';
 	import Pill from '$lib/components/ui/Pill.svelte';
+	import Segmented from '$lib/components/ui/Segmented.svelte';
 	import Textarea from '$lib/components/ui/Textarea.svelte';
-	import { api, type Region } from '$lib/api/client';
+	import { api, type MindScope, type Region } from '$lib/api/client';
+	import { workspace } from '$lib/stores/workspace.svelte';
 	import { t } from '$lib/i18n';
 	import { Placeholder } from '$lib/loading.svelte';
 	import { tooltip } from '$lib/tooltip';
@@ -25,6 +32,10 @@
 	let { filter = '' }: Props = $props();
 
 	let regions = $state<Region[]>([]);
+	let scope = $state<MindScope>('mine');
+	const admin = $derived(workspace.account?.role === 'admin');
+	/** Whether this region's text box takes edits from whoever is looking. */
+	const editable = (region: Region) => admin || !region.shared;
 	let drafts = $state<Record<string, string>>({});
 	let savedRegion = $state<string | null>(null);
 	let error = $state<string | null>(null);
@@ -56,7 +67,7 @@
 		failed = null;
 		settling.set(true);
 		try {
-			const found = await api.regions();
+			const found = await api.regions(scope);
 			if (token !== generation) return;
 			regions = found;
 			drafts = Object.fromEntries(found.map((region) => [region.id, region.text]));
@@ -70,7 +81,7 @@
 
 	async function saveRegion(region: Region) {
 		try {
-			const updated = await api.writeRegion(region.id, drafts[region.id] ?? '');
+			const updated = await api.writeRegion(region.id, drafts[region.id] ?? '', scope);
 			regions = regions.map((existing) => (existing.id === updated.id ? updated : existing));
 			savedRegion = region.id;
 			setTimeout(() => (savedRegion = null), 1600);
@@ -82,6 +93,22 @@
 
 {#if error}
 	<p class="error">{error}</p>
+{/if}
+
+{#if admin}
+	<div class="scope">
+		<Segmented
+			size="sm"
+			label={t.settings.mindScope}
+			bind:value={scope}
+			onchange={() => void load()}
+			options={[
+				{ value: 'mine', label: t.settings.mindMine },
+				{ value: 'template', label: t.settings.mindTemplate }
+			]}
+		/>
+		{#if scope === 'template'}<p class="caption">{t.settings.mindTemplateNote}</p>{/if}
+	</div>
 {/if}
 
 {#if settling.shown}
@@ -98,29 +125,36 @@
 				<span class="tier" use:tooltip={tier}>
 					<Icon name={region.tier === 'owner_fixed' ? 'lock' : 'sprout'} label={tier} />
 				</span>
+				{#if region.shared}<Pill>{t.settings.shared}</Pill>{/if}
 				<span class="caption generation">{t.settings.generation(region.generation)}</span>
 			</div>
 			<p class="caption purpose">{region.purpose}</p>
+			{#if region.shared && scope === 'mine'}
+				<p class="caption">{admin ? t.settings.sharedAdminNote : t.settings.sharedNote}</p>
+			{/if}
 			<Textarea
 				prose
 				rows={4}
 				ariaLabel={region.title}
+				disabled={!editable(region)}
 				value={drafts[region.id] ?? ''}
 				onchange={(value) => (drafts[region.id] = value)}
 			/>
-			<div class="region-foot">
-				<Button
-					variant="highlighted"
-					size="sm"
-					disabled={drafts[region.id] === region.text}
-					onclick={() => saveRegion(region)}
-				>
-					{t.settings.save}
-				</Button>
-				{#if savedRegion === region.id}
-					<Pill tone="live">{t.settings.saved}</Pill>
-				{/if}
-			</div>
+			{#if editable(region)}
+				<div class="region-foot">
+					<Button
+						variant="highlighted"
+						size="sm"
+						disabled={drafts[region.id] === region.text}
+						onclick={() => saveRegion(region)}
+					>
+						{t.settings.save}
+					</Button>
+					{#if savedRegion === region.id}
+						<Pill tone="live">{t.settings.saved}</Pill>
+					{/if}
+				</div>
+			{/if}
 		</section>
 	{:else}
 		<p class="empty">{t.settings.noMatch}</p>
@@ -128,6 +162,13 @@
 {/if}
 
 <style>
+	.scope {
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+		padding: 4px 0 10px;
+	}
+
 	h3 {
 		margin: 0;
 		font-size: 14px;

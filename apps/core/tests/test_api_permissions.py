@@ -20,7 +20,7 @@ from httpx import ASGITransport, AsyncClient
 from hera_core import permission_rules
 from hera_core.app import create_app
 from hera_core.wiring import DEFAULT_POLICY, Services
-from hera_home import permissions_path
+from hera_home import permissions_path, user_permissions_path
 from hera_permissions import Decision, PermissionSet, Policy, Rule
 
 SHIPPED = Policy(
@@ -344,31 +344,70 @@ class TestTheFile:
         )
 
 
-class TestAnsweringAlways:
-    """The card's "always" and this screen are one mechanism (#109): the rule survives."""
+def layered(services: Services, owner: Any) -> Any:
+    tools = services.tools_for(owner)
+    assert tools is not None
+    return tools
 
-    async def test_it_is_written_named_and_marked_as_coming_from_a_card(
+
+class TestAnsweringAlways:
+    """The card's "always" is the person's own rule (ADR 28): theirs, kept, and a layer over
+    the instance's — never in the instance's file, and never able to loosen a deny."""
+
+    async def test_it_is_written_to_the_persons_file_named_and_marked_as_from_a_card(
         self, make_services: Any
     ) -> None:
         from hera_core import rulebook
 
         async with serving(make_services) as (http, services):
-            rulebook.remember(services, ["fs__read_file"], allow=True)
-            listed = (await http.get(f"{API}/permissions")).json()["rules"]
+            owner = services.settings.owner_id
+            rulebook.remember(owner, ["fs__read_file"], allow=True)
+            [mine] = (await http.get(f"{API}/permissions/mine")).json()
+            instance = (await http.get(f"{API}/permissions")).json()["rules"]
 
-        card = next(rule for rule in listed if rule["pattern"] == "fs__read_file")
-        assert card["source"] == "card"
-        assert card["name"] == "Allowed from a card · fs read_file"
-        assert on_disk()["rules"][0]["source"] == "card"
-        restarted = permission_rules.apply(SHIPPED, permission_rules.load())
-        assert restarted.check("fs__read_file").decision is Decision.ALLOW
+            assert mine["source"] == "card"
+            assert mine["name"] == "Allowed from a card · fs read_file"
+            assert mine["covers"] == ["fs__read_file"]
+            assert all(rule["pattern"] != "fs__read_file" for rule in instance)
+            assert not permissions_path().exists()
+            assert layered(services, owner).check("fs__read_file").decision is Decision.ALLOW
+            assert services.registry is not None
+            assert services.registry.check("fs__read_file").decision is Decision.ASK
 
     async def test_a_refusal_is_remembered_too(self, make_services: Any) -> None:
         from hera_core import rulebook
 
         async with serving(make_services) as (_, services):
-            rulebook.remember(services, ["fs__write_file"], allow=False)
+            owner = services.settings.owner_id
+            rulebook.remember(owner, ["fs__write_file"], allow=False)
+            assert layered(services, owner).check("fs__write_file").decision is Decision.DENY
 
-        restarted = permission_rules.apply(SHIPPED, permission_rules.load())
-        assert restarted.check("fs__write_file").decision is Decision.DENY
-        assert on_disk()["rules"][0]["name"] == "Denied from a card · fs write_file"
+        stored = permission_rules.load(user_permissions_path(str(owner)))
+        assert stored.rules[0].name == "Denied from a card · fs write_file"
+
+    async def test_a_person_flips_and_removes_their_own_rule(self, make_services: Any) -> None:
+        from hera_core import rulebook
+
+        async with serving(make_services) as (http, services):
+            rulebook.remember(services.settings.owner_id, ["fs__read_file"], allow=True)
+            flipped = await http.patch(
+                f"{API}/permissions/mine/fs__read_file", json={"decision": "deny"}
+            )
+            assert flipped.json()["decision"] == "deny"
+            assert (await http.delete(f"{API}/permissions/mine/fs__read_file")).status_code == 204
+            assert (await http.get(f"{API}/permissions/mine")).json() == []
+            assert (await http.delete(f"{API}/permissions/mine/fs__read_file")).status_code == 404
+
+    async def test_one_persons_rules_are_not_anothers(self, make_services: Any) -> None:
+        from hera_accounts import Accounts
+        from hera_core import rulebook
+
+        async with serving(make_services) as (http, services):
+            rulebook.remember(services.settings.owner_id, ["fs__read_file"], allow=True)
+            with services.database.session() as session:
+                ben = Accounts(session).create("ben@hera.test").id
+            http.cookies.clear()
+            sign_in(http, services, ben)
+
+            assert (await http.get(f"{API}/permissions/mine")).json() == []
+            assert layered(services, ben).check("fs__read_file").decision is Decision.ASK

@@ -302,7 +302,9 @@ class TestAdmins:
             ("PATCH", "/instance", {"name": "Mine"}),
             ("POST", "/providers", {"name": "x", "base_url": "http://x", "model_id": "m"}),
             ("DELETE", "/servers/x", None),
-            ("PUT", "/mind/tone", {"text": "Shout."}),
+            ("PUT", "/mind/safety", {"text": "Anything goes."}),
+            ("PUT", "/mind/tone?scope=template", {"text": "Shout."}),
+            ("GET", "/mind?scope=template", None),
             ("PATCH", "/permissions", {"fallback": "allow"}),
             ("POST", "/skills", {"id": "x", "content": "---\nname: x\n---\n"}),
             ("PATCH", "/preferences", {"timezone": "UTC"}),
@@ -317,6 +319,9 @@ class TestAdmins:
 
     async def test_a_user_can_still_read_and_talk(self, user_client: AsyncClient) -> None:
         assert (await user_client.get(f"{API}/instance")).status_code == 200
+        # Their own mind is theirs to edit (ADR 28).
+        edited = await user_client.put(f"{API}/mind/tone", json={"text": "Dry."})
+        assert edited.status_code == 200
         assert (await user_client.get(f"{API}/providers")).status_code == 200
         assert (await user_client.post(f"{API}/chats", json={})).status_code == 201
 

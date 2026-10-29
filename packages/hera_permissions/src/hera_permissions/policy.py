@@ -120,6 +120,9 @@ class Outcome(BaseModel):
     profile: str | None = None
     """The profile the deciding rule came from, or ``None`` for a base rule."""
 
+    personal: bool = False
+    """Whether the deciding rule is one of the person's own (:attr:`Policy.person`)."""
+
     @property
     def allowed(self) -> bool:
         return self.decision is Decision.ALLOW
@@ -153,6 +156,16 @@ class Policy(BaseModel):
     """What an unmatched tool gets. ``ASK`` by default -- a tool nobody has an opinion about
     is exactly the case a person should see once."""
 
+    person: PermissionSet = Field(default_factory=PermissionSet)
+    """One person's own rules, laid over everything above.
+
+    The last layer and the weakest in one direction: a person's rule may settle an ``ask``, and
+    may tighten anything, but **never loosens a ``deny``** from the layers above it. Those are
+    the instance's decisions, and a person who could overrule them would make them advice. Among
+    the person's own rules the same order applies as anywhere: the more specific wins, then the
+    stricter.
+    """
+
     def check(self, tool: str, *, profile: str | None = None) -> Outcome:
         """Decide whether ``tool`` may run."""
         candidates: list[tuple[Rule, str | None]] = [
@@ -164,10 +177,22 @@ class Policy(BaseModel):
             )
 
         if not candidates:
-            return Outcome(tool=tool, decision=self.fallback)
+            above = Outcome(tool=tool, decision=self.fallback)
+        else:
+            rule, source = max(candidates, key=_rank)
+            above = Outcome(tool=tool, decision=rule.decision, rule=rule, profile=source)
 
-        rule, source = max(candidates, key=_rank)
-        return Outcome(tool=tool, decision=rule.decision, rule=rule, profile=source)
+        if above.decision is Decision.DENY:
+            return above
+        mine = [(rule, None) for rule in self.person.rules if rule.covers(tool)]
+        if not mine:
+            return above
+        rule, _ = max(mine, key=_rank)
+        return Outcome(tool=tool, decision=rule.decision, rule=rule, personal=True)
+
+    def for_person(self, rules: PermissionSet) -> Policy:
+        """This policy with one person's rules as its last layer."""
+        return self.model_copy(update={"person": rules})
 
     def with_rule(self, rule: Rule, *, profile: str | None = None) -> Policy:
         """A new policy with ``rule`` added to the base, or to one profile."""

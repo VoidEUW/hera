@@ -69,6 +69,9 @@ __all__ = [
     "setup_code_path",
     "skills_dir",
     "user_dir",
+    "user_memories_dir",
+    "user_mind_dir",
+    "user_permissions_path",
     "users_dir",
 ]
 
@@ -162,6 +165,21 @@ def avatar_path(user_id: str) -> Path:
     """One person's avatar. One file with no extension: the media type is stored beside the
     user row, and a name with no extension is one nothing can be tricked into running."""
     return user_dir(user_id) / "avatar"
+
+
+def user_mind_dir(user_id: str) -> Path:
+    """One person's mind, cloned from the template in :func:`mind_dir` (ADR 28)."""
+    return user_dir(user_id) / MIND_DIRNAME
+
+
+def user_memories_dir(user_id: str) -> Path:
+    """What she knows about one person — theirs alone, because every one is in the prompt."""
+    return user_dir(user_id) / MEMORIES_DIRNAME
+
+
+def user_permissions_path(user_id: str) -> Path:
+    """One person's own permission rules, over the instance's :func:`permissions_path`."""
+    return user_dir(user_id) / PERMISSIONS_FILENAME
 
 
 def setup_code_path() -> Path:

@@ -22,8 +22,8 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
-from hera_profiles.mind import MindRepository
 from hera_profiles.models import Profile
+from hera_profiles.personal import Mind
 from hera_profiles.traits import BEHAVIOUR_TRAITS
 from hera_prompts import (
     Prompt,
@@ -227,7 +227,7 @@ class PromptBuilder:
 
     def __init__(
         self,
-        mind: MindRepository,
+        mind: Mind,
         *,
         registry: TraitRegistry = BEHAVIOUR_TRAITS,
         layout: Sequence[Node] = LAYOUT,

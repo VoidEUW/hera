@@ -26,6 +26,8 @@ export interface TabEntry {
 	icon: IconName;
 	/** Listed and disabled: a feature you can see coming is a promise. */
 	soon?: boolean;
+	/** The instance's, not a person's (ADR 28): only an admin sees the screen at all. */
+	admin?: boolean;
 }
 
 export const GROUPS: Array<{ label: string; entries: TabEntry[] }> = [
@@ -48,7 +50,13 @@ export const GROUPS: Array<{ label: string; entries: TabEntry[] }> = [
 		entries: [
 			{ id: 'mind', label: t.settings.mind, blurb: t.settings.blurbMind, icon: 'brain' },
 			{ id: 'memory', label: t.settings.memory, blurb: t.settings.blurbMemory, icon: 'clock' },
-			{ id: 'models', label: t.settings.models, blurb: t.settings.blurbModels, icon: 'cube' },
+			{
+				id: 'models',
+				label: t.settings.models,
+				blurb: t.settings.blurbModels,
+				icon: 'cube',
+				admin: true
+			},
 			{
 				id: 'dreaming',
 				label: t.settings.dreaming,
@@ -61,8 +69,20 @@ export const GROUPS: Array<{ label: string; entries: TabEntry[] }> = [
 	{
 		label: t.settings.groupAdjust,
 		entries: [
-			{ id: 'skills', label: t.settings.skills, blurb: t.settings.blurbSkills, icon: 'spark' },
-			{ id: 'servers', label: t.settings.servers, blurb: t.settings.blurbServers, icon: 'plug' },
+			{
+				id: 'skills',
+				label: t.settings.skills,
+				blurb: t.settings.blurbSkills,
+				icon: 'spark',
+				admin: true
+			},
+			{
+				id: 'servers',
+				label: t.settings.servers,
+				blurb: t.settings.blurbServers,
+				icon: 'plug',
+				admin: true
+			},
 			{
 				id: 'permissions',
 				label: t.settings.permissions,
@@ -74,3 +94,16 @@ export const GROUPS: Array<{ label: string; entries: TabEntry[] }> = [
 ];
 
 export const ENTRIES: TabEntry[] = GROUPS.flatMap((group) => group.entries);
+
+/** The groups somebody sees: everything for an admin, and without the instance's screens for
+ * anybody else — a screen whose every control answers 403 is a door painted on a wall. */
+export function groupsFor(admin: boolean): typeof GROUPS {
+	return GROUPS.map((group) => ({
+		...group,
+		entries: group.entries.filter((entry) => admin || !entry.admin)
+	})).filter((group) => group.entries.length > 0);
+}
+
+export function entriesFor(admin: boolean): TabEntry[] {
+	return groupsFor(admin).flatMap((group) => group.entries);
+}

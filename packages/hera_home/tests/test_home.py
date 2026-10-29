@@ -25,6 +25,9 @@ from hera_home import (
     setup_code_path,
     skills_dir,
     user_dir,
+    user_memories_dir,
+    user_mind_dir,
+    user_permissions_path,
     users_dir,
 )
 
@@ -78,6 +81,9 @@ def test_every_well_known_path_sits_under_the_home(
     assert users_dir() == tmp_path / "users"
     assert user_dir("u-1") == tmp_path / "users" / "u-1"
     assert avatar_path("u-1") == tmp_path / "users" / "u-1" / "avatar"
+    assert user_mind_dir("u-1") == tmp_path / "users" / "u-1" / "mind"
+    assert user_memories_dir("u-1") == tmp_path / "users" / "u-1" / "memories"
+    assert user_permissions_path("u-1") == tmp_path / "users" / "u-1" / "permissions.json"
     assert setup_code_path() == tmp_path / "setup-code"
 
 
