@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from e2e_support import Served
 
 playwright = pytest.importorskip(
     "playwright.sync_api", reason="playwright is not installed; run `uv run playwright install`"
@@ -24,10 +25,11 @@ pytestmark = pytest.mark.e2e
 
 
 @pytest.fixture
-def page(server: str) -> Any:
+def page(server: Served) -> Any:
     with playwright.sync_playwright() as driver:
         browser = driver.chromium.launch()
         context = browser.new_context(viewport={"width": 1440, "height": 900})
+        server.sign_in(context)
         opened = context.new_page()
         try:
             yield opened
@@ -36,11 +38,11 @@ def page(server: str) -> Any:
             browser.close()
 
 
-def post(base: str, path: str, payload: dict[str, Any]) -> dict[str, Any]:
+def post(base: Served, path: str, payload: dict[str, Any]) -> dict[str, Any]:
     request = urllib.request.Request(
         f"{base}/api/v1{path}",
         data=json.dumps(payload).encode(),
-        headers={"content-type": "application/json"},
+        headers={"content-type": "application/json", **base.headers},
         method="POST",
     )
     with urllib.request.urlopen(request, timeout=10) as answer:
@@ -48,7 +50,7 @@ def post(base: str, path: str, payload: dict[str, Any]) -> dict[str, Any]:
 
 
 @pytest.fixture
-def notes(server: str) -> tuple[str, Path]:
+def notes(server: Served) -> tuple[str, Path]:
     """A chat that already published `notes.md`, so the side view reopens on it."""
     chat = post(server, "/chats", {"title": "Plans"})
     folder = Path(os.environ["HERA_HOME"]) / "chats" / str(chat["id"]) / "artifacts"
@@ -58,7 +60,7 @@ def notes(server: str) -> tuple[str, Path]:
 
 
 def test_an_edit_is_saved_and_survives_a_reload(
-    server: str, page: Any, notes: tuple[str, Path]
+    server: Served, page: Any, notes: tuple[str, Path]
 ) -> None:
     chat_id, file = notes
     page.goto(f"{server}/chat/{chat_id}")
@@ -79,7 +81,7 @@ def test_an_edit_is_saved_and_survives_a_reload(
 
 
 def test_an_unsaved_edit_is_not_thrown_away_without_asking(
-    server: str, page: Any, notes: tuple[str, Path]
+    server: Served, page: Any, notes: tuple[str, Path]
 ) -> None:
     chat_id, file = notes
     page.goto(f"{server}/chat/{chat_id}")
@@ -102,7 +104,7 @@ def test_an_unsaved_edit_is_not_thrown_away_without_asking(
 
 
 def test_the_chat_menu_exports_greys_share_and_deletes_after_asking(
-    server: str, page: Any, notes: tuple[str, Path]
+    server: Served, page: Any, notes: tuple[str, Path]
 ) -> None:
     chat_id, _ = notes
     page.goto(f"{server}/chat/{chat_id}")

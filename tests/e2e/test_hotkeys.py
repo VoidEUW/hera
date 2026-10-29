@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from e2e_support import Served
 
 playwright = pytest.importorskip(
     "playwright.sync_api", reason="playwright is not installed; run `uv run playwright install`"
@@ -25,10 +26,11 @@ MOD = "ControlOrMeta"
 
 
 @pytest.fixture
-def page(server: str) -> Any:
+def page(server: Served) -> Any:
     with playwright.sync_playwright() as driver:
         browser = driver.chromium.launch()
         context = browser.new_context(viewport={"width": 1440, "height": 900})
+        server.sign_in(context)
         opened = context.new_page()
         try:
             yield opened
@@ -37,11 +39,11 @@ def page(server: str) -> Any:
             browser.close()
 
 
-def post(base: str, path: str, payload: dict[str, Any]) -> dict[str, Any]:
+def post(base: Served, path: str, payload: dict[str, Any]) -> dict[str, Any]:
     request = urllib.request.Request(
         f"{base}/api/v1{path}",
         data=json.dumps(payload).encode(),
-        headers={"content-type": "application/json"},
+        headers={"content-type": "application/json", **base.headers},
         method="POST",
     )
     with urllib.request.urlopen(request, timeout=10) as answer:
@@ -55,7 +57,7 @@ def published(chat_id: str, name: str, text: str) -> Path:
     return folder / name
 
 
-def test_the_palette_finds_a_chat_by_name_and_opens_it(server: str, page: Any) -> None:
+def test_the_palette_finds_a_chat_by_name_and_opens_it(server: Served, page: Any) -> None:
     chat = post(server, "/chats", {"title": "Kerberos tickets"})
     post(server, "/chats", {"title": "Garden plans"})
     page.goto(server, wait_until="networkidle")
@@ -73,7 +75,7 @@ def test_the_palette_finds_a_chat_by_name_and_opens_it(server: str, page: Any) -
     palette.wait_for(state="detached", timeout=5_000)
 
 
-def test_the_sidebar_search_row_opens_the_same_palette(server: str, page: Any) -> None:
+def test_the_sidebar_search_row_opens_the_same_palette(server: Served, page: Any) -> None:
     page.goto(server, wait_until="networkidle")
 
     page.get_by_role("button", name="Search chats").click()
@@ -81,7 +83,7 @@ def test_the_sidebar_search_row_opens_the_same_palette(server: str, page: Any) -
     page.get_by_role("dialog", name="Search and jump").wait_for(timeout=5_000)
 
 
-def test_the_palette_chats_chord_is_scoped_to_chats(server: str, page: Any) -> None:
+def test_the_palette_chats_chord_is_scoped_to_chats(server: Served, page: Any) -> None:
     post(server, "/chats", {"title": "Kerberos tickets"})
     page.goto(server, wait_until="networkidle")
 
@@ -93,7 +95,7 @@ def test_the_palette_chats_chord_is_scoped_to_chats(server: str, page: Any) -> N
     assert palette.get_by_role("option", name="New chat").count() == 0
 
 
-def test_settings_and_the_hotkeys_screen_have_their_own_chords(server: str, page: Any) -> None:
+def test_settings_and_the_hotkeys_screen_have_their_own_chords(server: Served, page: Any) -> None:
     page.goto(server, wait_until="networkidle")
 
     page.keyboard.press(f"{MOD}+,")
@@ -109,7 +111,7 @@ def test_settings_and_the_hotkeys_screen_have_their_own_chords(server: str, page
     settings.get_by_text("Same as: Search in the sidebar").first.wait_for(timeout=5_000)
 
 
-def test_new_chat_chord_goes_to_the_start_screen(server: str, page: Any) -> None:
+def test_new_chat_chord_goes_to_the_start_screen(server: Served, page: Any) -> None:
     chat = post(server, "/chats", {"title": "Plans"})
     page.goto(f"{server}/chat/{chat['id']}", wait_until="networkidle")
 
@@ -118,7 +120,7 @@ def test_new_chat_chord_goes_to_the_start_screen(server: str, page: Any) -> None
     page.wait_for_url(f"{server}/", timeout=10_000)
 
 
-def test_alt_arrows_walk_the_chats(server: str, page: Any) -> None:
+def test_alt_arrows_walk_the_chats(server: Served, page: Any) -> None:
     first = post(server, "/chats", {"title": "First"})
     second = post(server, "/chats", {"title": "Second"})
     page.goto(f"{server}/chat/{first['id']}", wait_until="networkidle")
@@ -131,7 +133,7 @@ def test_alt_arrows_walk_the_chats(server: str, page: Any) -> None:
     page.wait_for_url(f"**/chat/{first['id']}", timeout=10_000)
 
 
-def test_a_key_does_not_steal_typing_in_the_message_field(server: str, page: Any) -> None:
+def test_a_key_does_not_steal_typing_in_the_message_field(server: Served, page: Any) -> None:
     chat = post(server, "/chats", {"title": "Plans"})
     page.goto(f"{server}/chat/{chat['id']}", wait_until="networkidle")
     box = page.locator("textarea").first
@@ -146,7 +148,7 @@ def test_a_key_does_not_steal_typing_in_the_message_field(server: str, page: Any
     assert page.get_by_text("Delete this chat?").count() == 0
 
 
-def test_the_side_view_chord_toggles_it_and_escape_closes_it(server: str, page: Any) -> None:
+def test_the_side_view_chord_toggles_it_and_escape_closes_it(server: Served, page: Any) -> None:
     chat = post(server, "/chats", {"title": "Plans"})
     published(chat["id"], "notes.md", "# Draft\n")
     page.goto(f"{server}/chat/{chat['id']}", wait_until="networkidle")
@@ -163,7 +165,7 @@ def test_the_side_view_chord_toggles_it_and_escape_closes_it(server: str, page: 
     drawer.wait_for(state="detached", timeout=5_000)
 
 
-def test_escape_closes_a_menu_before_the_side_view(server: str, page: Any) -> None:
+def test_escape_closes_a_menu_before_the_side_view(server: Served, page: Any) -> None:
     chat = post(server, "/chats", {"title": "Plans"})
     published(chat["id"], "notes.md", "# Draft\n")
     page.goto(f"{server}/chat/{chat['id']}", wait_until="networkidle")
@@ -180,7 +182,7 @@ def test_escape_closes_a_menu_before_the_side_view(server: str, page: Any) -> No
 
 
 def test_save_has_a_chord_that_only_answers_when_there_is_something_to_save(
-    server: str, page: Any
+    server: Served, page: Any
 ) -> None:
     chat = post(server, "/chats", {"title": "Plans"})
     file = published(chat["id"], "notes.md", "# Draft\n")
@@ -194,7 +196,7 @@ def test_save_has_a_chord_that_only_answers_when_there_is_something_to_save(
     assert file.read_text(encoding="utf-8") == "# Final\n"
 
 
-def test_export_and_delete_chords_mirror_the_chat_menu(server: str, page: Any) -> None:
+def test_export_and_delete_chords_mirror_the_chat_menu(server: Served, page: Any) -> None:
     chat = post(server, "/chats", {"title": "Plans"})
     page.goto(f"{server}/chat/{chat['id']}", wait_until="networkidle")
     page.locator("body").click(position={"x": 700, "y": 400})
@@ -209,7 +211,7 @@ def test_export_and_delete_chords_mirror_the_chat_menu(server: str, page: Any) -
     page.wait_for_url(f"{server}/", timeout=10_000)
 
 
-def test_find_counts_matches_walks_them_and_closes_on_escape(server: str, page: Any) -> None:
+def test_find_counts_matches_walks_them_and_closes_on_escape(server: Served, page: Any) -> None:
     page.goto(server, wait_until="networkidle")
     composer = page.locator("textarea").first
     composer.fill("Explain Kerberos")
@@ -238,7 +240,7 @@ def test_find_counts_matches_walks_them_and_closes_on_escape(server: str, page: 
     bar.wait_for(state="detached", timeout=5_000)
 
 
-def test_the_focus_chord_returns_to_the_message_field(server: str, page: Any) -> None:
+def test_the_focus_chord_returns_to_the_message_field(server: Served, page: Any) -> None:
     chat = post(server, "/chats", {"title": "Plans"})
     page.goto(f"{server}/chat/{chat['id']}", wait_until="networkidle")
     page.locator("body").click(position={"x": 700, "y": 300})

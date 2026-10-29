@@ -16,6 +16,7 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
+from e2e_support import Served
 
 playwright = pytest.importorskip(
     "playwright.sync_api", reason="playwright is not installed; run `uv run playwright install`"
@@ -29,10 +30,11 @@ INTERESTING = ("effect_update_depth_exceeded", "svelte", "Uncaught", "TypeError"
 
 
 @pytest.fixture
-def complaints(server: str) -> Any:
+def complaints(server: Served) -> Any:
     with playwright.sync_playwright() as driver:
         browser = driver.chromium.launch()
         context = browser.new_context(viewport={"width": 1440, "height": 900})
+        server.sign_in(context)
         page = context.new_page()
         said: list[str] = []
         page.on(
@@ -47,7 +49,7 @@ def complaints(server: str) -> Any:
 
 
 def test_a_turn_from_the_start_screen_says_nothing_in_the_console(
-    server: str, complaints: Any
+    server: Served, complaints: Any
 ) -> None:
     """The handoff path: the start screen creates the chat, navigates, and sends into it.
 

@@ -11,7 +11,7 @@ dependency is wrong, not the design.
    hera_profiles         hera_promptevo (v0.3)       │
    hera_tools            hera_memories        hera_skillsets
    hera_prompts *        hera_providers       hera_permissions      hera_chats
-                        hera_storage *          hera_mcp
+   hera_accounts        hera_storage *          hera_mcp
                          hera_home
 ```
 
@@ -39,6 +39,7 @@ as an empty mind directory rather than as an error.
 | Package | Owns | Never |
 |---|---|---|
 | `hera_home` | Where `~/.hera` is and the well-known paths inside it. Reads the environment on every call; caches nothing, creates nothing. `chat_dir()` is the one that refuses its argument — a chat id arrives from a tool call, and `..` there would put a scratchpad in the mind repository | No I/O, no dependency, no opinion about what lives in those paths |
+| `hera_accounts` | Who is asking (ADR 27): users with an `admin` or `user` role, argon2id passwords, sessions stored only as the SHA-256 of an opaque token, and single-use one-time tokens with a purpose (`setup`, `invite`, `reset`, `launch`). | Knows nothing about HTTP — the cookie, the Origin check and the throttle are `hera_core.auth`; imports only `hera_storage` |
 | `hera_storage` | The persistence foundation: engine, sessions, `Entity`/`SoftDeletable`/`Versioned` mixins, a generic `Repository`, snapshot versioning, pytest fixtures. | No table, no domain concept, no other `hera_*` import |
 | `hera_prompts` | The prompt compiler: `Prompt`, `Section`, traits, renderers, budget, `fingerprint()`. Foreign content enters only as pre-rendered strings through named slots. | Does not know what a tool, memory, skill or chat is; no persistence, no I/O |
 | `hera_providers` | Talking to a model. httpx streaming, the Qwen adapter, embeddings, and a `FakeProvider` for tests. Emits one normalised event union. | Knows nothing about chats, prompts or tools |
@@ -53,8 +54,8 @@ as an empty mind directory rather than as an error.
 
 ## Rules that hold everywhere
 
-**Tables.** Every package sets `__tablename__` explicitly with its own prefix (`chat_`, `mem_`,
-`skill_`, `evo_`). All models share one `MetaData`, so unprefixed names from two packages would
+**Tables.** Every package sets `__tablename__` explicitly with its own prefix (`account_`,
+`chat_`, `mem_`, `skill_`, `evo_`). All models share one `MetaData`, so unprefixed names from two packages would
 silently collide.
 
 **No cross-package foreign keys.** A reference to another package's entity is a bare `UUID`
@@ -108,8 +109,10 @@ code, in `hera_skillsets`.
 
 ```
 ~/.hera/                 HERA_HOME overrides
-  hera.sqlite3           everything relational
+  hera.sqlite3           everything relational, accounts and sessions included
   mind/                  a real git repository, one file per mind region
+  users/<id>/            what belongs to one person rather than the instance — today their avatar
+  setup-code             the code a fresh install's wizard asks for; gone once it is claimed
   skills/<name>/SKILL.md skill packages, syncable from a git repo
   chats/<id>/scratch/    her working files for one conversation; gone when the chat is
   chats/<id>/artifacts/  what she published there — named, rendered, downloadable; gone too

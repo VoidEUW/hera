@@ -7,12 +7,13 @@ no delete at all.
 
 from __future__ import annotations
 
-import json
 import os
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
 import pytest
+from e2e_support import Served, written
 
 playwright = pytest.importorskip(
     "playwright.sync_api", reason="playwright is not installed; run `uv run playwright install`"
@@ -22,10 +23,11 @@ pytestmark = pytest.mark.e2e
 
 
 @pytest.fixture
-def page(server: str) -> Any:
+def page(server: Served) -> Any:
     with playwright.sync_playwright() as driver:
         browser = driver.chromium.launch()
         context = browser.new_context(viewport={"width": 1440, "height": 900})
+        server.sign_in(context)
         opened = context.new_page()
         try:
             yield opened
@@ -34,13 +36,11 @@ def page(server: str) -> Any:
             browser.close()
 
 
-def stored() -> dict[str, Any]:
-    return dict(
-        json.loads((Path(os.environ["HERA_HOME"]) / "permissions.json").read_text(encoding="utf-8"))
-    )
+def stored(until: Callable[[dict[str, Any]], bool] = lambda _: True) -> dict[str, Any]:
+    return written(Path(os.environ["HERA_HOME"]) / "permissions.json", until)
 
 
-def open_permissions(page: Any, server: str) -> None:
+def open_permissions(page: Any, server: Served) -> None:
     page.goto(server, wait_until="networkidle")
     page.get_by_role("button", name="Settings").first.click(timeout=10_000)
     page.get_by_role("navigation", name="Settings").get_by_role(
@@ -53,7 +53,9 @@ def row(page: Any, title: str) -> Any:
     return page.locator("section.row").filter(has=page.get_by_role("heading", name=title))
 
 
-def test_a_rule_made_here_is_kept_flipped_and_deleted_after_asking(server: str, page: Any) -> None:
+def test_a_rule_made_here_is_kept_flipped_and_deleted_after_asking(
+    server: Served, page: Any
+) -> None:
     open_permissions(page, server)
 
     page.get_by_role("button", name="New rule").click()
@@ -68,7 +70,7 @@ def test_a_rule_made_here_is_kept_flipped_and_deleted_after_asking(server: str, 
     made.wait_for(timeout=5_000)
     assert made.get_by_text("fs__read*").count() == 1
     assert made.get_by_role("radio", name="Allow").get_attribute("aria-checked") == "true"
-    assert stored()["rules"][0]["name"] == "Reading files"
+    assert stored(lambda d: bool(d.get("rules")))["rules"][0]["name"] == "Reading files"
 
     # It survives a reload, and so is what the server holds rather than what the page remembers.
     page.reload(wait_until="networkidle")
@@ -81,7 +83,7 @@ def test_a_rule_made_here_is_kept_flipped_and_deleted_after_asking(server: str, 
         "r.textContent.includes('Reading files') && "
         "r.querySelector('[role=radio][aria-checked=true]')?.textContent.trim() === 'Deny')"
     )
-    assert stored()["rules"][0]["decision"] == "deny"
+    assert stored(lambda d: d["rules"][0]["decision"] == "deny")["rules"][0]["decision"] == "deny"
 
     row(page, "Reading files").get_by_role("button", name="Delete this rule").click()
     asked = page.get_by_role("dialog", name="Delete this rule?")
@@ -94,10 +96,12 @@ def test_a_rule_made_here_is_kept_flipped_and_deleted_after_asking(server: str, 
         "button", name="Delete"
     ).click()
     row(page, "Reading files").wait_for(state="detached", timeout=5_000)
-    assert stored()["rules"] == []
+    assert stored(lambda d: d["rules"] == [])["rules"] == []
 
 
-def test_a_rule_that_ships_with_hera_can_be_changed_but_not_deleted(server: str, page: Any) -> None:
+def test_a_rule_that_ships_with_hera_can_be_changed_but_not_deleted(
+    server: Served, page: Any
+) -> None:
     open_permissions(page, server)
 
     shipped = row(page, "Every tool from hera")
@@ -111,11 +115,11 @@ def test_a_rule_that_ships_with_hera_can_be_changed_but_not_deleted(server: str,
         "r.textContent.includes('Every tool from hera') && "
         "r.querySelector('[role=radio][aria-checked=true]')?.textContent.trim() === 'Ask')"
     )
-    assert stored()["rules"][0]["pattern"] == "hera__*"
+    assert stored(lambda d: bool(d.get("rules")))["rules"][0]["pattern"] == "hera__*"
 
 
 def test_the_form_says_which_tools_a_pattern_covers_before_it_is_added(
-    server: str, page: Any
+    server: Served, page: Any
 ) -> None:
     open_permissions(page, server)
 
@@ -126,7 +130,7 @@ def test_the_form_says_which_tools_a_pattern_covers_before_it_is_added(
     assert page.locator(".tool").filter(has_text="hera__note").count() == 1
 
 
-def test_the_fallback_is_a_switch_and_is_kept(server: str, page: Any) -> None:
+def test_the_fallback_is_a_switch_and_is_kept(server: Served, page: Any) -> None:
     open_permissions(page, server)
 
     section = page.locator("section.fallback")
@@ -136,11 +140,11 @@ def test_the_fallback_is_a_switch_and_is_kept(server: str, page: Any) -> None:
         "?.textContent.trim() === 'Deny'"
     )
 
-    assert stored()["fallback"] == "deny"
+    assert stored(lambda d: d.get("fallback") == "deny")["fallback"] == "deny"
 
 
 def test_a_pattern_that_is_already_a_rule_says_so_instead_of_replacing_it(
-    server: str, page: Any
+    server: Served, page: Any
 ) -> None:
     open_permissions(page, server)
 

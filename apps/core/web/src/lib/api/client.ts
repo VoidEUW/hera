@@ -369,11 +369,49 @@ export interface Probe {
 }
 
 export interface Account {
+	id: string;
 	name: string;
 	email: string;
+	role: 'admin' | 'user';
 	/** Zero when there is no picture; otherwise a version for {@link api.avatarUrl}, so a
 	 * replaced picture is a new address and a cached one cannot outlive it. */
 	avatar_version: number;
+}
+
+/** Who may make an account here (ADR 27). */
+export type Registration = 'open' | 'invite' | 'closed';
+
+/** What the sign-in screen needs before anybody is signed in. */
+export interface AuthState {
+	user: Account | null;
+	setup_required: boolean;
+	registration: Registration;
+	instance_name: string;
+}
+
+/** One browser somebody is signed in on. */
+export interface SignedInSession {
+	id: string;
+	user_agent: string;
+	created_at: string;
+	last_seen_at: string;
+	expires_at: string;
+	/** This browser — the one asking. */
+	current: boolean;
+}
+
+export interface SetupState {
+	required: boolean;
+	/** False on the machine Hera runs on, which needs no code to prove it could read the log. */
+	code_required: boolean;
+	/** Conversations an install from before accounts already has, which become the admin's. */
+	chats: number;
+}
+
+export interface Instance {
+	name: string;
+	public_url: string;
+	registration: Registration;
 }
 
 export interface Preferences {
@@ -404,11 +442,27 @@ export class ApiError extends Error {
 	}
 }
 
+let signedOut: () => void = () => {};
+
+/** What to do when the server says nobody is signed in — the layout points it at `/login`
+ * (`$lib/errors`). A hook rather than an import, because the errors module already imports this
+ * one for `ApiError`. */
+export function whenSignedOut(handler: () => void): void {
+	signedOut = handler;
+}
+
+/** Hand a 401 from any request to the sign-in screen. The streaming calls below return their
+ * response raw, so the chat store calls this for them. */
+export function noticeSignedOut(response: Response): void {
+	if (response.status === 401) signedOut();
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
 	const response = await fetch(`${API}${path}`, {
 		...init,
 		headers: { 'content-type': 'application/json', ...(init?.headers ?? {}) }
 	});
+	noticeSignedOut(response);
 	if (!response.ok) throw new ApiError(response.status, await detail(response));
 	if (response.status === 204) return undefined as T;
 	return (await response.json()) as T;
@@ -429,6 +483,40 @@ async function detail(response: Response): Promise<string> {
 
 export const api = {
 	health: () => request<Health>('/health'),
+
+	/** Public: who is signed in, if anybody, and what the sign-in screen offers. */
+	authState: () => request<AuthState>('/auth/state'),
+	signIn: (email: string, password: string) =>
+		request<Account>('/auth/sign-in', {
+			method: 'POST',
+			body: JSON.stringify({ email, password })
+		}),
+	register: (body: { name: string; email: string; password: string; invite?: string }) =>
+		request<Account>('/auth/register', { method: 'POST', body: JSON.stringify(body) }),
+	signOut: () => request<void>('/auth/sign-out', { method: 'POST' }),
+	sessions: () => request<SignedInSession[]>('/auth/sessions'),
+	revokeSession: (id: string) => request<void>(`/auth/sessions/${id}`, { method: 'DELETE' }),
+	/** Every browser, this one included. */
+	signOutEverywhere: () => request<void>('/auth/sessions', { method: 'DELETE' }),
+	/** Signs every *other* browser out. */
+	changePassword: (current: string, next: string) =>
+		request<void>('/auth/password', {
+			method: 'PUT',
+			body: JSON.stringify({ current, new: next })
+		}),
+
+	setupState: () => request<SetupState>('/setup'),
+	/** The wizard's first step: makes the admin and signs this browser in as them. */
+	setup: (body: {
+		name: string;
+		email: string;
+		password: string;
+		code?: string;
+		launch_token?: string;
+	}) => request<Account>('/setup', { method: 'POST', body: JSON.stringify(body) }),
+	instance: () => request<Instance>('/instance'),
+	updateInstance: (patch: Partial<Instance>) =>
+		request<Instance>('/instance', { method: 'PATCH', body: JSON.stringify(patch) }),
 
 	profiles: () => request<Profile[]>('/profiles'),
 	makeDefaultProfile: (id: string) =>

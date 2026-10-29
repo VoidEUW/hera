@@ -26,7 +26,7 @@ from alembic.script import ScriptDirectory
 from alembic.util.exc import CommandError
 
 from hera_core.migrations import alembic_config, upgrade_to_head
-from hera_home import DATABASE_FILENAME, home
+from hera_home import DATABASE_FILENAME, account_dir, avatar_path, home
 from hera_profiles import MindRepository, ProfileRepository
 from hera_storage import Database
 
@@ -163,3 +163,19 @@ def prepare(database: Database, mind: MindRepository, *, owner_id: UUID) -> None
     mind.ensure()
     with database.session() as session:
         ProfileRepository(session).ensure_default_exists(owner_id)
+    adopt_avatar(owner_id)
+
+
+def adopt_avatar(owner_id: UUID) -> None:
+    """Move a single-user install's avatar under its owner's own directory (ADR 28).
+
+    It sat at ``~/.hera/account/avatar``, one per install; with more than one person the second
+    upload would have replaced the first one's face. Moved rather than copied, and never over a
+    picture already in the new place.
+    """
+    legacy = account_dir() / "avatar"
+    target = avatar_path(str(owner_id))
+    if not legacy.is_file() or target.exists():
+        return
+    target.parent.mkdir(parents=True, exist_ok=True)
+    legacy.replace(target)

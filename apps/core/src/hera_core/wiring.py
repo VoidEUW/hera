@@ -28,6 +28,7 @@ from typing import Any
 
 from hera_chats import ChatsSettings, TurnOrchestrator
 from hera_core import permission_rules
+from hera_core.auth import Throttle
 from hera_core.chat_files import FileArtifacts, FileScratchpad
 from hera_core.config import load as load_config
 from hera_core.enabled_skills import EnabledSkillPort, EnabledSkills
@@ -98,6 +99,10 @@ class Services:
     """The rules this deployment ships with, before a person's own are laid over them. Kept so the
     Permissions screen can say which rule is built in, and so deleting an override puts the
     built-in one back (``hera_core.rulebook``)."""
+
+    throttle: Throttle = field(default_factory=Throttle)
+    """Failed sign-in and setup-code attempts, per address and per email. Process-wide, so it is
+    here rather than built per request."""
 
     owns_provider: bool = False
     """Whether closing this container should close the provider.

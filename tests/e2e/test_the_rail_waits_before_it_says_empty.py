@@ -18,6 +18,7 @@ import urllib.request
 from typing import Any
 
 import pytest
+from e2e_support import Served
 
 playwright = pytest.importorskip(
     "playwright.sync_api", reason="playwright is not installed; run `uv run playwright install`"
@@ -27,11 +28,12 @@ pytestmark = pytest.mark.e2e
 
 
 @pytest.fixture
-def page(server: str) -> Any:
+def page(server: Served) -> Any:
     """A browser that has *not* navigated yet -- these tests watch the first load."""
     with playwright.sync_playwright() as driver:
         browser = driver.chromium.launch()
         context = browser.new_context(viewport={"width": 1280, "height": 900})
+        server.sign_in(context)
         opened = context.new_page()
         try:
             yield opened
@@ -40,18 +42,18 @@ def page(server: str) -> Any:
             browser.close()
 
 
-def post(base: str, path: str, payload: dict[str, Any]) -> dict[str, Any]:
+def post(base: Served, path: str, payload: dict[str, Any]) -> dict[str, Any]:
     request = urllib.request.Request(
         f"{base}/api/v1{path}",
         data=json.dumps(payload).encode(),
-        headers={"content-type": "application/json"},
+        headers={"content-type": "application/json", **base.headers},
         method="POST",
     )
     with urllib.request.urlopen(request, timeout=10) as answer:
         return dict(json.load(answer))
 
 
-def test_an_ordinary_load_draws_the_shape_of_the_rail(server: str, page: Any) -> None:
+def test_an_ordinary_load_draws_the_shape_of_the_rail(server: Served, page: Any) -> None:
     post(server, "/projects", {"name": "Kerberos"})
     post(server, "/chats", {"title": "Ticket lifetimes"})
 
@@ -67,7 +69,7 @@ def test_an_ordinary_load_draws_the_shape_of_the_rail(server: str, page: Any) ->
     page.wait_for_selector("text=Kerberos", timeout=15_000)
 
 
-def test_the_placeholder_is_the_height_the_list_turns_out_to_be(server: str, page: Any) -> None:
+def test_the_placeholder_is_the_height_the_list_turns_out_to_be(server: Served, page: Any) -> None:
     """The second load knows what the first one found, so the swap moves nothing.
 
     A placeholder sized from a guess is the same jump as no placeholder at all, pointed the
@@ -89,7 +91,7 @@ def test_the_placeholder_is_the_height_the_list_turns_out_to_be(server: str, pag
     assert abs(holding - settled) < 32, f"placeholder {holding}px, list {settled}px"
 
 
-def test_a_genuinely_empty_rail_still_says_so(server: str, page: Any) -> None:
+def test_a_genuinely_empty_rail_still_says_so(server: Served, page: Any) -> None:
     """The other half of the rule, and the one a guard this blunt could quietly break."""
     page.goto(server, wait_until="networkidle")
 
@@ -97,7 +99,7 @@ def test_a_genuinely_empty_rail_still_says_so(server: str, page: Any) -> None:
     page.wait_for_selector("text=No projects yet.", timeout=10_000)
 
 
-def test_a_project_opened_by_url_is_not_declared_missing_first(server: str, page: Any) -> None:
+def test_a_project_opened_by_url_is_not_declared_missing_first(server: Served, page: Any) -> None:
     """The same bug one screen over, and a worse sentence to be wrong about.
 
     A project the rail has not fetched yet and a project that does not exist are the same `null`
@@ -113,13 +115,13 @@ def test_a_project_opened_by_url_is_not_declared_missing_first(server: str, page
     page.wait_for_selector("h1:has-text('Kerberos')", timeout=15_000)
 
 
-def test_a_project_that_really_is_missing_still_says_so(server: str, page: Any) -> None:
+def test_a_project_that_really_is_missing_still_says_so(server: Served, page: Any) -> None:
     page.goto(f"{server}/project/2b0b4b4e-0000-4000-8000-000000000000", wait_until="networkidle")
 
     page.wait_for_selector("text=There is no such project.", timeout=10_000)
 
 
-def test_the_remembered_shape_follows_what_the_rail_does(server: str, page: Any) -> None:
+def test_the_remembered_shape_follows_what_the_rail_does(server: Served, page: Any) -> None:
     """Made, not just fetched.
 
     The count is remembered so the next cold load holds the right height. If it were only noted

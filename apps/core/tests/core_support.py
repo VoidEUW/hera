@@ -11,13 +11,43 @@ from collections.abc import Iterable, Mapping, Sequence
 from pathlib import Path
 from typing import Any, Protocol
 
-from httpx import Response
+from httpx import AsyncClient, Response
 
 from hera_permissions import Decision, Outcome, Policy
 from hera_tools import Catalogue, Failure, Tool, ToolInvocation, ToolResult
 
 API = "/api/v1"
 """The versioned prefix every route sits under (ADR 6)."""
+
+
+def sign_in(http: AsyncClient, services: Any, user_id: Any = None) -> AsyncClient:
+    """Sign a hand-built client in — as the first admin unless ``user_id`` says otherwise.
+
+    ``services`` is a ``hera_core.wiring.Services``; typed loosely so this module does not import
+    the application at collection time.
+    """
+    from hera_accounts import Accounts
+    from hera_core.auth import SESSION_COOKIE
+
+    with services.database.session() as session:
+        token, _ = Accounts(session).open_session(user_id or services.settings.owner_id)
+    http.cookies.set(SESSION_COOKIE, token, domain="hera.test")
+    return http
+
+
+def unclaim(database: Any) -> None:
+    """Back to an install nobody can sign in to: the owner's row stays, its password goes."""
+    from sqlmodel import delete
+
+    from hera_accounts import Password
+
+    with database.session() as session:
+        session.exec(delete(Password))
+
+
+OWNER_EMAIL = "owner@hera.test"
+OWNER_PASSWORD = "correct horse battery"
+"""The first admin every application test runs as. Created by `make_services`."""
 
 
 class WriteSkill(Protocol):

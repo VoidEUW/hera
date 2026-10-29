@@ -74,6 +74,8 @@ export const t = {
 		settings: 'Settings',
 		account: (name: string) => `${name} — Settings`,
 		accountLabel: 'Account',
+		accountOptions: 'Account options',
+		openSettings: 'Settings',
 		resize: 'Resize the sidebar',
 		openMenu: 'Open menu',
 		closeMenu: 'Close menu',
@@ -710,11 +712,20 @@ export const t = {
 		notAnImage: 'Choose a PNG, JPEG, WebP or GIF picture.',
 		saved: 'Saved',
 		security: 'Sign-in',
-		securityNote: 'Hera has no login yet. These are drawn so you can see what is coming.',
 		password: 'Password',
-		twoFactor: 'Two-factor authentication',
+		currentPassword: 'Current password',
+		newPassword: 'New password',
+		changePassword: 'Change password',
+		passwordChanged: 'Changed. Every other browser has been signed out.',
 		passkeys: 'Passkeys',
-		later: 'Coming later'
+		later: 'Coming later',
+		sessions: 'Where you are signed in',
+		thisBrowser: 'This browser',
+		unknownBrowser: 'A browser',
+		lastSeen: (when: string) => `Last seen ${when}`,
+		revoke: 'Revoke',
+		admin: 'Admin',
+		user: 'User'
 	},
 
 	general: {
@@ -886,20 +897,57 @@ export const t = {
 		mode: 'Sign in or register',
 		signIn: 'Sign in',
 		register: 'Register',
-		signInTitle: 'Sign in to Hera',
+		signInTitle: (instance: string) => `Sign in to ${instance}`,
 		registerTitle: 'Create your account',
 		signInBlurb: 'Your chats stay on this machine either way.',
-		registerBlurb: 'One account for every machine Hera runs on.',
+		registerBlurb: 'Your own chats, memories and mind on this Hera.',
+		inviteBlurb: 'You were invited. Choose how you will sign in.',
+		closedNote: 'Accounts here are made by an admin.',
 		name: 'Name',
 		email: 'Email',
 		password: 'Password',
-		passwordPlaceholder: 'At least 12 characters',
-		passwordHelp: 'Or skip it and use a passkey.',
+		passwordPlaceholder: 'At least 8 characters',
 		continue: 'Continue',
 		create: 'Create account',
 		or: 'or',
 		signInPasskey: 'Sign in with a passkey',
-		registerPasskey: 'Register with a passkey'
+		registerPasskey: 'Register with a passkey',
+		signOut: 'Sign out',
+		signOutEverywhere: 'Sign out everywhere',
+		signOutEverywhereNote: 'Every browser you are signed in on, this one included.'
+	},
+	/** The first start: claiming an instance nobody can sign in to yet (ADR 27). */
+	setup: {
+		title: 'Set up Hera',
+		steps: { admin: 'You', instance: 'This Hera', model: 'Model', done: 'Done' },
+		adminTitle: 'Who looks after this Hera',
+		adminBlurb:
+			'The first account is an admin: it adds people, endpoints and servers. You can make others admins later.',
+		adopted: (chats: number) =>
+			chats === 1
+				? 'This Hera already has one conversation. It becomes yours.'
+				: `This Hera already has ${chats} conversations. They become yours.`,
+		code: 'Setup code',
+		codeHelp:
+			'Printed in the server’s log when it started, and written to ~/.hera/setup-code on that machine.',
+		instanceTitle: 'What this Hera is',
+		instanceName: 'Name',
+		publicUrl: 'Public address',
+		publicUrlHelp:
+			'How people reach it, for example https://hera.example.com. Leave it as it is if only this address is used.',
+		registration: 'Who may make an account',
+		registrationOpen: 'Anyone',
+		registrationInvite: 'By invitation',
+		registrationClosed: 'Only an admin',
+		registrationHelp:
+			'Each person gets their own chats. Memories and the mind are still shared until a later version, so keep this closed unless you trust everyone who can reach it.',
+		modelTitle: 'Where she runs',
+		modelBlurb: 'Point Hera at a model. You can skip this and do it in Settings later.',
+		doneTitle: 'Hera is ready',
+		doneBlurb: 'You are signed in as the admin.',
+		next: 'Next',
+		skip: 'Skip',
+		open: 'Open Hera'
 	},
 	/** A pane that could not load (`$lib/errors`). `what` is lower case: "usage". */
 	loadFailed: {

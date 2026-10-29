@@ -11,7 +11,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, status
 
-from hera_core.deps import Container, Db, Owner, not_found
+from hera_core.deps import AdminOnly, Container, Db, Owner, not_found
 from hera_core.schemas import ProfileOut, RegionIn, RegionOut
 from hera_profiles import MIND_REGIONS, Profile, ProfileRepository, UnknownRegion, region
 
@@ -49,7 +49,7 @@ def list_regions(container: Container) -> list[RegionOut]:
     ]
 
 
-@router.put("/mind/{region_id}", response_model=RegionOut)
+@router.put("/mind/{region_id}", response_model=RegionOut, dependencies=[AdminOnly])
 def write_region(region_id: str, payload: RegionIn, container: Container) -> RegionOut:
     """Edit a region. This is the owner's door, and it opens every one of them.
 

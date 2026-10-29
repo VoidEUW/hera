@@ -329,6 +329,39 @@ class SkillsConfig(BaseModel):
     disabled: list[str] = Field(default_factory=list)
 
 
+Registration = Literal["open", "invite", "closed"]
+"""Who may make an account (ADR 27). ``closed`` means only an admin, or ``hera user create``."""
+
+
+class InstanceConfig(BaseModel):
+    """``[instance]`` — what this Hera calls itself, where it is reached, and who may join.
+
+    Admin-edited, and in this file rather than a table because it is the kind of thing a person
+    fixes with an editor when the interface is what they locked themselves out of.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    name: str = "Hera"
+    public_url: str = ""
+    """How people reach this instance — ``https://hera.example.com``. Empty means *however the
+    request arrived*. When set, a request whose ``Origin`` is this URL is accepted even behind a
+    proxy that rewrites ``Host``; later it is the relying party for passkeys and the base of every
+    link in a mail."""
+
+    registration: Registration = "closed"
+    """Closed by default: an instance somebody just set up has said nothing yet about who else
+    should be able to walk in."""
+
+    @field_validator("public_url")
+    @classmethod
+    def _bare_origin(cls, url: str) -> str:
+        cleaned = url.strip().rstrip("/")
+        if cleaned and not cleaned.startswith(("http://", "https://")):
+            raise ValueError("a public URL starts with http:// or https://")
+        return cleaned
+
+
 class HeraConfig(BaseModel):
     """Everything in ``config.toml``."""
 
@@ -337,6 +370,7 @@ class HeraConfig(BaseModel):
     providers: list[ProviderEntry] = Field(default_factory=list)
     active_provider: str = ""
     skills: SkillsConfig = Field(default_factory=SkillsConfig)
+    instance: InstanceConfig = Field(default_factory=InstanceConfig)
 
     timezone: str = ""
     """Where the person is, as an IANA name — ``Europe/Berlin``, not an offset.
@@ -378,6 +412,11 @@ class HeraConfig(BaseModel):
         if active == name:
             active = remaining[0].name if remaining else ""
         return self.model_copy(update={"providers": remaining, "active_provider": active})
+
+    def with_instance(self, **changes: str) -> HeraConfig:
+        """Change some of ``[instance]``, validated as a whole."""
+        instance = InstanceConfig.model_validate({**self.instance.model_dump(), **changes})
+        return self.model_copy(update={"instance": instance})
 
     def with_timezone(self, timezone: str) -> HeraConfig:
         return self.model_copy(update={"timezone": timezone})

@@ -27,6 +27,8 @@ SCRATCH_DIRNAME = "scratch"
 ARTIFACTS_DIRNAME = "artifacts"
 LOGOS_DIRNAME = "logos"
 ACCOUNT_DIRNAME = "account"
+USERS_DIRNAME = "users"
+SETUP_CODE_FILENAME = "setup-code"
 DATABASE_FILENAME = "hera.sqlite3"
 MCP_FILENAME = "mcp.json"
 CONFIG_FILENAME = "config.toml"
@@ -46,7 +48,9 @@ __all__ = [
     "MIND_DIRNAME",
     "PERMISSIONS_FILENAME",
     "SCRATCH_DIRNAME",
+    "SETUP_CODE_FILENAME",
     "SKILLS_DIRNAME",
+    "USERS_DIRNAME",
     "account_dir",
     "artifacts_dir",
     "avatar_path",
@@ -62,7 +66,10 @@ __all__ = [
     "mind_dir",
     "permissions_path",
     "scratch_dir",
+    "setup_code_path",
     "skills_dir",
+    "user_dir",
+    "users_dir",
 ]
 
 
@@ -130,14 +137,40 @@ def artifacts_dir(chat_id: str) -> Path:
 
 
 def account_dir() -> Path:
-    """What belongs to the person rather than to a conversation — today, one avatar."""
+    """Where a single-user install kept its one avatar, before there were users.
+
+    Read once, by the boot step that moves the file under the first admin's own directory, and
+    by nothing else.
+    """
     return home() / ACCOUNT_DIRNAME
 
 
-def avatar_path() -> Path:
-    """The owner's avatar. One file with no extension: the media type is stored beside the
-    account row, and a name with no extension is one nothing can be tricked into running."""
-    return account_dir() / "avatar"
+def users_dir() -> Path:
+    """What belongs to one person rather than to the instance, one directory each (ADR 28)."""
+    return home() / USERS_DIRNAME
+
+
+def user_dir(user_id: str) -> Path:
+    """One person's directory, refused for anything that is not a single plain path segment —
+    the same guard as :func:`chat_dir`, for the same reason."""
+    if not user_id or user_id in {".", ".."} or "/" in user_id or "\\" in user_id:
+        raise ValueError(f"not a usable user id: {user_id!r}")
+    return users_dir() / user_id
+
+
+def avatar_path(user_id: str) -> Path:
+    """One person's avatar. One file with no extension: the media type is stored beside the
+    user row, and a name with no extension is one nothing can be tricked into running."""
+    return user_dir(user_id) / "avatar"
+
+
+def setup_code_path() -> Path:
+    """Where a fresh install writes the code its setup wizard asks for, beside printing it.
+
+    For whoever has a shell on the host and missed the log line. Deleted once somebody has
+    claimed the instance.
+    """
+    return home() / SETUP_CODE_FILENAME
 
 
 def logos_dir() -> Path:

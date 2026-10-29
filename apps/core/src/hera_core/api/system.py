@@ -19,7 +19,7 @@ from hera_core.clock import is_known
 from hera_core.clock import render as render_now
 from hera_core.config import load as load_config
 from hera_core.config import save as save_config
-from hera_core.deps import Container, Db, Owner
+from hera_core.deps import AdminOnly, Container, Db, Owner
 from hera_core.schemas import (
     BrokenSkillOut,
     HealthOut,
@@ -35,6 +35,16 @@ from hera_home import home
 from hera_skillsets import SKILL_FILENAME, SkillUsageRepository
 
 router = APIRouter(tags=["system"])
+public = APIRouter(tags=["system"])
+
+
+@public.get("/live")
+def live() -> dict[str, bool]:
+    """Whether the process answers, for a container's health check. Public, and says nothing
+    else: ``/health`` reports the home directory and the model, which is not a stranger's
+    business."""
+    return {"ok": True}
+
 
 DRAFT_BODY = """Write the instructions here.
 
@@ -81,7 +91,7 @@ def list_skills(owner: Owner, db: Db, container: Container) -> SkillsOut:
     )
 
 
-@router.patch("/skills/{skill_id}", response_model=SkillOut)
+@router.patch("/skills/{skill_id}", response_model=SkillOut, dependencies=[AdminOnly])
 def patch_skill(skill_id: str, payload: SkillPatch, container: Container) -> SkillOut:
     """Switch one skill on or off.
 
@@ -105,7 +115,7 @@ def read_skill_source(skill_id: str, container: Container) -> SkillSource:
     return SkillSource(content=file.read_text(encoding="utf-8"))
 
 
-@router.put("/skills/{skill_id}/source", response_model=SkillOut)
+@router.put("/skills/{skill_id}/source", response_model=SkillOut, dependencies=[AdminOnly])
 def write_skill_source(skill_id: str, payload: SkillSource, container: Container) -> SkillOut:
     """Replace a skill's ``SKILL.md``.
 
@@ -125,7 +135,9 @@ def write_skill_source(skill_id: str, payload: SkillSource, container: Container
     return SkillOut.of(written, enabled=skill_id not in load_config().skills.disabled)
 
 
-@router.delete("/skills/{skill_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/skills/{skill_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[AdminOnly]
+)
 def delete_skill(skill_id: str, container: Container) -> None:
     """Delete a skill's folder, and forget that it was ever switched off.
 
@@ -145,7 +157,12 @@ def delete_skill(skill_id: str, container: Container) -> None:
         save_config(config.with_skill_enabled(skill_id, True))
 
 
-@router.post("/skills", response_model=SkillOut, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/skills",
+    response_model=SkillOut,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[AdminOnly],
+)
 def create_skill(payload: SkillIn, container: Container) -> SkillOut:
     """Write a new skill folder, so one can be started without leaving the interface.
 
@@ -192,7 +209,7 @@ def read_preferences() -> PreferencesOut:
     return _preferences()
 
 
-@router.patch("/preferences", response_model=PreferencesOut)
+@router.patch("/preferences", response_model=PreferencesOut, dependencies=[AdminOnly])
 def write_preferences(payload: PreferencesPatch) -> PreferencesOut:
     """Change what is about *you* rather than about how she works.
 

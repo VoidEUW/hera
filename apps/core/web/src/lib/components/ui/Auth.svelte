@@ -1,10 +1,11 @@
 <script lang="ts">
 	/**
-	 * The sign-in surface Settings › Account is waiting for (the theme's `hera/auth`, soft look):
-	 * a centred rounded card with the mark, a switch between signing in and registering, an email
-	 * field, the highlighted primary action, and a passkey as the other way in.
+	 * The sign-in surface (the theme's `hera/auth`, soft look): a centred rounded card with the
+	 * mark, a switch between signing in and registering, the fields, the highlighted primary
+	 * action — and a passkey as the other way in, once there are passkeys (M4).
 	 *
-	 * Built and on `/design`; Hera has no accounts to sign in to yet.
+	 * Drawn on `/login`. The switch appears only when this instance takes registrations at all;
+	 * a card offering a tab that answers *registration is closed* is a door painted on a wall.
 	 */
 	import { t } from '$lib/i18n';
 	import Button from './Button.svelte';
@@ -14,44 +15,69 @@
 
 	interface Props {
 		mode?: 'in' | 'up';
+		/** Whether the *register* tab is offered at all. */
+		registration?: 'open' | 'invite' | 'closed';
+		/** What this Hera calls itself, for the title. */
+		instance?: string;
+		/** Said under the fields when the last attempt failed — the server's own sentence. */
+		error?: string | null;
+		busy?: boolean;
 		onsubmit?: (details: {
 			mode: 'in' | 'up';
 			name: string;
 			email: string;
 			password: string;
 		}) => void;
+		/** Draws the passkey button. Absent until passkeys exist. */
 		onpasskey?: (mode: 'in' | 'up') => void;
 	}
 
-	let { mode = $bindable('in'), onsubmit, onpasskey }: Props = $props();
+	let {
+		mode = $bindable('in'),
+		registration = 'closed',
+		instance = 'Hera',
+		error = null,
+		busy = false,
+		onsubmit,
+		onpasskey
+	}: Props = $props();
 
 	let name = $state('');
 	let email = $state('');
 	let password = $state('');
 	const registering = $derived(mode === 'up');
+	const blurb = $derived(
+		registering
+			? registration === 'invite'
+				? t.auth.inviteBlurb
+				: t.auth.registerBlurb
+			: t.auth.signInBlurb
+	);
 </script>
 
 <form
 	class="auth"
 	onsubmit={(event) => {
 		event.preventDefault();
-		onsubmit?.({ mode, name, email, password });
+		if (!busy) onsubmit?.({ mode, name, email, password });
 	}}
 >
 	<div class="head">
 		<Ocellus size={30} />
-		<h3>{registering ? t.auth.registerTitle : t.auth.signInTitle}</h3>
-		<p>{registering ? t.auth.registerBlurb : t.auth.signInBlurb}</p>
+		<h3>{registering ? t.auth.registerTitle : t.auth.signInTitle(instance)}</h3>
+		<p>{blurb}</p>
 	</div>
-	<Segmented
-		size="sm"
-		label={t.auth.mode}
-		bind:value={mode}
-		options={[
-			{ value: 'in', label: t.auth.signIn },
-			{ value: 'up', label: t.auth.register }
-		]}
-	/>
+	{#if registration !== 'closed'}
+		<Segmented
+			size="sm"
+			label={t.auth.mode}
+			bind:value={mode}
+			options={[
+				{ value: 'in', label: t.auth.signIn },
+				{ value: 'up', label: t.auth.register }
+			]}
+		/>
+	{/if}
 	{#if registering}
 		<Input label={t.auth.name} value={name} onchange={(value) => (name = value)} />
 	{/if}
@@ -60,25 +86,31 @@
 		label={t.auth.email}
 		placeholder="you@example.com"
 		value={email}
+		autofocus
 		onchange={(value) => (email = value)}
 	/>
-	{#if registering}
-		<Input
-			kind="password"
-			label={t.auth.password}
-			placeholder={t.auth.passwordPlaceholder}
-			help={t.auth.passwordHelp}
-			value={password}
-			onchange={(value) => (password = value)}
-		/>
+	<Input
+		kind="password"
+		label={t.auth.password}
+		placeholder={registering ? t.auth.passwordPlaceholder : ''}
+		value={password}
+		onchange={(value) => (password = value)}
+	/>
+	{#if error}
+		<p class="error" role="alert">{error}</p>
 	{/if}
-	<Button type="submit" variant="highlighted" size="lg" block>
+	<Button type="submit" variant="highlighted" size="lg" block {busy}>
 		{registering ? t.auth.create : t.auth.continue}
 	</Button>
-	<div class="or">{t.auth.or}</div>
-	<Button size="lg" block icon="key" onclick={() => onpasskey?.(mode)}>
-		{registering ? t.auth.registerPasskey : t.auth.signInPasskey}
-	</Button>
+	{#if onpasskey}
+		<div class="or">{t.auth.or}</div>
+		<Button size="lg" block icon="key" onclick={() => onpasskey?.(mode)}>
+			{registering ? t.auth.registerPasskey : t.auth.signInPasskey}
+		</Button>
+	{/if}
+	{#if registration === 'closed'}
+		<p class="note">{t.auth.closedNote}</p>
+	{/if}
 </form>
 
 <style>
@@ -117,6 +149,16 @@
 		margin: 0;
 		color: var(--text-muted);
 		font-size: 12.5px;
+	}
+
+	.error {
+		color: var(--danger);
+		font-size: 13px;
+	}
+
+	.note {
+		color: var(--text-faint);
+		text-align: center;
 	}
 
 	.or {

@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from e2e_support import Served
 
 playwright = pytest.importorskip(
     "playwright.sync_api", reason="playwright is not installed; run `uv run playwright install`"
@@ -31,10 +32,11 @@ TRANSCRIPT = "[role='status'][aria-label='Loading the conversation…']"
 
 
 @pytest.fixture
-def page(server: str) -> Any:
+def page(server: Served) -> Any:
     with playwright.sync_playwright() as driver:
         browser = driver.chromium.launch()
         context = browser.new_context(viewport={"width": 1440, "height": 900})
+        server.sign_in(context)
         opened = context.new_page()
         try:
             yield opened
@@ -44,23 +46,23 @@ def page(server: str) -> Any:
 
 
 @pytest.fixture
-def home(server: str) -> Path:
+def home(server: Served) -> Path:
     """The data directory the `server` fixture made for this test, so a file can be put in it."""
     return Path(os.environ["HERA_HOME"])
 
 
-def post(base: str, path: str, payload: dict[str, Any]) -> dict[str, Any]:
+def post(base: Served, path: str, payload: dict[str, Any]) -> dict[str, Any]:
     request = urllib.request.Request(
         f"{base}/api/v1{path}",
         data=json.dumps(payload).encode(),
-        headers={"content-type": "application/json"},
+        headers={"content-type": "application/json", **base.headers},
         method="POST",
     )
     with urllib.request.urlopen(request, timeout=10) as answer:
         return dict(json.load(answer))
 
 
-def test_a_conversation_draws_its_shape_before_it_arrives(server: str, page: Any) -> None:
+def test_a_conversation_draws_its_shape_before_it_arrives(server: Served, page: Any) -> None:
     chat = post(server, "/chats", {"title": "Kerberos"})
 
     page.goto(f"{server}/chat/{chat['id']}")
@@ -90,7 +92,7 @@ WATCH = """
 """
 
 
-def test_the_drawer_waits_for_the_conversation(server: str, home: Path, page: Any) -> None:
+def test_the_drawer_waits_for_the_conversation(server: Served, home: Path, page: Any) -> None:
     chat = post(server, "/chats", {"title": "Kerberos"})
     published = home / "chats" / chat["id"] / "artifacts"
     published.mkdir(parents=True)
@@ -113,7 +115,7 @@ def test_the_drawer_waits_for_the_conversation(server: str, home: Path, page: An
     assert not page.evaluate("window.__together"), "the drawer opened over the placeholder"
 
 
-def test_the_drawer_opens_the_one_she_made_last(server: str, home: Path, page: Any) -> None:
+def test_the_drawer_opens_the_one_she_made_last(server: Served, home: Path, page: Any) -> None:
     """A panel that opens onto *Nothing chosen yet* is a door that led nowhere.
 
     The listing arrives in name order -- `list_artifacts` walks the directory in `sorted()`

@@ -1,41 +1,41 @@
-"""The owner's account: a name, an email and an avatar.
+"""The signed-in person's account: a name, an email and an avatar.
 
-Three routes for the record and three for the picture. No login hides behind any of them —
-``Owner`` is the same single id every other route resolves — which is why password, two-factor
-and passkeys are not here: they are drawn on the screen as *coming later* and built when there
-is something to log in to.
+Three routes for the record and three for the picture. Signing in, sessions and the password
+are ``api.auth``; this is what a person says about themselves once they are in.
 """
 
 from __future__ import annotations
 
 import base64
 import binascii
+from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Response, status
+from sqlmodel import Session
 
-from hera_core.account import AVATAR_TYPES, MAX_AVATAR_BYTES, account_for, sniffs_as
+from hera_accounts import Accounts, EmailTaken, User
+from hera_core.account import AVATAR_TYPES, MAX_AVATAR_BYTES, sniffs_as
 from hera_core.deps import Db, Owner
 from hera_core.schemas import AccountOut, AccountPatch, AvatarIn
 from hera_home import avatar_path
+from hera_storage import utcnow
 
 router = APIRouter(tags=["account"])
 
 
 @router.get("/account", response_model=AccountOut)
 def read_account(owner: Owner, db: Db) -> AccountOut:
-    return AccountOut.of(account_for(db, owner))
+    return AccountOut.of(_user(db, owner))
 
 
 @router.patch("/account", response_model=AccountOut)
 def write_account(payload: AccountPatch, owner: Owner, db: Db) -> AccountOut:
-    account = account_for(db, owner)
-    if payload.name is not None:
-        account.name = payload.name
-    if payload.email is not None:
-        account.email = payload.email
-    db.add(account)
+    try:
+        user = Accounts(db).update(_user(db, owner), name=payload.name, email=payload.email)
+    except EmailTaken as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from None
     db.commit()
-    return AccountOut.of(account)
+    return AccountOut.of(user)
 
 
 @router.put("/account/avatar", response_model=AccountOut)
@@ -43,37 +43,47 @@ def put_avatar(payload: AvatarIn, owner: Owner, db: Db) -> AccountOut:
     """Replace the picture. Held to the limits an image attachment is: the four types the model
     can be shown, 12 MB, and bytes that really are what the header says."""
     media_type, data = _decode(payload.data_url)
-    account = account_for(db, owner)
-    path = avatar_path()
+    user = _user(db, owner)
+    path = avatar_path(str(owner))
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(data)
-    account.avatar_type = media_type
-    db.add(account)
-    db.commit()
-    return AccountOut.of(account)
+    return _set_avatar_type(db, user, media_type)
 
 
 @router.delete("/account/avatar", response_model=AccountOut)
 def delete_avatar(owner: Owner, db: Db) -> AccountOut:
-    account = account_for(db, owner)
-    avatar_path().unlink(missing_ok=True)
-    account.avatar_type = ""
-    db.add(account)
-    db.commit()
-    return AccountOut.of(account)
+    user = _user(db, owner)
+    avatar_path(str(owner)).unlink(missing_ok=True)
+    return _set_avatar_type(db, user, "")
 
 
 @router.get("/account/avatar")
 def get_avatar(owner: Owner, db: Db) -> Response:
-    account = account_for(db, owner)
-    path = avatar_path()
-    if not account.avatar_type or not path.is_file():
+    user = _user(db, owner)
+    path = avatar_path(str(owner))
+    if not user.avatar_type or not path.is_file():
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="no avatar")
     return Response(
         content=path.read_bytes(),
-        media_type=account.avatar_type,
+        media_type=user.avatar_type,
         headers={"X-Content-Type-Options": "nosniff", "Cache-Control": "private, max-age=3600"},
     )
+
+
+def _user(db: Session, owner: UUID) -> User:
+    user = Accounts(db).get(owner)
+    if user is None:
+        # Signed in a moment ago and gone now: an admin removed the account in between.
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="sign in first")
+    return user
+
+
+def _set_avatar_type(db: Session, user: User, media_type: str) -> AccountOut:
+    user.avatar_type = media_type
+    user.updated_at = utcnow()
+    db.add(user)
+    db.commit()
+    return AccountOut.of(user)
 
 
 def _decode(data_url: str) -> tuple[str, bytes]:

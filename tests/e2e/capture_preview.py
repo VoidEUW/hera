@@ -47,6 +47,7 @@ from pathlib import Path
 from typing import Any
 
 import uvicorn
+from e2e_support import Served, claim
 from hera_providers.events import Event
 from hera_providers.request import ChatRequest
 from playwright.sync_api import Error as PlaywrightError
@@ -193,8 +194,9 @@ def free_port() -> int:
         return int(probe.getsockname()[1])
 
 
-def serve(home: Path) -> tuple[str, uvicorn.Server, threading.Thread]:
-    """The real app on a free port, with its own disposable home."""
+def serve(home: Path) -> tuple[Served, uvicorn.Server, threading.Thread]:
+    """The real app on a free port, with its own disposable home, claimed by an admin whose
+    session every context below is signed in with."""
     from hera_core.app import create_app
     from hera_core.boot import prepare
     from hera_core.settings import CoreSettings
@@ -206,6 +208,7 @@ def serve(home: Path) -> tuple[str, uvicorn.Server, threading.Thread]:
     settings = CoreSettings()
     services = build_services(settings, provider=PacedProvider(SCRIPT), registry=None)
     prepare(services.database, services.mind, owner_id=settings.owner_id)
+    token = claim(services.database, settings.owner_id)
 
     port = free_port()
     server = uvicorn.Server(
@@ -224,7 +227,7 @@ def serve(home: Path) -> tuple[str, uvicorn.Server, threading.Thread]:
         time.sleep(0.05)
     if not server.started:
         raise RuntimeError("the server did not start")
-    return f"http://127.0.0.1:{port}", server, thread
+    return Served(f"http://127.0.0.1:{port}", token), server, thread
 
 
 # -- recording ---------------------------------------------------------------------------
@@ -1096,6 +1099,7 @@ def main() -> int:
                 # made to say what it means.
                 color_scheme="dark",
             )
+            base.sign_in(desktop)
             page = desktop.new_page()
             report.attach(page, "desktop")
             # Straight-line, and the order is the script's order: `FakeProvider` serves turns from
@@ -1131,6 +1135,7 @@ def main() -> int:
                 reduced_motion="reduce",
                 color_scheme="dark",
             )
+            base.sign_in(still)
             still_page = still.new_page()
             report.attach(still_page, "reduced-motion")
             act_reduced_motion(still_page, base, shots, report)
@@ -1150,6 +1155,7 @@ def main() -> int:
                 is_mobile=True,
                 has_touch=True,
             )
+            base.sign_in(mobile)
             mobile_page = mobile.new_page()
             report.attach(mobile_page, "phone")
             act_mobile(mobile_page, base, shots, report, chat_url)

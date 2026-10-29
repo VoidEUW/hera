@@ -13,7 +13,7 @@ from typing import Any, Literal
 from fastapi import APIRouter, HTTPException, Response, status
 
 from hera_core import serverbook
-from hera_core.deps import Container
+from hera_core.deps import AdminOnly, Container
 from hera_core.schemas import ServerEntry, ServerOut, ServerToolOut, ToolAllowedIn
 from hera_tools import InvalidToolConfig, InvalidToolName, mask
 
@@ -84,7 +84,9 @@ async def server_tools(name: str, container: Container) -> list[ServerToolOut]:
     return out
 
 
-@router.put("/servers/{name}/tools/{tool:path}", response_model=ServerToolOut)
+@router.put(
+    "/servers/{name}/tools/{tool:path}", response_model=ServerToolOut, dependencies=[AdminOnly]
+)
 async def set_tool(
     name: str, tool: str, payload: ToolAllowedIn, container: Container
 ) -> ServerToolOut:
@@ -105,7 +107,7 @@ async def set_tool(
     )
 
 
-@router.get("/servers/{name}/config", response_model=ServerEntry)
+@router.get("/servers/{name}/config", response_model=ServerEntry, dependencies=[AdminOnly])
 async def read_config(name: str, container: Container) -> ServerEntry:
     """The entry as written, for the editor — a pasted secret comes back as `null`."""
     try:
@@ -119,7 +121,7 @@ async def read_config(name: str, container: Container) -> ServerEntry:
     return _entry(entry)
 
 
-@router.put("/servers/{name}", response_model=ServerOut)
+@router.put("/servers/{name}", response_model=ServerOut, dependencies=[AdminOnly])
 async def write_server(
     name: str, payload: ServerEntry, response: Response, container: Container
 ) -> ServerOut:
@@ -137,7 +139,7 @@ async def write_server(
     return next(row for row in await list_servers(container) if row.name == name)
 
 
-@router.delete("/servers/{name}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/servers/{name}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[AdminOnly])
 async def delete_server(name: str, container: Container) -> Response:
     try:
         retired = serverbook.remove(container, name)

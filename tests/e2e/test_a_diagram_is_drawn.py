@@ -30,6 +30,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from e2e_support import Served
 
 from hera_providers import TextDelta, TurnEnd, text_turn, tool_call
 
@@ -111,10 +112,11 @@ OVERRIDE_SCRIPT: list[Any] = [
 
 
 @pytest.fixture
-def page(server: str) -> Any:
+def page(server: Served) -> Any:
     with playwright.sync_playwright() as driver:
         browser = driver.chromium.launch()
         context = browser.new_context(viewport={"width": 1280, "height": 900})
+        server.sign_in(context)
         opened = context.new_page()
         opened.goto(server, wait_until="networkidle")
         try:

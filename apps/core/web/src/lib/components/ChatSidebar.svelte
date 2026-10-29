@@ -47,6 +47,8 @@
 		sheet?: boolean;
 		onnew?: (projectId?: string) => void;
 		onsettings?: () => void;
+		/** Sign this browser out. In the account row's menu, beside the way into Settings. */
+		onsignout?: () => void;
 		/** Open the command palette. */
 		onsearch?: () => void;
 		settingsOpen?: boolean;
@@ -69,6 +71,7 @@
 		sheet = false,
 		onnew,
 		onsettings,
+		onsignout,
 		onsearch,
 		settingsOpen = false,
 		onrename,
@@ -96,6 +99,10 @@
 	let draft = $state('');
 	let publishedHere = $state(0);
 	let creating = $state(false);
+
+	/** The account row's own menu: Settings, and signing out. Not a `Target` — there is one. */
+	let accountMenu = $state(false);
+	let accountAnchor = $state<HTMLElement | null>(null);
 
 	/** Where each row's menu hangs from, keyed `kind:id`. */
 	let anchors = $state<Record<string, HTMLElement | null>>({});
@@ -466,6 +473,7 @@
 				ariaLabel={t.rail.account(shown)}
 				active={settingsOpen}
 				keyId="settings"
+				pinned={accountMenu}
 				onclick={() => onsettings?.()}
 			>
 				{#snippet lead()}
@@ -475,7 +483,39 @@
 						size={22}
 					/>
 				{/snippet}
+				{#snippet action()}
+					<IconButton
+						bind:ref={accountAnchor}
+						icon="more"
+						size="sm"
+						label={t.rail.accountOptions}
+						aria-haspopup="menu"
+						aria-expanded={accountMenu}
+						onclick={() => (accountMenu = !accountMenu)}
+					/>
+				{/snippet}
 			</SidebarEntry>
+			<Menu
+				open={accountMenu}
+				anchor={accountAnchor}
+				label={t.rail.accountOptions}
+				onclose={() => (accountMenu = false)}
+			>
+				<MenuItem
+					icon="sliders"
+					onclick={() => {
+						accountMenu = false;
+						onsettings?.();
+					}}>{t.rail.openSettings}</MenuItem
+				>
+				<MenuItem
+					icon="exit"
+					onclick={() => {
+						accountMenu = false;
+						onsignout?.();
+					}}>{t.auth.signOut}</MenuItem
+				>
+			</Menu>
 		{/if}
 	{/snippet}
 </Sidebar>

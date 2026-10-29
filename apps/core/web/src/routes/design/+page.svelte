@@ -11,7 +11,6 @@
 	 * The components with no backend yet — Voice call, Image generation, Sign in — live only here.
 	 */
 	import AttachmentChip from '$lib/components/ui/AttachmentChip.svelte';
-	import Auth from '$lib/components/ui/Auth.svelte';
 	import Avatar from '$lib/components/ui/Avatar.svelte';
 	import BarChart from '$lib/components/ui/BarChart.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
@@ -474,11 +473,6 @@ Pick a direction before writing a line of CSS.
 		<div class="editor">
 			<FileEditor kind="image" name="dunes.png" meta="PNG · 160 x 100" src={PICTURE} />
 		</div>
-	</section>
-
-	<section>
-		<h2>Sign in / Register</h2>
-		<Auth />
 	</section>
 
 	<section>

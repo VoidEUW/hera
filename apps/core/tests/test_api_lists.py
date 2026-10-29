@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
-from core_support import API, WriteSkill
+from core_support import API, WriteSkill, sign_in
 from httpx import ASGITransport, AsyncClient
 
 from hera_core.app import create_app
@@ -541,6 +541,7 @@ class TestServingTheInterface:
             app.router.lifespan_context(app),
         ):
             assert (await http.get("/")).status_code == 404
+            sign_in(http, services)
             assert (await http.get(f"{API}/health")).status_code == 200
 
 
@@ -561,4 +562,4 @@ async def _serving(services: Services, static: Path) -> AsyncIterator[AsyncClien
         AsyncClient(transport=ASGITransport(app=app), base_url="http://hera.test") as http,
         app.router.lifespan_context(app),
     ):
-        yield http
+        yield sign_in(http, services)

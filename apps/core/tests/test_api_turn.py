@@ -13,7 +13,7 @@ from typing import Any
 from uuid import uuid4
 
 import pytest
-from core_support import API, StubTools, WriteSkill, names, payload, sse
+from core_support import API, StubTools, WriteSkill, names, payload, sign_in, sse
 from httpx import ASGITransport, AsyncClient
 from sqlmodel import select
 
@@ -1123,7 +1123,7 @@ async def _client(services: Services) -> AsyncIterator[AsyncClient]:
         AsyncClient(transport=ASGITransport(app=app), base_url="http://hera.test") as http,
         app.router.lifespan_context(app),
     ):
-        yield http
+        yield sign_in(http, services)
 
 
 class TestAttachments:

@@ -15,13 +15,17 @@ from collections.abc import AsyncIterator, Iterator
 from pathlib import Path
 from uuid import UUID
 
+import hera_accounts.accounts
 import pytest
-from core_support import API, StubTools, WriteSkill  # noqa: F401
+from argon2 import PasswordHasher
+from core_support import API, OWNER_EMAIL, OWNER_PASSWORD, StubTools, WriteSkill  # noqa: F401
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 
+from hera_accounts import Accounts, Role
 from hera_chats import ChatsSettings, TurnOrchestrator
 from hera_core.app import create_app
+from hera_core.auth import SESSION_COOKIE
 
 # Registers every table into the shared MetaData before `create_all` runs.
 from hera_core.models import ALL_TABLES  # noqa: F401
@@ -39,6 +43,17 @@ from hera_storage import Database, StorageSettings
 @pytest.fixture(autouse=True)
 def _isolated_home(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setenv("HERA_HOME", str(tmp_path / "home"))
+
+
+@pytest.fixture(autouse=True)
+def _cheap_passwords(monkeypatch: pytest.MonkeyPatch) -> None:
+    """argon2id at its real cost is a tenth of a second per hash, by design. What the suite tests
+    is everything around the hash, so it runs at the cheapest parameters the library accepts."""
+    monkeypatch.setattr(
+        hera_accounts.accounts,
+        "DEFAULT_HASHER",
+        PasswordHasher(time_cost=1, memory_cost=8, parallelism=1),
+    )
 
 
 @pytest.fixture
@@ -125,6 +140,15 @@ def make_services(tmp_path: Path, skills_path: Path) -> Iterator[object]:
 
         with database.session() as session:
             ProfileRepository(session).ensure_default_exists(settings.owner_id)
+            # A claimed instance, the way the setup wizard leaves one: the first admin under the
+            # owner id every row already carries. `client` below is signed in as them.
+            Accounts(session).create(
+                OWNER_EMAIL,
+                name="",
+                role=Role.ADMIN,
+                password=OWNER_PASSWORD,
+                user_id=settings.owner_id,
+            )
 
         container = Services(
             settings=settings,
@@ -183,8 +207,8 @@ def app(services: Services, tmp_path: Path) -> FastAPI:
 
 
 @pytest.fixture
-async def client(app: FastAPI) -> AsyncIterator[AsyncClient]:
-    """An httpx client bound to the ASGI app, with the lifespan run.
+async def anonymous(app: FastAPI) -> AsyncIterator[AsyncClient]:
+    """An httpx client bound to the ASGI app, with the lifespan run, signed in as nobody.
 
     ``LifespanManager`` is not used and not needed: ``create_app`` was given a container, so
     the lifespan only has to attach it — which this does by hand, keeping the suite free of
@@ -195,3 +219,16 @@ async def client(app: FastAPI) -> AsyncIterator[AsyncClient]:
         app.router.lifespan_context(app),
     ):
         yield http
+
+
+@pytest.fixture
+async def client(anonymous: AsyncClient, services: Services) -> AsyncClient:
+    """The same client, signed in as the first admin — what every route test runs as.
+
+    A session opened in the database and handed over as a cookie, rather than a sign-in through
+    the route: that one is tested on its own, and a password check per test is time for nothing.
+    """
+    with services.database.session() as session:
+        token, _ = Accounts(session).open_session(services.settings.owner_id)
+    anonymous.cookies.set(SESSION_COOKIE, token, domain="hera.test")
+    return anonymous

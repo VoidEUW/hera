@@ -41,6 +41,9 @@ ALLOWED: dict[str, frozenset[str]] = {
     "hera_tools": frozenset({"hera_home", "hera_permissions"}),
     "hera_skillsets": frozenset({"hera_home", "hera_storage"}),
     "hera_memories": frozenset({"hera_home"}),
+    # Who is asking (ADR 27). Persistence and nothing else: it knows no HTTP, no chat and no
+    # mind, which is what lets the application decide what a cookie is.
+    "hera_accounts": frozenset({"hera_storage"}),
     # Assembly layer.
     "hera_profiles": frozenset({"hera_home", "hera_storage", "hera_prompts"}),
     # Orchestration.

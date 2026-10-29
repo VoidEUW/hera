@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ApiError } from '$lib/api/client';
-import { failure } from './errors';
+import { failure, safeNext } from './errors';
 
 describe('failure', () => {
 	it('names a server fault by its status, and keeps what the server said', () => {
@@ -32,5 +32,16 @@ describe('failure', () => {
 
 	it('copes with something thrown that is not an error at all', () => {
 		expect(failure('nope', 'usage').detail.text).toBe('nope');
+	});
+});
+
+describe('where signing in may send you', () => {
+	it('keeps a path on this origin', () => {
+		expect(safeNext('/chat/abc?x=1')).toBe('/chat/abc?x=1');
+	});
+
+	it('refuses anything that could leave it', () => {
+		for (const next of [null, '', 'https://evil.example', '//evil.example', '/\\evil.example'])
+			expect(safeNext(next), String(next)).toBe('/');
 	});
 });
