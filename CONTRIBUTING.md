@@ -206,6 +206,40 @@ would have built — publishing to an index later needs no restructuring.
 clone or a sparse checkout, or let `hera_skillsets` sync it into `~/.hera/skills/`. The same
 directory can be pointed at by Claude Code.
 
+## Dependency updates and security patches
+
+Dependabot opens one pull request per bump. Do not merge them one by one into `main`: each was cut
+from `main` and carries its own lockfile hunk, so the second one conflicts with the first and
+nothing proves the set works together.
+
+1. **Triage.** A bump that fails CI blocks only itself. Read the real error before deciding: a
+   failure in the install step is usually a peer-dependency constraint (hold the bump back and say
+   why in the pull request), and a timeout in an unrelated test is usually a flake (re-run it, and
+   run the suite locally before believing either).
+2. **Branch from the last tag, not from `main`.** Name it `chore/security-patch-X.Y.Z`. If `main`
+   has nothing past the tag but documentation, the two are the same commit and you may branch from
+   `main`. If `main` has moved for real, branch from the tag (`release/X.Y`) so the patch contains
+   the bumps and nothing else; a bump that only works with code newer than the tag belongs to the
+   next minor version instead.
+3. **Apply the bumps by hand.** Edit the version floors in the `pyproject.toml` files and
+   `package.json`, then regenerate the lockfiles (`uv lock`, `npm install --package-lock-only`)
+   instead of merging the Dependabot branches. Check that the lockfile diff names only the
+   packages you meant to change.
+4. **Prove the behaviour did not change.** Run the whole loop — ruff, mypy, coverage, `pytest -m
+   e2e`, and in `apps/core/web` the check, lint, unit tests and build. Then confirm that the diff
+   against the tag touches only manifests and lockfiles:
+   `git diff vX.Y.Z HEAD --stat -- packages apps ':!*.lock' ':!*pyproject.toml' ':!*package*.json'`
+   must show nothing but comments and documentation.
+5. **One pull request, titled `chore(deps): ...`.** List every bump in the description, and the
+   ones held back with their reason. Close the Dependabot pull requests it supersedes.
+6. **Release it.** A bump that fixes an advisory, or that changes a runtime dependency, ships as a
+   patch version through *Cutting an application release* above. Development tooling alone does
+   not need a release. When the branch came from a tag rather than `main`, merge the tag forward
+   into `main` afterwards and resolve lockfile conflicts by keeping the newer versions.
+
+Check the repository's Dependabot security alerts at the same time; an advisory with no pull request
+is still an open one.
+
 ## Architecture decisions
 
 Anything that changes the shape of the system gets a file in [docs/adr/](docs/adr/): the context,
