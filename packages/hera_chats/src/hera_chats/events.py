@@ -162,9 +162,8 @@ class AnswerRequired(BaseModel):
 
     The second thing that can suspend a turn, and deliberately the *same* mechanism as the
     first: the turn closes, the events are persisted, and replying starts a new turn that
-    resumes the same message. ``docs/tooling.md`` § 4 argued for generalising the permission
-    path rather than building a second suspension beside it, and this is that — the only new
-    machinery is a reply field instead of two buttons.
+    resumes the same message. It generalises the permission path rather than building a second
+    suspension beside it — the only new machinery is a reply field instead of two buttons.
 
     The reply becomes the ``tool_result`` for ``call_id``, which is what lets her carry on
     reading it as an ordinary answer to an ordinary call. Nothing about the model's side of the

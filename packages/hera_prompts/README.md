@@ -183,7 +183,7 @@ the children's keys do not already say.
 Turn the option off and only top-level sections get a `#HEADER`; children then contribute
 their text underneath, so `identity.character` and `identity.creator` arrive as two
 adjacent paragraphs under `#IDENTITY`. That is the shape the reference example in
-`docs/hera-prompts.md` shows, which is why the opt-out exists — but it is not the default, because it
+[the specification](https://github.com/VoidEUW/hera/blob/8e259fe0f31963f77843a121b4bfa58003322bb5/docs/hera-prompts.md) shows, which is why the opt-out exists — but it is not the default, because it
 makes `keyvalue` carry less than `xml` and `markdown`, and a comparison between the three
 formats over a nested prompt would then measure address depth as much as format.
 
@@ -241,4 +241,5 @@ content, no caching, no tokenizer, no persistence, no history management, and no
 of tools, memories, skills or chats. No provider specifics either beyond the three roles —
 mapping `Message` onto a wire format is `hera_providers`' job.
 
-The specification this library was built against is kept as `docs/hera-prompts.md`.
+The specification this library was built against is [in the history](https://github.com/VoidEUW/hera/blob/8e259fe0f31963f77843a121b4bfa58003322bb5/docs/hera-prompts.md); this README is what
+holds now.

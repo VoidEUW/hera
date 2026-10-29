@@ -363,10 +363,10 @@ def answer_question(
     """Reply to a question she asked, and resume the turn it stopped.
 
     The same route the permission card has, doing the same thing to the same machinery — which
-    is the point of `docs/tooling.md` § 4's argument for generalising the suspension rather than
-    building a second one. The only difference is what settles the call: a decision there, a
-    sentence here, and the sentence becomes the call's result so the model reads a reply to its
-    own question where a tool's output would have been.
+    is the point of generalising the suspension rather than building a second one. The only
+    difference is what settles the call: a decision there, a sentence here, and the sentence
+    becomes the call's result so the model reads a reply to its own question where a tool's
+    output would have been.
     """
     chat = require_chat(db, chat_id, owner)
     assistant = MessageRepository(db).latest_assistant(chat.id)

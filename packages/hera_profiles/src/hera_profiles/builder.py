@@ -1,6 +1,6 @@
 """Turning the mind into a prompt.
 
-This is the seam ``docs/status.md`` describes as *mind regions → Prompt, slots bound*. The
+This is the seam from *mind regions* to *a Prompt with its slots bound*. The
 builder produces a :class:`hera_prompts.Prompt` and stops. It does not render it, does not
 know what a chat is, and — importantly — does not know what a tool, a skill, a memory or a
 project is either: those enter as **slots**, named holes that the layer owning the turn fills

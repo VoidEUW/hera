@@ -11,17 +11,15 @@ models reachable the same way work too (ADR 19).
 
 ## Read first
 
-- `docs/status.md` — where the rebuild stands, what is settled, what is next. Start here
-- `docs/versions/` — what each version is for and in what order it lands. **v0.2.2 is tagged** (v0.2.1 and a security patch);
-  v0.3.0, the widening one, is next. Read the one you are working on before
-  touching its packages
+- **The issues and milestones on GitHub** — where the build stands and what is next. They are the
+  state, and nothing in this repository keeps a second copy of it. A milestone's description says
+  what that version is for; its epics say how the parts fit. **v0.2.2 is tagged**; v0.3.0 brings
+  accounts, the desktop app and dreaming
 - `ARCHITECTURE.md` — the packages, the layering rule, the shape of a turn
 - `docs/adr/` — why the structure looks like this; read 2 (Qwen only), 5 (deterministic skill
   routing), 17 (a stance is a sentence) and 19 (preferred models widen past Qwen) before changing
   model-facing behaviour. 17 supersedes 3, and 3 is worth reading anyway for the rule that
   outlived it. 19 narrows 2's target-model list; 2's other bets stay binding
-- `docs/tooling.md` — what she should be able to reach for and cannot. Notes, not decisions;
-  read it before adding a tool, and read § 1 before concluding she has no search *on purpose*
 - `CONTRIBUTING.md` — setup, the check loop, branching
 - `docs/README.md` — what the prototype document is still good for, and what it is wrong about
 
@@ -180,7 +178,9 @@ other behaviour.
 
 ## State of the build
 
-See `docs/status.md` — kept there so this file stays a map rather than turning back into a
-changelog.
+The issues and milestones on GitHub — a milestone's description says what its version is for, its
+epics how the parts fit. Nothing in this repository keeps a second copy, because a copy nobody
+remembers to update becomes the wrong answer: when something here is decided, it is an ADR; when it
+is still to do, it is an issue.
 
 Commit and push only when asked. Branch first — `main` is protected.

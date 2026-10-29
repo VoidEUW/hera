@@ -178,7 +178,7 @@
 	// counter, and `counter += 1` *reads* it: without this, `artifacts.version` becomes a
 	// dependency of the effect that writes it, and Svelte gives up rendering the page with
 	// `effect_update_depth_exceeded` and nothing on screen to say why. That is the third time
-	// this project has met that failure and the second shape of it recorded in `status.md`.
+	// this project has met that failure, in its second shape.
 	$effect(() => {
 		const arriving = session.draft;
 		const id = session.chat?.id ?? null;

@@ -3,7 +3,7 @@
 	 * The panel beside the transcript: one artifact full size, a download, and everything else
 	 * this conversation published.
 	 *
-	 * This is the drawer M3 planned to build once for three panels (`docs/versions/v0.2.0.md`),
+	 * This is the drawer v0.2.0's M3 planned to build once for three panels,
 	 * arriving a milestone early because artifacts is the panel that needed it. Memory and the
 	 * dream log are meant to fit this frame rather than each bringing their own, so what is
 	 * artifact-specific here is deliberately only the body and the file bar.

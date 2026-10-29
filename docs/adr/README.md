@@ -21,7 +21,7 @@ later.
 | [12](0012-a-chat-has-a-scratchpad.md) | A chat has a scratchpad, and a tool call carries the chat it is in | accepted |
 | [13](0013-an-artifact-is-a-file-she-publishes.md) | An artifact is a file she publishes | accepted |
 | [14](0014-skill-resources-are-readable.md) | Skill resources are readable | accepted |
-| [15](0015-running-code-in-a-container.md) | Running code happens in a container, and here is which claim that makes | **deferred to v0.3** |
+| [15](0015-running-code-in-a-container.md) | Running code happens in a container, and here is which claim that makes | **deferred to v0.4** |
 | [16](0016-a-memory-is-a-file-and-all-of-them-are-in-the-prompt.md) | A memory is a file, and every enabled one is in the prompt | accepted |
 | [17](0017-a-stance-is-a-sentence-and-a-question-stands-alone.md) | A stance is a sentence, and a question stands on its own | accepted · supersedes [3](0003-emotions-as-tool-calls.md) |
 | [18](0018-a-model-may-carry-request-options.md) | A model may carry request options, and Hera does not know what they mean | accepted |
@@ -33,3 +33,8 @@ later.
 | [24](0024-the-servers-screen-writes-mcp-json.md) | The Servers screen writes `mcp.json`, and a tool that is switched off is not offered | accepted |
 | [25](0025-usage-is-a-ledger.md) | What a turn cost is kept in a ledger, not read back out of the messages | accepted |
 | [26](0026-a-question-may-come-in-threes.md) | One question card may hold up to three questions | accepted |
+| [27](0027-an-account-is-a-session-and-a-role.md) | An account is a server-side session and a role | proposed |
+| [28](0028-what-belongs-to-a-person.md) | What belongs to a person, and what belongs to the instance | proposed |
+| [29](0029-the-desktop-app-is-a-shell-over-a-frozen-hera.md) | The desktop app is a Tauri shell over a frozen `hera` | proposed |
+| [30](0030-git-is-bundled-not-assumed.md) | Git is bundled with the desktop app, not assumed | proposed |
+| [31](0031-a-dream-proposes-and-a-person-accepts.md) | A dream proposes and a person accepts; training is scored by a judge and checked by a person | proposed |

@@ -35,9 +35,8 @@ and from the rest of the ecosystem.
 v0.2.0 made her *accumulate* (projects, a scratchpad, artifacts, memory); v0.2.1 is the polish
 pass: the interface rebuilt on one theme, the command palette and hotkeys, editable artifacts,
 diagrams, reading a skill's bundled files. v0.2.2 is v0.2.1 with its dependencies' security fixes.
-**Dreaming and experience training are v0.3.** Each version is planned in
-[docs/versions/](docs/versions/) before the work starts, and [docs/status.md](docs/status.md) says
-where things stand right now.
+**v0.3.0 brings accounts, the desktop app, and dreaming.** What is planned and where things stand
+are the [milestones](https://github.com/VoidEUW/hera/milestones) and their issues.
 
 ## A look
 
@@ -187,8 +186,6 @@ packages/          the libraries, each with one job and no upward imports
 apps/core          hera-core — FastAPI and, under web/, the SvelteKit interface it serves:
                    desktop-shaped, installable as a PWA
 docs/adr/          why the structure looks like this
-docs/versions/     what each version is for, written before the work rather than after
-docs/status.md     where the rebuild stands right now
 docs/frontend.md   the design language, the components, the keyboard
 ```
 

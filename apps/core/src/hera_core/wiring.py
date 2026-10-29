@@ -71,7 +71,7 @@ question takes, which is unusable in the same way. What travels is a
 query the model wrote, to whichever engine ``hera_core.search`` is pointed at, and a person who
 does not want that writes one rule to deny it. The tool that would deserve a card is a *fetch* —
 an arbitrary URL is a request to a machine somebody chose, and `http://192.168.1.1/` is not the
-same act as a search (``docs/tooling.md`` § 1).
+same act as a search (#259).
 """
 
 

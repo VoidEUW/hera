@@ -754,7 +754,7 @@ class TestPermissions:
 
 class TestAskingBack:
     """`hera__ask` suspends the turn the way a permission card does — deliberately the same
-    mechanism, per ``docs/tooling.md`` § 4, rather than a second one beside it."""
+    mechanism, rather than a second one beside it."""
 
     async def test_a_question_stops_the_turn(self, make_orchestrator: Make) -> None:
         tools = StubTools()

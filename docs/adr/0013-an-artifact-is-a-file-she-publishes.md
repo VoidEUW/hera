@@ -101,7 +101,7 @@ a targeted change is much harder to lose a document to than a full rewrite.
 
 Clicking a card opens a drawer beside the transcript: the artifact full size, a **Download**, and a
 **file bar** listing every artifact in this chat. That drawer is the one
-[`v0.2.0.md`](../versions/v0.2.0.md) M3 planned to build once for three panels — it lands here
+[`v0.2.0.md`](https://github.com/VoidEUW/hera/blob/8e259fe0f31963f77843a121b4bfa58003322bb5/docs/versions/v0.2.0.md) M3 planned to build once for three panels — it lands here
 because this is the panel that needs it, and memory and the dream log are shaped to fit it rather
 than each bringing their own.
 
@@ -144,7 +144,7 @@ Kept because the mistakes have shapes that recur.
 
 **Draft one — a versioned object.** A `hera_artifacts` package, `art_artifacts` and `art_versions`,
 content at `~/.hera/artifacts/<id>/v<N>.<ext>`. It invented a second store a day after ADR 12 built
-the first, which [`tooling.md`](../tooling.md) § 5 had explicitly warned about. And it sold
+the first, which [`tooling.md`](https://github.com/VoidEUW/hera/blob/8e259fe0f31963f77843a121b4bfa58003322bb5/docs/tooling.md) § 5 had explicitly warned about. And it sold
 *versions* as the reason to build the feature, when nobody had asked for them: what makes revision
 cheap is an edit tool, not a pile of old copies. That is the one idea from draft one worth keeping,
 and it is `artifact_edit` above.
