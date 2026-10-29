@@ -7,7 +7,7 @@
 
 Two problems that look unrelated turn out to be one.
 
-**She uses `hera__note` as working memory.** [`tooling.md`](../tooling.md) § 2 recorded the
+**She uses `hera__note` as working memory.** [`tooling.md`](https://github.com/VoidEUW/hera/blob/8e259fe0f31963f77843a121b4bfa58003322bb5/docs/tooling.md) § 2 recorded the
 observation: `note` is described as *"a document into the notes the person keeps"*, and what she
 actually reaches for it with is a plan, an intermediate result, a list of what she has checked so
 far. That is not a notes vault, and the mismatch is not hers to fix — two different things are

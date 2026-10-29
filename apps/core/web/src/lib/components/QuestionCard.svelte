@@ -2,9 +2,8 @@
 	/**
 	 * She asked something, and the turn is waiting on the answer.
 	 *
-	 * The second thing that can stop a turn, and deliberately the *same* mechanism as the first —
-	 * `docs/tooling.md` § 4 argued for generalising the permission path rather than building a
-	 * second suspension beside it. So this is `PermissionCard` with a field instead of buttons:
+	 * The second thing that can stop a turn, and deliberately the *same* mechanism as the first:
+	 * the permission path, generalised, rather than a second suspension beside it. So this is `PermissionCard` with a field instead of buttons:
 	 * same inline placement, same settled state read from a persisted event, same block on the
 	 * composer while it is open.
 	 *

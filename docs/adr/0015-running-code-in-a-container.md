@@ -10,7 +10,7 @@
 > Anthropic's skills, `pptx` and its siblings, and that is a smaller prize than a Docker
 > dependency and a security claim to maintain.
 >
-> Nothing below is withdrawn. The question [`tooling.md`](../tooling.md) § 3 refused to let this
+> Nothing below is withdrawn. The question [`tooling.md`](https://github.com/VoidEUW/hera/blob/8e259fe0f31963f77843a121b4bfa58003322bb5/docs/tooling.md) § 3 refused to let this
 > start without — *a small sandbox for testing, or safe?* — is answered here, and that answer
 > does not expire. When v0.3 picks it up, this is the record it picks up from.
 >
@@ -28,7 +28,7 @@ anything is a skill that fails strangely rather than honestly.
 More generally, she cannot check her own work. Asked for a program she writes one, and neither of
 us finds out whether it runs.
 
-[`tooling.md`](../tooling.md) § 3 set the condition this record has to meet, and it is the reason
+[`tooling.md`](https://github.com/VoidEUW/hera/blob/8e259fe0f31963f77843a121b4bfa58003322bb5/docs/tooling.md) § 3 set the condition this record has to meet, and it is the reason
 the sandbox was deferred rather than built:
 
 > `hera_sandbox` is the one with a real question in it: it is the only component in this project

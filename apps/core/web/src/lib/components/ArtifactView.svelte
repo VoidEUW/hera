@@ -110,8 +110,8 @@
 	$effect(() => {
 		// Re-runs when the file changes and when something published changed. `wanted` and `chat`
 		// are read by the call itself; `version` is the one nothing else here reads. All three
-		// are reads of state this effect does not write, which is what keeps it out of the loop
-		// `status.md` records — nothing here assigns to `artifacts.version`.
+		// are reads of state this effect does not write, which is what keeps it out of the
+		// `effect_update_depth_exceeded` loop — nothing here assigns to `artifacts.version`.
 		void artifacts.version;
 		let current = true;
 		if (held !== `${chat}/${wanted}`) content = null;
@@ -148,7 +148,7 @@
 	// Drawing is its own effect because it is its own wait: the content arrives over the API and
 	// then the renderer arrives over the network, and only the second one can fail in a way a
 	// person is meant to read. It reads `content` and `kind` and writes neither, which is what
-	// keeps it clear of the `effect_update_depth_exceeded` shape `status.md` records three times.
+	// keeps it clear of the `effect_update_depth_exceeded` loop this project has met three times.
 	$effect(() => {
 		const source = kind === 'mermaid' && content ? text : null;
 		diagram = '';

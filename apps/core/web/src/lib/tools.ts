@@ -35,7 +35,7 @@ export type Mark = 'thinking' | 'skill' | 'search' | 'note' | 'memory' | 'artifa
  * `default` below rather than an exhaustive map: adding a tool to `hera_mcp` must not be able to
  * break this file, and a tool this build has never heard of gets the honest generic mark.
  *
- * The scratchpad (`docs/tooling.md` § 2, ADR 12) is drawn with the quill, and all three of its
+ * The scratchpad (ADR 12) is drawn with the quill, and all three of its
  * calls share it: writing something down and reading it back are the same fact to a reader, which
  * is *she is keeping notes on this*. Splitting them would put two marks in the gutter for one
  * habit and make the second look like a different capability.

@@ -16,7 +16,7 @@ versions are [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## v0.2.1, written before the move
 
-Towards [v0.2.1](versions/v0.2.1.md), the polish pass. Incomplete by design — see the release notes.
+Towards [v0.2.1](https://github.com/VoidEUW/hera/blob/8e259fe0f31963f77843a121b4bfa58003322bb5/docs/versions/v0.2.1.md), the polish pass. Incomplete by design — see the release notes.
 
 ### Added
 
@@ -161,14 +161,14 @@ before memory could reuse the panel beside them.
 
 **Two of the five planned milestones moved before the tag**, both deliberately and both written
 down rather than dropped. *Dreaming and experience training* are now
-[v0.3.0](versions/v0.3.0.md) — the four under it want to be stable before anything proposes
+[v0.3.0](https://github.com/VoidEUW/hera/blob/8e259fe0f31963f77843a121b4bfa58003322bb5/docs/versions/v0.3.0.md) — the four under it want to be stable before anything proposes
 changes to them, and it is the only one that costs nothing to defer, because every dependency points
-into it and none point out. *The redesign pass* is now [v0.2.1](versions/v0.2.1.md) with the
+into it and none point out. *The redesign pass* is now [v0.2.1](https://github.com/VoidEUW/hera/blob/8e259fe0f31963f77843a121b4bfa58003322bb5/docs/versions/v0.2.1.md) with the
 `⌘K` palette, hotkeys and `hera__read_resource`: the one part of it anything depended on — the
 drawer — was built early with artifacts, and what is left is polish, which is what a patch release
 is for.
 
-Planned in [docs/versions/v0.2.0.md](versions/v0.2.0.md); the reasoning lives there.
+Planned in [docs/versions/v0.2.0.md](https://github.com/VoidEUW/hera/blob/8e259fe0f31963f77843a121b4bfa58003322bb5/docs/versions/v0.2.0.md); the reasoning lives there.
 
 ### Added
 
@@ -189,7 +189,7 @@ Planned in [docs/versions/v0.2.0.md](versions/v0.2.0.md); the reasoning lives th
   turn, draws a card with a reply field where she asked, and resumes the *same* assistant message
   with what you typed as the result of her own call — so nothing on the model's side of the loop
   learns a person was in it. Deliberately the permission card's machinery rather than a second
-  suspension beside it ([docs/tooling.md](tooling.md) § 4): a new close reason
+  suspension beside it ([docs/tooling.md](https://github.com/VoidEUW/hera/blob/8e259fe0f31963f77843a121b4bfa58003322bb5/docs/tooling.md) § 4): a new close reason
   (`awaiting_answer`), two event variants, and `POST /chats/{id}/answers`. `hera_chats` does not
   know the tool exists — it suspends on a name it is given.
 - **Two mind regions, and the model asked for both.** Reading its own prompt it reported two gaps
@@ -346,17 +346,17 @@ Listed so a missing feature and a forgotten one do not look alike:
   skill with files beside it arrives with *"read one if this skill tells you to"*, and there is no
   tool that can. `hera__read_resource` is written as a decision
   ([ADR 14](adr/0014-skill-resources-are-readable.md)) and is first in
-  [v0.2.1](versions/v0.2.1.md), because it is a sentence in the prompt that is not true.
+  [v0.2.1](https://github.com/VoidEUW/hera/blob/8e259fe0f31963f77843a121b4bfa58003322bb5/docs/versions/v0.2.1.md), because it is a sentence in the prompt that is not true.
 - **`⌘K` opens Settings** rather than a command palette, and there are no other keyboard shortcuts.
   v0.2.1.
 - **The interface is desktop-shaped.** It installs as a PWA and there is no mobile sheet. v0.2.1.
 - **Mermaid diagrams are not drawn.** `.mmd` is recognised and says so plainly; an `.svg` artifact
   is a drawn chart today.
 - **No dreaming, no sandbox, no agents.** v0.3 — see
-  [docs/versions/v0.3.0.md](versions/v0.3.0.md). Settings → Dreaming is listed and disabled,
+  [docs/versions/v0.3.0.md](https://github.com/VoidEUW/hera/blob/8e259fe0f31963f77843a121b4bfa58003322bb5/docs/versions/v0.3.0.md). Settings → Dreaming is listed and disabled,
   because a feature you can see coming is a promise and one you cannot is a surprise.
 - **`hera__fetch` and PDFs.** She can find a page and not read it; the composer refuses a PDF.
-  Both have their reasoning in [docs/tooling.md](tooling.md).
+  Both have their reasoning in [docs/tooling.md](https://github.com/VoidEUW/hera/blob/8e259fe0f31963f77843a121b4bfa58003322bb5/docs/tooling.md).
 
 ## [0.1.0] — 2026-08-27
 
@@ -497,7 +497,7 @@ Deliberate, and listed so a missing feature and a broken one do not look alike:
 - **Single user**, behind a multi-user-ready seam: `Depends(current_user)` on every route and an
   `owner_id` on every row.
 
-[docs/tooling.md](tooling.md) argues for the rest of the tool surface — a per-chat
+[docs/tooling.md](https://github.com/VoidEUW/hera/blob/8e259fe0f31963f77843a121b4bfa58003322bb5/docs/tooling.md) argues for the rest of the tool surface — a per-chat
 scratchpad, an emotion that can ask a question back, artifacts — as notes rather than decisions.
 
 [0.2.0]: https://github.com/VoidEUW/hera/releases/tag/v0.2.0

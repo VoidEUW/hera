@@ -9,8 +9,7 @@ in it mentions DuckDuckGo.
 
 **Why DuckDuckGo first.** It is the only one that needs no key, and a search that only works
 after somebody has signed up somewhere is not an answer to the problem search exists to solve —
-a fresh install that cannot look anything up has a model that invents things fluently
-(``docs/tooling.md`` § 1).
+a fresh install that cannot look anything up has a model that invents things fluently.
 
 ``ddgs`` is synchronous and does real network I/O, so every call goes through a worker thread.
 Calling it directly from the event loop would stall every other conversation in the process for

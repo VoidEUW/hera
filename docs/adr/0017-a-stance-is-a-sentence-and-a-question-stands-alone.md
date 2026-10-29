@@ -18,7 +18,7 @@ edit on Settings → Emotions, rendered into the prompt per turn and used to col
 two could not disagree.
 
 Driven against a real endpoint over v0.2, it does not work, and
-[`docs/versions/v0.2.1.md`](../versions/v0.2.1.md) § 4 wrote down the observation while it was
+[`docs/versions/v0.2.1.md`](https://github.com/VoidEUW/hera/blob/8e259fe0f31963f77843a121b4bfa58003322bb5/docs/versions/v0.2.1.md) § 4 wrote down the observation while it was
 fresh: she rarely reaches for a stance at all, and the ones she does reach for look close to
 arbitrary — a `curious` where the answer is plainly confident, a `warm` on a correction. That
 document listed three explanations and four possible responses, and deliberately decided none of
