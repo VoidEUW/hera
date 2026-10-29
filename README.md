@@ -31,10 +31,10 @@ and from the rest of the ecosystem.
 
 ## Status
 
-**v0.2.2 is the latest release** — see the [releases](https://github.com/VoidEUW/hera/releases).
+**v0.2.3 is the latest release** — see the [releases](https://github.com/VoidEUW/hera/releases).
 v0.2.0 made her *accumulate* (projects, a scratchpad, artifacts, memory); v0.2.1 is the polish
 pass: the interface rebuilt on one theme, the command palette and hotkeys, editable artifacts,
-diagrams, reading a skill's bundled files. v0.2.2 is v0.2.1 with its dependencies' security fixes.
+diagrams, reading a skill's bundled files. v0.2.2 and v0.2.3 are v0.2.1 with its dependencies' security fixes.
 **v0.3.0 brings accounts, the desktop app, and dreaming.** What is planned and where things stand
 are the [milestones](https://github.com/VoidEUW/hera/milestones) and their issues.
 
@@ -79,7 +79,7 @@ docker run -p 8756:8756 -v hera_data:/data ghcr.io/voideuw/hera:latest
 ```
 
 `:latest` is always the newest *release*, `:rc` follows the newest release candidate, and an exact
-version (`:0.2.2`) is always there. A container reaches a model on the host through
+version (`:0.2.3`) is always there. A container reaches a model on the host through
 `host.docker.internal` — see the comments in [docker-compose.yml](docker-compose.yml).
 
 It binds to `127.0.0.1` and there is no login: Hera is one person's server on one person's

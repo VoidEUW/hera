@@ -13,7 +13,7 @@ models reachable the same way work too (ADR 19).
 
 - **The issues and milestones on GitHub** — where the build stands and what is next. They are the
   state, and nothing in this repository keeps a second copy of it. A milestone's description says
-  what that version is for; its epics say how the parts fit. **v0.2.2 is tagged**; v0.3.0 brings
+  what that version is for; its epics say how the parts fit. **v0.2.3 is tagged**; v0.3.0 brings
   accounts, the desktop app and dreaming
 - `ARCHITECTURE.md` — the packages, the layering rule, the shape of a turn
 - `docs/adr/` — why the structure looks like this; read 2 (Qwen only), 5 (deterministic skill
