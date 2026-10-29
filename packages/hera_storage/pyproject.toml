@@ -18,7 +18,7 @@ classifiers = [
 ]
 dependencies = [
     "sqlmodel>=0.0.42",
-    "pydantic-settings>=2.16.0",
+    "pydantic-settings>=2.16.1",
 ]
 
 # Ships the `db` and `session` fixtures to every package that installs this one, without any

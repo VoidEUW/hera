@@ -18,8 +18,8 @@ classifiers = [
     "Typing :: Typed",
 ]
 dependencies = [
-    "alembic>=1.20.0",
-    "ddgs>=9.16.0",
+    "alembic>=1.20.1",
+    "ddgs>=9.16.1",
     "fastapi>=0.115",
     "hera-chats",
     "hera-home",
@@ -33,7 +33,7 @@ dependencies = [
     "hera-storage",
     "hera-tools",
     "pydantic>=2.14.1",
-    "pydantic-settings>=2.16.0",
+    "pydantic-settings>=2.16.1",
     # tomllib reads TOML; nothing in the standard library writes it, and hand-rolling the
     # serialisation is exactly what breaks on a quote in an API key.
     "tomli-w>=1.0",
