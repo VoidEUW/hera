@@ -12,7 +12,7 @@ migration that quietly drops a table.
 
 from __future__ import annotations
 
-from hera_accounts.models import OneTimeToken, Password, SignIn, User
+from hera_accounts.models import OneTimeToken, Passkey, Password, SignIn, User
 from hera_chats.models import Chat, Message, Project, TurnUsage
 from hera_profiles.models import Profile
 from hera_skillsets.models import SkillUsage
@@ -27,6 +27,7 @@ ALL_TABLES: tuple[type[SQLModel], ...] = (
     TurnUsage,
     User,
     Password,
+    Passkey,
     SignIn,
     OneTimeToken,
 )

@@ -72,6 +72,34 @@ class Password(Entity, table=True):
     hash: str
 
 
+class Passkey(Entity, table=True):
+    """A WebAuthn credential: a key pair whose private half never leaves the person's device.
+
+    What is kept is the public half and the bookkeeping WebAuthn asks for — the credential's id,
+    which the browser hands back to say which key it used, and the signature counter, which an
+    authenticator that counts raises on every use so a cloned key shows up as a counter that went
+    backwards. Both binary values are stored base64url-encoded, the form they travel in.
+    """
+
+    __tablename__ = "account_passkeys"
+    __table_args__ = (UniqueConstraint("credential_id"),)
+
+    user_id: UUID = Field(index=True)
+    credential_id: str
+    public_key: str
+    """The COSE-encoded public key, base64url."""
+
+    sign_count: int = 0
+    transports: str = ""
+    """How the authenticator was reached when it was registered — ``internal,hybrid`` — handed
+    back to the browser later so it knows where to look. Comma-separated; a hint, not a rule."""
+
+    label: str = ""
+    """What its owner calls it: "MacBook", "phone". Defaults to when it was added."""
+
+    last_used_at: datetime | None = Field(default=None, sa_type=_TIMESTAMP)
+
+
 class SignIn(Entity, table=True):
     """One signed-in browser. Deleting the row is signing it out.
 
@@ -107,4 +135,4 @@ class OneTimeToken(Entity, table=True):
     used_at: datetime | None = Field(default=None, sa_type=_TIMESTAMP)
 
 
-ALL_TABLES = (User, Password, SignIn, OneTimeToken)
+ALL_TABLES = (User, Password, Passkey, SignIn, OneTimeToken)

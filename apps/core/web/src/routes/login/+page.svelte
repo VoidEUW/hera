@@ -20,6 +20,7 @@
 	import Input from '$lib/components/ui/Input.svelte';
 	import Ocellus from '$lib/components/ui/Ocellus.svelte';
 	import { safeNext } from '$lib/errors';
+	import { available, cancelled, get } from '$lib/passkeys';
 	import { t } from '$lib/i18n';
 
 	const next = safeNext(page.url.searchParams.get('next'));
@@ -27,6 +28,7 @@
 	let mode = $state<'in' | 'up'>('in');
 	let forgetting = $state(false);
 	let resetByMail = $state(false);
+	let passkeys = $state(false);
 	let resetEmail = $state('');
 	let resetSent = $state(false);
 	let registration = $state<Registration>('closed');
@@ -43,12 +45,28 @@
 			registration = state.registration;
 			instance = state.instance_name;
 			resetByMail = state.reset_by_mail;
+			passkeys = available() && state.passkeys;
 			if (registration !== 'open') mode = 'in';
 		} catch (cause) {
 			error = cause instanceof Error ? cause.message : String(cause);
 		}
 		ready = true;
 	})();
+
+	/** No email first: the browser lists the passkeys it has for this site, and the one chosen
+	 * says whose account it is. */
+	async function withPasskey() {
+		busy = true;
+		error = null;
+		try {
+			const started = await api.passkeySignInOptions();
+			await api.signInWithPasskey(started.ceremony, await get(started.options));
+			window.location.assign(next);
+		} catch (cause) {
+			if (!cancelled(cause)) error = cause instanceof Error ? cause.message : String(cause);
+			busy = false;
+		}
+	}
 
 	async function askForReset() {
 		busy = true;
@@ -133,6 +151,7 @@
 			{error}
 			{busy}
 			onsubmit={submit}
+			onpasskey={passkeys ? withPasskey : undefined}
 			onforgot={() => {
 				error = null;
 				resetSent = false;

@@ -393,8 +393,25 @@ export interface AuthState {
 	setup_required: boolean;
 	registration: Registration;
 	instance_name: string;
+	/** Whether a passkey can work at the address this browser is at. The browser's own half —
+	 * whether it has WebAuthn — is `$lib/passkeys`' `available()`. */
+	passkeys: boolean;
 	/** Whether *forgot your password?* can mail a link here. Says nothing about any address. */
 	reset_by_mail: boolean;
+}
+
+/** One of a person's passkeys, as Settings → Account lists it. */
+export interface PasskeyInfo {
+	id: string;
+	label: string;
+	created_at: string;
+	last_used_at: string | null;
+}
+
+/** The first half of a passkey ceremony: what to hand the browser, and how to come back. */
+export interface Ceremony {
+	ceremony: string;
+	options: Record<string, unknown>;
 }
 
 /** Who an invitation or reset link is for, read before it is used. */
@@ -574,6 +591,26 @@ export const api = {
 			body: JSON.stringify({ current, new: next })
 		}),
 
+	passkeys: () => request<PasskeyInfo[]>('/auth/passkeys'),
+	passkeyOptions: () => request<Ceremony>('/auth/passkeys/options', { method: 'POST' }),
+	addPasskey: (ceremony: string, credential: Record<string, unknown>, label: string) =>
+		request<PasskeyInfo>('/auth/passkeys', {
+			method: 'POST',
+			body: JSON.stringify({ ceremony, credential, label })
+		}),
+	renamePasskey: (id: string, label: string) =>
+		request<PasskeyInfo>(`/auth/passkeys/${id}`, {
+			method: 'PATCH',
+			body: JSON.stringify({ label })
+		}),
+	removePasskey: (id: string) => request<void>(`/auth/passkeys/${id}`, { method: 'DELETE' }),
+	/** Public: options for signing in with whichever passkey the browser offers. */
+	passkeySignInOptions: () => request<Ceremony>('/auth/passkey/options', { method: 'POST' }),
+	signInWithPasskey: (ceremony: string, credential: Record<string, unknown>) =>
+		request<Account>('/auth/passkey', {
+			method: 'POST',
+			body: JSON.stringify({ ceremony, credential })
+		}),
 	/** *Forgot your password?* — the same answer for every address. */
 	requestReset: (email: string) =>
 		request<void>('/auth/reset', { method: 'POST', body: JSON.stringify({ email }) }),

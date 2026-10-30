@@ -21,7 +21,16 @@ from hera_accounts.accounts import (
     new_token,
     normalise_email,
 )
-from hera_accounts.models import ALL_TABLES, OneTimeToken, Password, Purpose, Role, SignIn, User
+from hera_accounts.models import (
+    ALL_TABLES,
+    OneTimeToken,
+    Passkey,
+    Password,
+    Purpose,
+    Role,
+    SignIn,
+    User,
+)
 
 __all__ = [
     "ALL_TABLES",
@@ -35,6 +44,7 @@ __all__ = [
     "EmailTaken",
     "LastAdmin",
     "OneTimeToken",
+    "Passkey",
     "Password",
     "Purpose",
     "Role",

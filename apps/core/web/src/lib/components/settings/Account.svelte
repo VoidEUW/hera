@@ -6,8 +6,8 @@
 	 * does it is here — an admin has Settings → Admin → Users for that instead.
 	 *
 	 * The sign-in section lists the browsers you are signed in on, each one revocable, with
-	 * *sign out* and *sign out everywhere*, and changes the password. Passkeys are drawn as a row
-	 * saying *coming later* (M4). Signing out reloads at `/login` rather than navigating there:
+	 * *sign out* and *sign out everywhere*, and changes the password. Passkeys have a section of
+	 * their own where they can work at all — see `Passkeys.svelte`. Signing out reloads at `/login` rather than navigating there:
 	 * every store in the shell was built for you, and a reload is how none of it outlives you.
 	 *
 	 * The picture is cropped to a square and scaled down in the browser before it is sent: it is
@@ -23,7 +23,9 @@
 	import { MAX_IMAGE_BYTES } from '$lib/attachments';
 	import Input from '$lib/components/ui/Input.svelte';
 	import { t } from '$lib/i18n';
+	import { available } from '$lib/passkeys';
 	import InviteForm from './InviteForm.svelte';
+	import Passkeys from './Passkeys.svelte';
 	import { workspace } from '$lib/stores/workspace.svelte';
 
 	interface Props {
@@ -74,12 +76,15 @@
 	/** Whether this person may invite somebody: registration by invitation, and not an admin,
 	 * who invites from the Users screen. */
 	let byInvitation = $state(false);
+	/** Passkeys can work here: this browser has WebAuthn, and the server can name this site. */
+	let passkeysHere = $state(false);
 	const showInvite = $derived(
 		byInvitation && account?.role !== 'admin' && shows(t.admin.invite, t.admin.email)
 	);
 	void (async () => {
 		try {
 			byInvitation = (await api.instance()).registration === 'invite';
+			passkeysHere = available() && (await api.authState()).passkeys;
 		} catch {
 			// Nothing to offer, and nothing worth saying: the rest of the screen still works.
 		}
@@ -310,13 +315,14 @@
 				{#if changed}<Pill tone="live">{t.account.passwordChanged}</Pill>{/if}
 			</div>
 		</form>
-		<ul class="later">
-			<li>
-				<span>{t.account.passkeys}</span>
-				<Pill>{t.account.later}</Pill>
-			</li>
-		</ul>
 	</section>
+
+	{#if passkeysHere}
+		<section>
+			<h3>{t.account.passkeys}</h3>
+			<Passkeys />
+		</section>
+	{/if}
 {/if}
 
 {#if showInvite}
@@ -408,23 +414,6 @@
 	.when {
 		color: var(--text-faint);
 		font-size: 12px;
-	}
-
-	.later {
-		margin: 10px 0 0;
-		padding: 0;
-		list-style: none;
-	}
-
-	.later li {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		max-width: 420px;
-		padding: 8px 0;
-		border-top: var(--border-width) solid var(--line);
-		color: var(--text-faint);
-		font-size: 13.5px;
 	}
 
 	.error {

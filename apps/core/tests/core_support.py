@@ -6,6 +6,7 @@ to one module name and it has no by-path loading the way pytest does.
 
 from __future__ import annotations
 
+import hashlib
 import json
 from collections.abc import Iterable, Mapping, Sequence
 from pathlib import Path
@@ -160,3 +161,104 @@ def payload(frames: Sequence[tuple[str, Any]], name: str) -> Any:
         if found == name:
             return body
     raise AssertionError(f"no {name!r} frame in {names(frames)}")
+
+
+class SoftAuthenticator:
+    """A passkey authenticator in software: a P-256 key that builds and signs exactly what a real
+    one does (WebAuthn §6.1, attestation ``none``), so the server verifies it as it would a phone.
+
+    ``origin`` is the page the browser would be on — what lands in the signed client data.
+    """
+
+    def __init__(self, origin: str = "https://hera.test") -> None:
+        import secrets
+
+        from cryptography.hazmat.primitives.asymmetric import ec
+
+        self.origin = origin
+        self.key = ec.generate_private_key(ec.SECP256R1())
+        self.credential_id = secrets.token_bytes(16)
+        self.count = 0
+        self.user_handle = b""
+
+    def create(self, options: dict[str, Any]) -> dict[str, Any]:
+        """``navigator.credentials.create``, answered."""
+        import cbor2
+        from webauthn.helpers import base64url_to_bytes
+
+        self.user_handle = base64url_to_bytes(options["user"]["id"])
+        client = self._client("webauthn.create", options["challenge"])
+        attested = (
+            bytes(16)  # aaguid: an authenticator that does not say what it is
+            + len(self.credential_id).to_bytes(2, "big")
+            + self.credential_id
+            + self._cose()
+        )
+        data = self._rp_hash(options["rp"]["id"]) + bytes([0x45]) + self.count.to_bytes(4, "big")
+        attestation = cbor2.dumps({"fmt": "none", "attStmt": {}, "authData": data + attested})
+        return self._credential(
+            {
+                "clientDataJSON": _b64(client),
+                "attestationObject": _b64(attestation),
+                "transports": ["internal", "made-up"],
+            }
+        )
+
+    def get(self, options: dict[str, Any], *, count: int | None = None) -> dict[str, Any]:
+        """``navigator.credentials.get``, answered — signed, with the counter raised."""
+        from cryptography.hazmat.primitives import hashes
+        from cryptography.hazmat.primitives.asymmetric import ec
+
+        self.count = count if count is not None else self.count + 1
+        client = self._client("webauthn.get", options["challenge"])
+        data = self._rp_hash(options["rpId"]) + bytes([0x05]) + self.count.to_bytes(4, "big")
+        signed = data + hashlib.sha256(client).digest()
+        signature = self.key.sign(signed, ec.ECDSA(hashes.SHA256()))
+        return self._credential(
+            {
+                "clientDataJSON": _b64(client),
+                "authenticatorData": _b64(data),
+                "signature": _b64(signature),
+                "userHandle": _b64(self.user_handle),
+            }
+        )
+
+    def _client(self, kind: str, challenge: str) -> bytes:
+        return json.dumps(
+            {"type": kind, "challenge": challenge, "origin": self.origin, "crossOrigin": False}
+        ).encode()
+
+    def _rp_hash(self, rp_id: str) -> bytes:
+        return hashlib.sha256(rp_id.encode()).digest()
+
+    def _cose(self) -> bytes:
+        import cbor2
+
+        numbers = self.key.public_key().public_numbers()
+        return bytes(
+            cbor2.dumps(
+                {
+                    1: 2,  # kty: EC2
+                    3: -7,  # alg: ES256
+                    -1: 1,  # crv: P-256
+                    -2: numbers.x.to_bytes(32, "big"),
+                    -3: numbers.y.to_bytes(32, "big"),
+                }
+            )
+        )
+
+    def _credential(self, response: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "id": _b64(self.credential_id),
+            "rawId": _b64(self.credential_id),
+            "type": "public-key",
+            "response": response,
+            "clientExtensionResults": {},
+            "authenticatorAttachment": "platform",
+        }
+
+
+def _b64(raw: bytes) -> str:
+    from webauthn.helpers import bytes_to_base64url
+
+    return str(bytes_to_base64url(raw))

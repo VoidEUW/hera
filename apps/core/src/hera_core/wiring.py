@@ -34,6 +34,7 @@ from hera_core.chat_files import FileArtifacts, FileScratchpad
 from hera_core.config import load as load_config
 from hera_core.enabled_skills import EnabledSkillPort, EnabledSkills
 from hera_core.mail import Mailer, SmtpMailer
+from hera_core.passkeys import Ceremonies
 from hera_core.people import People, Person, PersonalMemories
 from hera_core.search import DuckDuckGo
 from hera_core.settings import CoreSettings
@@ -111,6 +112,9 @@ class Services:
     throttle: Throttle = field(default_factory=Throttle)
     """Failed sign-in and setup-code attempts, per address and per email. Process-wide, so it is
     here rather than built per request."""
+
+    ceremonies: Ceremonies = field(default_factory=Ceremonies)
+    """Passkey challenges handed out and not yet answered. Process-wide, like the throttle."""
 
     mailer: Mailer = field(default_factory=SmtpMailer)
     """Where invitations and resets go out. ``[mail]`` in ``config.toml`` says *how*, read at each

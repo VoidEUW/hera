@@ -90,3 +90,21 @@ user.
 - **Deleting a person deletes what they made:** their rows in every table and `users/<id>/`.
   Disabling is the way to keep it all. Nobody can delete or disable their own account, and the
   last admin cannot be removed.
+
+## Amendment: passkeys (M4)
+
+- **A passkey is added to an account, never the only way to make one.** It is registered on
+  Settings → Account by somebody already signed in. Signing in with one needs no email, because
+  passkeys are *discoverable*: the browser lists the keys it holds for this site, and the chosen
+  key says whose account it is.
+- **The relying party is the public URL's host, or the host the browser is at.** With a public
+  URL set, passkeys are offered only to a browser actually at that host, since a key registered
+  for `hera.example.com` from `localhost` is one the browser refuses. An IP address can't be a
+  relying party, and a page that isn't a secure context (https or localhost) has no WebAuthn,
+  so a Hera opened at `http://192.168.1.20` draws no passkey control at all. `/auth/state` says
+  whether the server can name a relying party; the browser checks its own half.
+- **A ceremony's challenge is remembered in memory**, single-use, for five minutes, and bound to
+  the person who began it. A restart costs somebody one retry, which is cheaper than a table.
+- **The signature counter is kept**, and one that goes backwards refuses the sign-in: that's a
+  copied key. A key this Hera doesn't know and a key that didn't sign get the same answer, and
+  failures count against the same kind of throttle as passwords.

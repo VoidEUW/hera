@@ -31,7 +31,7 @@ from uuid import UUID
 from hera_skillsets.models import ID_PATTERN
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from hera_accounts import SignIn, User
+from hera_accounts import Passkey, SignIn, User
 from hera_chats import Chat, Message, Project, Totals, UsageSummary
 from hera_core.addresses import is_unspecified
 from hera_core.config import (
@@ -1125,6 +1125,10 @@ class AuthStateOut(BaseModel):
     setup_required: bool
     registration: Registration
     instance_name: str
+    passkeys: bool
+    """Whether a passkey can work at the address this browser is at — a domain name, over https
+    or on localhost (``hera_core.passkeys``). The browser checks its own half: whether it has
+    WebAuthn at all."""
     reset_by_mail: bool
     """Whether *forgot your password?* can send a link. Says nothing about any address — only
     that mail and a public URL are set up — so the card can say *ask an admin* instead."""
@@ -1195,6 +1199,48 @@ class InstanceOut(BaseModel):
             registration=instance.registration,
             suggested_url=suggested_url,
         )
+
+
+class CeremonyOut(BaseModel):
+    """The first half of a passkey ceremony: options for the browser, and the key the answer has
+    to come back with."""
+
+    ceremony: str
+    options: dict[str, Any]
+
+
+class PasskeyIn(BaseModel):
+    ceremony: str = Field(max_length=100)
+    credential: dict[str, Any]
+    """What the browser's ``PublicKeyCredential`` holds, base64url-encoded — its ``toJSON()``."""
+    label: str = Field(default="", max_length=80)
+
+
+class PasskeySignInIn(BaseModel):
+    ceremony: str = Field(max_length=100)
+    credential: dict[str, Any]
+
+
+class PasskeyOut(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    id: UUID
+    label: str
+    created_at: datetime
+    last_used_at: datetime | None
+
+    @classmethod
+    def of(cls, passkey: Passkey) -> PasskeyOut:
+        return cls(
+            id=passkey.id,
+            label=passkey.label,
+            created_at=passkey.created_at,
+            last_used_at=passkey.last_used_at,
+        )
+
+
+class PasskeyPatch(BaseModel):
+    label: str = Field(min_length=1, max_length=80)
 
 
 class ResetIn(BaseModel):
