@@ -19,6 +19,7 @@ from hera_core.claim import unclaimed
 from hera_core.config import HeraConfig
 from hera_core.config import load as load_config
 from hera_core.deps import Container, Db, SignedIn
+from hera_core.passkeys import relying_party
 from hera_core.schemas import (
     AccountOut,
     AuthStateOut,
@@ -47,6 +48,7 @@ def auth_state(request: Request, db: Db) -> AuthStateOut:
         setup_required=unclaimed(db),
         registration=config.instance.registration,
         instance_name=config.instance.name,
+        passkeys=relying_party(request, config) is not None,
         reset_by_mail=resets_by_mail(config),
     )
 

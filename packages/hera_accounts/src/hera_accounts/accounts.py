@@ -20,7 +20,7 @@ from argon2.exceptions import InvalidHashError, VerificationError, VerifyMismatc
 from sqlalchemy import func
 from sqlmodel import Session, col, delete, select
 
-from hera_accounts.models import OneTimeToken, Password, Purpose, Role, SignIn, User
+from hera_accounts.models import OneTimeToken, Passkey, Password, Purpose, Role, SignIn, User
 from hera_storage import utcnow
 
 SESSION_LIFETIME = timedelta(days=30)
@@ -188,7 +188,7 @@ class Accounts:
         removes it in the same unit of work."""
         if user.role == Role.ADMIN:
             self._keep_an_admin(user)
-        for table in (Password, SignIn, OneTimeToken):
+        for table in (Password, Passkey, SignIn, OneTimeToken):
             self._session.exec(delete(table).where(col(table.user_id) == user.id))
         self._session.delete(user)
         self._session.flush()
@@ -230,7 +230,9 @@ class Accounts:
     def any_credential(self) -> bool:
         """Whether anybody can sign in at all. Until somebody can, the instance is unclaimed and
         the setup wizard is what it shows."""
-        return self._session.exec(select(Password.id).limit(1)).first() is not None
+        if self._session.exec(select(Password.id).limit(1)).first() is not None:
+            return True
+        return self._session.exec(select(Passkey.id).limit(1)).first() is not None
 
     def verify(self, email: str, password: str) -> User | None:
         """The user these credentials belong to, or ``None`` — for an unknown email, a wrong
@@ -254,6 +256,74 @@ class Accounts:
 
     def _password(self, user_id: UUID) -> Password | None:
         return self._session.exec(select(Password).where(Password.user_id == user_id)).first()
+
+    # -- passkeys -------------------------------------------------------------------------------
+    # The WebAuthn ceremony itself — challenges, signatures, origins — is the application's
+    # (``hera_core.passkeys``); this package only keeps what a ceremony proved.
+
+    def passkeys(self, user_id: UUID) -> list[Passkey]:
+        return list(
+            self._session.exec(
+                select(Passkey)
+                .where(Passkey.user_id == user_id)
+                .order_by(col(Passkey.created_at), col(Passkey.id))
+            )
+        )
+
+    def add_passkey(
+        self,
+        user_id: UUID,
+        *,
+        credential_id: str,
+        public_key: str,
+        sign_count: int,
+        transports: list[str],
+        label: str,
+    ) -> Passkey:
+        if self.passkey(credential_id) is not None:
+            raise AccountError("that passkey is already registered")
+        passkey = Passkey(
+            user_id=user_id,
+            credential_id=credential_id,
+            public_key=public_key,
+            sign_count=sign_count,
+            transports=",".join(transports),
+            label=label.strip()[:80],
+        )
+        self._session.add(passkey)
+        self._session.flush()
+        return passkey
+
+    def passkey(self, credential_id: str) -> Passkey | None:
+        """The passkey a browser named by its credential id, whoever it belongs to."""
+        return self._session.exec(
+            select(Passkey).where(Passkey.credential_id == credential_id)
+        ).first()
+
+    def used_passkey(self, passkey: Passkey, sign_count: int) -> None:
+        passkey.sign_count = sign_count
+        passkey.last_used_at = self._now()
+        self._session.add(passkey)
+        self._session.flush()
+
+    def rename_passkey(self, user_id: UUID, passkey_id: UUID, label: str) -> Passkey | None:
+        """Somebody else's passkey is simply not found, the way :meth:`revoke` answers."""
+        passkey = self._session.get(Passkey, passkey_id)
+        if passkey is None or passkey.user_id != user_id:
+            return None
+        passkey.label = label.strip()[:80]
+        passkey.updated_at = self._now()
+        self._session.add(passkey)
+        self._session.flush()
+        return passkey
+
+    def remove_passkey(self, user_id: UUID, passkey_id: UUID) -> bool:
+        passkey = self._session.get(Passkey, passkey_id)
+        if passkey is None or passkey.user_id != user_id:
+            return False
+        self._session.delete(passkey)
+        self._session.flush()
+        return True
 
     # -- sessions -------------------------------------------------------------------------------
 

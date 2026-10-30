@@ -2,7 +2,8 @@
 	/**
 	 * The sign-in surface (the theme's `hera/auth`, soft look): a centred rounded card with the
 	 * mark, a switch between signing in and registering, the fields, the highlighted primary
-	 * action — and a passkey as the other way in, once there are passkeys (M4).
+	 * action — and a passkey as the other way in, where one can work at all (M4). Signing in
+	 * only: an account is made with a password, and a passkey is added to it afterwards.
 	 *
 	 * Drawn on `/login`. The switch appears only when anybody may register; a card offering a tab
 	 * that answers *registration is closed* is a door painted on a wall. By invitation, the link
@@ -29,8 +30,8 @@
 			email: string;
 			password: string;
 		}) => void;
-		/** Draws the passkey button. Absent until passkeys exist. */
-		onpasskey?: (mode: 'in' | 'up') => void;
+		/** Draws the passkey button under the sign-in form. Absent where WebAuthn cannot work. */
+		onpasskey?: () => void;
 		/** Draws *forgot your password?* under the sign-in form. */
 		onforgot?: () => void;
 	}
@@ -100,10 +101,10 @@
 	<Button type="submit" variant="highlighted" size="lg" block {busy}>
 		{registering ? t.auth.create : t.auth.continue}
 	</Button>
-	{#if onpasskey}
+	{#if onpasskey && !registering}
 		<div class="or">{t.auth.or}</div>
-		<Button size="lg" block icon="key" onclick={() => onpasskey?.(mode)}>
-			{registering ? t.auth.registerPasskey : t.auth.signInPasskey}
+		<Button size="lg" block icon="key" disabled={busy} onclick={() => onpasskey?.()}>
+			{t.auth.signInPasskey}
 		</Button>
 	{/if}
 	{#if onforgot && !registering}

@@ -391,13 +391,14 @@ def test_the_account_name_reaches_the_rail_card_and_the_greeting(page: Any) -> N
     page.get_by_role("button", name="Save").click()
     page.wait_for_selector("text=Saved", timeout=10_000)
 
-    # Signing in is real now: the way out, the browsers you are in, and a new password. Only
-    # passkeys are still drawn as coming later, and as a row rather than a control.
+    # Signing in is real now: the way out, the browsers you are in, and a new password. Passkeys
+    # are not drawn at all at an IP address, where WebAuthn cannot work (test_passkeys.py has
+    # them at localhost).
     assert page.get_by_role("button", name="Sign out", exact=True).is_visible()
     assert page.get_by_text("This browser").is_visible()
     assert page.get_by_role("button", name="Change password").is_visible()
-    assert page.locator(".later li", has_text="Passkeys").count() == 1
-    assert page.get_by_role("button", name="Passkeys").count() == 0
+    assert page.get_by_role("heading", name="Passkeys").count() == 0
+    assert page.get_by_role("button", name="Add a passkey").count() == 0
 
     page.keyboard.press("Escape")
     page.wait_for_selector("[role=dialog]", state="detached", timeout=10_000)

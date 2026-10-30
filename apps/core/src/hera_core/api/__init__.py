@@ -22,6 +22,7 @@ from hera_core.api import (
     chats,
     mail,
     memories,
+    passkeys,
     permissions,
     profiles,
     projects,
@@ -37,6 +38,7 @@ from hera_core.deps import current_user
 
 public = APIRouter()
 public.include_router(auth.router)
+public.include_router(passkeys.public)
 public.include_router(setup.router)
 public.include_router(system.public)
 
@@ -46,6 +48,7 @@ signed_in.include_router(chats.router)
 signed_in.include_router(artifacts.router)
 signed_in.include_router(mail.router)
 signed_in.include_router(memories.router)
+signed_in.include_router(passkeys.router)
 signed_in.include_router(permissions.router)
 signed_in.include_router(projects.router)
 signed_in.include_router(providers.router)

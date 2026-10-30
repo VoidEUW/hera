@@ -15,6 +15,7 @@ from hera_accounts import (
     EmailTaken,
     LastAdmin,
     OneTimeToken,
+    Passkey,
     Password,
     Purpose,
     Role,
@@ -267,11 +268,14 @@ def test_deleting_an_account_takes_every_credential_with_it(
     ana = accounts.create("ana@example.com", password="a long password")
     accounts.open_session(ana.id)
     accounts.issue(Purpose.RESET, lifetime=timedelta(hours=1), user_id=ana.id)
+    accounts.add_passkey(
+        ana.id, credential_id="c", public_key="k", sign_count=0, transports=[], label="Phone"
+    )
 
     accounts.delete(ana)
 
     assert accounts.by_email("ana@example.com") is None
-    for table in (Password, SignIn, OneTimeToken):
+    for table in (Password, Passkey, SignIn, OneTimeToken):
         assert session.exec(select(table)).all() == []
 
 
@@ -291,3 +295,34 @@ def test_last_seen_is_the_latest_live_session_per_person(accounts: Accounts, clo
     clock.at += timedelta(minutes=5)
 
     assert accounts.last_seen() == {ana: clock.at - timedelta(minutes=5)}
+
+
+def test_a_passkey_is_its_owners_alone_and_counts_as_a_credential(
+    accounts: Accounts, clock: Clock
+) -> None:
+    ana = accounts.create("ana@example.com").id
+    ben = accounts.create("ben@example.com").id
+    assert not accounts.any_credential()
+    key = accounts.add_passkey(
+        ana,
+        credential_id="c1",
+        public_key="k",
+        sign_count=0,
+        transports=["internal"],
+        label=" Mac ",
+    )
+    assert accounts.any_credential(), "somebody can sign in now"
+    assert key.label == "Mac" and key.transports == "internal"
+    with pytest.raises(AccountError):
+        accounts.add_passkey(
+            ben, credential_id="c1", public_key="k", sign_count=0, transports=[], label=""
+        )
+
+    assert accounts.rename_passkey(ben, key.id, "Mine") is None
+    assert accounts.remove_passkey(ben, key.id) is False
+    assert accounts.rename_passkey(ana, key.id, "Laptop") is not None
+    accounts.used_passkey(key, 7)
+    assert accounts.passkey("c1") is not None
+    assert (key.sign_count, key.last_used_at) == (7, clock.at)
+    assert accounts.remove_passkey(ana, key.id) is True
+    assert accounts.passkeys(ana) == []
