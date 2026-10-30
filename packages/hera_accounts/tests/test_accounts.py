@@ -223,3 +223,18 @@ def test_withdrawing_a_purpose_leaves_spent_tokens_alone(accounts: Accounts) -> 
     accounts.issue(Purpose.INVITE, lifetime=timedelta(hours=1))
     assert accounts.withdraw(Purpose.SETUP) == 1
     assert accounts.redeem(Purpose.SETUP, waiting) is None
+
+
+def test_a_crafted_address_is_refused_quickly() -> None:
+    """The pattern behind CodeQL's polynomial-ReDoS alert: ``!@!.`` and ``!.`` over and over. It
+    took seconds before; it is refused at once now, and so is a domain with an empty label."""
+    import time
+
+    started = time.perf_counter()
+    with pytest.raises(AccountError):
+        normalise_email("!@!." + "!." * 5000 + "@")
+    assert time.perf_counter() - started < 0.1
+    for broken in ("ana@example", "ana@.com", "ana@example..com", "ana@example.com."):
+        with pytest.raises(AccountError):
+            normalise_email(broken)
+    assert normalise_email(" Ana@Mail.Example.co.uk ") == "ana@mail.example.co.uk"

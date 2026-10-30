@@ -1052,7 +1052,8 @@ class AccountOut(BaseModel):
         )
 
 
-_EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+_EMAIL = re.compile(r"^[^@\s]+@[^@\s.]+(?:\.[^@\s.]+)+$")
+"""The same shape ``hera_accounts`` accepts, and linear for the same reason."""
 
 
 class AccountPatch(BaseModel):

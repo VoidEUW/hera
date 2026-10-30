@@ -37,7 +37,11 @@ MAX_PASSWORD = 1024
 """argon2 takes anything; a megabyte typed into the field is a request that costs the server a
 megabyte of hashing, which is a cheaper way to make it busy than it should be."""
 
-_EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+_EMAIL = re.compile(r"^[^@\s]+@[^@\s.]+(?:\.[^@\s.]+)+$")
+"""Something@somewhere.tld. Every dot in the domain is a separator, so the pattern can match an
+address only one way; ``[^@\s]+\.[^@\s]+`` could match a dot as itself or as part of either
+side, and backtracking through that is polynomial — a crafted address made it slow (CodeQL
+``py/polynomial-redos``)."""
 
 
 class AccountError(ValueError):
