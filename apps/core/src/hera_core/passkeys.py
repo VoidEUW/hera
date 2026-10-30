@@ -48,7 +48,7 @@ from webauthn.helpers.structs import (
 )
 
 from hera_accounts import Passkey, User
-from hera_core.addresses import is_loopback
+from hera_core.addresses import is_loopback, is_unspecified
 from hera_core.config import HeraConfig
 
 CEREMONY_LIFETIME_S = 300.0
@@ -79,6 +79,10 @@ def relying_party(request: Request, config: HeraConfig) -> RelyingParty | None:
     """
     page = urlsplit(str(request.base_url))
     public = config.instance.public_url
+    if public and is_unspecified(urlsplit(public).hostname or ""):
+        # `http://0.0.0.0:8756`, saved before the Instance screen refused it: a place to
+        # listen, not a site anybody is at — read as no public URL, the way links read it.
+        public = ""
     if public:
         site = urlsplit(public)
         if (site.hostname or "") != (page.hostname or ""):

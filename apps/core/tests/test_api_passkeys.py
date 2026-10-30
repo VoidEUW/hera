@@ -68,6 +68,11 @@ class TestWhereTheyWork:
         lan = await anonymous.get("http://192.168.1.20:8756/api/v1/auth/state")
         assert lan.json()["passkeys"] is False
 
+        # A public URL of 0.0.0.0, saved before the screen refused one, names no site at all.
+        public_url("http://0.0.0.0:8756")
+        assert (await anonymous.get("http://localhost/api/v1/auth/state")).json()["passkeys"]
+        public_url("")
+
         refused = await anonymous.post(f"{API}/auth/passkey/options")
         assert refused.status_code == 409
         assert "https or on localhost" in refused.json()["detail"]
