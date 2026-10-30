@@ -17,7 +17,10 @@ export type Tab =
 	| 'permissions'
 	| 'memory'
 	| 'mind'
-	| 'dreaming';
+	| 'dreaming'
+	| 'users'
+	| 'instance'
+	| 'mail';
 
 export interface TabEntry {
 	id: Tab;
@@ -88,6 +91,34 @@ export const GROUPS: Array<{ label: string; entries: TabEntry[] }> = [
 				label: t.settings.permissions,
 				blurb: t.settings.blurbPermissions,
 				icon: 'shield'
+			}
+		]
+	},
+	{
+		// The instance and the people on it (ADR 27). Every entry is an admin's, so the whole group
+		// is absent for anybody else.
+		label: t.settings.groupAdmin,
+		entries: [
+			{
+				id: 'users',
+				label: t.settings.users,
+				blurb: t.settings.blurbUsers,
+				icon: 'users',
+				admin: true
+			},
+			{
+				id: 'instance',
+				label: t.settings.instance,
+				blurb: t.settings.blurbInstance,
+				icon: 'globe',
+				admin: true
+			},
+			{
+				id: 'mail',
+				label: t.settings.mail,
+				blurb: t.settings.blurbMail,
+				icon: 'mail',
+				admin: true
 			}
 		]
 	}

@@ -61,3 +61,32 @@ user.
   same response.
 - Losing the only admin's password is not fatal: `hera user reset-password` runs on the host, and
   having a shell on the host is the credential.
+
+## Amendment: invitations, resets and mail (M3)
+
+- **An invitation makes the account.** It is created with no password, and its owner is sent a
+  link (`invite`, seven days) to choose one. That works whatever the registration setting is,
+  so `invite` needed a meaning of its own: **any signed-in person may invite somebody, as a
+  user**. Admins invite anybody as either role, under every setting. `open` lets strangers
+  register; `closed` leaves adding people to admins. There is no invite *code* to register with.
+- **A reset never says whether an address has an account.** The request answers `202` either
+  way, the mail goes out after the response so its timing is no clue, and every request counts
+  against a throttle, because each one may fill somebody's mailbox. The link (`reset`, one hour)
+  withdraws any earlier one, and using it signs that person out everywhere.
+- **A link in mail an anonymous request caused is built from the public URL, or not sent.** A
+  link built from the request's `Host` is one a stranger could aim at their own server. Without
+  mail and a public URL, *forgot your password?* says to ask an admin, whose Users screen makes a
+  reset link to copy. The token always sits after `#`, so no access log or `Referer` carries it.
+- **`[mail]` lives in `config.toml`.** Host, port, `starttls · tls · none`, user, a write-only
+  password, a sender and an optional sender name, which defaults to the instance's name. A
+  `Mailer` port in `apps/core` sits over `smtplib`, so tests use a postbox instead.
+- **A letter is plain text plus the same letter as HTML in the heaven theme**
+  (`hera_core.letters`). The palette is copied from `heaven.css` and checked against it by a
+  test. The HTML loads nothing remote: no font, no image, no pixel.
+- **A link is always shown to whoever made it, with a copy button**, mailed or not, because mail
+  can be slow or bounce after the server took it. *Copy a new link* makes one without mailing
+  it. Only the token's digest is stored, so there is no earlier link to show again, and the new
+  one replaces it.
+- **Deleting a person deletes what they made:** their rows in every table and `users/<id>/`.
+  Disabling is the way to keep it all. Nobody can delete or disable their own account, and the
+  last admin cannot be removed.

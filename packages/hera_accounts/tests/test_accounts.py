@@ -238,3 +238,56 @@ def test_a_crafted_address_is_refused_quickly() -> None:
         with pytest.raises(AccountError):
             normalise_email(broken)
     assert normalise_email(" Ana@Mail.Example.co.uk ") == "ana@mail.example.co.uk"
+
+
+def test_peeking_at_a_token_does_not_spend_it(accounts: Accounts) -> None:
+    token = accounts.issue(Purpose.RESET, lifetime=timedelta(hours=1))
+    assert accounts.peek(Purpose.SETUP, token) is None
+    assert accounts.peek((Purpose.INVITE, Purpose.RESET), token) is not None
+    assert accounts.peek(Purpose.RESET, token) is not None
+    assert accounts.redeem(Purpose.RESET, token) is not None
+    assert accounts.peek(Purpose.RESET, token) is None
+    assert accounts.peek(Purpose.RESET, "") is None
+
+
+def test_withdrawing_one_persons_tokens_leaves_everybody_elses(accounts: Accounts) -> None:
+    ana = accounts.create("ana@example.com").id
+    ben = accounts.create("ben@example.com").id
+    old = accounts.issue(Purpose.RESET, lifetime=timedelta(hours=1), user_id=ana)
+    theirs = accounts.issue(Purpose.RESET, lifetime=timedelta(hours=1), user_id=ben)
+    assert accounts.withdraw(Purpose.RESET, user_id=ana) == 1
+    assert accounts.peek(Purpose.RESET, old) is None
+    assert accounts.peek(Purpose.RESET, theirs) is not None
+
+
+def test_deleting_an_account_takes_every_credential_with_it(
+    accounts: Accounts, session: Session
+) -> None:
+    accounts.create("root@example.com", role=Role.ADMIN)
+    ana = accounts.create("ana@example.com", password="a long password")
+    accounts.open_session(ana.id)
+    accounts.issue(Purpose.RESET, lifetime=timedelta(hours=1), user_id=ana.id)
+
+    accounts.delete(ana)
+
+    assert accounts.by_email("ana@example.com") is None
+    for table in (Password, SignIn, OneTimeToken):
+        assert session.exec(select(table)).all() == []
+
+
+def test_the_last_admin_cannot_be_deleted(accounts: Accounts) -> None:
+    root = accounts.create("root@example.com", role=Role.ADMIN)
+    with pytest.raises(LastAdmin):
+        accounts.delete(root)
+
+
+def test_last_seen_is_the_latest_live_session_per_person(accounts: Accounts, clock: Clock) -> None:
+    ana = accounts.create("ana@example.com").id
+    ben = accounts.create("ben@example.com").id
+    accounts.open_session(ana)
+    clock.at += timedelta(hours=1)
+    accounts.open_session(ana)
+    accounts.open_session(ben, lifetime=timedelta(minutes=1))
+    clock.at += timedelta(minutes=5)
+
+    assert accounts.last_seen() == {ana: clock.at - timedelta(minutes=5)}

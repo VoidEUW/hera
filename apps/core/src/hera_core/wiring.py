@@ -33,6 +33,7 @@ from hera_core.auth import Throttle
 from hera_core.chat_files import FileArtifacts, FileScratchpad
 from hera_core.config import load as load_config
 from hera_core.enabled_skills import EnabledSkillPort, EnabledSkills
+from hera_core.mail import Mailer, SmtpMailer
 from hera_core.people import People, Person, PersonalMemories
 from hera_core.search import DuckDuckGo
 from hera_core.settings import CoreSettings
@@ -110,6 +111,10 @@ class Services:
     throttle: Throttle = field(default_factory=Throttle)
     """Failed sign-in and setup-code attempts, per address and per email. Process-wide, so it is
     here rather than built per request."""
+
+    mailer: Mailer = field(default_factory=SmtpMailer)
+    """Where invitations and resets go out. ``[mail]`` in ``config.toml`` says *how*, read at each
+    send, so changing the server on screen needs nothing rebuilt."""
 
     owns_provider: bool = False
     """Whether closing this container should close the provider.

@@ -12,6 +12,7 @@ from fastapi import APIRouter, HTTPException, Request, Response, status
 
 from hera_accounts import AccountError, Accounts, EmailTaken, Purpose
 from hera_chats import ChatRepository
+from hera_core.addresses import reachable_base
 from hera_core.auth import client_key, is_loopback, sign_in_as
 from hera_core.claim import claim_as_admin, normalise_code, unclaimed
 from hera_core.config import load as load_config
@@ -77,12 +78,12 @@ def claim(
 
 
 @instance_router.get("/instance", response_model=InstanceOut)
-def read_instance() -> InstanceOut:
-    return InstanceOut.of(load_config().instance)
+def read_instance(request: Request, container: Container) -> InstanceOut:
+    return InstanceOut.of(load_config().instance, suggested_url=_suggested(request, container))
 
 
 @instance_router.patch("/instance", response_model=InstanceOut, dependencies=[AdminOnly])
-def write_instance(payload: InstancePatch) -> InstanceOut:
+def write_instance(payload: InstancePatch, request: Request, container: Container) -> InstanceOut:
     changes = payload.model_dump(exclude_none=True)
     try:
         config = load_config().with_instance(**changes)
@@ -91,4 +92,10 @@ def write_instance(payload: InstancePatch) -> InstanceOut:
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)
         ) from None
     save_config(config)
-    return InstanceOut.of(config.instance)
+    return InstanceOut.of(config.instance, suggested_url=_suggested(request, container))
+
+
+def _suggested(request: Request, container: Container) -> str:
+    """What the public URL would be if nobody typed one: the address this browser used, made
+    into one somebody else can open."""
+    return reachable_base(str(request.base_url), bind_host=container.settings.host)

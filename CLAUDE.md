@@ -133,7 +133,7 @@ columns, never `ForeignKey`; migrations live in `apps/core`.
 | `chats/<id>/artifacts/` | what she publishes there: the filename is the identity, the extension is the kind. Goes with the chat too ([ADR 13](docs/adr/0013-an-artifact-is-a-file-she-publishes.md)) |
 | `mcp.json` | MCP servers, in the Claude-Desktop `mcpServers` shape. Written by Settings → Servers as well as by hand — the JSON is edited, never re-saved from the parsed model ([ADR 24](docs/adr/0024-the-servers-screen-writes-mcp-json.md)) |
 | `permissions.json` | the instance's permission rules, made by an admin and laid over the built-in policy at boot. A person's "always" on a card goes to `users/<id>/permissions.json`, a last layer that settles an *ask* and never loosens a *deny* ([ADR 23](docs/adr/0023-permission-rules-are-kept-over-the-shipped-policy.md)) |
-| `config.toml` | registered model endpoints, and `[instance]` — name, public URL, registration — written by the interface. A model in here may carry **`options`** — request-body fields merged in last and never read ([ADR 18](docs/adr/0018-a-model-may-carry-request-options.md)) |
+| `config.toml` | registered model endpoints, `[instance]` — name, public URL, registration — and `[mail]`, the SMTP server invitations and resets go through (its password is write-only, like an endpoint's key), written by the interface. A model in here may carry **`options`** — request-body fields merged in last and never read ([ADR 18](docs/adr/0018-a-model-may-carry-request-options.md)) |
 | `trusted.json` | **where trusted skills are recorded** — optional |
 
 `trusted.json` is the only thing that can put a *verified* mark on a skill, because a skill

@@ -11,8 +11,9 @@ import { resolve } from '$app/paths';
 import { ApiError } from '$lib/api/client';
 import { t } from '$lib/i18n';
 
-/** The two screens drawn before anybody is signed in. Neither redirects to itself. */
-export const SIGNED_OUT_ROUTES = ['/login', '/setup'] as const;
+/** The screens drawn before anybody is signed in — signing in, setting up, and the page an
+ * invitation or reset link opens. None of them redirects to itself. */
+export const SIGNED_OUT_ROUTES = ['/login', '/setup', '/password'] as const;
 
 /** A 401: the session ended — signed out elsewhere, expired, or the account was disabled. Off to
  * the sign-in screen, which brings you back here afterwards (ADR 27). A reload rather than a

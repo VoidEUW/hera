@@ -12,7 +12,7 @@ import pytest
 from core_support import API, OWNER_EMAIL, OWNER_PASSWORD, sign_in, unclaim
 from httpx import AsyncClient
 
-from hera_accounts import Accounts, Purpose, Role
+from hera_accounts import Accounts, Role
 from hera_core.auth import SESSION_COOKIE, Throttle
 from hera_core.config import load as load_config
 from hera_core.config import save as save_config
@@ -156,24 +156,15 @@ class TestRegistering:
         assert response.status_code == 422
         assert "at least" in response.json()["detail"]
 
-    async def test_invite_needs_a_token_that_works(
-        self, anonymous: AsyncClient, services: Services
+    async def test_invite_is_joining_by_invitation_not_registering(
+        self, anonymous: AsyncClient
     ) -> None:
-        from datetime import timedelta
-
+        """An invitation makes the account itself (test_api_admin.py); there is no code to
+        register with."""
         set_registration("invite")
-        with services.database.session() as session:
-            invite = Accounts(session).issue(Purpose.INVITE, lifetime=timedelta(days=1))
-
-        refused = await anonymous.post(f"{API}/auth/register", json={**NEWCOMER, "invite": "nope"})
+        refused = await anonymous.post(f"{API}/auth/register", json=NEWCOMER)
         assert refused.status_code == 403
-        made = await anonymous.post(f"{API}/auth/register", json={**NEWCOMER, "invite": invite})
-        assert made.status_code == 201
-        spent = await anonymous.post(
-            f"{API}/auth/register",
-            json={**NEWCOMER, "email": "cy@hera.test", "invite": invite},
-        )
-        assert spent.status_code == 403
+        assert "invitation" in refused.json()["detail"]
 
     async def test_an_unclaimed_instance_is_set_up_not_registered_into(
         self, anonymous: AsyncClient, services: Services
@@ -341,7 +332,12 @@ class TestAdmins:
                 json={"name": "Home", "public_url": "https://h.example/", "registration": "open"},
             )
         ).json()
-        assert body == {"name": "Home", "public_url": "https://h.example", "registration": "open"}
+        assert body == {
+            "name": "Home",
+            "public_url": "https://h.example",
+            "registration": "open",
+            "suggested_url": "http://hera.test",
+        }
         assert load_config().instance.registration == "open"
         bad = await client.patch(f"{API}/instance", json={"public_url": "h.example"})
         assert bad.status_code == 422

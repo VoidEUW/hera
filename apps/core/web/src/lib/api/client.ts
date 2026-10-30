@@ -393,7 +393,67 @@ export interface AuthState {
 	setup_required: boolean;
 	registration: Registration;
 	instance_name: string;
+	/** Whether *forgot your password?* can mail a link here. Says nothing about any address. */
+	reset_by_mail: boolean;
 }
+
+/** Who an invitation or reset link is for, read before it is used. */
+export interface LinkInfo {
+	purpose: 'invite' | 'reset';
+	email: string;
+	name: string;
+	instance_name: string;
+}
+
+/** A link made for somebody: mailed, or to be handed over — the link is here either way. */
+export interface Sent {
+	link: string;
+	mailed: boolean;
+	/** The mail server's complaint, when it had one. */
+	mail_error: string;
+}
+
+/** One account, as Settings → Admin → Users lists it. */
+export interface AdminUser {
+	id: string;
+	email: string;
+	name: string;
+	role: 'admin' | 'user';
+	disabled: boolean;
+	/** Made, and no password chosen yet. */
+	invited: boolean;
+	created_at: string;
+	last_seen_at: string | null;
+	avatar_version: number;
+}
+
+export interface Invitation extends Sent {
+	user: AdminUser;
+}
+
+export type MailSecurity = 'starttls' | 'tls' | 'none';
+
+/** `[mail]`, without its password — only whether one is set. */
+export interface MailSettings {
+	host: string;
+	port: number;
+	security: MailSecurity;
+	user: string;
+	sender: string;
+	/** The name beside the address; empty means the instance's own. */
+	sender_name: string;
+	password_set: boolean;
+	configured: boolean;
+	/** True while a reset somebody asks for cannot be mailed for want of a public URL. */
+	links_need_public_url: boolean;
+}
+
+/** `password` left out keeps it, `''` clears it. */
+export type MailPatch = Partial<
+	Omit<MailSettings, 'password_set' | 'configured' | 'links_need_public_url'>
+> & {
+	password?: string;
+};
 
 /** One browser somebody is signed in on. */
 export interface SignedInSession {
@@ -418,6 +478,9 @@ export interface Instance {
 	name: string;
 	public_url: string;
 	registration: Registration;
+	/** The address this browser reached Hera at, as somebody else would type it — never
+	 * `0.0.0.0` or `localhost` while Hera listens on the network. */
+	suggested_url: string;
 }
 
 export interface Preferences {
@@ -497,7 +560,7 @@ export const api = {
 			method: 'POST',
 			body: JSON.stringify({ email, password })
 		}),
-	register: (body: { name: string; email: string; password: string; invite?: string }) =>
+	register: (body: { name: string; email: string; password: string }) =>
 		request<Account>('/auth/register', { method: 'POST', body: JSON.stringify(body) }),
 	signOut: () => request<void>('/auth/sign-out', { method: 'POST' }),
 	sessions: () => request<SignedInSession[]>('/auth/sessions'),
@@ -511,6 +574,36 @@ export const api = {
 			body: JSON.stringify({ current, new: next })
 		}),
 
+	/** *Forgot your password?* — the same answer for every address. */
+	requestReset: (email: string) =>
+		request<void>('/auth/reset', { method: 'POST', body: JSON.stringify({ email }) }),
+	/** Who a link is for, without spending it. */
+	openLink: (token: string) =>
+		request<LinkInfo>('/auth/link', { method: 'POST', body: JSON.stringify({ token }) }),
+	/** Choose a password with a link, and be signed in as its owner. */
+	useLink: (token: string, password: string) =>
+		request<Account>('/auth/link/password', {
+			method: 'POST',
+			body: JSON.stringify({ token, password })
+		}),
+	invite: (body: { email: string; name?: string; role?: 'admin' | 'user' }) =>
+		request<Invitation>('/invitations', { method: 'POST', body: JSON.stringify(body) }),
+
+	users: () => request<AdminUser[]>('/users'),
+	updateUser: (id: string, patch: { role?: 'admin' | 'user'; disabled?: boolean }) =>
+		request<AdminUser>(`/users/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
+	/** A new invitation, or a reset link for somebody who already has a password. */
+	sendLink: (id: string, { mail = true }: { mail?: boolean } = {}) =>
+		request<Sent>(`/users/${id}/link${mail ? '' : '?mail=false'}`, { method: 'POST' }),
+	signOutUser: (id: string) => request<void>(`/users/${id}/sessions`, { method: 'DELETE' }),
+	deleteUser: (id: string) => request<void>(`/users/${id}`, { method: 'DELETE' }),
+
+	mail: () => request<MailSettings>('/mail'),
+	updateMail: (patch: MailPatch) =>
+		request<MailSettings>('/mail', { method: 'PATCH', body: JSON.stringify(patch) }),
+	/** A message to you, through the server as it is saved now. */
+	testMail: () => request<void>('/mail/test', { method: 'POST' }),
+
 	setupState: () => request<SetupState>('/setup'),
 	/** The wizard's first step: makes the admin and signs this browser in as them. */
 	setup: (body: {
@@ -521,7 +614,7 @@ export const api = {
 		launch_token?: string;
 	}) => request<Account>('/setup', { method: 'POST', body: JSON.stringify(body) }),
 	instance: () => request<Instance>('/instance'),
-	updateInstance: (patch: Partial<Instance>) =>
+	updateInstance: (patch: Partial<Omit<Instance, 'suggested_url'>>) =>
 		request<Instance>('/instance', { method: 'PATCH', body: JSON.stringify(patch) }),
 
 	profiles: () => request<Profile[]>('/profiles'),

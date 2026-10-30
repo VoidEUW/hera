@@ -2,6 +2,9 @@
 	/**
 	 * Who you are to Hera: a name, an email and a picture — and how you sign in.
 	 *
+	 * While registration here is by invitation, anybody may invite somebody, and the section that
+	 * does it is here — an admin has Settings → Admin → Users for that instead.
+	 *
 	 * The sign-in section lists the browsers you are signed in on, each one revocable, with
 	 * *sign out* and *sign out everywhere*, and changes the password. Passkeys are drawn as a row
 	 * saying *coming later* (M4). Signing out reloads at `/login` rather than navigating there:
@@ -20,6 +23,7 @@
 	import { MAX_IMAGE_BYTES } from '$lib/attachments';
 	import Input from '$lib/components/ui/Input.svelte';
 	import { t } from '$lib/i18n';
+	import InviteForm from './InviteForm.svelte';
 	import { workspace } from '$lib/stores/workspace.svelte';
 
 	interface Props {
@@ -66,6 +70,20 @@
 			t.auth.signOut
 		)
 	);
+
+	/** Whether this person may invite somebody: registration by invitation, and not an admin,
+	 * who invites from the Users screen. */
+	let byInvitation = $state(false);
+	const showInvite = $derived(
+		byInvitation && account?.role !== 'admin' && shows(t.admin.invite, t.admin.email)
+	);
+	void (async () => {
+		try {
+			byInvitation = (await api.instance()).registration === 'invite';
+		} catch {
+			// Nothing to offer, and nothing worth saying: the rest of the screen still works.
+		}
+	})();
 
 	let sessions = $state<SignedInSession[]>([]);
 	let current = $state('');
@@ -301,7 +319,15 @@
 	</section>
 {/if}
 
-{#if !(showProfile || showSecurity)}
+{#if showInvite}
+	<section>
+		<h3>{t.admin.invite}</h3>
+		<p class="caption invite-blurb">{t.admin.memberInviteBlurb}</p>
+		<InviteForm />
+	</section>
+{/if}
+
+{#if !(showProfile || showSecurity || showInvite)}
 	<p class="empty">{t.settings.noMatch}</p>
 {/if}
 
@@ -319,6 +345,10 @@
 
 	.caption {
 		margin: 6px 0 0;
+	}
+
+	.invite-blurb {
+		margin: 0 0 12px;
 	}
 
 	.avatar-row {

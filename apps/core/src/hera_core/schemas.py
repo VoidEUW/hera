@@ -23,7 +23,9 @@ import binascii
 import json
 import re
 from datetime import date, datetime
+from email.utils import parseaddr
 from typing import Annotated, Any, Literal
+from urllib.parse import urlsplit
 from uuid import UUID
 
 from hera_skillsets.models import ID_PATTERN
@@ -31,7 +33,15 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 from hera_accounts import SignIn, User
 from hera_chats import Chat, Message, Project, Totals, UsageSummary
-from hera_core.config import InstanceConfig, ProviderKind, Registration, validate_provider_name
+from hera_core.addresses import is_unspecified
+from hera_core.config import (
+    InstanceConfig,
+    MailConfig,
+    MailSecurity,
+    ProviderKind,
+    Registration,
+    validate_provider_name,
+)
 from hera_core.model_presets import PRESETS, ModelPreset
 from hera_memories import MAX_DESCRIPTION, MAX_TEXT
 from hera_permissions import Decision
@@ -1095,8 +1105,6 @@ class RegisterIn(BaseModel):
     name: str = Field(default="", max_length=120)
     email: str = Field(max_length=254)
     password: str = Field(max_length=1024)
-    invite: str = Field(default="", max_length=200)
-    """The token from an invitation, when registration is ``invite``."""
 
 
 class PasswordIn(BaseModel):
@@ -1117,6 +1125,9 @@ class AuthStateOut(BaseModel):
     setup_required: bool
     registration: Registration
     instance_name: str
+    reset_by_mail: bool
+    """Whether *forgot your password?* can send a link. Says nothing about any address — only
+    that mail and a public URL are set up — so the card can say *ask an admin* instead."""
 
 
 class SessionOut(BaseModel):
@@ -1172,18 +1183,168 @@ class InstanceOut(BaseModel):
     name: str
     public_url: str
     registration: Registration
+    suggested_url: str
+    """The address this browser reached Hera at, as somebody else would have to type it — what
+    the wizard fills the public URL in with, never ``0.0.0.0`` (``hera_core.addresses``)."""
 
     @classmethod
-    def of(cls, instance: InstanceConfig) -> InstanceOut:
+    def of(cls, instance: InstanceConfig, *, suggested_url: str) -> InstanceOut:
         return cls(
-            name=instance.name, public_url=instance.public_url, registration=instance.registration
+            name=instance.name,
+            public_url=instance.public_url,
+            registration=instance.registration,
+            suggested_url=suggested_url,
         )
+
+
+class ResetIn(BaseModel):
+    email: str = Field(max_length=254)
+
+
+class LinkIn(BaseModel):
+    """The token from an invitation or reset link — the part after ``#``."""
+
+    token: str = Field(min_length=1, max_length=200)
+
+
+class LinkOut(BaseModel):
+    """Who a link is for, so the page it opens can greet them before it is used."""
+
+    model_config = ConfigDict(frozen=True)
+
+    purpose: Literal["invite", "reset"]
+    email: str
+    name: str
+    instance_name: str
+
+
+class LinkPasswordIn(LinkIn):
+    password: str = Field(max_length=1024)
+
+
+class SentOut(BaseModel):
+    """A link made for somebody: whether it went by mail, and the link itself to hand over when
+    it did not. ``mail_error`` is the mail server's complaint, empty when there was none."""
+
+    model_config = ConfigDict(frozen=True)
+
+    link: str
+    mailed: bool
+    mail_error: str = ""
+
+
+class InvitationIn(BaseModel):
+    email: str = Field(max_length=254)
+    name: str = Field(default="", max_length=120)
+    role: Literal["admin", "user"] = "user"
+    """``admin`` only from an admin; a member inviting somebody invites a user."""
+
+
+class UserOut(BaseModel):
+    """One account, as Settings → Admin → Users lists it."""
+
+    model_config = ConfigDict(frozen=True)
+
+    id: UUID
+    email: str
+    name: str
+    role: Literal["admin", "user"]
+    disabled: bool
+    invited: bool
+    """Made, and no password chosen yet: the invitation has not been taken up."""
+    created_at: datetime
+    last_seen_at: datetime | None
+    avatar_version: int
+
+    @classmethod
+    def of(cls, user: User, *, invited: bool, last_seen: datetime | None) -> UserOut:
+        account = AccountOut.of(user)
+        return cls(
+            id=user.id,
+            email=user.email,
+            name=user.name,
+            role=account.role,
+            disabled=user.disabled,
+            invited=invited,
+            created_at=user.created_at,
+            last_seen_at=last_seen,
+            avatar_version=account.avatar_version,
+        )
+
+
+class InvitationOut(SentOut):
+    user: UserOut
+
+
+class UserPatch(BaseModel):
+    role: Literal["admin", "user"] | None = None
+    disabled: bool | None = None
+
+
+class MailOut(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    host: str
+    port: int
+    security: MailSecurity
+    user: str
+    sender: str
+    sender_name: str
+    password_set: bool
+    configured: bool
+    links_need_public_url: bool
+    """A reset asked for by somebody who is not signed in is mailed only with the instance's
+    public URL to build the link from (``hera_core.mail``) — true while that is missing."""
+
+    @classmethod
+    def of(cls, mail: MailConfig, *, public_url: str) -> MailOut:
+        return cls(**mail.redacted(), links_need_public_url=not public_url)
+
+
+class MailPatch(BaseModel):
+    """``None`` leaves a field as it is. ``password`` is the provider key's three states again:
+    left out keeps it, ``""`` clears it, anything else replaces it."""
+
+    host: str | None = Field(default=None, max_length=253)
+    port: int | None = Field(default=None, ge=1, le=65535)
+    security: MailSecurity | None = None
+    user: str | None = Field(default=None, max_length=254)
+    password: str | None = Field(default=None, max_length=1024)
+    sender: str | None = Field(default=None, max_length=330)
+    sender_name: str | None = Field(default=None, max_length=80)
+
+    @model_validator(mode="after")
+    def _plausible_sender(self) -> MailPatch:
+        """An address, or a whole ``Hera <hera@example.com>`` pasted from somewhere else — split
+        into the two fields it means, the name only where none was given alongside it."""
+        if self.sender is None or not self.sender.strip():
+            return self
+        name, address = parseaddr(self.sender.strip())
+        if not _EMAIL.match(address):
+            raise ValueError("the sender has to be an email address")
+        self.sender = address
+        if name and self.sender_name is None:
+            self.sender_name = name
+        return self
 
 
 class InstancePatch(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=80)
     public_url: str | None = Field(default=None, max_length=300)
     registration: Registration | None = None
+
+    @field_validator("public_url")
+    @classmethod
+    def _somewhere_others_can_reach(cls, url: str | None) -> str | None:
+        """Refused here, at the edge, and not in ``InstanceConfig``: a ``config.toml`` already
+        holding one must still load, and a link built from it is corrected anyway."""
+        host = urlsplit(url.strip()).hostname if url else None
+        if host is not None and is_unspecified(host):
+            raise ValueError(
+                f"{host} means every address of this machine, not one anybody can open; "
+                "use its IP address or name"
+            )
+        return url
 
 
 class AvatarIn(BaseModel):

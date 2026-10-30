@@ -9,10 +9,12 @@ from __future__ import annotations
 
 import argparse
 import getpass
+import os
 import sys
 from collections.abc import Sequence
 
 from hera_core import __version__
+from hera_core.addresses import is_unspecified, reachable_from
 from hera_core.boot import DatabaseAhead, LegacyHome
 from hera_core.settings import CoreSettings
 
@@ -87,7 +89,12 @@ def _serve(settings: CoreSettings, *, host: str | None, port: int | None, reload
 
     host = host or settings.host
     port = port or settings.port
-    print(f"Hera is at http://{host}:{port}")
+    # The app is built by uvicorn's factory and reads its own settings; this is how it learns
+    # which address it was bound to, for the links it hands out (`hera_core.addresses`).
+    os.environ["HERA_HOST"] = host
+    print(f"Hera is at http://{_shown(host)}:{port}")
+    if is_unspecified(host):
+        print(f"  — listening on every interface; on this machine, http://localhost:{port}")
     if code is not None:
         _print_setup_code(code)
     uvicorn.run(
@@ -99,6 +106,12 @@ def _serve(settings: CoreSettings, *, host: str | None, port: int | None, reload
         log_level="info",
     )
     return 0
+
+
+def _shown(host: str) -> str:
+    """The address to print: the one another machine would use, never ``0.0.0.0``."""
+    shown = reachable_from(host) if is_unspecified(host) else host
+    return f"[{shown}]" if ":" in shown else shown
 
 
 def _init(settings: CoreSettings) -> int:

@@ -20,6 +20,7 @@ from hera_core.api import (
     artifacts,
     auth,
     chats,
+    mail,
     memories,
     permissions,
     profiles,
@@ -29,6 +30,7 @@ from hera_core.api import (
     setup,
     system,
     usage,
+    users,
 )
 from hera_core.auth import same_origin
 from hera_core.deps import current_user
@@ -42,6 +44,7 @@ signed_in = APIRouter(dependencies=[Depends(current_user)])
 signed_in.include_router(account.router)
 signed_in.include_router(chats.router)
 signed_in.include_router(artifacts.router)
+signed_in.include_router(mail.router)
 signed_in.include_router(memories.router)
 signed_in.include_router(permissions.router)
 signed_in.include_router(projects.router)
@@ -51,6 +54,7 @@ signed_in.include_router(profiles.router)
 signed_in.include_router(setup.instance_router)
 signed_in.include_router(system.router)
 signed_in.include_router(usage.router)
+signed_in.include_router(users.router)
 
 router = APIRouter(dependencies=[Depends(same_origin)])
 router.include_router(public)

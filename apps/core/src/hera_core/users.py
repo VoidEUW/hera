@@ -1,4 +1,4 @@
-"""``hera user …``: accounts, managed from the host.
+"""Accounts managed by an admin: ``hera user …`` on the host, and removing somebody entirely.
 
 Its own module so the CLI stays a parser. Every verb opens the database the way the server
 would — refusing an old directory or a database ahead of this build — and commits only when it
@@ -8,14 +8,23 @@ has done all of what it was asked.
 from __future__ import annotations
 
 import argparse
+import shutil
 import sys
 from collections.abc import Callable
+from uuid import UUID
 
-from hera_accounts import AccountError, Accounts, Role
+from sqlmodel import Session, col, delete, select
+
+from hera_accounts import AccountError, Accounts, Role, User
+from hera_chats import Chat, Message, Project, TurnUsage
 from hera_core.boot import check_home, check_revision
+from hera_core.chat_files import forget_chat
 from hera_core.claim import claim_as_admin, claimed, unclaimed
 from hera_core.migrations import upgrade_to_head
 from hera_core.settings import CoreSettings
+from hera_home import user_dir
+from hera_profiles import Profile
+from hera_skillsets import SkillUsage
 from hera_storage import Database, StorageSettings
 
 
@@ -33,6 +42,34 @@ def run(
         return 1
     finally:
         database.dispose()
+
+
+OWNED = (Message, TurnUsage, Chat, Project, Profile, SkillUsage)
+"""Every table with a row a person made. Deleted, not revoked: an admin removing somebody is
+removing what they said, and a soft-deleted row is what they said, still on the disk."""
+
+
+def remove(session: Session, user: User) -> list[UUID]:
+    """Delete an account and every row of theirs, in the caller's unit of work. Returns the ids
+    of their chats, whose directories :func:`remove_files` takes once that work has committed —
+    files go last, because a commit that fails must not have taken them already.
+
+    Refuses the last admin, through :meth:`Accounts.delete`.
+    """
+    chats = list(session.exec(select(Chat.id).where(Chat.owner_id == user.id)))
+    Accounts(session).delete(user)
+    for table in OWNED:
+        session.exec(delete(table).where(col(table.owner_id) == user.id))
+    session.flush()
+    return chats
+
+
+def remove_files(user_id: UUID, chats: list[UUID]) -> None:
+    """Their chats' directories and everything under ``users/<id>/`` — the mind, the memories,
+    their rules, the picture. Best effort, like :func:`hera_core.chat_files.forget_chat`."""
+    for chat_id in chats:
+        forget_chat(str(chat_id))
+    shutil.rmtree(user_dir(str(user_id)), ignore_errors=True)
 
 
 def _verb(

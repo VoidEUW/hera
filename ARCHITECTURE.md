@@ -120,7 +120,7 @@ code, in `hera_skillsets`.
   mcp.json               Claude-Desktop-compatible `mcpServers` shape
   permissions.json       the instance's rules, over the policy Hera ships with (ADR 23); a
                          person's own are in users/<id>/permissions.json, over these
-  config.toml            registered endpoints, written by the interface
+  config.toml            registered endpoints, [instance] and [mail], written by the interface
   trusted.json           skill ids and the SHA-256 you accepted; optional
 ```
 
