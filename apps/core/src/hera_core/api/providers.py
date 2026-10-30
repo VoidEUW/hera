@@ -22,7 +22,7 @@ from hera_providers.thinking import NOTHING, Registry, Thinking
 from hera_core.config import ConfigError, HeraConfig, ModelEntry, ProviderEntry
 from hera_core.config import load as load_config
 from hera_core.config import save as save_config
-from hera_core.deps import Container
+from hera_core.deps import AdminOnly, Container
 from hera_core.schemas import (
     ActivateIn,
     ModelIn,
@@ -115,7 +115,12 @@ async def list_providers() -> ProvidersOut:
     return await _out(config, active.name if active is not None else "")
 
 
-@router.post("/providers", response_model=ProvidersOut, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/providers",
+    response_model=ProvidersOut,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[AdminOnly],
+)
 async def add_provider(payload: ProviderIn, container: Container) -> ProvidersOut:
     """Register an endpoint and its first model. The first endpoint registered becomes active,
     and the first model registered on it does too."""
@@ -140,7 +145,7 @@ async def add_provider(payload: ProviderIn, container: Container) -> ProvidersOu
     return await _commit(container, config.with_provider(entry))
 
 
-@router.patch("/providers/{name}", response_model=ProvidersOut)
+@router.patch("/providers/{name}", response_model=ProvidersOut, dependencies=[AdminOnly])
 async def update_provider(name: str, payload: ProviderPatch, container: Container) -> ProvidersOut:
     """Change one endpoint's fields, kind, or logo.
 
@@ -161,7 +166,7 @@ async def update_provider(name: str, payload: ProviderPatch, container: Containe
     return await _commit(container, config.with_provider(entry))
 
 
-@router.post("/providers/{name}/activate", response_model=ProvidersOut)
+@router.post("/providers/{name}/activate", response_model=ProvidersOut, dependencies=[AdminOnly])
 async def activate_provider(
     name: str, container: Container, payload: ActivateIn | None = None
 ) -> ProvidersOut:
@@ -182,7 +187,7 @@ async def activate_provider(
     return await _commit(container, config.activated(name))
 
 
-@router.delete("/providers/{name}", response_model=ProvidersOut)
+@router.delete("/providers/{name}", response_model=ProvidersOut, dependencies=[AdminOnly])
 async def delete_provider(name: str, container: Container) -> ProvidersOut:
     config = _read()
     _require(config, name)
@@ -190,7 +195,7 @@ async def delete_provider(name: str, container: Container) -> ProvidersOut:
     return await _commit(container, config.without(name))
 
 
-@router.get("/providers/{name}/models", response_model=ProbeOut)
+@router.get("/providers/{name}/models", response_model=ProbeOut, dependencies=[AdminOnly])
 async def probe_provider(name: str) -> ProbeOut:
     """Ask the endpoint what it has.
 
@@ -215,7 +220,10 @@ async def probe_provider(name: str) -> ProbeOut:
 
 
 @router.post(
-    "/providers/{name}/models", response_model=ProvidersOut, status_code=status.HTTP_201_CREATED
+    "/providers/{name}/models",
+    response_model=ProvidersOut,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[AdminOnly],
 )
 async def register_model(name: str, payload: ModelIn, container: Container) -> ProvidersOut:
     """Register a model against an endpoint — from a probe result or typed by hand. The first
@@ -241,7 +249,7 @@ async def register_model(name: str, payload: ModelIn, container: Container) -> P
     return await _commit(container, config.with_provider(updated))
 
 
-@router.delete("/providers/{name}/models", response_model=ProvidersOut)
+@router.delete("/providers/{name}/models", response_model=ProvidersOut, dependencies=[AdminOnly])
 async def remove_model(
     name: str, container: Container, id: str = Query(min_length=1)
 ) -> ProvidersOut:

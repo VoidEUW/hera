@@ -14,7 +14,7 @@ from contextlib import asynccontextmanager
 from typing import Any
 
 import pytest
-from core_support import API
+from core_support import API, sign_in
 from httpx import ASGITransport, AsyncClient
 from mcp.server.mcpserver import MCPServer
 
@@ -82,7 +82,7 @@ async def serving(make_services: Any) -> AsyncIterator[tuple[AsyncClient, Servic
             AsyncClient(transport=ASGITransport(app=app), base_url="http://hera.test") as http,
             app.router.lifespan_context(app),
         ):
-            yield http, services
+            yield sign_in(http, services), services
     finally:
         assert services.registry is not None
         await services.registry.aclose()
@@ -125,6 +125,7 @@ class TestListing:
             AsyncClient(transport=ASGITransport(app=app), base_url="http://hera.test") as http,
             app.router.lifespan_context(app),
         ):
+            sign_in(http, services)
             assert (await http.get(f"{API}/servers")).json() == []
             assert (await http.put(f"{API}/servers/x", json=entry())).status_code == 409
 

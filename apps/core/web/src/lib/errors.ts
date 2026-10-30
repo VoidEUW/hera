@@ -7,8 +7,29 @@
  * person can search for, a title and a sentence about what to do, and the server's own words
  * kept behind a disclosure for whoever has to fix it.
  */
+import { resolve } from '$app/paths';
 import { ApiError } from '$lib/api/client';
 import { t } from '$lib/i18n';
+
+/** The two screens drawn before anybody is signed in. Neither redirects to itself. */
+export const SIGNED_OUT_ROUTES = ['/login', '/setup'] as const;
+
+/** A 401: the session ended — signed out elsewhere, expired, or the account was disabled. Off to
+ * the sign-in screen, which brings you back here afterwards (ADR 27). A reload rather than a
+ * navigation, for the reason signing out is one: nothing built for that person should stay. */
+export function toSignIn(): void {
+	const here = window.location.pathname;
+	if ((SIGNED_OUT_ROUTES as readonly string[]).includes(here)) return;
+	const next = here === '/' ? '' : `?next=${encodeURIComponent(here + window.location.search)}`;
+	window.location.assign(`${resolve('/login')}${next}`);
+}
+
+/** Where `?next=` may send you after signing in: a path on this origin, and nothing else — a
+ * full URL there would make the sign-in screen a link anybody can point somewhere else. */
+export function safeNext(next: string | null): string {
+	if (!next || !next.startsWith('/') || next.startsWith('//') || next.includes('\\')) return '/';
+	return next;
+}
 
 export interface Failure {
 	kind: 'offline' | 'server' | 'not-found';

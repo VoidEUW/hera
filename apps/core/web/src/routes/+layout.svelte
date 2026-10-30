@@ -16,7 +16,9 @@
 	import CommandPalette from '$lib/components/CommandPalette.svelte';
 	import Settings from '$lib/components/Settings.svelte';
 	import Toaster from '$lib/components/ui/Toaster.svelte';
+	import { api, whenSignedOut } from '$lib/api/client';
 	import { dialog } from '$lib/dialog';
+	import { SIGNED_OUT_ROUTES, toSignIn } from '$lib/errors';
 	import { t } from '$lib/i18n';
 	import { keys } from '$lib/keys';
 	import { sidebar } from '$lib/stores/sidebar.svelte';
@@ -34,7 +36,34 @@
 	theme.load();
 	sidebar.load();
 	notifications.load();
-	void workspace.load();
+
+	/** The sign-in screen and the setup wizard are drawn on their own, with no rail: there is
+	 * nothing in a rail for somebody who is not signed in. */
+	const bare = $derived((SIGNED_OUT_ROUTES as readonly string[]).includes(page.route.id ?? ''));
+
+	/** Whether the shell may draw: only once the server has said who is signed in. Drawing it
+	 * first and taking it away a moment later is a flash of somebody's chats. */
+	let admitted = $state(false);
+
+	whenSignedOut(toSignIn);
+	void (async () => {
+		try {
+			const state = await api.authState();
+			if (state.setup_required) {
+				if (page.route.id !== '/setup') await goto(resolve('/setup'));
+				return;
+			}
+			if (!state.user) {
+				toSignIn();
+				return;
+			}
+		} catch {
+			// The workspace's own load is what draws the offline screen or the error, so it runs
+			// and says which.
+		}
+		admitted = true;
+		if (!bare) await workspace.load();
+	})();
 
 	// Scoped to the chat route, not just `page.params.id`. `/project/<uuid>` fills the same
 	// parameter name, and a rail that compared it against chat ids would go quiet the moment you
@@ -116,11 +145,22 @@
 		if (removed && page.url.pathname === `/project/${id}`) await goto(resolve('/'));
 	}
 
+	/** Signed out, and reloaded at the sign-in screen so nothing of this person stays in memory. */
+	async function signOut() {
+		try {
+			await api.signOut();
+		} finally {
+			window.location.assign(resolve('/login'));
+		}
+	}
+
 	/** The composer shows what she can reach, and settings is where that changes. */
 	async function closeSettings() {
 		workspace.settingsOpen = false;
 		await Promise.all([workspace.loadProviders(), workspace.loadServers()]);
 	}
+
+	const shown = $derived(admitted && !bare);
 
 	/** The command palette, and which question it was opened with. */
 	let palette = $state<'all' | 'chats' | null>(null);
@@ -140,30 +180,30 @@
 	$effect(() => {
 		const off = [
 			keys.on('palette', () => {
-				if (workspace.unreachable) return false;
+				if (workspace.unreachable || !shown) return false;
 				palette = palette ? null : 'all';
 			}),
 			keys.on('palette.chats', () => {
-				if (workspace.unreachable) return false;
+				if (workspace.unreachable || !shown) return false;
 				palette = 'chats';
 			}),
 			keys.on('settings', () => {
-				if (workspace.unreachable) return false;
+				if (workspace.unreachable || !shown) return false;
 				palette = null;
 				workspace.openSettings();
 			}),
 			keys.on('hotkeys', () => {
-				if (workspace.unreachable) return false;
+				if (workspace.unreachable || !shown) return false;
 				palette = null;
 				workspace.openSettings('hotkeys');
 			}),
 			keys.on('newChat', () => {
-				if (workspace.unreachable) return false;
+				if (workspace.unreachable || !shown) return false;
 				palette = null;
 				void newChat();
 			}),
-			keys.on('chat.previous', () => step(-1)),
-			keys.on('chat.next', () => step(1))
+			keys.on('chat.previous', () => shown && step(-1)),
+			keys.on('chat.next', () => shown && step(1))
 		];
 		return () => off.forEach((undo) => undo());
 	});
@@ -171,12 +211,14 @@
 
 <svelte:window onkeydown={(event) => keys.dispatch(event)} />
 
-{#if workspace.unreachable}
+{#if bare}
+	{@render children()}
+{:else if workspace.unreachable}
 	<!-- Instead of the shell, not over it. Nothing below works without that first answer: no
 	     rail, no profile, no endpoint, no conversation — and drawing the chrome anyway is an
 	     invitation to click seven things that cannot work. -->
 	<Offline />
-{:else}
+{:else if admitted}
 	<div class="shell">
 		<!-- Below the phone breakpoint the rail below is off-canvas by default; this is the one
 	     control that brings it on screen, placed once here rather than in every route's own
@@ -219,6 +261,7 @@
 				{activeProjectId}
 				onnew={newChat}
 				onsettings={() => workspace.openSettings()}
+				onsignout={signOut}
 				onsearch={() => {
 					// The sheet steps aside for the palette, as it does for Settings (#41).
 					workspace.railOpen = false;

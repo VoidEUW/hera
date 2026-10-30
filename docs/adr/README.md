@@ -38,3 +38,4 @@ later.
 | [29](0029-the-desktop-app-is-a-shell-over-a-frozen-hera.md) | The desktop app is a Tauri shell over a frozen `hera` | proposed |
 | [30](0030-git-is-bundled-not-assumed.md) | Git is bundled with the desktop app, not assumed | proposed |
 | [31](0031-a-dream-proposes-and-a-person-accepts.md) | A dream proposes and a person accepts; training is scored by a judge and checked by a person | proposed |
+| [32](0032-what-a-person-says-is-encrypted-at-rest.md) | What a person says is encrypted at rest, with the instance's key | proposed |

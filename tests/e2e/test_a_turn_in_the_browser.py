@@ -11,6 +11,7 @@ import re
 from typing import Any
 
 import pytest
+from e2e_support import Served
 
 from hera_providers import TextDelta, ThinkingDelta, TurnEnd, text_turn, tool_call
 
@@ -28,10 +29,11 @@ pytestmark = pytest.mark.e2e
 
 
 @pytest.fixture
-def page(server: str) -> Any:
+def page(server: Served) -> Any:
     with playwright.sync_playwright() as driver:
         browser = driver.chromium.launch()
         context = browser.new_context(viewport={"width": 1280, "height": 900})
+        server.sign_in(context)
         opened = context.new_page()
         opened.goto(server, wait_until="networkidle")
         try:
@@ -386,10 +388,13 @@ def test_the_account_name_reaches_the_rail_card_and_the_greeting(page: Any) -> N
     page.get_by_role("button", name="Save").click()
     page.wait_for_selector("text=Saved", timeout=10_000)
 
-    # The three sign-in rows are drawn, marked as coming later, and are not controls at all.
-    for row in ("Password", "Two-factor authentication", "Passkeys"):
-        assert page.locator(".later li", has_text=row).count() == 1
-        assert page.get_by_role("button", name=row).count() == 0
+    # Signing in is real now: the way out, the browsers you are in, and a new password. Only
+    # passkeys are still drawn as coming later, and as a row rather than a control.
+    assert page.get_by_role("button", name="Sign out", exact=True).is_visible()
+    assert page.get_by_text("This browser").is_visible()
+    assert page.get_by_role("button", name="Change password").is_visible()
+    assert page.locator(".later li", has_text="Passkeys").count() == 1
+    assert page.get_by_role("button", name="Passkeys").count() == 0
 
     page.keyboard.press("Escape")
     page.wait_for_selector("[role=dialog]", state="detached", timeout=10_000)
@@ -519,7 +524,7 @@ class TestSheAsksSeveralAtOnce:
     def script(self) -> list[Any]:
         return SEVERAL_QUESTIONS_SCRIPT
 
-    def test_a_choice_and_a_sentence_are_one_reply(self, page: Any, server: str) -> None:
+    def test_a_choice_and_a_sentence_are_one_reply(self, page: Any, server: Served) -> None:
         composer = page.locator("textarea").first
         composer.fill("Summarise the deck")
         composer.press("Enter")

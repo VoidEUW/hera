@@ -26,6 +26,7 @@ from starlette.types import Scope
 from hera_core import __version__
 from hera_core.api import router as api_router
 from hera_core.boot import LegacyHome, check_home, prepare
+from hera_core.claim import announce
 from hera_core.settings import CoreSettings
 from hera_core.wiring import Services, build_services
 
@@ -135,9 +136,13 @@ def build_app() -> FastAPI:
     return create_app()
 
 
-def prepare_home(settings: CoreSettings | None = None) -> None:
-    """Check the data directory and make a fresh install usable. Called by the CLI."""
+def prepare_home(settings: CoreSettings | None = None) -> str | None:
+    """Check the data directory and make a fresh install usable. Called by the CLI.
+
+    Returns the setup code when nobody can sign in yet, for the CLI to print (ADR 27).
+    """
     settings = settings or CoreSettings()
     check_home()
     container = build_services(settings)
     prepare(container.database, container.mind, owner_id=settings.owner_id)
+    return announce(container.database)

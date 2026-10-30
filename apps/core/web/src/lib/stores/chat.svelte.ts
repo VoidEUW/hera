@@ -12,6 +12,7 @@ import {
 	api,
 	answerPermission,
 	answerQuestion,
+	noticeSignedOut,
 	redoMessage,
 	sendMessage,
 	type Chat,
@@ -302,6 +303,7 @@ export class ChatSession {
 		try {
 			const response = await start();
 			owner = this.#abort;
+			noticeSignedOut(response);
 			if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
 
 			for await (const frame of frames(response)) {

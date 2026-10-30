@@ -12,6 +12,7 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
+from e2e_support import Served
 
 playwright = pytest.importorskip(
     "playwright.sync_api", reason="playwright is not installed; run `uv run playwright install`"
@@ -27,10 +28,11 @@ SCREENS = ("Skills", "Servers", "Permissions", "Memory", "Mind", "Models")
 
 
 @pytest.fixture
-def page(server: str) -> Any:
+def page(server: Served) -> Any:
     with playwright.sync_playwright() as driver:
         browser = driver.chromium.launch()
         context = browser.new_context(viewport={"width": 1440, "height": 900})
+        server.sign_in(context)
         opened = context.new_page()
         opened.goto(server, wait_until="networkidle")
         try:

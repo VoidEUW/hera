@@ -156,7 +156,7 @@ class TestMigrations:
             mapper.class_.__tablename__
             for mapper in SQLModel._sa_registry.mappers
             if str(mapper.class_.__tablename__).split("_")[0]
-            in {"chat", "profile", "skill", "mem", "evo", "core"}
+            in {"chat", "profile", "skill", "mem", "evo", "core", "account"}
         }
         assert registered == set(TABLE_NAMES)
 
@@ -264,6 +264,45 @@ class TestMigrations:
         assert row.cached_tokens is None and row.first_token_ms is None
         database.dispose()
 
+    def test_the_owners_record_becomes_the_first_admin(self) -> None:
+        """0008 folds `core_accounts` into `account_users` under the owner's own id, as an admin
+        with no password — so the install is adopted by whoever claims it, and every row it
+        already has is theirs (ADR 27)."""
+        from alembic import command
+        from sqlalchemy import text
+        from sqlmodel import Session, select
+
+        from hera_accounts import User
+        from hera_core.migrations import alembic_config
+
+        database = Database.in_memory()
+        config = alembic_config(database)
+        command.upgrade(config, "0007")
+        owner = uuid4()
+        with database.engine.begin() as connection:
+            connection.execute(
+                text(
+                    "INSERT INTO core_accounts (id, created_at, updated_at, owner_id, name, email,"
+                    " avatar_type) VALUES (:id, :now, :now, :o, 'Ada', ' Ada@Example.org ',"
+                    " 'image/png')"
+                ),
+                {"id": uuid4().hex, "now": "2026-10-26 10:00:00.000000", "o": owner.hex},
+            )
+
+        command.upgrade(config, "head")
+
+        with Session(database.engine) as session:
+            [user] = list(session.exec(select(User)).all())
+        assert (user.id, user.role, user.email) == (owner, "admin", "ada@example.org")
+        assert (user.name, user.avatar_type) == ("Ada", "image/png")
+        assert "core_accounts" not in inspect(database.engine).get_table_names()
+
+        command.downgrade(config, "0007")
+        with database.engine.connect() as connection:
+            rows = connection.execute(text("SELECT owner_id, name FROM core_accounts")).all()
+        assert [(row[0], row[1]) for row in rows] == [(owner.hex, "Ada")]
+        database.dispose()
+
     def test_all_tables_carry_a_package_prefix(self) -> None:
         """All models share one MetaData, so an unprefixed name from two packages collides."""
         for name in TABLE_NAMES:
@@ -271,6 +310,24 @@ class TestMigrations:
 
 
 class TestPreparing:
+    def test_a_single_users_avatar_moves_under_their_own_directory(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from hera_core.boot import adopt_avatar
+        from hera_home import avatar_path
+
+        monkeypatch.setenv("HERA_HOME", str(tmp_path))
+        legacy = tmp_path / "account" / "avatar"
+        legacy.parent.mkdir()
+        legacy.write_bytes(b"face")
+        owner = uuid4()
+
+        adopt_avatar(owner)
+        adopt_avatar(owner)
+
+        assert avatar_path(str(owner)).read_bytes() == b"face"
+        assert not legacy.exists()
+
     def test_a_fresh_install_gets_a_schema_a_mind_and_a_profile(self, tmp_path: Path) -> None:
         database = Database.in_memory()
         mind = MindRepository(tmp_path / "mind")

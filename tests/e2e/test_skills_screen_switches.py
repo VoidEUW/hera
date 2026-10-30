@@ -6,6 +6,7 @@ from collections.abc import Iterator
 from typing import Any
 
 import pytest
+from e2e_support import Served
 
 playwright = pytest.importorskip(
     "playwright.sync_api", reason="playwright is not installed; run `uv run playwright install`"
@@ -18,10 +19,11 @@ WAITING = "[role='status'][aria-busy='true']"
 
 
 @pytest.fixture
-def page(server: str) -> Iterator[Any]:
+def page(server: Served) -> Iterator[Any]:
     with playwright.sync_playwright() as driver:
         browser = driver.chromium.launch()
         context = browser.new_context(viewport={"width": 1440, "height": 900})
+        server.sign_in(context)
         opened = context.new_page()
         opened.goto(server, wait_until="networkidle")
         try:
@@ -40,7 +42,7 @@ def skills(page: Any) -> None:
     page.wait_for_selector(WAITING, state="detached", timeout=10_000)
 
 
-def test_a_skill_is_switched_off_and_stays_off(page: Any, server: str) -> None:
+def test_a_skill_is_switched_off_and_stays_off(page: Any, server: Served) -> None:
     skills(page)
 
     box = page.get_by_role("switch", name="Use tdd")
@@ -60,7 +62,7 @@ def test_the_row_has_no_usage_count(page: Any) -> None:
     assert dialog.get_by_role("link", name="hera-skills repository").count() == 1
 
 
-def test_a_skill_is_edited_in_place_over_settings(page: Any, server: str) -> None:
+def test_a_skill_is_edited_in_place_over_settings(page: Any, server: Served) -> None:
     skills(page)
     page.get_by_role("button", name="Edit tdd").click()
 
@@ -88,7 +90,7 @@ def test_a_skill_is_edited_in_place_over_settings(page: Any, server: str) -> Non
     assert "Red, green, refactor." in source
 
 
-def test_a_skill_is_created_in_the_editor_and_deleted_from_it(page: Any, server: str) -> None:
+def test_a_skill_is_created_in_the_editor_and_deleted_from_it(page: Any, server: Served) -> None:
     skills(page)
     page.get_by_role("button", name="Add a skill").click()
 

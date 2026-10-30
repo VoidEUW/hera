@@ -29,9 +29,9 @@ from uuid import UUID
 from hera_skillsets.models import ID_PATTERN
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from hera_accounts import SignIn, User
 from hera_chats import Chat, Message, Project, Totals, UsageSummary
-from hera_core.account import Account
-from hera_core.config import ProviderKind, validate_provider_name
+from hera_core.config import InstanceConfig, ProviderKind, Registration, validate_provider_name
 from hera_core.model_presets import PRESETS, ModelPreset
 from hera_memories import MAX_DESCRIPTION, MAX_TEXT
 from hera_permissions import Decision
@@ -1026,7 +1026,7 @@ class HealthOut(BaseModel):
 
 
 class AccountOut(BaseModel):
-    """Who the owner is.
+    """Who is signed in.
 
     ``avatar_version`` is zero when there is no picture, and otherwise the row's last-change
     time. The interface puts it in the picture's query string, so a replaced picture is a
@@ -1035,24 +1035,30 @@ class AccountOut(BaseModel):
 
     model_config = ConfigDict(frozen=True)
 
+    id: UUID
     name: str
     email: str
+    role: Literal["admin", "user"]
     avatar_version: int
 
     @classmethod
-    def of(cls, account: Account) -> AccountOut:
+    def of(cls, user: User) -> AccountOut:
         return cls(
-            name=account.name,
-            email=account.email,
-            avatar_version=int(account.updated_at.timestamp()) if account.avatar_type else 0,
+            id=user.id,
+            name=user.name,
+            email=user.email,
+            role="admin" if user.role == "admin" else "user",
+            avatar_version=int(user.updated_at.timestamp()) if user.avatar_type else 0,
         )
 
 
-_EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+_EMAIL = re.compile(r"^[^@\s]+@[^@\s.]+(?:\.[^@\s.]+)+$")
+"""The same shape ``hera_accounts`` accepts, and linear for the same reason."""
 
 
 class AccountPatch(BaseModel):
-    """``None`` means *leave it*; an empty string clears the field."""
+    """``None`` means *leave it*. An empty name clears it; an email cannot be cleared, because
+    it is what a person signs in with."""
 
     name: str | None = Field(default=None, max_length=120)
     email: str | None = Field(default=None, max_length=254)
@@ -1068,9 +1074,109 @@ class AccountPatch(BaseModel):
         if email is None:
             return None
         email = email.strip()
-        if email and not _EMAIL.match(email):
+        if not _EMAIL.match(email):
             raise ValueError("that does not look like an email address")
         return email
+
+
+class SignInIn(BaseModel):
+    email: str = Field(max_length=254)
+    password: str = Field(max_length=1024)
+
+
+class RegisterIn(BaseModel):
+    name: str = Field(default="", max_length=120)
+    email: str = Field(max_length=254)
+    password: str = Field(max_length=1024)
+    invite: str = Field(default="", max_length=200)
+    """The token from an invitation, when registration is ``invite``."""
+
+
+class PasswordIn(BaseModel):
+    current: str = Field(max_length=1024)
+    new: str = Field(max_length=1024)
+
+
+class AuthStateOut(BaseModel):
+    """What the sign-in screen needs before anybody has signed in, and nothing more.
+
+    Public, so it says only what the login card has to draw: whether the instance is unclaimed,
+    whether a stranger may register, and the name to greet them with.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    user: AccountOut | None
+    setup_required: bool
+    registration: Registration
+    instance_name: str
+
+
+class SessionOut(BaseModel):
+    """One signed-in browser, as Settings → Account lists it."""
+
+    model_config = ConfigDict(frozen=True)
+
+    id: UUID
+    user_agent: str
+    created_at: datetime
+    last_seen_at: datetime
+    expires_at: datetime
+    current: bool
+
+    @classmethod
+    def of(cls, sign_in: SignIn, *, current: UUID) -> SessionOut:
+        return cls(
+            id=sign_in.id,
+            user_agent=sign_in.user_agent,
+            created_at=sign_in.created_at,
+            last_seen_at=sign_in.last_seen_at,
+            expires_at=sign_in.expires_at,
+            current=sign_in.id == current,
+        )
+
+
+class SetupOut(BaseModel):
+    """Whether this instance still has to be claimed, and what claiming it will need."""
+
+    model_config = ConfigDict(frozen=True)
+
+    required: bool
+    code_required: bool
+    """``False`` from the machine Hera runs on: somebody at its keyboard needs no code to prove
+    they could have read the log."""
+
+    chats: int
+    """How many conversations an install from before accounts already has. They become the
+    first admin's, and the wizard says so rather than letting it be a surprise."""
+
+
+class SetupIn(BaseModel):
+    name: str = Field(default="", max_length=120)
+    email: str = Field(max_length=254)
+    password: str = Field(max_length=1024)
+    code: str = Field(default="", max_length=64)
+    launch_token: str = Field(default="", max_length=200)
+
+
+class InstanceOut(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    name: str
+    public_url: str
+    registration: Registration
+
+    @classmethod
+    def of(cls, instance: InstanceConfig) -> InstanceOut:
+        return cls(
+            name=instance.name, public_url=instance.public_url, registration=instance.registration
+        )
+
+
+class InstancePatch(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=80)
+    public_url: str | None = Field(default=None, max_length=300)
+    registration: Registration | None = None
 
 
 class AvatarIn(BaseModel):

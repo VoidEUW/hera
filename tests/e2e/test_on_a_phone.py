@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from e2e_support import Served
 
 playwright = pytest.importorskip(
     "playwright.sync_api", reason="playwright is not installed; run `uv run playwright install`"
@@ -44,13 +45,14 @@ SCREENS = (
 
 
 @pytest.fixture
-def page(server: str) -> Any:
+def page(server: Served) -> Any:
     with playwright.sync_playwright() as driver:
         browser = driver.chromium.launch()
         # A touch screen as well as a narrow one: `is_mobile` and `has_touch` are what make
         # `(hover: none)` and `(pointer: coarse)` true, which the chord and row-action rules
         # read.
         context = browser.new_context(viewport=PHONE, is_mobile=True, has_touch=True)
+        server.sign_in(context)
         opened = context.new_page()
         opened.goto(server, wait_until="networkidle")
         try:

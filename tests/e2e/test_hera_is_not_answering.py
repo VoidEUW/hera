@@ -15,6 +15,7 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
+from e2e_support import Served
 
 playwright = pytest.importorskip(
     "playwright.sync_api", reason="playwright is not installed; run `uv run playwright install`"
@@ -24,10 +25,11 @@ pytestmark = pytest.mark.e2e
 
 
 @pytest.fixture
-def page(server: str) -> Any:
+def page(server: Served) -> Any:
     with playwright.sync_playwright() as driver:
         browser = driver.chromium.launch()
         context = browser.new_context(viewport={"width": 1440, "height": 900})
+        server.sign_in(context)
         opened = context.new_page()
         try:
             yield opened
@@ -46,7 +48,7 @@ def refuse(page: Any) -> dict[str, bool]:
     return listening
 
 
-def test_an_unreachable_server_is_not_an_empty_account(server: str, page: Any) -> None:
+def test_an_unreachable_server_is_not_an_empty_account(server: Served, page: Any) -> None:
     refuse(page)
     page.goto(server)
 
@@ -62,7 +64,7 @@ def test_an_unreachable_server_is_not_an_empty_account(server: str, page: Any) -
     assert page.get_by_text("uv run hera serve").count() == 1
 
 
-def test_try_again_brings_the_application_back(server: str, page: Any) -> None:
+def test_try_again_brings_the_application_back(server: Served, page: Any) -> None:
     listening = refuse(page)
     page.goto(server)
     page.wait_for_selector("text=Hera is not answering", timeout=15_000)

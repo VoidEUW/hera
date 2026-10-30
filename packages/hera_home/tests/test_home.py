@@ -9,6 +9,7 @@ import pytest
 import hera_home
 from hera_home import (
     artifacts_dir,
+    avatar_path,
     chat_dir,
     chats_dir,
     config_path,
@@ -21,7 +22,10 @@ from hera_home import (
     mind_dir,
     permissions_path,
     scratch_dir,
+    setup_code_path,
     skills_dir,
+    user_dir,
+    users_dir,
 )
 
 
@@ -71,6 +75,10 @@ def test_every_well_known_path_sits_under_the_home(
     assert artifacts_dir("c-1") == tmp_path / "chats" / "c-1" / "artifacts"
     assert logos_dir() == tmp_path / "logos"
     assert logo_path("studio") == tmp_path / "logos" / "studio.logo"
+    assert users_dir() == tmp_path / "users"
+    assert user_dir("u-1") == tmp_path / "users" / "u-1"
+    assert avatar_path("u-1") == tmp_path / "users" / "u-1" / "avatar"
+    assert setup_code_path() == tmp_path / "setup-code"
 
 
 def test_nothing_is_created_by_asking(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -119,3 +127,13 @@ def test_a_logo_path_is_not_created_by_asking(
     monkeypatch.setenv(hera_home.HOME_ENV, str(tmp_path))
     for path in (logos_dir(), logo_path("studio")):
         assert not path.exists()
+
+
+@pytest.mark.parametrize("user_id", ["", ".", "..", "../mind", "a/b", "a\\b", "/etc"])
+def test_a_user_id_that_is_not_one_path_segment_is_refused(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, user_id: str
+) -> None:
+    """The same guard as a chat's, for a directory that holds a person's mind and memories."""
+    monkeypatch.setenv(hera_home.HOME_ENV, str(tmp_path))
+    with pytest.raises(ValueError, match="not a usable user id"):
+        user_dir(user_id)

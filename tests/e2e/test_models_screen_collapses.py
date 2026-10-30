@@ -12,6 +12,7 @@ from collections.abc import Iterator
 from typing import Any
 
 import pytest
+from e2e_support import Served
 
 playwright = pytest.importorskip(
     "playwright.sync_api", reason="playwright is not installed; run `uv run playwright install`"
@@ -24,10 +25,11 @@ WAITING = "[role='status'][aria-busy='true']"
 
 
 @pytest.fixture
-def page(server: str) -> Iterator[Any]:
+def page(server: Served) -> Iterator[Any]:
     with playwright.sync_playwright() as driver:
         browser = driver.chromium.launch()
         context = browser.new_context(viewport={"width": 1440, "height": 900})
+        server.sign_in(context)
         opened = context.new_page()
         # A second endpoint, which starts closed because it is not the active one, and a second
         # model on the active one, so there is something for "one row open at a time" to mean.
@@ -84,7 +86,9 @@ def test_what_you_opened_is_still_open_when_you_come_back(page: Any) -> None:
     assert header(page, "studio").get_attribute("aria-expanded") == "true"
 
 
-def test_a_model_row_opens_its_own_options_and_only_one_at_a_time(page: Any, server: str) -> None:
+def test_a_model_row_opens_its_own_options_and_only_one_at_a_time(
+    page: Any, server: Served
+) -> None:
     models(page)
     header(page, "studio").click()
     # Two models on one provider.

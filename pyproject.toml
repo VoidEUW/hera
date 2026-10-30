@@ -21,6 +21,7 @@ members = ["packages/*", "apps/core"]
 # uv then resolves that package's internal dependencies from the same commit, with no extra
 # declarations on the consumer's side. tests/test_workspace.py checks the list stays complete.
 [tool.uv.sources]
+hera-accounts = { workspace = true }
 hera-chats = { workspace = true }
 hera-core = { workspace = true }
 hera-home = { workspace = true }
@@ -109,6 +110,8 @@ files = [
     "tests",
     "apps/core/src",
     "apps/core/tests",
+    "packages/hera_accounts/src",
+    "packages/hera_accounts/tests",
     "packages/hera_chats/src",
     "packages/hera_chats/tests",
     "packages/hera_home/src",

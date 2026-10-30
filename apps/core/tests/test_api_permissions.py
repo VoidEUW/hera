@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from core_support import API, StubTools
+from core_support import API, StubTools, sign_in
 from httpx import ASGITransport, AsyncClient
 
 from hera_core import permission_rules
@@ -42,7 +42,7 @@ async def serving(
         AsyncClient(transport=ASGITransport(app=app), base_url="http://hera.test") as http,
         app.router.lifespan_context(app),
     ):
-        yield http, services
+        yield sign_in(http, services), services
 
 
 def on_disk() -> dict[str, Any]:
@@ -72,6 +72,7 @@ class TestReading:
             AsyncClient(transport=ASGITransport(app=app), base_url="http://hera.test") as http,
             app.router.lifespan_context(app),
         ):
+            sign_in(http, services)
             body = (await http.get(f"{API}/permissions")).json()
 
         assert body == {"fallback": "ask", "rules": []}

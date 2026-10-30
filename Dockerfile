@@ -54,7 +54,7 @@ EXPOSE 8756
 VOLUME /data
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
-    CMD curl -f http://localhost:8756/api/v1/health || exit 1
+    CMD curl -f http://localhost:8756/api/v1/live || exit 1
 
 # No --reload: the same command CONTRIBUTING.md tells a developer to run (modulo `uv run`,
 # see above), so the container is not a second, divergent way of starting the application.

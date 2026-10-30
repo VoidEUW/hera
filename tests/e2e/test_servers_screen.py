@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from e2e_support import Served, written
 
 playwright = pytest.importorskip(
     "playwright.sync_api", reason="playwright is not installed; run `uv run playwright install`"
@@ -38,10 +39,11 @@ server.run(transport="stdio")
 
 
 @pytest.fixture
-def page(server: str) -> Any:
+def page(server: Served) -> Any:
     with playwright.sync_playwright() as driver:
         browser = driver.chromium.launch()
         context = browser.new_context(viewport={"width": 1440, "height": 900})
+        server.sign_in(context)
         opened = context.new_page()
         try:
             yield opened
@@ -54,7 +56,7 @@ def home() -> Path:
     return Path(os.environ["HERA_HOME"])
 
 
-def open_servers(page: Any, server: str) -> None:
+def open_servers(page: Any, server: Served) -> None:
     page.goto(server, wait_until="networkidle")
     page.get_by_role("button", name="Settings").first.click(timeout=10_000)
     page.get_by_role("navigation", name="Settings").get_by_role("button", name="Servers").click()
@@ -68,7 +70,7 @@ def box(page: Any, name: str) -> Any:
     )
 
 
-def test_her_own_server_is_a_box_and_a_tool_can_be_switched_off(server: str, page: Any) -> None:
+def test_her_own_server_is_a_box_and_a_tool_can_be_switched_off(server: Served, page: Any) -> None:
     open_servers(page, server)
 
     hers = box(page, "hera")
@@ -89,7 +91,10 @@ def test_her_own_server_is_a_box_and_a_tool_can_be_switched_off(server: str, pag
         "(n) => !document.querySelector(`[aria-label='${n}']`).checked", arg=name, timeout=5_000
     )
 
-    rules = json.loads((home() / "permissions.json").read_text(encoding="utf-8"))["rules"]
+    rules = written(
+        home() / "permissions.json",
+        lambda doc: any(rule["pattern"] == f"hera__{name}" for rule in doc.get("rules", [])),
+    )["rules"]
     off = next(rule for rule in rules if rule["pattern"] == f"hera__{name}")
     assert (off["decision"], off["name"]) == ("deny", "Off on the Servers screen")
 
@@ -108,7 +113,7 @@ def test_her_own_server_is_a_box_and_a_tool_can_be_switched_off(server: str, pag
 
 
 def test_a_server_added_here_connects_is_kept_and_is_removed_after_asking(
-    server: str, page: Any, tmp_path: Path
+    server: Served, page: Any, tmp_path: Path
 ) -> None:
     script = tmp_path / "spike.py"
     script.write_text(SPIKE, encoding="utf-8")
@@ -164,6 +169,6 @@ def test_a_server_added_here_connects_is_kept_and_is_removed_after_asking(
     assert json.loads((home() / "mcp.json").read_text(encoding="utf-8"))["mcpServers"] == {}
 
 
-def test_the_composer_counts_only_the_servers_a_person_added(server: str, page: Any) -> None:
+def test_the_composer_counts_only_the_servers_a_person_added(server: Served, page: Any) -> None:
     page.goto(server, wait_until="networkidle")
     page.get_by_role("button", name="0 servers").wait_for(timeout=10_000)

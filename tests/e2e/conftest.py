@@ -20,6 +20,7 @@ from typing import Any
 
 import pytest
 import uvicorn
+from e2e_support import Served, claim
 
 from hera_providers import (
     FakeProvider,
@@ -95,14 +96,25 @@ def stream_delay() -> float:
 
 
 @pytest.fixture
+def claimed() -> bool:
+    """Whether the server starts with an admin. False for the test that sets one up."""
+    return True
+
+
+@pytest.fixture
 def server(
     built_interface: Path,
+    claimed: bool,
     tmp_path_factory: pytest.TempPathFactory,
     monkeypatch: pytest.MonkeyPatch,
     script: list[Any],
     stream_delay: float,
-) -> Iterator[str]:
-    """A real server on a free port, with its own data directory.
+) -> Iterator[Served]:
+    """A real server on a free port, with its own data directory, already claimed.
+
+    Claimed means an admin exists, and the value yielded carries their session, so a test signs
+    its browser in with ``server.sign_in(context)``. The wizard itself is driven by one test that
+    asks for an unclaimed server instead (``fresh_server``).
 
     Its own, because the suite writes chats and edits mind regions, and a test that mutates the
     developer's ~/.hera is a test nobody runs twice.
@@ -130,6 +142,7 @@ def server(
         settings, provider=FakeProvider(script, delay=stream_delay), registry=None
     )
     prepare(services.database, services.mind, owner_id=settings.owner_id)
+    token = claim(services.database, settings.owner_id) if claimed else ""
 
     port = free_port()
     config = uvicorn.Config(
@@ -146,7 +159,7 @@ def server(
         raise RuntimeError("the server did not start")
 
     try:
-        yield f"http://127.0.0.1:{port}"
+        yield Served(f"http://127.0.0.1:{port}", token)
     finally:
         running.should_exit = True
         thread.join(timeout=10)

@@ -1,11 +1,11 @@
 <script lang="ts">
 	/**
-	 * Who you are to Hera: a name, an email and a picture.
+	 * Who you are to Hera: a name, an email and a picture — and how you sign in.
 	 *
-	 * **A record, not a login.** Nothing here authenticates anybody — there is one owner and no
-	 * sign-in — so password, two-factor and passkeys are drawn as disabled rows saying *coming
-	 * later*. They are here so the shape of what is coming is visible, and not built, because a
-	 * login half-built is worse than none.
+	 * The sign-in section lists the browsers you are signed in on, each one revocable, with
+	 * *sign out* and *sign out everywhere*, and changes the password. Passkeys are drawn as a row
+	 * saying *coming later* (M4). Signing out reloads at `/login` rather than navigating there:
+	 * every store in the shell was built for you, and a reload is how none of it outlives you.
 	 *
 	 * The picture is cropped to a square and scaled down in the browser before it is sent: it is
 	 * drawn at 24 px in the rail, and the server is not the place to learn what a 12 MB photo
@@ -16,7 +16,7 @@
 	import Avatar from '$lib/components/ui/Avatar.svelte';
 	import FileButton from '$lib/components/ui/FileButton.svelte';
 	import Pill from '$lib/components/ui/Pill.svelte';
-	import { api } from '$lib/api/client';
+	import { api, type SignedInSession } from '$lib/api/client';
 	import { MAX_IMAGE_BYTES } from '$lib/attachments';
 	import Input from '$lib/components/ui/Input.svelte';
 	import { t } from '$lib/i18n';
@@ -58,8 +58,66 @@
 		!filter || words.some((word) => word.toLowerCase().includes(filter));
 	const showProfile = $derived(shows(t.account.name, t.account.email, t.account.avatar));
 	const showSecurity = $derived(
-		shows(t.account.security, t.account.password, t.account.twoFactor, t.account.passkeys)
+		shows(
+			t.account.security,
+			t.account.password,
+			t.account.passkeys,
+			t.account.sessions,
+			t.auth.signOut
+		)
 	);
+
+	let sessions = $state<SignedInSession[]>([]);
+	let current = $state('');
+	let fresh = $state('');
+	let changed = $state(false);
+
+	async function loadSessions() {
+		try {
+			sessions = await api.sessions();
+		} catch (cause) {
+			error = cause instanceof Error ? cause.message : String(cause);
+		}
+	}
+	void loadSessions();
+
+	function seen(session: SignedInSession): string {
+		return new Date(session.last_seen_at).toLocaleString();
+	}
+
+	async function revoke(session: SignedInSession) {
+		error = null;
+		try {
+			await api.revokeSession(session.id);
+			if (session.current) return window.location.assign('/login');
+			await loadSessions();
+		} catch (cause) {
+			error = cause instanceof Error ? cause.message : String(cause);
+		}
+	}
+
+	async function signOut(everywhere: boolean) {
+		error = null;
+		try {
+			await (everywhere ? api.signOutEverywhere() : api.signOut());
+			window.location.assign('/login');
+		} catch (cause) {
+			error = cause instanceof Error ? cause.message : String(cause);
+		}
+	}
+
+	async function changePassword() {
+		error = null;
+		changed = false;
+		try {
+			await api.changePassword(current, fresh);
+			current = fresh = '';
+			changed = true;
+			await loadSessions();
+		} catch (cause) {
+			error = cause instanceof Error ? cause.message : String(cause);
+		}
+	}
 
 	async function save() {
 		if (emailBad) return;
@@ -179,14 +237,66 @@
 {#if showSecurity}
 	<section>
 		<h3>{t.account.security}</h3>
-		<p class="caption">{t.account.securityNote}</p>
-		<ul class="later">
-			{#each [t.account.password, t.account.twoFactor, t.account.passkeys] as label (label)}
+		<div class="foot">
+			<Button icon="exit" onclick={() => signOut(false)}>{t.auth.signOut}</Button>
+			<Button variant="ghost" onclick={() => signOut(true)}>{t.auth.signOutEverywhere}</Button>
+		</div>
+		<p class="caption">{t.auth.signOutEverywhereNote}</p>
+	</section>
+
+	<section>
+		<h3>{t.account.sessions}</h3>
+		<ul class="rows">
+			{#each sessions as session (session.id)}
 				<li>
-					<span>{label}</span>
-					<Pill>{t.account.later}</Pill>
+					<span class="what">
+						<span
+							>{session.current
+								? t.account.thisBrowser
+								: session.user_agent || t.account.unknownBrowser}</span
+						>
+						<span class="when">{t.account.lastSeen(seen(session))}</span>
+					</span>
+					<Button size="sm" variant="ghost" onclick={() => revoke(session)}>
+						{t.account.revoke}
+					</Button>
 				</li>
 			{/each}
+		</ul>
+	</section>
+
+	<section>
+		<h3>{t.account.password}</h3>
+		<form
+			class="fields"
+			onsubmit={(event) => {
+				event.preventDefault();
+				void changePassword();
+			}}
+		>
+			<Input
+				kind="password"
+				label={t.account.currentPassword}
+				value={current}
+				onchange={(value) => (current = value)}
+			/>
+			<Input
+				kind="password"
+				label={t.account.newPassword}
+				placeholder={t.auth.passwordPlaceholder}
+				value={fresh}
+				onchange={(value) => (fresh = value)}
+			/>
+			<div class="foot">
+				<Button type="submit" disabled={!current || !fresh}>{t.account.changePassword}</Button>
+				{#if changed}<Pill tone="live">{t.account.passwordChanged}</Pill>{/if}
+			</div>
+		</form>
+		<ul class="later">
+			<li>
+				<span>{t.account.passkeys}</span>
+				<Pill>{t.account.later}</Pill>
+			</li>
 		</ul>
 	</section>
 {/if}
@@ -234,6 +344,40 @@
 		display: flex;
 		align-items: center;
 		gap: 10px;
+	}
+
+	.rows {
+		margin: 0;
+		padding: 0;
+		list-style: none;
+		max-width: 520px;
+	}
+
+	.rows li {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 12px;
+		padding: 8px 0;
+		border-top: var(--border-width) solid var(--line);
+		font-size: 13.5px;
+	}
+
+	.what {
+		display: flex;
+		flex-direction: column;
+		min-width: 0;
+	}
+
+	.what > span:first-child {
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.when {
+		color: var(--text-faint);
+		font-size: 12px;
 	}
 
 	.later {

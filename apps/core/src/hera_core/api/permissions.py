@@ -12,7 +12,7 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException, Query, Response, status
 
 from hera_core import rulebook
-from hera_core.deps import Container
+from hera_core.deps import AdminOnly, Container
 from hera_core.schemas import (
     FallbackPatch,
     MatchesOut,
@@ -52,7 +52,12 @@ async def read_permissions(container: Container) -> PermissionsOut:
     )
 
 
-@router.post("/permissions/rules", response_model=RuleOut, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/permissions/rules",
+    response_model=RuleOut,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[AdminOnly],
+)
 async def create_rule(payload: RuleIn, container: Container) -> RuleOut:
     try:
         view = rulebook.add(
@@ -74,7 +79,7 @@ async def create_rule(payload: RuleIn, container: Container) -> RuleOut:
     return await _out(view, container)
 
 
-@router.patch("/permissions/rules/{pattern:path}", response_model=RuleOut)
+@router.patch("/permissions/rules/{pattern:path}", response_model=RuleOut, dependencies=[AdminOnly])
 async def change_rule(pattern: str, payload: RulePatch, container: Container) -> RuleOut:
     try:
         view = rulebook.change(
@@ -91,7 +96,11 @@ async def change_rule(pattern: str, payload: RulePatch, container: Container) ->
     return await _out(view, container)
 
 
-@router.delete("/permissions/rules/{pattern:path}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/permissions/rules/{pattern:path}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[AdminOnly],
+)
 def delete_rule(pattern: str, container: Container) -> Response:
     try:
         rulebook.remove(container, pattern)
@@ -107,7 +116,7 @@ def delete_rule(pattern: str, container: Container) -> Response:
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
-@router.patch("/permissions", response_model=PermissionsOut)
+@router.patch("/permissions", response_model=PermissionsOut, dependencies=[AdminOnly])
 async def change_fallback(payload: FallbackPatch, container: Container) -> PermissionsOut:
     """What a tool no rule covers gets."""
     try:
