@@ -17,6 +17,7 @@ answer to that is a forty-line traceback ending in ``Can't locate revision ident
 
 from __future__ import annotations
 
+import shutil
 import sqlite3
 from pathlib import Path
 from uuid import UUID
@@ -26,7 +27,14 @@ from alembic.script import ScriptDirectory
 from alembic.util.exc import CommandError
 
 from hera_core.migrations import alembic_config, upgrade_to_head
-from hera_home import DATABASE_FILENAME, account_dir, avatar_path, home
+from hera_home import (
+    DATABASE_FILENAME,
+    account_dir,
+    avatar_path,
+    home,
+    memories_dir,
+    user_memories_dir,
+)
 from hera_profiles import MindRepository, ProfileRepository
 from hera_storage import Database
 
@@ -164,6 +172,23 @@ def prepare(database: Database, mind: MindRepository, *, owner_id: UUID) -> None
     with database.session() as session:
         ProfileRepository(session).ensure_default_exists(owner_id)
     adopt_avatar(owner_id)
+    adopt_memories(owner_id)
+
+
+def adopt_memories(owner_id: UUID) -> None:
+    """Copy a single-user install's memories to its owner's own directory (ADR 28).
+
+    Copied, not moved: ``~/.hera/memories`` is left exactly as it was, because nothing is ever
+    deleted for you. Only once — a person with a memories directory of their own already has
+    what is theirs, and copying again would bring back what they deleted since. Their mind needs
+    no such step: it is cloned from ``~/.hera/mind``, which is the template now, the first time
+    it is used, history and all.
+    """
+    legacy = memories_dir()
+    target = user_memories_dir(str(owner_id))
+    if target.exists() or not legacy.is_dir() or not any(legacy.glob("*.md")):
+        return
+    shutil.copytree(legacy, target)
 
 
 def adopt_avatar(owner_id: UUID) -> None:

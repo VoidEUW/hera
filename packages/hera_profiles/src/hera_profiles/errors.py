@@ -56,3 +56,18 @@ class NoSuchVersion(ProfilesError):
         self.region_id = region_id
         self.ref = ref
         super().__init__(f"no version {ref!r} of mind region {region_id!r}")
+
+
+class RegionShared(ProfilesError):
+    """A person's mind was asked to change a region it does not hold.
+
+    The shared regions (:data:`hera_profiles.SHARED_REGIONS`) are instance policy, read from the
+    template for everybody. A person's copy of ``safety`` that could be edited would be a way to
+    remove it (ADR 28), so their mind refuses, and the template is changed by an admin instead.
+    """
+
+    def __init__(self, region_id: str) -> None:
+        self.region_id = region_id
+        super().__init__(
+            f"mind region {region_id!r} is the same for everybody here; an admin changes it"
+        )

@@ -12,7 +12,8 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException, Query, Response, status
 
 from hera_core import rulebook
-from hera_core.deps import AdminOnly, Container
+from hera_core.deps import AdminOnly, Container, Owner, not_found
+from hera_core.permission_rules import StoredRule
 from hera_core.schemas import (
     FallbackPatch,
     MatchesOut,
@@ -49,6 +50,54 @@ async def read_permissions(container: Container) -> PermissionsOut:
             )
             for view in rulebook.rules(container)
         ],
+    )
+
+
+@router.get("/permissions/mine", response_model=list[RuleOut])
+async def read_my_rules(owner: Owner, container: Container) -> list[RuleOut]:
+    """The signed-in person's own rules — mostly "always" answered on a card (ADR 28).
+
+    A layer over the instance's rules above: each one may settle an *ask* for this person and
+    never loosens a *deny*. Everybody may read and change their own; nobody may reach anybody
+    else's, because the file is found from the session and never from the request.
+    """
+    known = await _known_tools(container)
+    return [_mine_out(rule, known) for rule in rulebook.mine(owner)]
+
+
+@router.patch("/permissions/mine/{pattern:path}", response_model=RuleOut)
+async def change_my_rule(
+    pattern: str, payload: RulePatch, owner: Owner, container: Container
+) -> RuleOut:
+    if payload.decision is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="only a rule's decision can be changed here",
+        )
+    try:
+        changed = rulebook.change_mine(owner, pattern, payload.decision)
+    except rulebook.NoSuchRule:
+        raise not_found("rule") from None
+    return _mine_out(changed, await _known_tools(container))
+
+
+@router.delete("/permissions/mine/{pattern:path}", status_code=status.HTTP_204_NO_CONTENT)
+async def forget_my_rule(pattern: str, owner: Owner) -> Response:
+    try:
+        rulebook.forget_mine(owner, pattern)
+    except rulebook.NoSuchRule:
+        raise not_found("rule") from None
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+def _mine_out(rule: StoredRule, known: list[str]) -> RuleOut:
+    return RuleOut(
+        pattern=rule.pattern,
+        decision=rule.decision.value,
+        reason=rule.reason,
+        name=rule.name,
+        source=rule.source,
+        covers=rulebook.matching(rule.pattern, known),
     )
 
 

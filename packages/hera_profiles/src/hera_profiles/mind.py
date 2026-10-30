@@ -27,7 +27,9 @@ nothing. Every invocation pins its own identity and disables signing, so a machi
 from __future__ import annotations
 
 import os
+import shutil
 import subprocess
+import tempfile
 import threading
 from collections.abc import Iterable, Mapping, Sequence
 from datetime import datetime
@@ -118,6 +120,37 @@ class MindRepository:
                 message=_seed_message(missing),
                 origin="seed",
             )
+
+    def clone_from(self, template: MindRepository) -> None:
+        """Start this repository as a copy of ``template``, history and all. Idempotent.
+
+        A person's mind begins as the instance's template (ADR 28), and a clone rather than a
+        copy of the files so that ``git log`` in their directory shows where each region came
+        from. The clone's remote is removed afterwards: this is a separate mind from here on, and
+        nothing should ever push to or pull from the template by accident.
+        """
+        with self._lock:
+            if self.initialised:
+                return
+            template.ensure()
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            # Cloned beside the target and renamed into place, so the mind directory either is a
+            # whole repository or does not exist. Two first visits racing — two processes, or two
+            # repositories over one path — both clone; one rename wins and the other copy goes.
+            staging = Path(tempfile.mkdtemp(prefix=f".{self.path.name}-", dir=self.path.parent))
+            try:
+                clone = staging / "mind"
+                _run_git(
+                    staging, "clone", "--quiet", "--no-hardlinks", str(template.path), str(clone)
+                )
+                _run_git(clone, "remote", "remove", "origin")
+                try:
+                    clone.rename(self.path)
+                except OSError:
+                    if not self.initialised:
+                        raise
+            finally:
+                shutil.rmtree(staging, ignore_errors=True)
 
     # -- reading -----------------------------------------------------------------------
 
@@ -269,36 +302,41 @@ class MindRepository:
         repository's config: this must work on a machine where git has never been set up,
         and it must not care what the user's global config says about signing.
         """
-        command = [
-            "git",
-            "-C",
-            str(self.path),
-            "-c",
-            f"user.name={COMMITTER_NAME}",
-            "-c",
-            f"user.email={COMMITTER_EMAIL}",
-            "-c",
-            "commit.gpgsign=false",
-            *args,
-        ]
-        try:
-            completed = subprocess.run(
-                command,
-                capture_output=True,
-                text=True,
-                check=True,
-                env=_environment(env),
-            )
-        except FileNotFoundError as exc:
-            raise MindError(
-                "git is not installed, and the mind is a git repository. "
-                "Install git, or point HERA_HOME somewhere its mind directory already exists."
-            ) from exc
-        except subprocess.CalledProcessError as exc:
-            raise MindError(
-                f"git {' '.join(args)} failed in {self.path}: {(exc.stderr or '').strip()}"
-            ) from exc
-        return completed.stdout.strip()
+        return _run_git(self.path, *args, env=env)
+
+
+def _run_git(where: Path, *args: str, env: Mapping[str, str] | None = None) -> str:
+    """One git command run in ``where``, with Hera's identity and no signing."""
+    command = [
+        "git",
+        "-C",
+        str(where),
+        "-c",
+        f"user.name={COMMITTER_NAME}",
+        "-c",
+        f"user.email={COMMITTER_EMAIL}",
+        "-c",
+        "commit.gpgsign=false",
+        *args,
+    ]
+    try:
+        completed = subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            check=True,
+            env=_environment(env),
+        )
+    except FileNotFoundError as exc:
+        raise MindError(
+            "git is not installed, and the mind is a git repository. "
+            "Install git, or point HERA_HOME somewhere its mind directory already exists."
+        ) from exc
+    except subprocess.CalledProcessError as exc:
+        raise MindError(
+            f"git {' '.join(args)} failed in {where}: {(exc.stderr or '').strip()}"
+        ) from exc
+    return completed.stdout.strip()
 
 
 def _environment(extra: Mapping[str, str] | None) -> dict[str, str] | None:

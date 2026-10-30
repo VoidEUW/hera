@@ -49,7 +49,7 @@ as an empty mind directory rather than as an error.
 | `hera_skillsets` | `SKILL.md` packages on disk, the **router** that picks them server-side — pinned, `/slash`, retrieved — and per-owner usage counts. Bad content is a reported problem, never an exception. | Does not ask the model which skill it wants; does not write to the skills directory; does not know what a profile or a project is |
 | `hera_profiles` | The mind: twelve named regions as files in a git repository, behaviour traits, profiles that select and override them, and the builder that turns the lot into a `hera_prompts.Prompt` with slots left open. Answers *who she is*; a project answers *what we are working on*. | Does not render, does not stream, does not know what fills a slot |
 | `hera_chats` | **Projects**, chats, messages, the persisted `ChatEvent` stream (ADR 10), and the turn orchestrator. A project is a container with behaviour — instructions, pinned skills, a default profile, and later its own files — not a folder. | Does not know which provider or which tools exist — both arrive injected; does not answer *who she is*, which is `hera_profiles`; raises nothing — a turn closes with a reason |
-| `hera_memories` | What Hera remembers across chats: one markdown file per memory under `~/.hera/memories/`, the filename as the key, every enabled one injected whole under a token ceiling (ADR 16). | Does not rank, does not embed, does not delete — `forget` switches a memory off and keeps the file |
+| `hera_memories` | What Hera remembers across chats: one markdown file per memory under a person's `~/.hera/users/<id>/memories/`, the filename as the key, every enabled one injected whole under a token ceiling (ADR 16). | Does not rank, does not embed, does not delete — `forget` switches a memory off and keeps the file |
 | `hera_promptevo` (v0.3) | Dreaming and experience training — the only place the words *generation*, *fitness* and *dream* are allowed. | Never writes to the mind without an accepted proposal |
 
 ## Rules that hold everywhere
@@ -110,14 +110,16 @@ code, in `hera_skillsets`.
 ```
 ~/.hera/                 HERA_HOME overrides
   hera.sqlite3           everything relational, accounts and sessions included
-  mind/                  a real git repository, one file per mind region
-  users/<id>/            what belongs to one person rather than the instance — today their avatar
+  mind/                  the mind template: a git repository, one file per region, admin-edited
+  users/<id>/            what belongs to one person (ADR 28): mind/ (cloned from the template),
+                         memories/, permissions.json, avatar
   setup-code             the code a fresh install's wizard asks for; gone once it is claimed
   skills/<name>/SKILL.md skill packages, syncable from a git repo
   chats/<id>/scratch/    her working files for one conversation; gone when the chat is
   chats/<id>/artifacts/  what she published there — named, rendered, downloadable; gone too
   mcp.json               Claude-Desktop-compatible `mcpServers` shape
-  permissions.json       the rules a person made, over the policy Hera ships with (ADR 23)
+  permissions.json       the instance's rules, over the policy Hera ships with (ADR 23); a
+                         person's own are in users/<id>/permissions.json, over these
   config.toml            registered endpoints, written by the interface
   trusted.json           skill ids and the SHA-256 you accepted; optional
 ```

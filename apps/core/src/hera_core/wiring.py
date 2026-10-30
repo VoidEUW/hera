@@ -25,6 +25,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from typing import Any
+from uuid import UUID
 
 from hera_chats import ChatsSettings, TurnOrchestrator
 from hera_core import permission_rules
@@ -32,11 +33,12 @@ from hera_core.auth import Throttle
 from hera_core.chat_files import FileArtifacts, FileScratchpad
 from hera_core.config import load as load_config
 from hera_core.enabled_skills import EnabledSkillPort, EnabledSkills
+from hera_core.people import People, Person, PersonalMemories
 from hera_core.search import DuckDuckGo
 from hera_core.settings import CoreSettings
-from hera_home import memories_dir, mind_dir, skills_dir
+from hera_home import mind_dir, skills_dir
 from hera_mcp import ASK_TOOL, BUILTIN_SERVER_NAME, CHAT_ID_META, build_builtin_server
-from hera_memories import MemoriesSettings, MemoryPort, MemoryStore
+from hera_memories import MemoriesSettings
 from hera_permissions import Decision, PermissionSet, Policy, Rule
 from hera_profiles import MindRepository, PromptBuilder
 from hera_providers import OpenAICompatibleProvider, Provider, ProviderSettings
@@ -87,10 +89,15 @@ class Services:
     settings: CoreSettings
     database: Database
     mind: MindRepository
+    """The mind **template** (ADR 28): what an admin edits, what a new person's mind is cloned
+    from, and where the shared regions are read from for everybody."""
     builder: PromptBuilder
+    """A builder over the template alone. A turn speaks from its person's builder instead
+    (:meth:`for_user`); this one is the orchestrator's fallback."""
     library: SkillLibrary
     router: SkillRouter
-    memories: MemoryStore
+    people: People
+    """Each person's mind, builder and memories, built when first asked for."""
     registry: ToolRegistry | None
     provider: Provider
     orchestrator: TurnOrchestrator
@@ -162,6 +169,23 @@ class Services:
             # finishes what it has begun.
             await previous.aclose()
 
+    def for_user(self, user_id: UUID) -> Person:
+        """What belongs to this person: their mind, their builder, their memories."""
+        return self.people.get(user_id)
+
+    def tools_for(self, user_id: UUID) -> ToolRegistry | None:
+        """The tool layer under this person's own permission rules, laid over the instance's.
+
+        The same servers with another policy on top — free, and per turn, so a rule a person
+        answered on a card a moment ago is already in force.
+        """
+        if self.registry is None:
+            return None
+        rules = self.for_user(user_id).rules()
+        if not rules.rules:
+            return self.registry
+        return self.registry.with_policy(self.registry.policy.for_person(rules))
+
     @property
     def model(self) -> str:
         """The model name requests are sent with. What the health check reports."""
@@ -208,11 +232,12 @@ def build_services(
     # The router sees only what is switched on; `library` stays whole for the settings screen.
     router = SkillRouter(EnabledSkills(library))
 
-    # Memories are files rather than rows, so there is nothing to open and nothing to close --
-    # the store is a directory and a ceiling (ADR 16). Held on the container because two
-    # different callers need it: her `remember` tool, through the port below, and the settings
-    # screen, which lists what is there and shows what it costs.
-    memories = MemoryStore(memories_dir(), MemoriesSettings())
+    # The mind in `~/.hera/mind` is the template now, and each person's own mind and memories
+    # are built from it on first use (ADR 28). Memories are still files rather than rows -- a
+    # directory and a ceiling (ADR 16) -- just one directory per person.
+    mind = MindRepository(mind_dir())
+    builder = PromptBuilder(mind)
+    people = People(mind, memories=MemoriesSettings())
 
     # What this deployment ships with, and then what a person has decided over it: the rules in
     # `permissions.json` (made on the Permissions screen or answered "always" on a card) are laid
@@ -234,7 +259,9 @@ def build_services(
                 # Two tools and no way to list or delete, which is the design rather than an
                 # omission: every enabled memory is already in her prompt, and `forget`
                 # switches one off keeping the file (ADR 16).
-                memories=MemoryPort(memories),
+                # Whose memory it is comes from the chat the call is part of, in `_meta`, the
+                # same way the chat itself does (ADR 12, ADR 28).
+                memories=PersonalMemories(people, database),
                 # Which conversation a write belongs to arrives per call, in `_meta` -- see
                 # ChatsSettings.chat_meta_key below. These objects are singletons and know
                 # nothing about any one chat, which is the whole reason that mechanism exists.
@@ -246,9 +273,6 @@ def build_services(
             ),
         )
 
-    mind = MindRepository(mind_dir())
-    builder = PromptBuilder(mind)
-
     return Services(
         settings=settings,
         database=database,
@@ -256,7 +280,7 @@ def build_services(
         builder=builder,
         library=library,
         router=router,
-        memories=memories,
+        people=people,
         registry=registry,
         default_policy=shipped,
         provider=provider,

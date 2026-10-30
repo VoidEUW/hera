@@ -82,16 +82,23 @@ class Memories(Protocol):
 
         ``key`` is the identity, so writing the same one twice is a correction rather than a
         second copy of a fact that changed. ``scope`` is ``"chat"`` for something true of this
-        conversation and ``"global"`` for something true of the person; ``chat_id`` arrives
-        from the call's ``_meta`` and never from an argument (ADR 12).
+        conversation and ``"global"`` for something true of the person.
+
+        ``chat_id`` is the conversation the call is part of, for either scope, from the call's
+        ``_meta`` and never from an argument (ADR 12). A global memory is not *kept for* that
+        chat — but the chat says whose memory it is (ADR 28), which is why it travels anyway.
+        Empty when the call is not part of a conversation.
 
         Raise when it will not fit. The message reaches the model, so it says what is taking the
         space — a refusal it cannot act on is a refusal it will repeat.
         """
         ...
 
-    async def forget(self, key: str) -> str:
-        """Stop carrying one memory, keeping the file. Returns a confirmation for the model."""
+    async def forget(self, key: str, *, chat_id: str = "") -> str:
+        """Stop carrying one memory, keeping the file. Returns a confirmation for the model.
+
+        ``chat_id`` is the conversation the call is part of, for the reason ``remember`` takes
+        one: it says whose memory is meant."""
         ...
 
 

@@ -170,7 +170,13 @@ export interface Region {
 	tier: 'owner_fixed' | 'evolvable';
 	text: string;
 	generation: number;
+	/** The same for everybody here, read from the instance's template (ADR 28). Only an admin
+	 * changes it, and the change is everybody's. */
+	shared: boolean;
 }
+
+/** Whose mind a request means: your own, or the template an admin edits. */
+export type MindScope = 'mine' | 'template';
 
 /** Whether this is one you have vouched for. `modified` means listed and changed since. */
 export type Trust = 'verified' | 'modified' | 'unknown';
@@ -522,9 +528,13 @@ export const api = {
 	makeDefaultProfile: (id: string) =>
 		request<Profile>(`/profiles/${id}/default`, { method: 'POST' }),
 
-	regions: () => request<Region[]>('/mind'),
-	writeRegion: (id: string, text: string) =>
-		request<Region>(`/mind/${id}`, { method: 'PUT', body: JSON.stringify({ text }) }),
+	/** Your own mind, or — for an admin — the template every new person's is cloned from. */
+	regions: (scope: MindScope = 'mine') => request<Region[]>(`/mind?scope=${scope}`),
+	writeRegion: (id: string, text: string, scope: MindScope = 'mine') =>
+		request<Region>(`/mind/${id}?scope=${scope}`, {
+			method: 'PUT',
+			body: JSON.stringify({ text })
+		}),
 
 	projects: () => request<Project[]>('/projects'),
 	project: (id: string) => request<Project>(`/projects/${id}`),
@@ -730,6 +740,16 @@ export const api = {
 			method: 'PATCH',
 			body: JSON.stringify({ fallback })
 		}),
+	/** Your own rules — mostly "always" answered on a card (ADR 28). A layer over the instance's:
+	 * each settles an *ask* for you and never loosens a *deny*. */
+	myRules: () => request<Rule[]>('/permissions/mine'),
+	updateMyRule: (pattern: string, decision: Decision) =>
+		request<Rule>(`/permissions/mine/${encodeURIComponent(pattern)}`, {
+			method: 'PATCH',
+			body: JSON.stringify({ decision })
+		}),
+	deleteMyRule: (pattern: string) =>
+		request<void>(`/permissions/mine/${encodeURIComponent(pattern)}`, { method: 'DELETE' }),
 	/** Which of her tools a pattern would cover. Asked as it is typed, so the matcher is the
 	 * server's own and the browser holds no second copy of it. */
 	ruleMatches: (pattern: string) =>

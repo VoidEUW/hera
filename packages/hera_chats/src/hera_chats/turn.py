@@ -164,6 +164,22 @@ class TurnContext:
     the person's.
     """
 
+    builder: PromptBuilder | None = None
+    """Whose mind this turn speaks from, when it is not the orchestrator's.
+
+    With accounts every person has a mind of their own (ADR 28), so the application hands the
+    turn that person's builder here. ``None`` falls back to the one the orchestrator was built
+    with, which is what a single-mind deployment and this package's own tests use.
+    """
+
+    tools: Tools | None = None
+    """The tool layer under this person's permission rules, when it is not the orchestrator's.
+
+    The same servers with a different policy on top — a person's own rules are a layer over the
+    instance's (ADR 28), and swapping the policy is free. ``None`` falls back to the
+    orchestrator's registry.
+    """
+
 
 @dataclass
 class _Round:
@@ -199,9 +215,9 @@ class Turn:
     ) -> None:
         self.context = context
         self._provider = provider
-        self._builder = builder
+        self._builder = context.builder if context.builder is not None else builder
         self._router = router
-        self._registry = registry
+        self._registry = context.tools if context.tools is not None else registry
         self._settings = settings
 
         self._recorded: list[ChatEvent] = list(context.resume)

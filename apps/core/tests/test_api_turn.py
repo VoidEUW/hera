@@ -879,13 +879,14 @@ class TestThePermissionCard:
                 f"{API}/chats/{chat_id}/permissions",
                 json={"call_ids": ["call_fs__read_file"], "allow": True, "remember": True},
             )
-            rules = (await client.get(f"{API}/permissions")).json()["rules"]
+            # The person's own rule (ADR 28), not the instance's.
+            rules = (await client.get(f"{API}/permissions/mine")).json()
+            instance = (await client.get(f"{API}/permissions")).json()["rules"]
 
-        written = [rule for rule in rules if rule["pattern"] == "fs__read_file"]
-        assert written and written[0]["decision"] == "allow"
-        assert not [
-            rule for rule in rules if rule["pattern"] == "fs__*" and rule["decision"] == "allow"
+        assert [(rule["pattern"], rule["decision"]) for rule in rules] == [
+            ("fs__read_file", "allow")
         ]
+        assert all(rule["pattern"] != "fs__read_file" for rule in instance)
 
     async def test_the_decision_is_recorded_so_a_reload_shows_a_settled_card(
         self, make_services: Any, ask_policy: Policy

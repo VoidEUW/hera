@@ -124,15 +124,15 @@ columns, never `ForeignKey`; migrations live in `apps/core`.
 | | |
 |---|---|
 | `hera.sqlite3` | everything relational — accounts and sessions too (`hera_accounts`, [ADR 27](docs/adr/0027-an-account-is-a-session-and-a-role.md)) |
-| `users/<id>/` | what belongs to one person rather than the instance ([ADR 28](docs/adr/0028-what-belongs-to-a-person.md)); today, their avatar |
+| `users/<id>/` | what belongs to one person rather than the instance ([ADR 28](docs/adr/0028-what-belongs-to-a-person.md)): their `mind/` (a git clone of the template), `memories/`, `permissions.json` and `avatar` |
 | `setup-code` | printed and written by a boot nobody can sign in to yet; the wizard asks for it from anywhere but the host |
-| `mind/` | a real git repository, one file per mind region |
-| `memories/<key>.md` | what she knows about you, one markdown file each. The filename is the key; every enabled one is in the prompt, under a token ceiling ([ADR 16](docs/adr/0016-a-memory-is-a-file-and-all-of-them-are-in-the-prompt.md)) |
+| `mind/` | the mind **template**: a real git repository, one file per region, that an admin edits and every person's mind is cloned from. `safety`, `tool_usage` and `developer` are read from here for everybody |
+| `users/<id>/memories/<key>.md` | what she knows about that person, one markdown file each — never shared, because every one is in their prompt. A top-level `memories/` from before accounts is copied to the first admin and left alone. The filename is the key; every enabled one is in the prompt, under a token ceiling ([ADR 16](docs/adr/0016-a-memory-is-a-file-and-all-of-them-are-in-the-prompt.md)) |
 | `skills/<name>/SKILL.md` | skill packages |
 | `chats/<id>/scratch/` | her working files for one conversation. A cache, not something you keep — deleting the chat deletes it |
 | `chats/<id>/artifacts/` | what she publishes there: the filename is the identity, the extension is the kind. Goes with the chat too ([ADR 13](docs/adr/0013-an-artifact-is-a-file-she-publishes.md)) |
 | `mcp.json` | MCP servers, in the Claude-Desktop `mcpServers` shape. Written by Settings → Servers as well as by hand — the JSON is edited, never re-saved from the parsed model ([ADR 24](docs/adr/0024-the-servers-screen-writes-mcp-json.md)) |
-| `permissions.json` | the permission rules a person made or answered "always" on a card, laid over the built-in policy at boot ([ADR 23](docs/adr/0023-permission-rules-are-kept-over-the-shipped-policy.md)) |
+| `permissions.json` | the instance's permission rules, made by an admin and laid over the built-in policy at boot. A person's "always" on a card goes to `users/<id>/permissions.json`, a last layer that settles an *ask* and never loosens a *deny* ([ADR 23](docs/adr/0023-permission-rules-are-kept-over-the-shipped-policy.md)) |
 | `config.toml` | registered model endpoints, and `[instance]` — name, public URL, registration — written by the interface. A model in here may carry **`options`** — request-body fields merged in last and never read ([ADR 18](docs/adr/0018-a-model-may-carry-request-options.md)) |
 | `trusted.json` | **where trusted skills are recorded** — optional |
 

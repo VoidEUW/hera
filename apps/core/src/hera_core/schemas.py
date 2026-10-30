@@ -416,8 +416,14 @@ class RegionOut(BaseModel):
     generation: int
     """How many times it has been written. A commit count, not a column."""
 
+    shared: bool = False
+    """Read from the instance's template for everybody (ADR 28). Only an admin changes it, and
+    the change is everybody's."""
+
     @classmethod
-    def of(cls, region: MindRegion, *, text: str, generation: int) -> RegionOut:
+    def of(
+        cls, region: MindRegion, *, text: str, generation: int, shared: bool = False
+    ) -> RegionOut:
         return cls(
             id=region.id,
             title=region.title,
@@ -425,6 +431,7 @@ class RegionOut(BaseModel):
             tier=region.tier.value,
             text=text,
             generation=generation,
+            shared=shared,
         )
 
 

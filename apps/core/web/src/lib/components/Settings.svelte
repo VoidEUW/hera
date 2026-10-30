@@ -30,7 +30,8 @@
 	import Modal from '$lib/components/ui/Modal.svelte';
 	import Ocellus from '$lib/components/ui/Ocellus.svelte';
 	import IconButton from '$lib/components/ui/IconButton.svelte';
-	import { ENTRIES, GROUPS, type Tab } from '$lib/settingsTabs';
+	import { entriesFor, groupsFor, type Tab } from '$lib/settingsTabs';
+	import { workspace } from '$lib/stores/workspace.svelte';
 	import Sidebar from '$lib/components/ui/sidebar/Sidebar.svelte';
 	import SidebarEntry from '$lib/components/ui/sidebar/SidebarEntry.svelte';
 	import SidebarGroup from '$lib/components/ui/sidebar/SidebarGroup.svelte';
@@ -63,7 +64,9 @@
 	let query = $state('');
 
 	const filter = $derived(query.trim().toLowerCase());
-	const current = $derived(ENTRIES.find((entry) => entry.id === tab) ?? ENTRIES[0]);
+	const admin = $derived(workspace.account?.role === 'admin');
+	const shownEntries = $derived(entriesFor(admin));
+	const current = $derived(shownEntries.find((entry) => entry.id === tab) ?? shownEntries[0]);
 
 	// The list first, unless the caller asked for a screen: the default tab is what an unaimed
 	// opening lands on, and anything else (the composer's "Manage servers") is aimed.
@@ -104,7 +107,7 @@
 					/>
 				</div>
 			{/snippet}
-			{#each GROUPS as group (group.label)}
+			{#each groupsFor(admin) as group (group.label)}
 				<SidebarGroup label={group.label} fixed>
 					{#each group.entries as entry (entry.id)}
 						<SidebarEntry
@@ -137,25 +140,25 @@
 			{#key tab}
 				<div class="pane">
 					<Screen title={current.label} blurb={current.blurb}>
-						{#if tab === 'account'}
+						{#if current.id === 'account'}
 							<Account {filter} />
-						{:else if tab === 'general'}
+						{:else if current.id === 'general'}
 							<General {filter} />
-						{:else if tab === 'hotkeys'}
+						{:else if current.id === 'hotkeys'}
 							<Hotkeys {filter} />
-						{:else if tab === 'usage'}
+						{:else if current.id === 'usage'}
 							<Usage />
-						{:else if tab === 'models'}
+						{:else if current.id === 'models'}
 							<Models {filter} />
-						{:else if tab === 'memory'}
+						{:else if current.id === 'memory'}
 							<Memory {filter} />
-						{:else if tab === 'dreaming'}
+						{:else if current.id === 'dreaming'}
 							<Dreaming />
-						{:else if tab === 'mind'}
+						{:else if current.id === 'mind'}
 							<Mind {filter} />
-						{:else if tab === 'skills'}
+						{:else if current.id === 'skills'}
 							<Skills {filter} />
-						{:else if tab === 'servers'}
+						{:else if current.id === 'servers'}
 							<Servers {filter} />
 						{:else}
 							<Permissions {filter} />

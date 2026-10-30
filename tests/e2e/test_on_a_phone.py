@@ -21,6 +21,8 @@ from typing import Any
 import pytest
 from e2e_support import Served
 
+from hera_core.settings import CoreSettings
+
 playwright = pytest.importorskip(
     "playwright.sync_api", reason="playwright is not installed; run `uv run playwright install`"
 )
@@ -249,8 +251,10 @@ class TestMemory:
         """A row held the key, its badges, the cost, a word and the switch on one line, and the
         switch ran off the edge of its card. Written as files because no route makes a memory:
         she does, and a person edits one."""
-        memories = Path(os.environ["HERA_HOME"]) / "memories"
-        memories.mkdir(exist_ok=True)
+        # The signed-in admin's own memories (ADR 28); a top-level `memories/` is nobody's now.
+        owner = str(CoreSettings().owner_id)
+        memories = Path(os.environ["HERA_HOME"]) / "users" / owner / "memories"
+        memories.mkdir(parents=True, exist_ok=True)
         for key, scope in (("visit-family-december-2026", "global"), ("short-answers", "chat")):
             memories.joinpath(f"{key}.md").write_text(
                 f"---\ndescription: A line about {key}.\nscope: {scope}\nsource: auto\n"

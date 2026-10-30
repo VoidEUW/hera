@@ -31,10 +31,12 @@ from hera_profiles.errors import (
     NoSuchVersion,
     ProfilesError,
     RegionLocked,
+    RegionShared,
     UnknownRegion,
 )
 from hera_profiles.mind import ORIGIN_TRAILER, MindRepository, RegionVersion
 from hera_profiles.models import DEFAULT_SLUG, Profile
+from hera_profiles.personal import SHARED_REGIONS, Mind, PersonalMind
 from hera_profiles.regions import (
     EVOLVABLE_REGIONS,
     MIND_REGIONS,
@@ -61,6 +63,7 @@ __all__ = [
     "MIND_REGIONS",
     "ORIGIN_TRAILER",
     "REGIONS_BY_ID",
+    "SHARED_REGIONS",
     "SLOTS",
     "SLOT_MEMORIES",
     "SLOT_NOW",
@@ -68,16 +71,19 @@ __all__ = [
     "SLOT_PROJECT",
     "SLOT_SKILLS",
     "SLOT_TOOLS",
+    "Mind",
     "MindError",
     "MindRegion",
     "MindRepository",
     "NoSuchVersion",
     "Node",
+    "PersonalMind",
     "Profile",
     "ProfileRepository",
     "ProfilesError",
     "PromptBuilder",
     "RegionLocked",
+    "RegionShared",
     "RegionVersion",
     "Tier",
     "UnknownRegion",

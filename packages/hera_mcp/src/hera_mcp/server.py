@@ -290,9 +290,15 @@ def build_builtin_server(
     ) -> str:
         if memories is None:
             raise ToolError("memory is not available in this deployment")
-        # Only asked for when it is needed. A global memory is the ordinary case and has no
-        # business failing because this server happens to be driven outside a turn.
-        chat_id = _chat_of(ctx, "a memory kept for one conversation") if scope == "chat" else ""
+        # The conversation travels with every memory, global ones too: it is how the port finds
+        # *whose* memory this is (ADR 28), and that is never an argument. Only a chat-scoped
+        # memory insists on one here; a global memory driven outside a turn is the port's to
+        # accept or refuse.
+        chat_id = (
+            _chat_of(ctx, "a memory kept for one conversation")
+            if scope == "chat"
+            else _maybe_chat_of(ctx)
+        )
         with _readable("remember that"):
             return await memories.remember(
                 key.strip(),
@@ -313,11 +319,11 @@ def build_builtin_server(
             "folding two memories into one to make room."
         ),
     )
-    async def forget(key: str) -> str:
+    async def forget(key: str, ctx: Context) -> str:
         if memories is None:
             raise ToolError("memory is not available in this deployment")
         with _readable("forget that"):
-            return await memories.forget(key.strip())
+            return await memories.forget(key.strip(), chat_id=_maybe_chat_of(ctx))
 
     @server.tool(
         name="note",
@@ -635,6 +641,13 @@ def _readable(what: str) -> Iterator[None]:
         raise
     except Exception as cause:
         raise ToolError(f"could not {what}: {cause}") from cause
+
+
+def _maybe_chat_of(ctx: Context) -> str:
+    """The conversation from ``_meta``, or ``""`` when this call is not part of one."""
+    meta = getattr(ctx.request_context, "meta", None) or {}
+    chat_id = meta.get(CHAT_ID_META)
+    return chat_id if isinstance(chat_id, str) else ""
 
 
 def _chat_of(ctx: Context, what: str = "the scratchpad") -> str:
