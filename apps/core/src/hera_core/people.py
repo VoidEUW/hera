@@ -86,6 +86,12 @@ class People:
                 self._building.pop(user_id, None)
         return person
 
+    def forget(self, user_id: UUID) -> None:
+        """Drop what is held for somebody whose account is gone, so nothing answers as them."""
+        with self._lock:
+            self._people.pop(user_id, None)
+            self._building.pop(user_id, None)
+
     def _build(self, user_id: UUID) -> Person:
         mind = PersonalMind(MindRepository(user_mind_dir(str(user_id))), self.template)
         mind.ensure()

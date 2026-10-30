@@ -58,6 +58,9 @@ def test_the_wizard_makes_the_admin_and_signing_out_and_in_works(server: Served,
     page.get_by_label("Name").fill("Home")
     page.get_by_role("button", name="Next").click()
 
+    expect(page.get_by_text("How Hera sends mail")).to_be_visible()
+    page.get_by_role("button", name="Skip").click()
+
     expect(page.get_by_text("Where she runs")).to_be_visible()
     page.get_by_role("button", name="Skip").click()
 

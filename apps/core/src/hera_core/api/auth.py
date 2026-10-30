@@ -9,21 +9,30 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, Request, Response, status
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Request, Response, status
 
-from hera_accounts import AccountError, Accounts, EmailTaken, Purpose
+from hera_accounts import AccountError, Accounts, EmailTaken, Purpose, check_password
+from hera_core import letters, links, mail
+from hera_core.addresses import reachable_base
 from hera_core.auth import clear_session_cookie, client_key, session_token, sign_in_as
 from hera_core.claim import unclaimed
+from hera_core.config import HeraConfig
 from hera_core.config import load as load_config
 from hera_core.deps import Container, Db, SignedIn
 from hera_core.schemas import (
     AccountOut,
     AuthStateOut,
+    LinkIn,
+    LinkOut,
+    LinkPasswordIn,
     PasswordIn,
     RegisterIn,
+    ResetIn,
     SessionOut,
     SignInIn,
 )
+
+LINKS = (Purpose.INVITE, Purpose.RESET)
 
 router = APIRouter(tags=["auth"])
 
@@ -32,13 +41,20 @@ router = APIRouter(tags=["auth"])
 def auth_state(request: Request, db: Db) -> AuthStateOut:
     """Who is signed in, if anybody, and what the sign-in screen should offer."""
     found = Accounts(db).resolve(session_token(request))
-    instance = load_config().instance
+    config = load_config()
     return AuthStateOut(
         user=AccountOut.of(found[0]) if found is not None else None,
         setup_required=unclaimed(db),
-        registration=instance.registration,
-        instance_name=instance.name,
+        registration=config.instance.registration,
+        instance_name=config.instance.name,
+        reset_by_mail=resets_by_mail(config),
     )
+
+
+def resets_by_mail(config: HeraConfig) -> bool:
+    """Mail is set up, and there is a public URL to build the link from — never the request's
+    own ``Host``, which whoever asks for a reset chooses (``hera_core.mail``)."""
+    return config.mail.configured and bool(config.instance.public_url)
 
 
 @router.post("/auth/sign-in", response_model=AccountOut)
@@ -85,10 +101,12 @@ def register(payload: RegisterIn, request: Request, response: Response, db: Db) 
             status_code=status.HTTP_403_FORBIDDEN,
             detail="registration is closed here; ask an admin for an account",
         )
-    if mode == "invite" and accounts.redeem(Purpose.INVITE, payload.invite) is None:
+    if mode == "invite":
+        # People join by being invited — by an admin, or by anybody already here — and the link
+        # they are sent makes the account. There is no code to register *with*.
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="registering here needs an invitation, and that one does not work",
+            detail="accounts here are by invitation; ask somebody who has one to invite you",
         )
     try:
         user = accounts.create(payload.email, name=payload.name, password=payload.password)
@@ -149,6 +167,95 @@ def change_password(
         raise _unprocessable(exc) from None
     accounts.close_sessions(viewer.id, keep=viewer.session_id)
     db.commit()
+
+
+@router.post("/auth/reset", status_code=status.HTTP_202_ACCEPTED)
+def request_reset(
+    payload: ResetIn,
+    request: Request,
+    background: BackgroundTasks,
+    container: Container,
+    db: Db,
+) -> None:
+    """*Forgot your password?* Always the same answer, whether or not the address has an
+    account here — the answer is the only thing a stranger sees, and it must not be a way to
+    find out who does. The mail goes after the response, so how long it takes is no clue
+    either."""
+    config = load_config()
+    if not resets_by_mail(config):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="this Hera cannot send a reset link; ask an admin for one",
+        )
+    address = payload.email.strip().lower()
+    keys = (f"reset-ip:{client_key(request)}", f"reset:{address}")
+    container.throttle.check(*keys)
+    # Every request counts against the budget, not only failed ones: each may send a mail, and
+    # somebody's mailbox is not something a stranger gets to fill.
+    container.throttle.failed(*keys)
+    accounts = Accounts(db)
+    user = accounts.by_email(address)
+    if user is None or user.disabled:
+        return
+    base = reachable_base(config.instance.public_url, bind_host=container.settings.host)
+    url = mail.link(base, links.issue(accounts, user, Purpose.RESET))
+    db.commit()
+    letter = letters.reset(to=user.email, instance=config.instance.name, url=url)
+    background.add_task(links.deliver, container.mailer, config, letter)
+
+
+@router.post("/auth/link", response_model=LinkOut)
+def open_link(payload: LinkIn, request: Request, container: Container, db: Db) -> LinkOut:
+    """Who an invitation or reset link is for — read, not spent, so the page can greet them."""
+    key = f"link:{client_key(request)}"
+    container.throttle.check(key)
+    accounts = Accounts(db)
+    found = accounts.peek(LINKS, payload.token)
+    user = accounts.get(found.user_id) if found is not None and found.user_id else None
+    if found is None or user is None or user.disabled:
+        container.throttle.failed(key)
+        raise _dead_link()
+    return LinkOut(
+        purpose="invite" if found.purpose == Purpose.INVITE else "reset",
+        email=user.email,
+        name=user.name,
+        instance_name=load_config().instance.name,
+    )
+
+
+@router.post("/auth/link/password", response_model=AccountOut)
+def use_link(
+    payload: LinkPasswordIn, request: Request, response: Response, container: Container, db: Db
+) -> AccountOut:
+    """Choose a password with a link, and be signed in. Every other browser of theirs is signed
+    out: a reset is usually because somebody else might be in."""
+    key = f"link:{client_key(request)}"
+    container.throttle.check(key)
+    try:
+        # Checked before the token is spent, so a password that is too short costs a retry and
+        # not the link.
+        check_password(payload.password)
+    except AccountError as exc:
+        raise _unprocessable(exc) from None
+    accounts = Accounts(db)
+    found = accounts.peek(LINKS, payload.token)
+    user = accounts.get(found.user_id) if found is not None and found.user_id else None
+    if found is None or user is None or user.disabled:
+        container.throttle.failed(key)
+        raise _dead_link()
+    accounts.redeem(Purpose(found.purpose), payload.token)
+    accounts.set_password(user.id, payload.password)
+    accounts.close_sessions(user.id)
+    container.throttle.succeeded(key)
+    sign_in_as(db, request, response, user)
+    return AccountOut.of(user)
+
+
+def _dead_link() -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail="this link does not work any more; ask for a new one",
+    )
 
 
 def _unprocessable(exc: AccountError) -> HTTPException:

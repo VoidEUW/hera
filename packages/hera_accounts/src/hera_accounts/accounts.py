@@ -32,6 +32,13 @@ SEEN_GRANULARITY = timedelta(minutes=5)
 authenticated, and a write per request is a write per streamed turn for nothing anyone reads
 more precisely than this."""
 
+INVITE_LIFETIME = timedelta(days=7)
+"""How long an invitation link works. Long enough to survive a weekend in somebody's inbox."""
+
+RESET_LIFETIME = timedelta(hours=1)
+"""How long a password-reset link works. Short, because the mailbox it went to is the only thing
+standing between it and the account."""
+
 MIN_PASSWORD = 8
 MAX_PASSWORD = 1024
 """argon2 takes anything; a megabyte typed into the field is a request that costs the server a
@@ -174,6 +181,26 @@ class Accounts:
             self.close_sessions(user.id)
         self._session.flush()
         return user
+
+    def delete(self, user: User) -> None:
+        """Remove the account and every credential, session and token it had. What the person
+        *made* — chats, a mind, memories — is not this package's to know about; the caller
+        removes it in the same unit of work."""
+        if user.role == Role.ADMIN:
+            self._keep_an_admin(user)
+        for table in (Password, SignIn, OneTimeToken):
+            self._session.exec(delete(table).where(col(table.user_id) == user.id))
+        self._session.delete(user)
+        self._session.flush()
+
+    def last_seen(self) -> dict[UUID, datetime]:
+        """When each person was last seen in a browser that is still signed in."""
+        rows = self._session.exec(
+            select(SignIn.user_id, func.max(SignIn.last_seen_at))
+            .where(SignIn.expires_at > self._now())
+            .group_by(col(SignIn.user_id))
+        )
+        return {user_id: seen for user_id, seen in rows if seen is not None}
 
     def _keep_an_admin(self, leaving: User) -> None:
         others = self._session.exec(
@@ -329,34 +356,44 @@ class Accounts:
         self._session.flush()
         return token
 
-    def redeem(self, purpose: Purpose, token: str) -> OneTimeToken | None:
-        """Spend a token. ``None`` for one that is unknown, used, expired or for something else."""
+    def peek(self, purposes: Purpose | tuple[Purpose, ...], token: str) -> OneTimeToken | None:
+        """The token, if it is live and for one of these purposes — without spending it. A link
+        is opened before it is used, and the page it opens says who it is for."""
+        wanted = purposes if isinstance(purposes, tuple) else (purposes,)
         if not token:
             return None
         found = self._session.exec(
             select(OneTimeToken).where(OneTimeToken.token_hash == digest(token))
         ).first()
-        now = self._now()
         if (
             found is None
-            or not hmac.compare_digest(found.purpose, purpose)
+            or not any(hmac.compare_digest(found.purpose, purpose) for purpose in wanted)
             or found.used_at is not None
-            or found.expires_at <= now
+            or found.expires_at <= self._now()
         ):
             return None
-        found.used_at = now
+        return found
+
+    def redeem(self, purpose: Purpose, token: str) -> OneTimeToken | None:
+        """Spend a token. ``None`` for one that is unknown, used, expired or for something else."""
+        found = self.peek(purpose, token)
+        if found is None:
+            return None
+        found.used_at = self._now()
         self._session.add(found)
         self._session.flush()
         return found
 
-    def withdraw(self, purpose: Purpose) -> int:
+    def withdraw(self, purpose: Purpose, *, user_id: UUID | None = None) -> int:
         """Delete every unspent token of one purpose — a setup code printed by a previous boot
-        should not still work after this one printed another."""
-        result = self._session.exec(
-            delete(OneTimeToken).where(
-                col(OneTimeToken.purpose) == purpose, col(OneTimeToken.used_at).is_(None)
-            )
+        should not still work after this one printed another, and an earlier reset link should
+        not still work once a newer one was sent. ``user_id`` narrows it to one person's."""
+        statement = delete(OneTimeToken).where(
+            col(OneTimeToken.purpose) == purpose, col(OneTimeToken.used_at).is_(None)
         )
+        if user_id is not None:
+            statement = statement.where(col(OneTimeToken.user_id) == user_id)
+        result = self._session.exec(statement)
         self._session.flush()
         return int(result.rowcount)
 

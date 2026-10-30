@@ -362,6 +362,55 @@ class InstanceConfig(BaseModel):
         return cleaned
 
 
+MailSecurity = Literal["starttls", "tls", "none"]
+"""How the connection to the mail server is protected: upgraded after connecting (port 587),
+TLS from the first byte (465), or not at all — for a relay on the same machine or network."""
+
+
+class MailConfig(BaseModel):
+    """``[mail]`` — the SMTP server invitations and password resets go out through (ADR 27).
+
+    Optional: without it an admin copies a link and hands it over, and a forgotten password is
+    something to ask an admin about.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    host: str = ""
+    port: int = Field(default=587, ge=1, le=65535)
+    security: MailSecurity = "starttls"
+    user: str = ""
+    """Empty for a server that takes mail without signing in."""
+
+    password: str = ""
+    """Never sent to the browser, the way :attr:`ProviderEntry.api_key` is not —
+    :meth:`redacted` is what the API returns."""
+
+    sender: str = ""
+    """The ``From`` address, ``hera@example.com``."""
+
+    sender_name: str = ""
+    """The name shown beside it — ``Hera <hera@example.com>``. Empty means the instance's name,
+    which is what a person receiving it knows this Hera as."""
+
+    @field_validator("host", "user", "sender", "sender_name")
+    @classmethod
+    def _trimmed(cls, value: str) -> str:
+        return value.strip()
+
+    @property
+    def configured(self) -> bool:
+        """Whether there is enough here to send anything at all."""
+        return bool(self.host and self.sender)
+
+    def redacted(self) -> dict[str, Any]:
+        data = self.model_dump()
+        data.pop("password")
+        data["password_set"] = bool(self.password)
+        data["configured"] = self.configured
+        return data
+
+
 class HeraConfig(BaseModel):
     """Everything in ``config.toml``."""
 
@@ -371,6 +420,7 @@ class HeraConfig(BaseModel):
     active_provider: str = ""
     skills: SkillsConfig = Field(default_factory=SkillsConfig)
     instance: InstanceConfig = Field(default_factory=InstanceConfig)
+    mail: MailConfig = Field(default_factory=MailConfig)
 
     timezone: str = ""
     """Where the person is, as an IANA name — ``Europe/Berlin``, not an offset.
@@ -417,6 +467,11 @@ class HeraConfig(BaseModel):
         """Change some of ``[instance]``, validated as a whole."""
         instance = InstanceConfig.model_validate({**self.instance.model_dump(), **changes})
         return self.model_copy(update={"instance": instance})
+
+    def with_mail(self, **changes: object) -> HeraConfig:
+        """Change some of ``[mail]``, validated as a whole."""
+        mail = MailConfig.model_validate({**self.mail.model_dump(), **changes})
+        return self.model_copy(update={"mail": mail})
 
     def with_timezone(self, timezone: str) -> HeraConfig:
         return self.model_copy(update={"timezone": timezone})

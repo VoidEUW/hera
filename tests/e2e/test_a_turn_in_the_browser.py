@@ -305,6 +305,9 @@ def test_settings_holds_what_changes_her_behaviour(page: Any) -> None:
         "Skills",
         "Servers",
         "Permissions",
+        "Users",
+        "Instance",
+        "Mail",
     ]
 
     # The search field is in the sidebar, beside the navigation, and the title is in the content.

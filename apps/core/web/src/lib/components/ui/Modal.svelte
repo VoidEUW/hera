@@ -213,11 +213,18 @@
 	 * once. Insets and margins centre the same way and leave containing blocks where the spec
 	 * puts them.
 	 *
-	 * `centre` needs a definite height from the caller (`sheetclass`), which Settings already
-	 * gives it; without one the over-constrained insets stretch the sheet to the viewport. */
+	 * Centring by insets needs a definite height, or the over-constrained insets stretch the
+	 * sheet to the viewport — which is what every `Confirm` did, a two-line question drawn as a
+	 * column the height of the window. `fit-content` is that height for a sheet that brings none
+	 * of its own; inside `:where()` it weighs nothing, so a caller's `sheetclass` height
+	 * (Settings, the skill editor) still wins. */
 	.sheet.centre {
 		inset: 0;
 		margin: auto;
+	}
+
+	:where(.sheet.centre) {
+		height: fit-content;
 	}
 
 	.sheet.docked {

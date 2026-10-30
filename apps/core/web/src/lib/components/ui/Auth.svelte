@@ -4,8 +4,9 @@
 	 * mark, a switch between signing in and registering, the fields, the highlighted primary
 	 * action — and a passkey as the other way in, once there are passkeys (M4).
 	 *
-	 * Drawn on `/login`. The switch appears only when this instance takes registrations at all;
-	 * a card offering a tab that answers *registration is closed* is a door painted on a wall.
+	 * Drawn on `/login`. The switch appears only when anybody may register; a card offering a tab
+	 * that answers *registration is closed* is a door painted on a wall. By invitation, the link
+	 * somebody was sent is the way in, and the card says so.
 	 */
 	import { t } from '$lib/i18n';
 	import Button from './Button.svelte';
@@ -30,6 +31,8 @@
 		}) => void;
 		/** Draws the passkey button. Absent until passkeys exist. */
 		onpasskey?: (mode: 'in' | 'up') => void;
+		/** Draws *forgot your password?* under the sign-in form. */
+		onforgot?: () => void;
 	}
 
 	let {
@@ -39,20 +42,15 @@
 		error = null,
 		busy = false,
 		onsubmit,
-		onpasskey
+		onpasskey,
+		onforgot
 	}: Props = $props();
 
 	let name = $state('');
 	let email = $state('');
 	let password = $state('');
-	const registering = $derived(mode === 'up');
-	const blurb = $derived(
-		registering
-			? registration === 'invite'
-				? t.auth.inviteBlurb
-				: t.auth.registerBlurb
-			: t.auth.signInBlurb
-	);
+	const registering = $derived(mode === 'up' && registration === 'open');
+	const blurb = $derived(registering ? t.auth.registerBlurb : t.auth.signInBlurb);
 </script>
 
 <form
@@ -67,7 +65,7 @@
 		<h3>{registering ? t.auth.registerTitle : t.auth.signInTitle(instance)}</h3>
 		<p>{blurb}</p>
 	</div>
-	{#if registration !== 'closed'}
+	{#if registration === 'open'}
 		<Segmented
 			size="sm"
 			label={t.auth.mode}
@@ -108,8 +106,13 @@
 			{registering ? t.auth.registerPasskey : t.auth.signInPasskey}
 		</Button>
 	{/if}
+	{#if onforgot && !registering}
+		<Button variant="ghost" size="sm" onclick={onforgot}>{t.auth.forgot}</Button>
+	{/if}
 	{#if registration === 'closed'}
 		<p class="note">{t.auth.closedNote}</p>
+	{:else if registration === 'invite'}
+		<p class="note">{t.auth.inviteNote}</p>
 	{/if}
 </form>
 

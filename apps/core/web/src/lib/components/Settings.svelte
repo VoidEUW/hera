@@ -7,6 +7,7 @@
 	 * remembers, what she runs on; **Adjust** is what she can reach and what she may do with it.
 	 * Within a group the order is what a person reaches for, with **Models** first among hers
 	 * because until she is pointed at an endpoint nothing else in Hera does anything.
+	 * **Admin** — the people here, this instance, its mail — is drawn for admins and nobody else.
 	 * **Dreaming** is listed and disabled rather than hidden: a v0.3 feature you can see coming
 	 * is a promise, and one you cannot is a surprise.
 	 *
@@ -39,6 +40,8 @@
 	import Account from './settings/Account.svelte';
 	import General from './settings/General.svelte';
 	import Hotkeys from './settings/Hotkeys.svelte';
+	import Instance from './settings/Instance.svelte';
+	import Mail from './settings/Mail.svelte';
 	import Memory from './settings/Memory.svelte';
 	import Mind from './settings/Mind.svelte';
 	import Models from './settings/Models.svelte';
@@ -47,6 +50,7 @@
 	import Servers from './settings/Servers.svelte';
 	import Skills from './settings/Skills.svelte';
 	import Usage from './settings/Usage.svelte';
+	import Users from './settings/Users.svelte';
 
 	interface Props {
 		onclose?: () => void;
@@ -160,6 +164,12 @@
 							<Skills {filter} />
 						{:else if current.id === 'servers'}
 							<Servers {filter} />
+						{:else if current.id === 'users'}
+							<Users {filter} />
+						{:else if current.id === 'instance'}
+							<Instance />
+						{:else if current.id === 'mail'}
+							<Mail />
 						{:else}
 							<Permissions {filter} />
 						{/if}

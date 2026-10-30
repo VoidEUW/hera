@@ -7,8 +7,13 @@ cannot import from anyway.
 from __future__ import annotations
 
 import json
+import socketserver
+import threading
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
+from email import message_from_string
+from email.policy import default
 from pathlib import Path
 from typing import Any
 from uuid import UUID
@@ -74,3 +79,71 @@ def written(path: Path, until: Callable[[dict[str, Any]], bool] = lambda _: True
             if time.monotonic() > deadline:
                 raise
         time.sleep(0.05)
+
+
+class _Conversation(socketserver.StreamRequestHandler):
+    """Just enough SMTP to take a message: what ``smtplib`` says, answered in order."""
+
+    server: MailSink
+
+    def handle(self) -> None:
+        self.wfile.write(b"220 sink\r\n")
+        body: list[str] | None = None
+        while line := self.rfile.readline():
+            text = line.decode(errors="replace").rstrip("\r\n")
+            if body is not None:
+                if text == ".":
+                    self.server.received(message_from_string("\n".join(body), policy=default))
+                    body = None
+                    self.wfile.write(b"250 queued\r\n")
+                else:
+                    body.append(text[1:] if text.startswith("..") else text)
+            elif text.upper().startswith("DATA"):
+                body = []
+                self.wfile.write(b"354 go on\r\n")
+            elif text.upper().startswith("QUIT"):
+                self.wfile.write(b"221 bye\r\n")
+                return
+            else:
+                self.wfile.write(b"250 ok\r\n")
+
+
+class MailSink(socketserver.ThreadingTCPServer):
+    """A mail server on a free local port that keeps the text of every message it is sent."""
+
+    allow_reuse_address = True
+    daemon_threads = True
+
+    def __init__(self) -> None:
+        super().__init__(("127.0.0.1", 0), _Conversation)
+        self.texts: list[str] = []
+        self._arrived = threading.Condition()
+
+    @property
+    def port(self) -> int:
+        return int(self.server_address[1])
+
+    def received(self, message: Any) -> None:
+        with self._arrived:
+            # The plain part: what a link is read out of, whatever HTML rides beside it.
+            self.texts.append(str(message.get_body(preferencelist=("plain",)).get_content()))
+            self._arrived.notify_all()
+
+    def next_text(self, timeout: float = 10.0) -> str:
+        """The oldest message not yet read, waiting for it to arrive."""
+        with self._arrived:
+            if not self._arrived.wait_for(lambda: bool(self.texts), timeout=timeout):
+                raise TimeoutError("no mail arrived")
+            return self.texts.pop(0)
+
+
+@contextmanager
+def mail_sink() -> Iterator[MailSink]:
+    sink = MailSink()
+    thread = threading.Thread(target=sink.serve_forever, args=(0.05,), daemon=True)
+    thread.start()
+    try:
+        yield sink
+    finally:
+        sink.shutdown()
+        sink.server_close()

@@ -497,9 +497,13 @@ export const t = {
 		servers: 'Servers',
 		permissions: 'Permissions',
 		dreaming: 'Dreaming',
+		users: 'Users',
+		instance: 'Instance',
+		mail: 'Mail',
 		groupApp: 'App',
 		groupHera: 'Hera',
 		groupAdjust: 'Adjust',
+		groupAdmin: 'Admin',
 		// One line under each screen's heading: what it is for, not how to use it.
 		blurbAccount: 'Who you are to Hera: a name, an email and a picture.',
 		blurbGeneral: 'This browser and this machine: appearance, language, time zone, notifications.',
@@ -513,6 +517,9 @@ export const t = {
 		blurbServers:
 			'The MCP servers Hera can reach, and the tools each one brings. Switch a tool off and she no longer has it.',
 		blurbPermissions: 'What Hera may do without asking.',
+		blurbUsers: 'Everybody who can sign in here: invite people, change roles, send a link.',
+		blurbInstance: 'What this Hera calls itself, where it is reached, and who may join.',
+		blurbMail: 'The mail server invitations and password resets go out through.',
 		permissionsFallback: 'Anything not matched below:',
 		toolCount: (n: number) => `${n} ${n === 1 ? 'tool' : 'tools'}`,
 		soon: 'v0.3',
@@ -914,8 +921,17 @@ export const t = {
 		registerTitle: 'Create your account',
 		signInBlurb: 'Your chats stay on this machine either way.',
 		registerBlurb: 'Your own chats, memories and mind on this Hera.',
-		inviteBlurb: 'You were invited. Choose how you will sign in.',
 		closedNote: 'Accounts here are made by an admin.',
+		inviteNote: 'Accounts here are by invitation. Ask somebody who has one to invite you.',
+		forgot: 'Forgot your password?',
+		resetTitle: 'Reset your password',
+		resetBlurb: 'Hera mails you a link to choose a new one.',
+		sendReset: 'Send a link',
+		resetSent:
+			'If there is an account for that address, a link is on its way. It works once, for an hour.',
+		resetAskAdmin:
+			'This Hera cannot mail you a link. Ask an admin for a reset link — or, on the machine Hera runs on, run hera user reset-password.',
+		backToSignIn: 'Back to sign in',
 		name: 'Name',
 		email: 'Email',
 		password: 'Password',
@@ -929,10 +945,104 @@ export const t = {
 		signOutEverywhere: 'Sign out everywhere',
 		signOutEverywhereNote: 'Every browser you are signed in on, this one included.'
 	},
+	/** The page an invitation or reset link opens (ADR 27). */
+	link: {
+		inviteTitle: (instance: string) => `Welcome to ${instance}`,
+		inviteBlurb: (email: string) => `Choose a password, and you are signed in as ${email}.`,
+		resetTitle: 'Choose a new password',
+		resetBlurb: (email: string) =>
+			`For ${email}. Every browser you are signed in on is signed out.`,
+		choose: 'Choose password',
+		deadTitle: 'This link does not work any more',
+		deadBlurb: 'It was used already, or it expired. Ask for a new one.'
+	},
+	/** Settings → Admin → Users, and inviting somebody from Settings → Account. */
+	admin: {
+		invite: 'Invite someone',
+		inviteBlurb: 'They get a link to choose their own password.',
+		memberInviteBlurb:
+			'Accounts here are by invitation. Invite somebody, and they choose their own password.',
+		email: 'Email',
+		name: 'Name',
+		namePlaceholder: 'Optional',
+		role: 'Role',
+		roleAdmin: 'Admin',
+		roleUser: 'User',
+		send: 'Invite',
+		you: 'You',
+		invited: 'Invited',
+		disabled: 'Disabled',
+		lastSeen: (when: string) => `Last seen ${when}`,
+		notSignedIn: 'Not signed in anywhere',
+		actions: (who: string) => `Actions for ${who}`,
+		makeAdmin: 'Make admin',
+		makeUser: 'Make user',
+		disable: 'Disable',
+		enable: 'Enable',
+		newInvitation: 'New invitation link',
+		resetLink: 'Password reset link',
+		signOut: 'Sign out everywhere',
+		signedOut: (who: string) => `${who} is signed out everywhere.`,
+		deleteTitle: (who: string) => `Delete ${who}?`,
+		deleteBody:
+			'Their account goes, and with it every chat, project, memory and their mind. This cannot be undone — disabling the account keeps everything.',
+		deleteYes: 'Delete',
+		keep: 'Keep',
+		deleteOne: (who: string) => `Delete ${who}`,
+		select: (who: string) => `Select ${who}`,
+		selectAll: 'Select everybody shown',
+		selected: (n: number) => (n === 1 ? '1 selected' : `${n} selected`),
+		deleteSelected: 'Delete selected',
+		deleteManyTitle: (n: number) => `Delete ${n} people?`,
+		deleteManyBody:
+			'Their accounts go, and with them every chat, project, memory and their mind. This cannot be undone — disabling an account keeps everything.',
+		deleteFailed: (who: string, why: string) => `${who} was not deleted: ${why}.`,
+		mailed: (email: string) => `Handed to the mail server for ${email}.`,
+		orCopy: 'If it does not arrive, copy the link and send it another way:',
+		handOver: 'Copy this link and send it to them. It works once.',
+		mailFailed: (error: string) => `The mail did not go: ${error}`,
+		copy: 'Copy link',
+		copied: 'Link copied',
+		copyFailed: 'This browser would not copy it. Select the link and copy it by hand.',
+		copyInvitation: 'Copy a new invitation link',
+		copyReset: 'Copy a new reset link',
+		copiedNew: 'Link copied. Any link sent before no longer works.'
+	},
+	/** Settings → Admin → Mail, and the wizard's mail step. */
+	mail: {
+		host: 'Server',
+		port: 'Port',
+		security: 'Security',
+		starttls: 'STARTTLS',
+		tls: 'TLS',
+		none: 'None',
+		securityHelp:
+			'STARTTLS is usually port 587, TLS port 465. None is for a relay on this network.',
+		user: 'User name',
+		userHelp: 'Leave it empty if the server takes mail without signing in.',
+		password: 'Password',
+		passwordSet: 'Saved — type to replace it',
+		clearPassword: 'Forget the password',
+		sender: 'From address',
+		senderHelp:
+			'An address the account above may send from. Pasting “Hera <hera@example.com>” fills in the name too.',
+		senderName: 'From name',
+		senderNameHelp: 'Shown beside the address. Empty uses the name of this Hera.',
+		fromPreview: (from: string) => `People see mail from ${from}`,
+		fromNotUser: (user: string) =>
+			`This is not ${user}, the account Hera signs in with. Most providers only deliver mail from that address or an alias of it — anything else is refused or marked as suspicious. Make it an alias in your provider, or use the same address here.`,
+		test: 'Send a test mail',
+		testSent: (email: string) =>
+			`The mail server took it, for ${email}. If nothing arrives, the server could not deliver it — a bounce goes to the From address and says why.`,
+		notConfigured: 'Not set up yet: invitations and resets are links you copy and hand over.',
+		needsPublicUrl:
+			'A password reset somebody asks for on the sign-in screen is only mailed with a public address set on the Instance screen.',
+		saved: 'Saved'
+	},
 	/** The first start: claiming an instance nobody can sign in to yet (ADR 27). */
 	setup: {
 		title: 'Set up Hera',
-		steps: { admin: 'You', instance: 'This Hera', model: 'Model', done: 'Done' },
+		steps: { admin: 'You', instance: 'This Hera', mail: 'Mail', model: 'Model', done: 'Done' },
 		adminTitle: 'Who looks after this Hera',
 		adminBlurb:
 			'The first account is an admin: it adds people, endpoints and servers. You can make others admins later.',
@@ -953,7 +1063,10 @@ export const t = {
 		registrationInvite: 'By invitation',
 		registrationClosed: 'Only an admin',
 		registrationHelp:
-			'Each person gets their own chats. Memories and the mind are still shared until a later version, so keep this closed unless you trust everyone who can reach it.',
+			'Anyone: whoever can reach this address may register. By invitation: anybody here can invite someone. Only an admin: admins add every account. Each person has their own chats, memories and mind.',
+		mailTitle: 'How Hera sends mail',
+		mailBlurb:
+			'For invitations and password resets. Without it you copy a link and hand it over. You can skip this and set it up in Settings later.',
 		modelTitle: 'Where she runs',
 		modelBlurb: 'Point Hera at a model. You can skip this and do it in Settings later.',
 		doneTitle: 'Hera is ready',
@@ -985,7 +1098,10 @@ export const t = {
 			skills: 'skills',
 			servers: 'servers',
 			permissions: 'permission rules',
-			models: 'models'
+			models: 'models',
+			users: 'the people here',
+			instance: 'this Hera’s settings',
+			mail: 'the mail settings'
 		}
 	},
 

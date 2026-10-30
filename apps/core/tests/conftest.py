@@ -28,6 +28,7 @@ from hera_core.app import create_app
 from hera_core.auth import SESSION_COOKIE
 
 # Registers every table into the shared MetaData before `create_all` runs.
+from hera_core.mail import Postbox
 from hera_core.models import ALL_TABLES  # noqa: F401
 from hera_core.people import People
 from hera_core.settings import CoreSettings
@@ -161,6 +162,8 @@ def make_services(tmp_path: Path, skills_path: Path) -> Iterator[object]:
             people=people,
             registry=registry,  # type: ignore[arg-type]  # StubTools satisfies the Tools port
             provider=used,
+            # Nothing in the suite reaches a mail server: what would have been sent is kept.
+            mailer=Postbox(),
             orchestrator=TurnOrchestrator(
                 provider=used,
                 builder=builder,

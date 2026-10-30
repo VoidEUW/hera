@@ -79,6 +79,9 @@ select = ["E", "F", "I", "UP", "B", "SIM", "ANN", "RUF"]
 # filter expressions and **changes (ANN401).
 "packages/hera_storage/src/hera_storage/repository.py" = ["UP046", "ANN401"]
 "packages/hera_storage/src/hera_storage/versioning.py" = ["UP047", "ANN401"]
+# Mail HTML is one inline-styled element per line, because mail programs ignore stylesheets;
+# wrapping those attributes across Python lines would make the markup unreadable, not shorter.
+"apps/core/src/hera_core/letters.py" = ["E501"]
 # Canonical JSON encoding accepts whatever pydantic dumped. Spelling that as a recursive
 # JSON alias buys no safety -- the input is already `model_dump(mode="json")` output -- and
 # costs a cast at every call site (ANN401).

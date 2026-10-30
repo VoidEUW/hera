@@ -2,18 +2,17 @@
 	/**
 	 * The first start: claiming an instance nobody can sign in to yet (ADR 27).
 	 *
-	 * Four steps, and only the first is special. It makes the admin — with the setup code from the
+	 * Five steps, and only the first is special. It makes the admin — with the setup code from the
 	 * server's log, unless this browser is on the machine Hera runs on — and signs this browser in
 	 * as them. From then on the wizard is an admin using the ordinary screens: the instance's own
-	 * route, then the Models screen itself, probe and all. So the model step is skippable and so
-	 * is everything after it; Settings has the same controls.
-	 *
-	 * Mail is not here yet (M3).
+	 * route, then the Mail screen and the Models screen themselves, test mail and probe and all.
+	 * So mail and the model are skippable; Settings has the same controls.
 	 */
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { api, type Registration, type SetupState } from '$lib/api/client';
+	import Mail from '$lib/components/settings/Mail.svelte';
 	import Models from '$lib/components/settings/Models.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
 	import Input from '$lib/components/ui/Input.svelte';
@@ -21,8 +20,8 @@
 	import Segmented from '$lib/components/ui/Segmented.svelte';
 	import { t } from '$lib/i18n';
 
-	type Step = 'admin' | 'instance' | 'model' | 'done';
-	const STEPS: Step[] = ['admin', 'instance', 'model', 'done'];
+	type Step = 'admin' | 'instance' | 'mail' | 'model' | 'done';
+	const STEPS: Step[] = ['admin', 'instance', 'mail', 'model', 'done'];
 
 	/** Handed over by the desktop app that started this server, in place of a setup code. */
 	const launchToken = page.url.searchParams.get('launch') ?? '';
@@ -38,7 +37,7 @@
 	let code = $state('');
 
 	let instanceName = $state('Hera');
-	let publicUrl = $state(window.location.origin);
+	let publicUrl = $state('');
 	let registration = $state<Registration>('closed');
 
 	void (async () => {
@@ -71,7 +70,9 @@
 			await api.setup({ name, email, password, code, launch_token: launchToken });
 			const instance = await api.instance();
 			instanceName = instance.name;
-			if (instance.public_url) publicUrl = instance.public_url;
+			// The server's suggestion rather than this page's own origin: a browser on the machine
+			// itself may be at `0.0.0.0` or `localhost`, which nobody else can open.
+			publicUrl = instance.public_url || instance.suggested_url;
 			registration = instance.registration;
 			step = 'instance';
 		});
@@ -83,7 +84,7 @@
 				public_url: publicUrl.trim(),
 				registration
 			});
-			step = 'model';
+			step = 'mail';
 		});
 </script>
 
@@ -179,6 +180,14 @@
 				{#if error}<p class="error" role="alert">{error}</p>{/if}
 				<Button type="submit" variant="highlighted" size="lg" block {busy}>{t.setup.next}</Button>
 			</form>
+		{:else if step === 'mail'}
+			<h3>{t.setup.mailTitle}</h3>
+			<p>{t.setup.mailBlurb}</p>
+			<div class="models"><Mail {email} /></div>
+			<div class="row">
+				<Button variant="ghost" onclick={() => (step = 'model')}>{t.setup.skip}</Button>
+				<Button variant="highlighted" onclick={() => (step = 'model')}>{t.setup.next}</Button>
+			</div>
 		{:else if step === 'model'}
 			<h3>{t.setup.modelTitle}</h3>
 			<p>{t.setup.modelBlurb}</p>
