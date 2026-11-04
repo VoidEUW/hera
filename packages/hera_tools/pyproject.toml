@@ -20,7 +20,7 @@ classifiers = [
 dependencies = [
     "hera-home",
     "hera-permissions",
-    "httpx2>=2.13.1",
+    "httpx2>=2.16.0",
     "mcp>=2.3.0",
     "pydantic>=2.14.1",
     "pydantic-settings>=2.16.1",
