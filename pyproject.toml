@@ -37,11 +37,11 @@ hera-tools = { workspace = true }
 
 [dependency-groups]
 dev = [
-    "pytest>=8.3",
-    "pytest-asyncio>=0.24",
-    "coverage>=7.17.0",
-    "mypy>=2.4.0",
-    "ruff>=0.17.2",
+    "pytest>=9.2.0",
+    "pytest-asyncio>=1.4.1.post1",
+    "coverage>=7.17.2",
+    "mypy>=2.4.1",
+    "ruff>=0.17.4",
     "httpx>=0.27",
     # Needed at the workspace root for the pydantic mypy plugin to load.
     "pydantic>=2.14.1",
