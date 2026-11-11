@@ -18,7 +18,7 @@ classifiers = [
     "Typing :: Typed",
 ]
 dependencies = [
-    "pydantic>=2.14.1",
+    "pydantic>=2.14.3",
 ]
 
 [tool.hatch.build.targets.wheel]
