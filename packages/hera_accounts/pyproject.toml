@@ -19,7 +19,7 @@ classifiers = [
 dependencies = [
     "argon2-cffi>=25.1.0",
     "hera-storage",
-    "sqlmodel>=0.0.42",
+    "sqlmodel>=0.0.50",
 ]
 
 [tool.hatch.build.targets.wheel]
